@@ -60,6 +60,7 @@ interface ElectionRoutePlannerProps {
   vehicles: ResourceVehicle[];
   initialDepot?: { latitude: number; longitude: number };
   timezone?: string;
+  initialPlanningDate?: string;
   initialSelectedPointIds?: string[];
   parentPlanId?: string;
   canManage?: boolean;
@@ -113,6 +114,7 @@ export function ElectionRoutePlanner({
   vehicles,
   initialDepot,
   timezone = 'Europe/Prague',
+  initialPlanningDate,
   initialSelectedPointIds,
   parentPlanId,
   fieldPlans,
@@ -124,9 +126,9 @@ export function ElectionRoutePlanner({
   const [isPending, startTransition] = useTransition();
 
   // Planning date & time configuration
-  const initialDate = campaign.targetDate
+  const initialDate = initialPlanningDate ?? (campaign.targetDate
     ? dayInZone(new Date(campaign.targetDate), timezone)
-    : dayInZone(new Date(), timezone);
+    : dayInZone(new Date(), timezone));
 
   const [date, setDate] = useState<string>(initialDate);
   const [startTime, setStartTime] = useState<string>('07:30');

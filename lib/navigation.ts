@@ -65,7 +65,7 @@ export const navigationHubs: NavigationHub[] = [
     { label: 'Terén & Fotodokumentace', items: [
       ["/fotodokumentace","Fotodokumentace","camera","photoDocumentation"],
       ["/election-removal","Terénní práce","truck","electionRemoval"],
-      ["/work/route","Pracovní výjezd","route","work"]
+      ["/work/dispatch","Dispečink práce","route","work"]
     ] },
     { label: 'Zakázky & Výroba', items: [
       ["/work","Plán práce","briefcaseBusiness","work"],

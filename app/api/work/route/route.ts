@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     const profile = await loadProfile(); const date = query.get('date');
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: 'Vyberte den.' }, { status: 400 });
     const data = profile?.enabled ? await loadPlanningData(date) : null;
-    const plans = await prisma.fieldPlan.findMany({ where: { organizationId: user.organizationId, date }, orderBy: { version: 'desc' }, take: 20 });
+    const plans = await prisma.fieldPlan.findMany({ where: { organizationId: user.organizationId, date, ...(query.get('source') === 'work' ? { electionCampaignId: null } : {}) }, orderBy: { version: 'desc' }, take: 20 });
     const navigation = await navigationAvailable();
     const rawPlans = plans.filter(p => navigation || !(p.planningInputSnapshot as unknown as PlanningInput).jobs.some(j => j.navigationPointId)).map(planView);
     const enrichedPlans = await Promise.all(rawPlans.map(async p => {

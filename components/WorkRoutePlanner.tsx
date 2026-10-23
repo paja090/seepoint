@@ -102,12 +102,14 @@ export function WorkRoutePlanner({
   navigation = false,
   initialJobIds,
   initialPlanId,
+  standardOnly = false,
 }: {
   navigation?: boolean;
   defaultDate: string;
   country: string | null;
   initialJobIds?: string[];
   initialPlanId?: string;
+  standardOnly?: boolean;
 }) {
   const [date, setDate] = useState(defaultDate);
   const [startTime, setStartTime] = useState('08:00');
@@ -248,7 +250,7 @@ export function WorkRoutePlanner({
     const ticket = ++loadCounter.current;
     setError('');
     try {
-      const response = await fetch(`/api/work/route?date=${date}`);
+      const response = await fetch(`/api/work/route?date=${date}${standardOnly ? '&source=work' : ''}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       if (ticket !== loadCounter.current) return;
@@ -314,7 +316,7 @@ export function WorkRoutePlanner({
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Načtení plánovacích dat selhalo.');
     }
-  }, [date, initialJobIds, initialPlanId]);
+  }, [date, initialJobIds, initialPlanId, standardOnly]);
 
   useEffect(() => {
     setPlan(null);

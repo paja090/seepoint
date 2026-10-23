@@ -164,11 +164,11 @@ export function WorkModuleClient({
           </button>
 
           <Link
-            href="/work/route"
+            href="/work/dispatch"
             className="flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-700 shadow-sm hover:bg-slate-50 transition"
           >
             <Route size={16} className="text-emerald-600" />
-            <span>🚗 Naplánovat výjezd</span>
+            <span>🚗 Dispečink práce</span>
           </Link>
 
           {canCreateWorkOrder && (
