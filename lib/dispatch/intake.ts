@@ -12,12 +12,19 @@ export async function createDispatchWork(raw: unknown, actor: PlannerActor, db=p
   if(body.clientName != null && (typeof body.clientName!=='string' || body.clientName.length>200))throw new Error('Neplatný název klienta.');
   const clientName=typeof body.clientName==='string'?body.clientName.trim():'';
   const spec=parseTaskSpec(body.task);const requestHash=hash({spec:JSON.parse(JSON.stringify(spec)),clientName});
-  const id='dispatch-'+hash([organizationId,body.requestKey]).slice(0,32);
+  const requestId='dispatch-'+hash([organizationId,body.requestKey]).slice(0,32);
   return plannerTransaction(async tx=>{
-    const existing=await tx.electionCampaign.findFirst({where:{id,organizationId},select:{id:true,mediaDefaults:true}});
-    if(existing){if((existing.mediaDefaults as {dispatchRequestHash?:string}|null)?.dispatchRequestHash!==requestHash)throw new Error('Požadavek už byl uložen s jiným zadáním. Obnovte formulář.');return {campaignId:existing.id};}
-    await tx.electionCampaign.create({data:{id,organizationId,name:spec.label,clientName:clientName || null,description:spec.description || null,targetDate:null,status:'DRAFT',totalPoints:0,completedPoints:0,mediaDefaults:{dispatchRequestHash:requestHash}}});
-    await saveFieldTaskTx(tx,id,body.task,actor);
-    return {campaignId:id};
+    const existing=await tx.crmAuditLog.findFirst({where:{id:requestId,organizationId,action:'DISPATCH_WORK_CREATED'},select:{detailsJson:true}});
+    if(existing){
+      const saved=JSON.parse(existing.detailsJson ?? '{}') as {requestHash?:string;campaignId:string;pointId:string};
+      if(saved.requestHash!==requestHash)throw new Error('Požadavek už byl uložen s jiným zadáním. Obnovte formulář.');
+      return {campaignId:saved.campaignId,pointId:saved.pointId};
+    }
+    // Reuse open intake work for the same client so several tasks can share one route.
+    let campaign=await tx.electionCampaign.findFirst({where:{organizationId,clientName:clientName||null,targetDate:null,status:{notIn:['COMPLETED','ARCHIVED','CANCELLED']},mediaDefaults:{path:['dispatchIntake'],equals:true}},orderBy:{createdAt:'desc'},select:{id:true}});
+    if(!campaign)campaign=await tx.electionCampaign.create({data:{organizationId,name:clientName?'Práce pro '+clientName:'Průběžná terénní práce',clientName:clientName||null,targetDate:null,status:'DRAFT',totalPoints:0,completedPoints:0,mediaDefaults:{dispatchIntake:true}},select:{id:true}});
+    const point=await saveFieldTaskTx(tx,campaign.id,body.task,actor);
+    await tx.crmAuditLog.create({data:{id:requestId,organizationId,userId:actor.id,userEmail:actor.email,entityType:'ElectionRemovalPoint',entityId:point.id,action:'DISPATCH_WORK_CREATED',detailsJson:JSON.stringify({requestHash,campaignId:campaign.id,pointId:point.id})}});
+    return {campaignId:campaign.id,pointId:point.id};
   },db);
 }

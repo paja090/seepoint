@@ -2,7 +2,7 @@
 
 Nová stránka /work/dispatch sjednocuje denní přehled montáží, navigací a terénních bodů. Rozlišuje čekající práci, rezervované body a problémy. Výběr otevírá současné plánovače přímo na stránce. Různé terénní akce se stále plánují samostatně; společné schvalování různých zdrojů v jednom návrhu zatím není implementováno.
 
-Jednoduché zadání používá stávající ElectionCampaign, ElectionRemovalPoint a FieldWorkStep. Nepotřebuje termín, posádku ani vozidlo. Přesun vyžaduje potvrzený cíl a vytváří navazující kroky. Opakované odeslání stejného požadavku má stabilní identitu v rámci organizace a běží v opakovatelné serializovatelné transakci. Žádná migrace.
+Jednoduché zadání používá stávající ElectionCampaign, ElectionRemovalPoint a FieldWorkStep. Nová zadání stejného klienta sdílí otevřenou průběžnou akci, takže více drobných prací lze naplánovat společně. Idempotenci eviduje stávající audit v téže transakci. Nepotřebuje termín, posádku ani vozidlo. Přesun vyžaduje potvrzený cíl a vytváří navazující kroky. Opakované odeslání stejného požadavku má stabilní identitu v rámci organizace a běží v opakovatelné serializovatelné transakci. Žádná migrace.
 
 Přístup vyžaduje manažera/správce a modul výjezdů; terénní zadání navíc modul terénních akcí. Načítání i zápis používají explicitní tenant context. Původní plánovací URL a API zůstávají zachované.
 

@@ -36,9 +36,9 @@ test('undated intake preserves transport steps, destination confirmation and veh
 
 test('intake retry is idempotent, tenant scoped and rejects changed payload and workers',async()=>{
  const {build}=await import('esbuild');const {createRequire}=await import('node:module');const {resolve}=await import('node:path');const {createHash}=await import('node:crypto');
- let organizationId='a';const rows=new Map<string,Record<string,unknown>>();let tasks=0;let transactionCount=0;
- const tx={electionCampaign:{findFirst:async({where}:{where:{id:string;organizationId:string}})=>{const row=rows.get(where.id);return row?.organizationId===where.organizationId?row:null;},create:async({data}:{data:Record<string,unknown> & {id:string}})=>{rows.set(data.id,data);return data;}}};
- const mocks:Record<string,unknown>={'../db':{prisma:{}},'../tenant-context':{requireTenantContext:()=>({organizationId})},'../field-planning/service':{hash:(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex'),requirePlannerManager:(actor:{role:string})=>{if(actor.role!=='MANAGER')throw Error('FORBIDDEN');},plannerTransaction:async(fn:(client:typeof tx)=>Promise<unknown>)=>{transactionCount++;return fn(tx);}},'../election-removal/tasks':{saveFieldTaskTx:async()=>{tasks++;}}};
+ let organizationId='a';const rows=new Map<string,Record<string,unknown>>();const audits=new Map<string,{organizationId:string;detailsJson:string}>();let tasks=0;let transactionCount=0;
+ const tx={electionCampaign:{findFirst:async({where}:{where:{organizationId:string;clientName:string|null}})=>[...rows.values()].find(r=>r.organizationId===where.organizationId&&r.clientName===where.clientName),create:async({data}:{data:Record<string,unknown>})=>{const row={...data,id:'campaign-'+rows.size};rows.set(row.id,row);return row;}},crmAuditLog:{findFirst:async({where}:{where:{id:string;organizationId:string}})=>{const r=audits.get(where.id);return r?.organizationId===where.organizationId?r:null;},create:async({data}:{data:{id:string;organizationId:string;detailsJson:string}})=>audits.set(data.id,data)}};
+ const mocks:Record<string,unknown>={'../db':{prisma:{}},'../tenant-context':{requireTenantContext:()=>({organizationId})},'../field-planning/service':{hash:(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex'),requirePlannerManager:(actor:{role:string})=>{if(actor.role!=='MANAGER')throw Error('FORBIDDEN');},plannerTransaction:async(fn:(client:typeof tx)=>Promise<unknown>)=>{transactionCount++;return fn(tx);}},'../election-removal/tasks':{saveFieldTaskTx:async()=>({id:'point-'+(++tasks)})}};
  const bundle=await build({entryPoints:['lib/dispatch/intake.ts'],bundle:true,write:false,platform:'node',format:'cjs',packages:'external',plugins:[{name:'intake-fixtures',setup(b){b.onResolve({filter:/.*/},args=>args.importer.replaceAll('\\','/').endsWith('/dispatch/intake.ts')&&args.path in mocks?{path:'fixture:'+args.path,external:true}:undefined);}}]});
  const realRequire=createRequire(resolve('package.json'));const evaluated={exports:{} as {createDispatchWork:(raw:unknown,actor:unknown)=>Promise<{campaignId:string}>}};
  new Function('require','module','exports',bundle.outputFiles[0].text)((id:string)=>id.startsWith('fixture:')?mocks[id.slice(8)]:realRequire(id),evaluated,evaluated.exports);
@@ -49,7 +49,8 @@ test('intake retry is idempotent, tenant scoped and rejects changed payload and 
  await assert.rejects(()=>create({...payload,task:{...payload.task,label:'Jiná'}}),/jiným/);
  await assert.rejects(()=>create(payload,'WORKER'),/FORBIDDEN/);
  const before=transactionCount;await assert.rejects(()=>create({...payload,task:{...payload.task,gpsConfirmed:false}}),/GPS/);assert.equal(transactionCount,before);
- organizationId='b';assert.notEqual((await create()).campaignId,first.campaignId);assert.equal(tasks,2);
+ const second=await create({...payload,requestKey:'request-456'});assert.equal(second.campaignId,first.campaignId);assert.equal(tasks,2);assert.equal(rows.size,1);
+ organizationId='b';assert.notEqual((await create()).campaignId,first.campaignId);assert.equal(tasks,3);
 });
 
 test('reported issue remains visible even when its point belongs to an active route',()=>{
