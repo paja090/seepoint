@@ -103,6 +103,7 @@ export function WorkRoutePlanner({
   initialJobIds,
   initialPlanId,
   standardOnly = false,
+  unified = false,
 }: {
   navigation?: boolean;
   defaultDate: string;
@@ -110,6 +111,7 @@ export function WorkRoutePlanner({
   initialJobIds?: string[];
   initialPlanId?: string;
   standardOnly?: boolean;
+  unified?: boolean;
 }) {
   const [date, setDate] = useState(defaultDate);
   const [startTime, setStartTime] = useState('08:00');
@@ -250,16 +252,23 @@ export function WorkRoutePlanner({
     const ticket = ++loadCounter.current;
     setError('');
     try {
-      const response = await fetch(`/api/work/route?date=${date}${standardOnly ? '&source=work' : ''}`);
+      const response = await fetch(`/api/work/route?date=${date}${unified ? '&source=dispatch'+(initialJobIds?.length?'&jobs='+encodeURIComponent(initialJobIds.join(',')):'') : standardOnly ? '&source=work' : ''}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       if (ticket !== loadCounter.current) return;
 
       setInputsChanged(false);
-      setLoaded(data);
 
+
+      if(initialPlanId && !(data.plans as PlanView[]).some(p=>p.id===initialPlanId)){
+        const selected=await fetch('/api/work/route?id='+encodeURIComponent(initialPlanId));
+        const value=await selected.json();if(!selected.ok)throw new Error(value.error || 'Výjezd není dostupný.');
+        if(ticket!==loadCounter.current)return;
+        data.plans=[value,...data.plans];
+      }
+      setLoaded(data);
       const activePlan = initialPlanId
-        ? (data.plans as PlanView[]).find((p: PlanView) => p.id === initialPlanId) ?? data.plans[0] ?? null
+        ? (data.plans as PlanView[]).find((p: PlanView) => p.id === initialPlanId) ?? null
         : data.plans[0] ?? null;
       setPlan(activePlan);
 
@@ -316,7 +325,7 @@ export function WorkRoutePlanner({
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Načtení plánovacích dat selhalo.');
     }
-  }, [date, initialJobIds, initialPlanId, standardOnly]);
+  }, [date, initialJobIds, initialPlanId, standardOnly, unified]);
 
   useEffect(() => {
     setPlan(null);
@@ -479,7 +488,7 @@ export function WorkRoutePlanner({
         </div>
       </header>
 
-      {plan && ['APPROVED', 'ACTIVE'].includes(plan.status) && plan.result.crews.some(c=>c.stops.some(s=>s.fieldWorkStepId)) && <div className="rounded-xl border border-sky-300 bg-sky-50 p-4"><PostponeRouteButton planId={plan.id} /></div>}
+      {plan && ['APPROVED', 'ACTIVE'].includes(plan.status) && (unified || plan.result.crews.some(c=>c.stops.some(s=>s.fieldWorkStepId))) && <div className="rounded-xl border border-sky-300 bg-sky-50 p-4"><PostponeRouteButton planId={plan.id} unified={unified} /></div>}
 
       {/* AI Telemetry & Calibration Section */}
       {telemetryOpen && (
@@ -816,7 +825,7 @@ export function WorkRoutePlanner({
                 const assignedEmployees = loaded?.data?.employees.filter((e) => c.employeeIds.includes(e.id)) ?? [];
                 const availableToAdd =
                   loaded?.data?.employees.filter((e) => e.isActive && !c.employeeIds.includes(e.id)) ?? [];
-                const currentVehicle = loaded?.data?.vehicles.find((v) => v.id === c.vehicleId);
+
 
                 return (
                   <div

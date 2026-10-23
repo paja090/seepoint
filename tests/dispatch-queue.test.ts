@@ -20,12 +20,11 @@ test('field assignments from another day remain reserved and drafts do not reser
  assert.deepEqual(rows.map(r=>r.state),['planned','ready']);
  assert.equal(rows[0].planId,'yesterday');
 });
-test('mixed selections retain canonical source links and split into compatible proposals',()=>{
+test('mixed selections retain canonical source links and share one proposal',()=>{
  const rows=dispatchQueue([job('w'),job('n',{navigationPointId:'np',navigationOrderId:'no'}),job('f',{electionCampaignId:'campaign',electionRemovalPointId:'point'})],[]);
  assert.deepEqual(rows.map(r=>r.detailUrl),['/work/w','/navigation/orders/no','/election-removal/campaign']);
- const links=dispatchPlanningLinks(rows,'2035-06-10');assert.equal(links.length,2);
- assert.equal(new URL(links[0].url,'https://test').searchParams.get('jobs'),'w,n');
- assert.equal(new URL(links[1].url,'https://test').searchParams.get('points'),'point');
+ const links=dispatchPlanningLinks(rows,'2035-06-10');assert.equal(links.length,1);
+ assert.equal(new URL(links[0].url,'https://test').searchParams.get('jobs'),'w,n,f');
 });
 test('undated intake preserves transport steps, destination confirmation and vehicle load',()=>{
  const raw={label:'Přesun lavičky',operationType:'RELOCATION',mediaType:'BENCH',quantity:2,latitude:49,longitude:18,gpsConfirmed:true,materialDisposition:'TRANSFER',destinationName:'Park',destinationLatitude:49.1,destinationLongitude:18.1,destinationGpsConfirmed:true};

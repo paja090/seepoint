@@ -1,4 +1,6 @@
 import { enterTenantContext } from '@/lib/tenant-context';
+import { hasModuleAccess } from '@/lib/module-policy';
+import { isFieldJobId } from '@/lib/field-planning/field-jobs';
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { profileForNavigation } from '@/lib/field-planning/profile';
@@ -22,10 +24,14 @@ export async function GET(request: Request) {
     if (query.get('id')) return NextResponse.json(await publicPlan(planView(await getPlan(query.get('id')!))));
     const profile = await loadProfile(); const date = query.get('date');
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: 'Vyberte den.' }, { status: 400 });
-    const data = profile?.enabled ? await loadPlanningData(date) : null;
-    const plans = await prisma.fieldPlan.findMany({ where: { organizationId: user.organizationId, date, ...(query.get('source') === 'work' ? { electionCampaignId: null } : {}) }, orderBy: { version: 'desc' }, take: 20 });
+    const jobs=query.get('jobs')?.split(',').filter(Boolean);
+    if(jobs && (jobs.length>200||jobs.some(id=>id.length>100)))throw new Error('Vyberte nejvýše 200 prací.');
+    const field=hasModuleAccess(user,'electionRemoval','electionRemoval');
+    if(!field&&jobs?.some(isFieldJobId))throw new Error('FORBIDDEN: Terénní práce nejsou dostupné.');
+    const data = profile?.enabled ? await loadPlanningData(date,{jobIds:jobs,includeField:query.get('source')==='dispatch'&&field}) : null;
+    const plans = await prisma.fieldPlan.findMany({ where: { organizationId: user.organizationId, date, ...(['work','dispatch'].includes(query.get('source')??'') ? { electionCampaignId: null } : {}) }, orderBy: { version: 'desc' }, take: 20 });
     const navigation = await navigationAvailable();
-    const rawPlans = plans.filter(p => navigation || !(p.planningInputSnapshot as unknown as PlanningInput).jobs.some(j => j.navigationPointId)).map(planView);
+    const rawPlans = plans.filter(p=>field || !(p.planningInputSnapshot as unknown as PlanningInput).jobs.some(j=>j.electionRemovalPointId)).filter(p => navigation || !(p.planningInputSnapshot as unknown as PlanningInput).jobs.some(j => j.navigationPointId)).map(planView);
     const enrichedPlans = await Promise.all(rawPlans.map(async p => {
       const crewsWithLocations = await enrichCrewsWithLiveLocations(p.result.crews, p.id, user.organizationId!);
       return { ...p, result: { ...p.result, crews: crewsWithLocations }, profile: profileForNavigation(p.profile, navigation) };
@@ -36,7 +42,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const user = await requireApiAccess('work', 'workRoute'); if (isApiDenied(user)) return user;
   enterTenantContext({ organizationId: user.organizationId!, userId: user.id, source: 'session' });
-  try { requirePlannerManager(user); return NextResponse.json(await publicPlan(await generatePlan(await request.json(), user))); }
+  try { requirePlannerManager(user); const body=await request.json();
+    if(Array.isArray(body?.jobIds)&&body.jobIds.some((id:unknown)=>typeof id==='string'&&isFieldJobId(id))&&!hasModuleAccess(user,'electionRemoval','electionRemoval'))throw new Error('FORBIDDEN: Terénní práce nejsou dostupné.');
+    return NextResponse.json(await publicPlan(await generatePlan(body, user))); }
   catch (error) { return failure(error); }
 }
 export async function PATCH(request: Request) {

@@ -26,6 +26,6 @@ export async function loadDispatch(date: string, fieldEnabled: boolean, navigati
     return {...job,...(point.status==='ISSUE'?{status:'ISSUE',blockedReason:point.issueNote||'Hlášen problém na stanovišti'}:{}),clientName:point.campaign.clientName,address:point.label};
   })];
   // Apply the same module filtering as the existing standard planner.
-  const visiblePlans=(plans as DispatchPlan[]).slice(0,100).filter(plan=>navigationEnabled || !((plan.planningSummary as {crews?:Array<{stops?:Array<{navigationPointId?:string}>}>}|null)?.crews ?? []).some(c=>c.stops?.some(s=>s.navigationPointId)));
+  const visiblePlans=(plans as DispatchPlan[]).slice(0,100).filter(plan=>fieldEnabled || !((plan.planningSummary as {crews?:Array<{stops?:Array<{electionRemovalPointId?:string}>}>}|null)?.crews??[]).some(c=>c.stops?.some(s=>s.electionRemovalPointId))).filter(plan=>navigationEnabled || !((plan.planningSummary as {crews?:Array<{stops?:Array<{navigationPointId?:string}>}>}|null)?.crews ?? []).some(c=>c.stops?.some(s=>s.navigationPointId)));
   return {items:dispatchQueue(jobs,visiblePlans,fieldAssignments),plans:visiblePlans,profile,messages};
 }

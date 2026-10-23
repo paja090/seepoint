@@ -21,15 +21,10 @@ export function dispatchQueue(jobs: PlanningJob[], plans: DispatchPlan[], fieldA
   return [...unique.values()];
 }
 export function dispatchPlanningLinks(items: DispatchItem[], date: string) {
-  const groups = new Map<string,DispatchItem[]>();
-  for(const item of items.filter(i=>i.state==='ready')) {
-    const key = item.campaignId ?? 'standard';groups.set(key,[...(groups.get(key)??[]),item]);
-  }
-  return [...groups.entries()].flatMap(([key,allRows])=>Array.from({length:Math.ceil(allRows.length/100)},(_,part)=>{
-    const rows=allRows.slice(part*100,(part+1)*100);
-    const params=new URLSearchParams({date});
-    if(key==='standard'){params.set('planner','work');params.set('jobs',rows.map(r=>r.id).join(','));}
-    else {params.set('campaign',key);params.set('points',rows.map(r=>r.pointId).filter(Boolean).join(','));}
-    return {key:key+':'+part,count:rows.length,label:(key==='standard'?'Montáže a navigace':rows[0].client || rows[0].title)+(allRows.length>100?' — část '+(part+1):''),url:'/work/dispatch?'+params.toString()+'#planner'};
-  }));
+  const ready=items.filter(item=>item.state==='ready');
+  return Array.from({length:Math.ceil(ready.length/100)},(_,part)=>{
+    const rows=ready.slice(part*100,(part+1)*100);
+    const params=new URLSearchParams({date,planner:'work',jobs:rows.map(row=>row.id).join(',')});
+    return {key:'dispatch:'+part,count:rows.length,label:ready.length>100?'Společný výjezd — část '+(part+1):'Společný výjezd',url:'/work/dispatch?'+params+'#planner'};
+  });
 }
