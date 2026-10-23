@@ -17,7 +17,7 @@ import type { PlanningInput, PlanningResult, MyRouteDTO, MyRouteStop } from './c
 import { computeRouteLiveETA } from './live-eta';
 import { loadPlanCrewLocations } from './live-location';
 
-export async function myRoute(userId: string, dateOrNow?: string | Date, db = prisma): Promise<MyRouteDTO> {
+export async function myRoute(userId: string, dateOrNow?: string | Date, db = prisma, scope?: { allCrews: boolean; planIds: string[] }): Promise<MyRouteDTO> {
   const { organizationId } = requireTenantContext();
   const profile = await loadProfile(db); if (!profile?.enabled) return { timezone: 'Europe/Prague', routes: [] };
   const employee = await db.employee.findFirst({ where: { organizationId, userId, isActive: true }, select: { id: true } });
@@ -34,7 +34,7 @@ export async function myRoute(userId: string, dateOrNow?: string | Date, db = pr
     targetDate = dayInZone(new Date(), profile.timezone);
   }
 
-  const plans = await db.fieldPlan.findMany({ where: { organizationId, date: targetDate, status: { in: ['APPROVED', 'ACTIVE', 'COMPLETED'] } }, orderBy: { version: 'desc' } });
+  const plans = await db.fieldPlan.findMany({ where: { organizationId, ...(scope ? { id: { in: scope.planIds } } : {}), date: targetDate, status: { in: ['APPROVED', 'ACTIVE', 'COMPLETED'] } }, orderBy: { version: 'desc' } });
 
   const effectivePlans = plans;
   const navigation = await navigationAvailable(db);
@@ -43,7 +43,7 @@ export async function myRoute(userId: string, dateOrNow?: string | Date, db = pr
     const result = plan.planningSummary as unknown as PlanningResult;
     const planLocations = await loadPlanCrewLocations(plan.id, organizationId, db);
     const userCrews = employee ? result.crews.filter(c => c.employeeIds.includes(employee.id)) : [];
-    const targetCrews = userCrews.length > 0 ? userCrews : (isAdminOrManager ? result.crews : []);
+    const targetCrews = scope?.allCrews && isAdminOrManager ? result.crews : userCrews.length > 0 ? userCrews : (isAdminOrManager ? result.crews : []);
     for (const crew of targetCrews) {
       const orders = await db.workOrder.findMany({
         where: {
@@ -316,6 +316,7 @@ export async function myRoute(userId: string, dateOrNow?: string | Date, db = pr
 
       routes.push({
         planId: plan.id,
+        crewId: crew.id,
         crewName: crew.name || (crew.names?.length ? crew.names.join(', ') : null),
         vehicleName: crew.vehicleName,
         departureAt: crew.departureAt,

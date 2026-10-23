@@ -1,7 +1,7 @@
 import type { PlanningJob, PlanningResult } from '../field-planning/contracts';
 import { planningStopHref } from '../field-planning/presentation';
 
-export type DispatchItem = { id: string; title: string; client: string; address: string; source: 'work' | 'navigation' | 'field'; campaignId?: string; pointId?: string; state: 'ready' | 'issue' | 'planned'; reason: string; detailUrl: string; planId?: string; quantity: number };
+export type DispatchItem = { id: string; title: string; client: string; address: string; source: 'work' | 'navigation' | 'field'; campaignId?: string; pointId?: string; state: 'ready' | 'issue' | 'planned'; reason: string; detailUrl: string; planId?: string; quantity: number; location?: PlanningJob['location'] };
 export type DispatchPlan = { id: string; date: string; status: string; electionCampaignId: string | null; version: number; planningSummary: unknown };
 export function dispatchQueue(jobs: PlanningJob[], plans: DispatchPlan[], fieldAssignments: Record<string,string> = {}): DispatchItem[] {
   const assigned = new Map(Object.entries(fieldAssignments));
@@ -16,7 +16,7 @@ export function dispatchQueue(jobs: PlanningJob[], plans: DispatchPlan[], fieldA
     if(['DONE','CANCELLED'].includes(job.status)) continue;
     const planId = assigned.get(job.id) ?? (job.parentWorkOrderId ? assigned.get(job.parentWorkOrderId) : undefined);
     const source = job.electionCampaignId ? 'field' : job.navigationPointId ? 'navigation' : 'work';
-    unique.set(job.id,{id:job.id,title:job.title,client:job.clientName ?? '',address:job.address ?? '',source,campaignId:job.electionCampaignId,pointId:job.electionRemovalPointId,state:job.status==='ISSUE'?'issue':planId?'planned':job.blockedReason?'issue':'ready',reason:job.blockedReason ?? '',detailUrl:planningStopHref({...job,workOrderId:job.parentWorkOrderId ?? (source==='work'?job.id:'')}) ?? '/work',planId,quantity:job.quantity ?? 1});
+    unique.set(job.id,{id:job.id,title:job.title,client:job.clientName ?? '',address:job.address ?? '',source,campaignId:job.electionCampaignId,pointId:job.electionRemovalPointId,location:job.location,state:job.status==='ISSUE'?'issue':planId?'planned':job.blockedReason?'issue':'ready',reason:job.blockedReason ?? '',detailUrl:planningStopHref({...job,workOrderId:job.parentWorkOrderId ?? (source==='work'?job.id:'')}) ?? '/work',planId,quantity:job.quantity ?? 1});
   }
   return [...unique.values()];
 }

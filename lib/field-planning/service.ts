@@ -48,8 +48,11 @@ export async function auditPlan(tx: Prisma.TransactionClient, id: string, actor:
 export async function getPlan(id: string, db: Prisma.TransactionClient = prisma) {
   const row = await db.fieldPlan.findUnique({ where: { id, organizationId: requireTenantContext().organizationId } });
   if (!row) throw new Error('NOT_FOUND: plán nebyl nalezen.');
-  if((row.planningInputSnapshot as unknown as PlanningInput).jobs.some(j=>j.fieldWorkStepId||j.electionRemovalPointId))await requireFieldJobsEnabled(db);
-  if (!await navigationAvailable(db) && (row.planningInputSnapshot as unknown as PlanningInput).jobs.some(j => j.navigationPointId)) throw new Error('FORBIDDEN: Navigation není aktivní.');
+  // Older saved plans can contain only a profile; their persisted stops remain authoritative.
+  const jobs = (row.planningInputSnapshot as unknown as Partial<PlanningInput> | null)?.jobs ?? [];
+  const stops = (row.planningSummary as unknown as Partial<PlanningResult> | null)?.crews?.flatMap(crew => crew.stops ?? []) ?? [];
+  if (row.electionCampaignId || [...jobs, ...stops].some(job => job.fieldWorkStepId || job.electionRemovalPointId)) await requireFieldJobsEnabled(db);
+  if (!await navigationAvailable(db) && [...jobs, ...stops].some(job => job.navigationPointId)) throw new Error('FORBIDDEN: Navigation není aktivní.');
   return row;
 }
 export async function saveProfile(value: unknown, actor: PlannerActor) {

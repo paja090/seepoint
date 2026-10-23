@@ -6,7 +6,7 @@ import { ELECTION_REMOVAL_MEDIA_LABELS } from '@/lib/election-removal/constants'
 import { dispositions, type Operation, type Disposition } from '@/lib/election-removal/task-spec';
 
 const templates: Array<[Operation,string]> = [['REPLACE_AD','Výměna reklamy'],['INSTALL_OBJECT','Instalace objektu'],['REMOVE_OBJECT','Demontáž'],['RELOCATION','Přesun objektu'],['REPAIR','Oprava'],['OTHER','Jiná práce']];
-export function DispatchIntake({onClose}:{onClose:()=>void}) {
+export function DispatchIntake({onClose, embedded = false, onBusyChange}:{onClose:()=>void; embedded?:boolean; onBusyChange?:(busy:boolean)=>void}) {
   const router=useRouter();const [operation,setOperation]=useState<Operation>('REPLACE_AD');
   const [disposition,setDisposition]=useState<Disposition>('LEAVE');
   const [location,setLocation]=useState<{latitude:number;longitude:number}|null>(null);
@@ -17,15 +17,15 @@ export function DispatchIntake({onClose}:{onClose:()=>void}) {
     event.preventDefault();if(busy)return;
     if(!location || (transport&&!destination)){setError('Vyberte místo práce a případně místo předání v mapě.');return;}
     const form=new FormData(event.currentTarget);const value=(key:string)=>String(form.get(key)??'').trim();
-    setBusy(true);setError('');
+    setBusy(true);onBusyChange?.(true);setError('');
     try {
       const response=await fetch('/api/work/dispatch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requestKey,clientName:value('client'),task:{label:value('title'),description:value('description'),operationType:operation,mediaType:value('media'),objectType:value('media'),quantity:Number(value('quantity')), ...location,gpsConfirmed:true,materialDisposition:disposition,materialInstructions:value('instructions'),destinationName:value('destinationName'),destinationLatitude:transport?destination?.latitude:null,destinationLongitude:transport?destination?.longitude:null,destinationGpsConfirmed:transport,referenceUrl:value('reference'),contact:value('contact'),accessInstructions:value('access'),...(value('minutes')?{serviceMinutes:Number(value('minutes'))}:{}),...(value('workers')?{requiredWorkers:Number(value('workers'))}:{})}})});
       const result=await response.json();if(!response.ok)throw Error(result.error || 'Uložení se nezdařilo.');
       router.refresh();onClose();
-    }catch(e){setError(e instanceof Error?e.message:'Uložení se nezdařilo.');setBusy(false);}
+    }catch(e){setError(e instanceof Error?e.message:'Uložení se nezdařilo.');setBusy(false);onBusyChange?.(false);}
   }
-  return <section className="rounded-2xl border bg-white p-5 shadow-sm" aria-labelledby="intake-title">
-    <div className="flex items-start justify-between gap-4"><div><h2 id="intake-title" className="text-xl font-bold">Co potřebujeme udělat?</h2><p className="mt-1 text-sm text-slate-600">Termín, posádku a auto vyberete až při plánování výjezdu.</p></div><button type="button" onClick={onClose} disabled={busy} className="btn">Zavřít zadání</button></div>
+  return <section className={embedded ? "bg-white" : "rounded-2xl border bg-white p-5 shadow-sm"} aria-labelledby="intake-title">
+    <div className="flex items-start justify-between gap-4"><div><h2 id="intake-title" className="text-xl font-bold">Co potřebujeme udělat?</h2><p className="mt-1 text-sm text-slate-600">Termín, posádku a auto vyberete až při plánování výjezdu.</p></div>{!embedded&&<button type="button" onClick={onClose} disabled={busy} className="btn">Zavřít zadání</button>}</div>
     <div className="my-4 flex flex-wrap gap-2">{templates.map(([key,label])=><button type="button" key={key} aria-pressed={operation===key} className={'rounded-xl border px-3 py-2 text-sm '+(operation===key?'bg-sky-800 text-white':'bg-white')} onClick={()=>{setOperation(key);if(key==='RELOCATION')setDisposition('TRANSFER');}}>{label}</button>)}</div>
     <form onSubmit={submit} className="space-y-4">
       {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">{error}</p>}

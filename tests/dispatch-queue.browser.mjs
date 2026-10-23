@@ -15,7 +15,7 @@ await page.route('**/api/work/dispatch',async route=>{sent=route.request().postD
 await page.goto('http://127.0.0.1:'+server.address().port);
 assert.equal(await page.getByRole('checkbox',{name:'Vybrat Chybí GPS'}).isDisabled(),true);assert.equal(await page.getByRole('checkbox',{name:'Vybrat Přidělená práce'}).isDisabled(),true);
 await page.getByRole('checkbox',{name:'Vybrat Výměna reklamy'}).check();assert.match(await page.getByRole('link',{name:/Naplánovat:/}).getAttribute('href'),/jobs=ready/);
-await page.getByRole('button',{name:'Zadat práci',exact:true}).click();await page.getByLabel('Název práce').fill('Přesun lavičky');await page.getByRole('button',{name:'Přesun objektu',exact:true}).click();
+await page.getByRole('button',{name:'Přidat práci',exact:true}).click();await page.getByLabel('Název práce').fill('Přesun lavičky');await page.getByRole('button',{name:'Přesun objektu',exact:true}).click();
 await page.getByLabel('Médium nebo objekt').selectOption('BENCH');await page.getByLabel('Místo předání',{exact:true}).fill('Park');
 await page.getByRole('button',{name:'Uložit do fronty práce'}).click();assert.match(await page.getByRole('alert').innerText(),/Vyberte místo/);assert.equal(sent,undefined);
 await page.getByRole('button',{name:'Potvrdit místo na mapě'}).nth(0).click();await page.getByRole('button',{name:'Potvrdit místo na mapě'}).nth(1).click();await page.getByRole('button',{name:'Uložit do fronty práce'}).click();await page.waitForFunction(()=>window.refreshed);

@@ -22,7 +22,8 @@ function escapeHtml(str: string): string {
   }[tag] || tag));
 }
 
-export function RouteMap({ result, depot, active }: { result?: PlanningResult; depot?: Coordinates; active: string }) {
+export type RouteMapPoint = { id: string; title: string; location: Coordinates };
+export function RouteMap({ result, depot, active, points, onPointSelect, selectedPointId }: { result?: PlanningResult; depot?: Coordinates; active: string; points?: RouteMapPoint[]; onPointSelect?: (id: string) => void; selectedPointId?: string }) {
   const element = useRef<HTMLDivElement>(null);
   const map = useRef<LeafletMap | null>(null);
   const layerInstance = useRef<TileLayer | null>(null);
@@ -32,7 +33,7 @@ export function RouteMap({ result, depot, active }: { result?: PlanningResult; d
     let disposed = false;
     void import('leaflet').then(L => {
       if (disposed || !element.current) return;
-      const m = L.map(element.current).setView(depot ? [depot.latitude, depot.longitude] : [0, 0], depot ? 10 : 2);
+      const m = L.map(element.current, { zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false }).setView(depot ? [depot.latitude, depot.longitude] : [0, 0], depot ? 10 : 2);
       map.current = m;
 
       const initialConfig = MAP_LAYERS[mapType];
@@ -114,10 +115,16 @@ export function RouteMap({ result, depot, active }: { result?: PlanningResult; d
           bounds.extend(livePoint);
         }
       });
+      points?.forEach(point => {
+        const position: [number, number] = [point.location.latitude, point.location.longitude];
+        const marker = L.circleMarker(position, { radius: point.id === selectedPointId ? 10 : 7, color: '#fff', weight: 2, fillColor: '#64748b', fillOpacity: 1 });
+        const label = document.createElement('span'); label.textContent = point.title;
+        marker.bindTooltip(label).on('click', () => onPointSelect?.(point.id)).addTo(m); bounds.extend(position);
+      });
       if (bounds.isValid()) m.fitBounds(bounds, { padding: [32, 32], maxZoom: 15 });
     });
     return () => { disposed = true; map.current?.remove(); map.current = null; };
-  }, [result, depot, active]);
+  }, [result, depot, active, points, onPointSelect, selectedPointId, mapType]);
 
   useEffect(() => {
     if (!map.current || !layerInstance.current) return;

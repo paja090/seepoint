@@ -13,7 +13,7 @@ import { dayInZone } from '@/lib/field-planning/profile';
 import { loadElectionPlanningResources } from '@/lib/election-removal/planning';
 import type { PlanningResult } from '@/lib/field-planning/contracts';
 export const dynamic = 'force-dynamic';
-type Query = { date?: string; planner?: string; jobs?: string; campaign?: string; points?: string; plan?: string; parentPlan?: string };
+type Query = { view?: string; date?: string; planner?: string; jobs?: string; campaign?: string; points?: string; plan?: string; parentPlan?: string };
 export default async function DispatchPage({ searchParams }: { searchParams?: Promise<Query> }) {
   const user = await requirePageAccess('work', 'workRoute');
   if (!['ADMIN', 'MANAGER'].includes(user.role)) redirect('/my-route');
@@ -25,7 +25,8 @@ export default async function DispatchPage({ searchParams }: { searchParams?: Pr
     const date = valid ? requested : dayInZone(new Date(), profile?.timezone ?? 'Europe/Prague');
     const fieldEnabled = hasModuleAccess(user, 'electionRemoval', 'electionRemoval');
     const navigation = hasModuleAccess(user, 'navigation');
-    const data = await loadDispatch(date, fieldEnabled, navigation);
+    const view = query.view === 'week' ? 'week' : query.view === 'map' ? 'map' : 'day';
+    const data = await loadDispatch(date, fieldEnabled, navigation, { week: view === 'week', userId: user.id });
     const campaign = query.campaign && fieldEnabled ? await loadElectionPlanningResources(query.campaign, date, user.organizationId!) : null;
     const selectedPlan = query.plan ? data.plans.find(p => p.id === query.plan) : undefined;
     if (query.plan && !selectedPlan) notFound();
@@ -33,9 +34,9 @@ export default async function DispatchPage({ searchParams }: { searchParams?: Pr
     const result = selectedPlan?.planningSummary as PlanningResult | undefined;
     const jobs = query.jobs?.split(',').filter(Boolean);
     const points = query.points?.split(',').filter(Boolean);
-    return <AppShell><div className="mx-auto max-w-7xl space-y-6">
-      <DispatchBoard key={date} items={data.items} plans={data.plans} date={date} canCreate={fieldEnabled} messages={data.messages}/>
-      <section id="planner" className="scroll-mt-20">
+    return <AppShell><div className="mx-auto w-full max-w-[1760px] space-y-6">
+      <DispatchBoard key={date+view} items={data.items} plans={data.plans} date={date} today={dayInZone(new Date(), profile?.timezone ?? 'Europe/Prague')} canCreate={fieldEnabled} messages={data.messages} timezone={profile?.timezone} depot={profile?.depot} view={view} progress={data.progress}/>
+      <section id="planner" className="scroll-mt-20">{(campaign || query.planner === 'work') && <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold">Rozšířené plánování</h2><Link href={'/work/dispatch?date='+date} className="text-sm font-semibold text-sky-800">Zpět na přehled</Link></div>}
         {campaign && selectedPlan ? <div className="rounded-2xl border bg-white p-5 space-y-3"><h2 className="text-xl font-bold">{result?.planName || 'Výjezd'} · {selectedPlan.date}</h2>
           {result?.crews?.map(crew => <p key={crew.id}>{crew.name}: {crew.stops.length} zastávek</p>)}
           <Link className="block underline" href={'/election-removal/'+encodeURIComponent(campaign.campaign.id)}>Detail akce a výjezdů</Link>
