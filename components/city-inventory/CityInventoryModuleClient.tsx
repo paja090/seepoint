@@ -24,6 +24,7 @@ const navItems = [
   { href: '/carriers', label: '🪧 Evidence nosičů' },
   { href: '/occupancy', label: '📅 Obsazenost ploch' },
   { href: '/map', label: '🗺️ Mapa nosičů' },
+  { href: '/realization', label: '🛒 Zakázky & Realizace' },
 ];
 
 export function CityInventoryModuleClient({ carriers, summary }: { carriers: CarrierItem[]; summary: CityInventorySummary }) {
@@ -47,9 +48,9 @@ export function CityInventoryModuleClient({ carriers, summary }: { carriers: Car
       {/* Header */}
       <div>
         <span className="text-xs font-bold text-sky-700 uppercase tracking-wider">Městský Reklamní Inventář</span>
-        <h1 className="text-3xl font-black text-slate-900">🪧 City Postery, Lavičky & Nosiče</h1>
+        <h1 className="text-3xl font-black text-slate-900">🪧 City Postery, Lavičky, Horizonty & Nosiče</h1>
         <p className="text-xs text-slate-500 mt-1">
-          Přehled a správa všech reklamních ploch, městského mobiliáře a obsazenosti po celém Česku.
+          Přehled a správa městských reklamních ploch, mobiliáře a obsazenosti po celém Česku (mimo navigační tabule VO).
         </p>
       </div>
 
@@ -57,13 +58,13 @@ export function CityInventoryModuleClient({ carriers, summary }: { carriers: Car
       <ProjectSubNav items={navItems} />
 
       {/* Mini Dashboard KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {/* City Postery */}
         <button
           type="button"
           onClick={() => setSelectedType(selectedType === 'POSTER' ? 'ALL' : 'POSTER')}
           aria-pressed={selectedType === 'POSTER'}
-          className={`card text-left p-5 transition cursor-pointer border-2 ${
+          className={`card text-left p-4 transition cursor-pointer border-2 ${
             selectedType === 'POSTER' ? 'border-sky-500 bg-sky-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'
           }`}
         >
@@ -82,7 +83,7 @@ export function CityInventoryModuleClient({ carriers, summary }: { carriers: Car
           type="button"
           onClick={() => setSelectedType(selectedType === 'BENCH' ? 'ALL' : 'BENCH')}
           aria-pressed={selectedType === 'BENCH'}
-          className={`card text-left p-5 transition cursor-pointer border-2 ${
+          className={`card text-left p-4 transition cursor-pointer border-2 ${
             selectedType === 'BENCH' ? 'border-emerald-500 bg-emerald-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'
           }`}
         >
@@ -96,22 +97,41 @@ export function CityInventoryModuleClient({ carriers, summary }: { carriers: Car
           </div>
         </button>
 
-        {/* Navigační nosiče */}
+        {/* Horizonty */}
         <button
           type="button"
-          onClick={() => setSelectedType(selectedType === 'NAVIGATION' ? 'ALL' : 'NAVIGATION')}
-          aria-pressed={selectedType === 'NAVIGATION'}
-          className={`card text-left p-5 transition cursor-pointer border-2 ${
-            selectedType === 'NAVIGATION' ? 'border-amber-500 bg-amber-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'
+          onClick={() => setSelectedType(selectedType === 'HORIZON' ? 'ALL' : 'HORIZON')}
+          aria-pressed={selectedType === 'HORIZON'}
+          className={`card text-left p-4 transition cursor-pointer border-2 ${
+            selectedType === 'HORIZON' ? 'border-indigo-500 bg-indigo-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="rounded-xl bg-amber-100 p-2 text-amber-700 font-bold">🧭</span>
-            <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md">Navigace</span>
+            <span className="rounded-xl bg-indigo-100 p-2 text-indigo-700 font-bold">🌉</span>
+            <span className="text-[11px] font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-md">Horizonty</span>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-black text-slate-900">{summary.categories.NAVIGATION} ks</div>
-            <p className="text-xs text-slate-500 mt-0.5">Navigační směrové nosiče</p>
+            <div className="text-2xl font-black text-slate-900">{summary.categories.HORIZON} ks</div>
+            <p className="text-xs text-slate-500 mt-0.5">Mostní a silniční horizonty</p>
+          </div>
+        </button>
+
+        {/* Tower & CLV */}
+        <button
+          type="button"
+          onClick={() => setSelectedType(selectedType === 'TOWER' ? 'ALL' : 'TOWER')}
+          aria-pressed={selectedType === 'TOWER'}
+          className={`card text-left p-4 transition cursor-pointer border-2 ${
+            selectedType === 'TOWER' ? 'border-amber-500 bg-amber-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="rounded-xl bg-amber-100 p-2 text-amber-700 font-bold">🗼</span>
+            <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md">Tower & CLV</span>
+          </div>
+          <div className="mt-3">
+            <div className="text-2xl font-black text-slate-900">{summary.categories.TOWER} ks</div>
+            <p className="text-xs text-slate-500 mt-0.5">Věže, minitowery & CLV</p>
           </div>
         </button>
 
@@ -120,7 +140,7 @@ export function CityInventoryModuleClient({ carriers, summary }: { carriers: Car
           type="button"
           onClick={() => setSelectedType(selectedType === 'OTHER' ? 'ALL' : 'OTHER')}
           aria-pressed={selectedType === 'OTHER'}
-          className={`card text-left p-5 transition cursor-pointer border-2 ${
+          className={`card text-left p-4 transition cursor-pointer border-2 ${
             selectedType === 'OTHER' ? 'border-purple-500 bg-purple-50/50 shadow-md' : 'border-slate-200 hover:border-slate-300'
           }`}
         >
@@ -174,7 +194,7 @@ export function CityInventoryModuleClient({ carriers, summary }: { carriers: Car
           </span>
           {summary.displayed < summary.total && (
             <span>
-              Dashboard zobrazuje vyvážený náhled {summary.displayed} z {summary.total} nearchivovaných nosičů, nejvýše 60 z každé kategorie.{' '}
+              Dashboard zobrazuje vyvážený náhled {summary.displayed} z {summary.total} nearchivovaných nosičů.{' '}
               <Link href="/carriers" className="font-bold text-sky-700 hover:underline">Otevřít úplnou stránkovanou evidenci</Link>
             </span>
           )}

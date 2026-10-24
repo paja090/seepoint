@@ -23,8 +23,10 @@ export default async function CityInventoryProjectsPage() {
   const user = await requirePageAccess('carriers', 'cityInventory');
   if (!user.organizationId) throw new Error('Není vybraná aktivní organizace.');
 
-  const where = { organizationId: user.organizationId, archivedAt: null } as const;
-  const [posterRows, benchRows, navigationRows, otherRows, typeGroups, statusGroups, total] = await Promise.all([
+  // City inventory covers urban street furniture & promo media (posters, benches, horizons, towers, other)
+  // Navigation points on VO poles are exclusively managed under /navigation
+  const where = { organizationId: user.organizationId, archivedAt: null, type: { not: 'NAVIGATION' as const } } as const;
+  const [posterRows, benchRows, horizonRows, towerRows, otherRows, typeGroups, statusGroups, total] = await Promise.all([
     prisma.advertisingCarrier.findMany({
       where: { ...where, type: 'CITY_POSTER' },
       select: carrierPreviewSelect,
@@ -38,13 +40,24 @@ export default async function CityInventoryProjectsPage() {
       take: PREVIEW_LIMIT_PER_CATEGORY,
     }),
     prisma.advertisingCarrier.findMany({
-      where: { ...where, type: 'NAVIGATION' },
+      where: { ...where, type: 'PROMO_HORIZON' },
       select: carrierPreviewSelect,
       orderBy: { code: 'asc' },
       take: PREVIEW_LIMIT_PER_CATEGORY,
     }),
     prisma.advertisingCarrier.findMany({
-      where: { ...where, type: { notIn: ['CITY_POSTER', 'PROMO_BENCH', 'NAVIGATION'] } },
+      where: { ...where, type: { in: ['PROMO_TOWER', 'PROMO_MINITOWER', 'CITYLIGHT'] } },
+      select: carrierPreviewSelect,
+      orderBy: { code: 'asc' },
+      take: PREVIEW_LIMIT_PER_CATEGORY,
+    }),
+    prisma.advertisingCarrier.findMany({
+      where: {
+        ...where,
+        type: {
+          notIn: ['CITY_POSTER', 'PROMO_BENCH', 'PROMO_HORIZON', 'PROMO_TOWER', 'PROMO_MINITOWER', 'CITYLIGHT', 'NAVIGATION'],
+        },
+      },
       select: carrierPreviewSelect,
       orderBy: { code: 'asc' },
       take: PREVIEW_LIMIT_PER_CATEGORY,
@@ -62,7 +75,7 @@ export default async function CityInventoryProjectsPage() {
     prisma.advertisingCarrier.count({ where }),
   ]);
 
-  const carriersRaw = [...posterRows, ...benchRows, ...navigationRows, ...otherRows]
+  const carriersRaw = [...posterRows, ...benchRows, ...horizonRows, ...towerRows, ...otherRows]
     .sort((left, right) => left.code.localeCompare(right.code, 'cs'));
 
   const carriers = carriersRaw.map((c) => ({
