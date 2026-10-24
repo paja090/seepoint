@@ -103,7 +103,7 @@ export async function PATCH(
         data: {
           status: body.itemStatus as RealizationStatus,
           ...(body.itemStatus === 'INSTALLED' || body.itemStatus === 'PHOTOGRAPHED' || body.itemStatus === 'COMPLETED'
-            ? { installedAt: new Date() }
+            ? { actualDate: new Date() }
             : {}),
         },
       });
@@ -115,7 +115,7 @@ export async function PATCH(
       if (targetPhase === 'COMPLETED' || targetPhase === 'READY_FOR_BILLING') {
         await prisma.crmRealization.updateMany({
           where: { crmOrderId: order.id, organizationId, status: { not: 'COMPLETED' } },
-          data: { status: 'COMPLETED', installedAt: new Date() },
+          data: { status: 'COMPLETED', actualDate: new Date() },
         });
         await prisma.crmOrder.update({
           where: { id: order.id },
@@ -128,12 +128,12 @@ export async function PATCH(
         });
         await prisma.crmOrder.update({
           where: { id: order.id },
-          data: { status: 'IN_PROGRESS' },
+          data: { status: 'IN_REALIZATION' },
         });
       } else if (targetPhase === 'PRODUCTION') {
         await prisma.printProductionJob.updateMany({
-          where: { organizationId, offerId: order.offerId || undefined, status: 'PENDING' },
-          data: { status: 'IN_PRODUCTION' },
+          where: { organizationId, offerId: order.offerId || undefined, status: 'PREPARATION' },
+          data: { status: 'IN_PRINT' },
         });
       }
     }
