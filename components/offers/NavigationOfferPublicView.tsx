@@ -22,6 +22,7 @@ import {
   RefreshCw,
   RotateCw,
   Calendar,
+  Maximize2,
 } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { canDownloadInstallationSheet, canDownloadOfferPdf } from '@/lib/offers/navigation-document-access';
@@ -490,11 +491,28 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
       <div className="overflow-hidden rounded-3xl border border-sky-800/60 bg-gradient-to-br from-sky-950 via-slate-900 to-slate-950 p-6 text-white shadow-xl lg:p-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-4 flex-1">
-            {offer.client?.logoUrl && (
+            {targets[0]?.photoUrl ? (
+              <button
+                type="button"
+                onClick={() => setActiveLightboxImage(toPhotoFullUrl(String(targets[0].photoUrl)))}
+                className="h-16 w-24 sm:h-20 sm:w-32 rounded-2xl overflow-hidden border border-sky-400/40 shadow-lg bg-slate-900 shrink-0 relative group cursor-pointer text-left"
+                title="Kliknutím zvětšit fotografii cílové prodejny"
+              >
+                <img
+                  src={targets[0].photoUrl}
+                  alt={targets[0].name}
+                  className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                />
+                <span className="absolute bottom-1 right-1 rounded-md bg-black/70 backdrop-blur-xs px-1.5 py-0.5 text-[9px] font-bold text-white flex items-center gap-0.5">
+                  <Maximize2 size={10} />
+                  Prodejna
+                </span>
+              </button>
+            ) : offer.client?.logoUrl ? (
               <div className="h-16 w-24 sm:h-20 sm:w-32 rounded-2xl bg-white p-2 border border-sky-400/30 shadow-md flex items-center justify-center shrink-0">
                 <img src={offer.client.logoUrl} alt={offer.client.name} className="max-h-full max-w-full object-contain" />
               </div>
-            )}
+            ) : null}
             <div className="space-y-2 flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="rounded-xl bg-rose-500/20 p-2 text-rose-400 border border-rose-500/30">
@@ -512,13 +530,6 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                   <p className="text-sm font-medium text-slate-300">
                     📍 {targets[0].address || `${targets[0].latitude.toFixed(5)}, ${targets[0].longitude.toFixed(5)}`}
                   </p>
-                {targets[0].photoUrl ? (
-                  <img
-                    alt={`Cílová provozovna ${targets[0].name}`}
-                    className="mt-4 h-36 w-full max-w-md rounded-2xl border border-sky-700/60 object-cover shadow-lg"
-                    src={targets[0].photoUrl}
-                  />
-                ) : null}
                 {targets[0].note && (
                   <div className="mt-3 rounded-xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-300">
                     <strong>Poznámka k příjezdu:</strong> {targets[0].note}
