@@ -21,6 +21,7 @@ export function normalizeOperation(value: unknown): Operation {
 export type TaskSpec = {
   label: string; description: string; mediaType: ElectionRemovalMediaType; objectType: string;
   latitude: number; longitude: number; quantity: number; operationType: Operation;
+  gpsConfirmed?: boolean; destinationGpsConfirmed?: boolean;
   materialDisposition: Disposition; materialInstructions: string; destinationName: string;
   destinationLatitude: number | null; destinationLongitude: number | null;
   carrierId: string | null; surfaceId: string | null; referenceUrl: string | null;
@@ -54,16 +55,16 @@ export function parseTaskSpec(raw: unknown): TaskSpec {
   const destination = { latitude: p.destinationLatitude, longitude: p.destinationLongitude };
   if (transport && (!coordinates(destination) || p.destinationGpsConfirmed !== true || !text(p.destinationName))) throw new Error('Přeprava vyžaduje pojmenovaný cíl a potvrzenou cílovou GPS.');
   const legacyOp = operationType === 'REPLACE_AD' || operationType === 'REMOVE_AD' || operationType === 'INSTALL_AD' ? 'BANNER_CHANGE' : operationType === 'RELOCATION' ? 'RELOCATION' : 'FULL_REMOVAL';
-  const defaultSlots = transport ? calculateMediaLoadSlots(mediaType, legacyOp, quantity) : 0;
+  const defaultSlots = transport ? Math.max(1, calculateMediaLoadSlots(mediaType, legacyOp, quantity)) : 0;
   const loadSlots = integer(p.loadSlots ?? defaultSlots, 0, 100000);
   if (transport && loadSlots === 0) throw new Error('Určete skutečný nárok přepravovaného materiálu na kapacitu (alespoň 1 slot).');
   const referenceUrl = text(p.referenceUrl, 2000) || null;
   if (referenceUrl && !/^https?:\/\//.test(referenceUrl)) throw new Error('Podklad musí být HTTP(S) odkaz.');
   if (p.deadlineAt && !Number.isFinite(new Date(String(p.deadlineAt)).getTime())) throw new Error('Neplatný termín práce.');
-  return { windowStart: window.windowStart ? new Date(window.windowStart) : null, windowEnd: window.windowEnd ? new Date(window.windowEnd) : null, label, description, mediaType, objectType, latitude: Number(p.latitude), longitude: Number(p.longitude), quantity, operationType,
+  return { windowStart: window.windowStart ? new Date(window.windowStart) : null, windowEnd: window.windowEnd ? new Date(window.windowEnd) : null, label, description, mediaType, objectType, latitude: Number(p.latitude), longitude: Number(p.longitude), gpsConfirmed: true, quantity, operationType,
     deadlineAt: p.deadlineAt ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(String(p.deadlineAt)) ? zonedTime(String(p.deadlineAt), '23:59', 'Europe/Prague') : new Date(String(p.deadlineAt)).getTime()) : null,
     materialDisposition, materialInstructions, destinationName: text(p.destinationName, 200),
-    destinationLatitude: transport ? Number(p.destinationLatitude) : null, destinationLongitude: transport ? Number(p.destinationLongitude) : null,
+    destinationLatitude: transport ? Number(p.destinationLatitude) : null, destinationLongitude: transport ? Number(p.destinationLongitude) : null, destinationGpsConfirmed: transport,
     carrierId: text(p.carrierId, 100) || null, surfaceId: text(p.surfaceId, 100) || null, referenceUrl,
     contact: text(p.contact, 500), accessInstructions: text(p.accessInstructions),
     layerName: text(p.layerName, 200) || null,

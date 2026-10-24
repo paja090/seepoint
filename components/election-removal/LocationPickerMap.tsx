@@ -193,10 +193,7 @@ export function LocationPickerMap({
       }
       if (Array.isArray(data) && data.length > 0) {
         setSearchResults(data);
-        if (data.length === 1) {
-          // Direct jump if only 1 exact result
-          handleSelectLocation(data[0]);
-        }
+        handleSelectLocation(data[0]);
       } else {
         setSearchError('Nebylo nalezeno žádné místo odpovídající hledání.');
       }
