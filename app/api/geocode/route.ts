@@ -3,7 +3,7 @@ import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { reverseGeocode } from '@/lib/google-maps';
 
 export async function GET(request: Request) {
-  const auth = await requireApiAccess('offers'); if (isApiDenied(auth)) return auth;
+  const auth = await requireApiAccess(['offers', 'work', 'map', 'dashboard', 'electionRemoval']); if (isApiDenied(auth)) return auth;
   const url = new URL(request.url);
   const latStr = url.searchParams.get('lat');
   const lngStr = url.searchParams.get('lng');
