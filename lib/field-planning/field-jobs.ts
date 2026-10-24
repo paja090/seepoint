@@ -6,9 +6,7 @@ export const isFieldJobId=(id:string)=>id.startsWith('field-step:')||id.startsWi
 export async function requireFieldJobsEnabled(db:Prisma.TransactionClient) {
   const {organizationId}=requireTenantContext();
   const organization=await db.organization.findUnique({where:{id:organizationId},select:{plan:true,enabledModules:true}});
-  if (!isModuleEnabled(organization, 'electionRemoval') && !isModuleEnabled(organization, 'work')) {
-    throw new Error('FORBIDDEN: Terénní práce nejsou aktivní.');
-  }
+  if(!isModuleEnabled(organization,'electionRemoval'))throw new Error('FORBIDDEN: Terénní práce nejsou aktivní.');
 }
 export async function loadFieldJobs(db:Prisma.TransactionClient, jobIds?:string[]) {
   const {organizationId}=requireTenantContext();
