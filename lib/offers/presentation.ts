@@ -380,9 +380,9 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
 
         if (productionSum > 0) {
           rows.push({
-            label: 'UV tisk na Dibond',
+            label: 'Výroba a UV tisk',
             amount: productionSum,
-            note: 'Potisk hliníkových Dibond desek 3mm',
+            note: 'Výroba reklamních ploch a odolný UV potisk',
           });
         }
 
@@ -390,7 +390,7 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
           rows.push({
             label: 'Montáž a instalace',
             amount: installationSum,
-            note: 'Ukotvení na vybrané sloupy VO',
+            note: 'Profesionální instalace a osazení v terénu',
           });
         }
 

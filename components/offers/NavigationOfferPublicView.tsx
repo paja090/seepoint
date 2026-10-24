@@ -942,7 +942,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                   <th className="px-3 py-3 text-right">Počet</th>
                   <th className="px-3 py-3 text-right">Pronájem ({durationOption.shortLabel})</th>
                   <th className="px-3 py-3 text-right">Výroba rámu</th>
-                  <th className="px-3 py-3 text-right">UV tisk na Dibond</th>
+                  <th className="px-3 py-3 text-right">Výroba plochy</th>
                   <th className="px-3 py-3 text-right">Montáž</th>
                   <th className="px-3 py-3 text-right">Demontáž</th>
                   <th className="px-5 py-3 text-right">Celkem bez DPH</th>
@@ -1046,7 +1046,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 </dd>
               </div>
               <div className="rounded-xl bg-white p-3 border"><dt className="text-slate-500 text-xs">Výroba rámů (D-FLEX)</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.frame)}</dd></div>
-              <div className="rounded-xl bg-white p-3 border"><dt className="text-slate-500 text-xs">UV tisk na Dibond</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.production)}</dd></div>
+              <div className="rounded-xl bg-white p-3 border"><dt className="text-slate-500 text-xs">Výroba reklamní plochy</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.production)}</dd></div>
               <div className="rounded-xl bg-white p-3 border"><dt className="text-slate-500 text-xs">Montáž / Instalace</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.installation)}</dd></div>
               <div className="rounded-xl bg-white p-3 border"><dt className="text-slate-500 text-xs">Demontáž / Deinstalace</dt><dd className="mt-1 font-bold text-slate-900">{money(priceTotals.removal)}</dd></div>
             </dl>
@@ -1411,7 +1411,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 <span className="text-base leading-none">🛡️</span>
                 <div>
                   <span className="font-bold text-white block">Materiálové provedení:</span>
-                  <span className="text-slate-400">Odolná sendvičová deska <strong>DIBOND (3 mm)</strong>, standardně jednostranná; dle lokality oboustranná.</span>
+                  <span className="text-slate-400">Odolné certifikované materiály s UV stálým potiskem dle typu nosiče (sendvičové desky pro směrovky VO, hliníkové profily pro áčka, zátěžové PVC pro plachty a bannery).</span>
                 </div>
               </div>
 
