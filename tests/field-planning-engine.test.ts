@@ -75,3 +75,18 @@ test('disabled module cannot be accessed even by manager', () => {
   assert.equal(hasModuleAccess(user, 'workRoute', 'work'), false);
 });
 test('snapshot fingerprint survives JSONB key reordering', () => { assert.equal(hash({ a: 1, b: { x: 2, y: 3 } }), hash({ b: { y: 3, x: 2 }, a: 1 })); });
+test('parseProfile validates and parses multiple warehouses', () => {
+  const parsed = parseProfile({
+    ...profile,
+    warehouses: [
+      { id: 'wh-1', name: 'Centrální sklad Ostrava', address: 'Fráni Šrámka 5', location: { latitude: 49.827, longitude: 18.261 }, isMain: true },
+      { id: 'wh-2', name: 'Sklad Havířov', location: { latitude: 49.779, longitude: 18.436 } },
+      { id: 'wh-invalid', name: 'Neplatný bez GPS', location: null },
+    ],
+  });
+  assert.equal(parsed.warehouses?.length, 2);
+  assert.equal(parsed.warehouses[0].name, 'Centrální sklad Ostrava');
+  assert.equal(parsed.warehouses[0].isMain, true);
+  assert.equal(parsed.warehouses[1].name, 'Sklad Havířov');
+  assert.equal(parsed.warehouses[1].isMain, false);
+});

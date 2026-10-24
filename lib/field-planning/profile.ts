@@ -35,13 +35,30 @@ export function parseProfile(value: unknown): PlanningProfile {
         (a) => a && typeof a.key === 'string' && typeof a.label === 'string' && typeof a.defaultMinutes === 'number'
       )
     : undefined;
+  const warehouses = Array.isArray(p.warehouses)
+    ? (p.warehouses as Array<Record<string, unknown>>)
+        .filter((w) => w && typeof w.name === 'string' && coordinates(w.location))
+        .map((w) => {
+          const loc = w.location as { latitude: number | string; longitude: number | string };
+          return {
+            id: String(w.id || 'wh-' + Math.random().toString(36).slice(2, 9)),
+            name: String(w.name).trim(),
+            address: typeof w.address === 'string' ? w.address.trim() : undefined,
+            location: {
+              latitude: Number(loc.latitude),
+              longitude: Number(loc.longitude),
+            },
+            isMain: Boolean(w.isMain),
+          };
+        })
+    : undefined;
   return { navigationPointMinutes, timezone: p.timezone, country: p.country as string | null, depot: p.depot, endLocation: p.endLocation,
     workdayStart: p.workdayStart as string, workdayEnd: p.workdayEnd as string,
     breakMinutes: bounded(p.breakMinutes, 0, 240, 'přestávka'), overtimeMinutes: bounded(p.overtimeMinutes, 0, 480, 'přesčas'),
     flexibleHours, maxShiftHours, vehicleCapacitySlots, warehouseUnloadMinutes,
     routeMode: p.routeMode === 'SEPARATE_MEDIA' ? 'SEPARATE_MEDIA' : 'MIXED',
     strategy: p.strategy as PlanningProfile['strategy'], serviceMinutes,
-    customActivities,
+    customActivities, warehouses,
     fallbackSpeedKph: bounded(p.fallbackSpeedKph, 1, 130, 'odhad rychlosti'), fallbackDistanceFactor: bounded(p.fallbackDistanceFactor, 1, 5, 'koeficient vzdálenosti'),
     maximumJobsPerRoute: bounded(p.maximumJobsPerRoute, 1, 100, 'počet zastávek'), vehicleRequired: p.vehicleRequired,
     requireHumanApproval: true, enabled: p.enabled };
@@ -91,5 +108,6 @@ export function zonedTime(day: string, time: string, timezone: string): number {
 export function profileForNavigation(profile: PlanningProfile, navigation: boolean): PlanningProfile {
   if (navigation) return profile;
   const { navigationPointMinutes: _hidden, ...rest } = profile;
+  void _hidden;
   return { ...rest, serviceMinutes: Object.fromEntries(Object.entries(profile.serviceMinutes).filter(([key]) => !key.startsWith('NAVIGATION_INSTALLATION'))) };
 }
