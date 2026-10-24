@@ -472,6 +472,7 @@ export async function getNavigationOrderDetail(id: string, user: CurrentUser): P
     id: o.id,
     crmOrderId: o.crmOrderId,
     orderNumber: o.crmOrder.orderNumber,
+    clientOrderCode: o.crmOrder.clientOrderCode || null,
     title: o.crmOrder.title,
     clientId: o.crmOrder.clientId,
     clientName: o.crmOrder.client.name,

@@ -8,7 +8,6 @@ import type { CrewInput, PlanningInput, PlanningProfile, PlanView } from '@/lib/
 import { RouteMap } from './field-planning/RouteMap';
 import { PlanningProfileForm } from './field-planning/PlanningProfileForm';
 import { FieldTelemetryCard } from './field-planning/FieldTelemetryCard';
-import { QuickCreateWorkOrderModal } from './field-planning/QuickCreateWorkOrderModal';
 import {
   Calendar,
   Clock,
@@ -131,7 +130,6 @@ export function WorkRoutePlanner({
   const [telemetryOpen, setTelemetryOpen] = useState(false);
   const [inputsChanged, setInputsChanged] = useState(false);
   const [acceptEstimated, setAcceptEstimated] = useState(false);
-  const [createTaskModalOpen, setCreateTaskModalOpen] = useState(false);
 
   const [renameModal, setRenameModal] = useState<{ open: boolean; crewId: string; currentName: string } | null>(null);
   const [transferModal, setTransferModal] = useState<{
@@ -147,15 +145,6 @@ export function WorkRoutePlanner({
 
   const requestKey = useRef<string | null>(null);
   const loadCounter = useRef(0);
-
-  const handleTaskCreated = async (newOrderId: string) => {
-    setToast('Úkol byl úspěšně vytvořen v Plánu práce a zařazen do výběru.');
-    setTimeout(() => setToast(null), 4000);
-    await load();
-    setSelectedJobs((prev) => (prev.includes(newOrderId) ? prev : [...prev, newOrderId]));
-    setInputsChanged(true);
-    setActiveTab('jobs');
-  };
 
   async function handleRenameSubmit(crewId: string, newName: string) {
     const trimmed = newName.trim();
@@ -583,12 +572,15 @@ export function WorkRoutePlanner({
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            onClick={() => setCreateTaskModalOpen(true)}
+            onClick={() => {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+              window.dispatchEvent(new CustomEvent('open-dispatch-intake'));
+            }}
             className="flex items-center gap-1.5 rounded-xl border border-sky-300 bg-sky-50 px-3.5 py-2.5 text-xs font-bold text-sky-800 hover:bg-sky-100 transition shadow-xs"
-            title="Vytvořit nový terénní úkol do plánu práce a zařadit do plánování"
+            title="Otevřít centrální formulář zadání práce v hlavním dispečinku"
           >
             <Plus size={15} />
-            <span>+ Nový úkol</span>
+            <span>+ Zadat práci</span>
           </button>
 
           <button
@@ -991,11 +983,15 @@ export function WorkRoutePlanner({
                 <div className="flex items-center gap-2 text-xs">
                   <button
                     type="button"
-                    onClick={() => setCreateTaskModalOpen(true)}
+                    onClick={() => {
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                      window.dispatchEvent(new CustomEvent('open-dispatch-intake'));
+                    }}
                     className="flex items-center gap-1 font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 px-2.5 py-1 rounded-lg border border-sky-200 transition mr-1"
+                    title="Otevřít centrální formulář zadání práce v dispečinku"
                   >
                     <Plus size={13} />
-                    <span>Přidat úkol</span>
+                    <span>Přidat práci</span>
                   </button>
                   <button
                     onClick={() => {
@@ -1535,14 +1531,6 @@ export function WorkRoutePlanner({
           </div>
         </div>
       )}
-
-      {/* Quick Create Work Order Modal */}
-      <QuickCreateWorkOrderModal
-        isOpen={createTaskModalOpen}
-        onClose={() => setCreateTaskModalOpen(false)}
-        onCreated={handleTaskCreated}
-        defaultDate={date}
-      />
 
       {/* Toast Notification */}
       {toast && (

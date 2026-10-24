@@ -130,6 +130,7 @@ export type NavigationOrderDetail = {
   id: string;
   crmOrderId: string;
   orderNumber: string;
+  clientOrderCode?: string | null;
   title: string;
   clientId: string;
   clientName: string;

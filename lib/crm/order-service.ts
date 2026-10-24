@@ -1,6 +1,7 @@
 import { CrmOrderStatus, CrmProjectType } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { nextCrmOrderNumber } from './domain';
+import { syncCrmOrderToWorkOrderInTransaction } from './crm-work-sync';
 
 export type CreateCrmOrderInput = {
   clientId: string;
@@ -83,6 +84,8 @@ export async function convertOfferToCrmOrder(offerId: string, actorUserId: strin
         },
       });
     }
+
+    await syncCrmOrderToWorkOrderInTransaction(tx, order.id);
 
     await tx.crmAuditLog.create({
       data: {
