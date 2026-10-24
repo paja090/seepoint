@@ -230,3 +230,4 @@ test('syncCrmOrderToWorkOrderInTransaction: is idempotent when WorkOrder already
   assert.equal(createdWorkOrdersCount, 0, 'Should not create duplicate WorkOrder');
   assert.equal(createdItems.length, 0, 'Should not duplicate already existing WorkOrderItem');
 });
+

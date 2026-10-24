@@ -74,24 +74,28 @@ export async function executeFieldStep(tx: Prisma.TransactionClient, stop: Plann
     startedAt: point.startedAt ?? new Date(), completedAt: done ? new Date() : null, completedByUserId: done ? actor.id : null } });
   await tx.electionCampaign.update({ where: { id: point.campaignId, organizationId }, data: {
     completedPoints: await tx.electionRemovalPoint.count({ where: { organizationId, campaignId: point.campaignId, status: 'COMPLETED' } }) } });
-  const linkedWorkOrders = await tx.workOrder.findMany({
-    where: {
-      organizationId,
-      planningConstraints: { path: ['electionRemovalPointId'], equals: point.id },
-    },
-    select: { id: true },
-  });
-  if (linkedWorkOrders.length > 0) {
-    const nextStatus = done ? 'DONE' : 'IN_PROGRESS';
-    for (const wo of linkedWorkOrders) {
-      await tx.workOrder.update({
-        where: { id: wo.id },
-        data: { status: nextStatus },
-      });
-      await tx.workTask.updateMany({
-        where: { organizationId, workOrderId: wo.id },
-        data: { status: nextStatus },
-      });
+  if (tx.workOrder?.findMany) {
+    const linkedWorkOrders = await tx.workOrder.findMany({
+      where: {
+        organizationId,
+        planningConstraints: { path: ['electionRemovalPointId'], equals: point.id },
+      },
+      select: { id: true },
+    });
+    if (linkedWorkOrders.length > 0) {
+      const nextStatus = done ? 'DONE' : 'IN_PROGRESS';
+      for (const wo of linkedWorkOrders) {
+        await tx.workOrder.update({
+          where: { id: wo.id },
+          data: { status: nextStatus },
+        });
+        if (tx.workTask?.updateMany) {
+          await tx.workTask.updateMany({
+            where: { organizationId, workOrderId: wo.id },
+            data: { status: nextStatus },
+          });
+        }
+      }
     }
   }
   await tx.crmAuditLog.create({ data: { id: eventId, organizationId, entityType: 'FieldWorkStep', entityId: step.id,
