@@ -459,7 +459,9 @@ export function MonthlyInvoiceModal({ settlementId, onClose, onSettlementUpdated
                   </div>
                 ) : (
                   <div className="hidden md:flex md:col-span-3 rounded-xl border border-dashed border-slate-200 p-3 items-center justify-center text-center text-slate-400 text-[11px]">
-                    Pro QR platbu doplňte číslo účtu nebo IBAN
+                    {data.grossAmount <= 0
+                      ? 'Vyúčtování je vyrovnané (0 Kč)'
+                      : 'Pro QR platbu doplňte číslo účtu nebo IBAN'}
                   </div>
                 )}
 
