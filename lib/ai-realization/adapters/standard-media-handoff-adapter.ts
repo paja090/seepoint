@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { nextCrmOrderNumber } from '@/lib/crm/domain';
 import { isModuleEnabled } from '@/lib/organization-modules';
+import { syncCrmOrderToWorkOrderInTransaction } from '@/lib/crm/crm-work-sync';
 import type { HandoffActor } from './navigation-handoff-adapter';
 
 export async function executeStandardMediaHandoffInTransaction(
@@ -79,6 +80,9 @@ export async function executeStandardMediaHandoffInTransaction(
         },
       });
     }
+
+    // Synchronize to WorkOrder in Plán práce (/work)
+    await syncCrmOrderToWorkOrderInTransaction(tx, crmOrder.id);
 
     // Create PrintProductionJob if module is enabled and does not exist
     const org = await tx.organization.findUnique({ where: { id: organizationId } });

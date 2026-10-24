@@ -1,8 +1,10 @@
+import type { WorkType } from '@prisma/client';
 import { prisma } from '../db';
 import { requireTenantContext } from '../tenant-context';
 import { hash, plannerTransaction, requirePlannerManager, type PlannerActor } from '../field-planning/service';
-import { parseTaskSpec, type TaskSpec } from '../election-removal/task-spec';
+import { parseTaskSpec, operations, type TaskSpec } from '../election-removal/task-spec';
 import { saveFieldTaskTx } from '../election-removal/tasks';
+import { syncWorkOrderTasks } from '../work-task-sync';
 
 export async function createDispatchWork(raw: unknown, actor: PlannerActor, db = prisma) {
   requirePlannerManager(actor);
@@ -108,6 +110,60 @@ export async function createDispatchWork(raw: unknown, actor: PlannerActor, db =
       };
       const point = await saveFieldTaskTx(tx, campaign.id, taskPayload, actor);
       createdPointIds.push(point.id);
+
+      const workType: WorkType =
+        spec.operationType === 'INSTALL_OBJECT' || spec.operationType === 'INSTALL_AD' ? 'INSTALLATION'
+        : spec.operationType === 'REPLACE_AD' ? 'REINSTALLATION'
+        : spec.operationType === 'REMOVE_OBJECT' || spec.operationType === 'REMOVE_AD' ? 'DEINSTALLATION'
+        : spec.operationType === 'REPAIR' ? 'REPAIR'
+        : spec.operationType === 'INSPECTION' ? 'CHECK'
+        : spec.operationType === 'RELOCATION' ? 'TRANSPORT'
+        : 'OTHER';
+
+      const workOrder = await tx.workOrder.create({
+        data: {
+          organizationId,
+          title: spec.label,
+          description: spec.description || `${operations[spec.operationType]} – ${spec.objectType}`,
+          status: 'PLANNED',
+          priority: 'NORMAL',
+          workType,
+          scheduledAt: targetDate || new Date(),
+          deadlineAt: spec.deadlineAt || targetDate,
+          clientName: clientName || 'Běžná zakázka',
+          locationNote: spec.label,
+          mediaLabel: spec.objectType,
+          quantity: spec.quantity,
+          estimatedHours: (spec.serviceMinutes / 60).toFixed(2),
+          planningConstraints: {
+            electionRemovalPointId: point.id,
+            dispatchIntake: true,
+            latitude: spec.latitude,
+            longitude: spec.longitude,
+            scope: 'FIELD',
+          },
+          referenceUrl: spec.referenceUrl || null,
+        },
+      });
+
+      if (employeeId) {
+        const employee = await tx.employee.findUnique({
+          where: { id: employeeId },
+          select: { id: true, firstName: true, lastName: true, userId: true },
+        });
+        if (employee) {
+          await tx.workAssignment.create({
+            data: {
+              organizationId,
+              workOrderId: workOrder.id,
+              userId: employee.userId,
+              workerName: `${employee.firstName} ${employee.lastName}`.trim(),
+            },
+          });
+        }
+      }
+
+      await syncWorkOrderTasks(workOrder.id, tx);
     }
 
     await tx.crmAuditLog.create({

@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Building2, CalendarDays, CheckCheck, ChevronLeft, ChevronRight, ClipboardList, MapPin, Plus, RefreshCw, Search, Settings2, SlidersHorizontal, Truck, Users } from 'lucide-react';
 import { dispatchPlanningLinks, type DispatchItem, type DispatchPlan } from '@/lib/dispatch/queue';
@@ -60,6 +60,12 @@ export function DispatchBoard({
   const [intakeBusy, setIntakeBusy] = useState(false);
   const closePanel = useCallback(() => { setPanel(null); setIntakeBusy(false); }, []);
   const openWork = useCallback((id: string) => setPanel({ type: 'work', id }), []);
+
+  useEffect(() => {
+    const handleOpenIntake = () => setPanel({ type: 'create' });
+    window.addEventListener('open-dispatch-intake', handleOpenIntake);
+    return () => window.removeEventListener('open-dispatch-intake', handleOpenIntake);
+  }, []);
   const visible = useMemo(() => items.filter(item => (state === 'all' || item.state === state) && (source === 'all' || item.source === source) && [item.title, item.client, item.address, item.reason].join(' ').toLocaleLowerCase('cs').includes(query.toLocaleLowerCase('cs'))), [items, state, source, query]);
   const groups = dispatchPlanningLinks(items.filter(item => selected.includes(item.id)), date);
   const dayPlans = useMemo(() => plans.filter(plan => plan.date === date), [plans, date]);

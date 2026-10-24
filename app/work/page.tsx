@@ -5,6 +5,7 @@ import { prisma, ensureWorkOrderSchema } from '@/lib/db';
 import { overlapsAbsence } from '@/lib/work-absence-conflicts';
 import { getOrganizationWorkCategories } from '@/lib/work-categories-server';
 import { extractOrderRouteMap } from '@/lib/field-planning/order-route-mapper';
+import { syncCrmOrderToWorkOrderInTransaction } from '@/lib/crm/crm-work-sync';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +23,25 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
   const initialClientName = cleanParam(params.clientName) || '';
   const initialCampaignDateFrom = cleanParam(params.campaignDateFrom) || '';
   const initialCampaignDateTo = cleanParam(params.campaignDateTo) || '';
+
+  // Ensure active CRM realizations are reflected in WorkOrders
+  const unlinkedCrmOrders = await prisma.crmOrder.findMany({
+    where: {
+      organizationId: user.organizationId,
+      workOrders: { none: {} },
+      realizations: { some: {} },
+      status: { notIn: ['CANCELLED', 'COMPLETED'] },
+    },
+    select: { id: true },
+    take: 20,
+  });
+  if (unlinkedCrmOrders.length > 0) {
+    for (const o of unlinkedCrmOrders) {
+      await prisma.$transaction(async (tx) => {
+        await syncCrmOrderToWorkOrderInTransaction(tx, o.id);
+      });
+    }
+  }
 
   const [orders, clients, carriers, employees, categories, plans] = await Promise.all([
     prisma.workOrder.findMany({

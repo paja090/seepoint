@@ -16,6 +16,10 @@ import {
   ArrowLeft,
   Calendar,
   RotateCcw,
+  Upload,
+  ExternalLink,
+  FileText,
+  FolderOpen,
 } from 'lucide-react';
 import type { NavigationOrderDetail, NavigationPointItem } from '@/lib/navigation/types';
 import {
@@ -30,6 +34,7 @@ import { QuickCompanySettingsModal, type CompanySettingsForm } from '@/component
 import { ActionableResolutionCard } from '@/components/ui/ActionableResolutionCard';
 import { NavigationInvoiceModal } from './NavigationInvoiceModal';
 import { NavigationContactModal } from './NavigationContactModal';
+import { NavigationScheduleModal } from './NavigationScheduleModal';
 
 export type NavigationTabKey = 'overview' | 'survey' | 'points' | 'graphics' | 'installation' | 'photos' | 'billing' | 'history';
 
@@ -82,6 +87,24 @@ export function NavigationOrderDetailView({
   const [showCompanyModal, setShowCompanyModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+
+  // Quick Installation Date in Montáž Tab
+  const [quickInstallationDate, setQuickInstallationDate] = useState(() => {
+    if (!order.installationDate) return '';
+    try {
+      return new Date(order.installationDate).toISOString().slice(0, 10);
+    } catch {
+      return '';
+    }
+  });
+  const [savingInstallationDate, setSavingInstallationDate] = useState(false);
+
+  // Graphics & Production Tab State
+  const [artworkUrlInput, setArtworkUrlInput] = useState(order.graphicArtworkUrl || '');
+  const [cloudDriveUrl, setCloudDriveUrl] = useState(order.clientArtworkUrl || '');
+  const [savingGraphics, setSavingGraphics] = useState(false);
+  const [uploadingArtwork, setUploadingArtwork] = useState(false);
 
   // Revert Status Modal
   const [showRevertModal, setShowRevertModal] = useState(false);
@@ -290,6 +313,81 @@ export function NavigationOrderDetailView({
     }
   }
 
+  async function handleSaveInstallationDate(dateStr: string) {
+    if (!dateStr) return;
+    setSavingInstallationDate(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const res = await fetch(`/api/navigation/orders/${currentOrder.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          installationDate: new Date(dateStr).toISOString(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Chyba při ukládání termínu montáže.');
+      setCurrentOrder(data.order);
+      setSuccessMsg('Termín montáže byl úspěšně naplánován.');
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Chyba při ukládání termínu.');
+    } finally {
+      setSavingInstallationDate(false);
+    }
+  }
+
+  async function handleSaveGraphics(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    setSavingGraphics(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const bodyPayload: Record<string, unknown> = {
+        graphicArtworkUrl: artworkUrlInput.trim() || null,
+      };
+      if (cloudDriveUrl.trim()) {
+        bodyPayload.clientArtworkUrl = cloudDriveUrl.trim();
+        bodyPayload.clientArtworkFileName = 'Externí tisková data (Cloud disk)';
+      }
+      const res = await fetch(`/api/navigation/orders/${currentOrder.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyPayload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Chyba při ukládání grafických podkladů.');
+      setCurrentOrder(data.order);
+      setSuccessMsg('Grafické podklady a odkazy na tisková data byly úspěšně uloženy.');
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Chyba při ukládání grafických podkladů.');
+    } finally {
+      setSavingGraphics(false);
+    }
+  }
+
+  function handleArtworkFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      setErrorMsg('Soubor náhledu je příliš velký (max 8 MB). Pro objemná tisková data vložte níže odkaz na Google Disk nebo OneDrive.');
+      return;
+    }
+    setUploadingArtwork(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setArtworkUrlInput(reader.result);
+      }
+      setUploadingArtwork(false);
+    };
+    reader.onerror = () => {
+      setErrorMsg('Chyba při čtení souboru.');
+      setUploadingArtwork(false);
+    };
+    reader.readAsDataURL(file);
+  }
+
   // Next primary action helper based on status
   const getPrimaryNextAction = () => {
     switch (currentOrder.status) {
@@ -340,7 +438,12 @@ export function NavigationOrderDetailView({
                 </span>
                 <h1 className="text-xl font-bold text-slate-900">{currentOrder.targetName}</h1>
               </div>
-              <p className="text-xs text-slate-500">Klient: <b>{currentOrder.clientName}</b> | Obchodník: <b>{currentOrder.assignedUserName || 'Nepřiřazen'}</b></p>
+              <p className="text-xs text-slate-500">
+                Klient: <b>{currentOrder.clientName}</b> | Obchodník: <b>{currentOrder.assignedUserName || 'Nepřiřazen'}</b>
+                {currentOrder.clientOrderCode && (
+                  <> | Objednávka: <b className="text-sky-800 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">{currentOrder.clientOrderCode}</b></>
+                )}
+              </p>
             </div>
           </div>
 
@@ -556,9 +659,26 @@ export function NavigationOrderDetailView({
               </div>
 
               <div className="card space-y-4 md:col-span-2">
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Calendar size={18} className="text-amber-600" /> Termíny a harmonogram
-                </h3>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <Calendar size={18} className="text-amber-600" /> Termíny a harmonogram
+                    </h3>
+                    {currentOrder.clientOrderCode && (
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Objednávka / smlouva klienta: <b className="text-slate-800">{currentOrder.clientOrderCode}</b>
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowScheduleModal(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:border-amber-300 hover:text-amber-900 transition"
+                    title="Upravit termíny nájmu, montáže a kód objednávky"
+                  >
+                    <Edit3 size={13} /> Upravit termíny
+                  </button>
+                </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <span className="text-slate-400 font-medium block">Začátek pronájmu</span>
@@ -577,6 +697,11 @@ export function NavigationOrderDetailView({
                     <span className="font-bold text-slate-900">{currentOrder.deinstallationDate ? formatNavigationDate(currentOrder.deinstallationDate) : 'Neuvedena'}</span>
                   </div>
                 </div>
+                {currentOrder.targetNote && (
+                  <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                    <strong>Poznámka k realizaci:</strong> {currentOrder.targetNote}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -662,47 +787,301 @@ export function NavigationOrderDetailView({
 
           {/* Tab: Graphics */}
           {activeTab === 'graphics' && (
-            <div className="card space-y-4">
-              <h3 className="text-base font-bold text-slate-900">Grafické podklady & Výroba</h3>
-              <p className="text-xs text-slate-500">
-                Schválené grafické podklady pro výrobu navigačních cedulí a klientské vizualizace.
-              </p>
-              {currentOrder.graphicArtworkUrl || currentOrder.clientArtworkUrl ? (
-                <div className="grid gap-4 md:grid-cols-2">
-                  {currentOrder.graphicArtworkUrl && (
-                    <div className="rounded-xl border border-sky-200 bg-sky-50 p-3">
-                      <p className="mb-2 text-xs font-bold text-sky-900">Motiv vložený do nabídky</p>
-                      <img src={currentOrder.graphicArtworkUrl} alt="Grafický motiv z nabídky" className="h-56 w-full rounded-lg bg-white object-contain" />
-                    </div>
-                  )}
-                  {currentOrder.clientArtworkUrl && (
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                      <p className="mb-2 text-xs font-bold text-emerald-900">Podklady nahrané klientem</p>
-                      <img src={currentOrder.clientArtworkUrl} alt="Grafické podklady klienta" className="h-56 w-full rounded-lg bg-white object-contain" />
-                      <p className="mt-2 text-[11px] text-emerald-800">{currentOrder.clientArtworkFileName || 'Grafické podklady'}</p>
-                    </div>
+            <div className="card space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <ImageIcon size={18} className="text-purple-600" /> Grafické podklady & Výroba
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Správa grafických motivů, odkazů na velká tisková data (Google Disk) a schválení do výroby.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {currentOrder.graphicsApprovedAt || ['TISK_VYROBA', 'PRIPRAVENO_K_INSTALACI', 'INSTALACE', 'FOTODOKUMENTACE', 'PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO'].includes(currentOrder.status) ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
+                      <CheckCircle2 size={14} /> Grafika schválena pro výrobu
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange('TISK_VYROBA')}
+                      className="rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white hover:bg-purple-700 shadow-sm transition flex items-center gap-1.5"
+                    >
+                      <CheckCircle2 size={14} /> Schválit grafiku a zadat do výroby ➔
+                    </button>
                   )}
                 </div>
-              ) : (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center text-xs text-amber-800">
-                  🎨 K této nabídce nebyl nahrán žádný motiv ani grafický podklad.
-                </div>
-              )}
+              </div>
+
+              {/* Existing artwork view */}
+              <div className="grid gap-4 md:grid-cols-2">
+                {currentOrder.graphicArtworkUrl ? (
+                  <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold text-sky-900">Motiv vložený do nabídky / zakázky</p>
+                      <a
+                        href={currentOrder.graphicArtworkUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] font-bold text-sky-700 hover:underline inline-flex items-center gap-1"
+                      >
+                        <ExternalLink size={12} /> Zvětšit
+                      </a>
+                    </div>
+                    <img
+                      src={currentOrder.graphicArtworkUrl}
+                      alt="Grafický motiv z nabídky"
+                      className="h-56 w-full rounded-lg bg-white object-contain border border-sky-100"
+                    />
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 flex flex-col items-center justify-center text-center space-y-2">
+                    <ImageIcon size={32} className="text-slate-300" />
+                    <p className="text-xs font-semibold text-slate-600">Zatím nebyl nahrán náhled motivu</p>
+                    <p className="text-[11px] text-slate-400 max-w-xs">Můžete níže nahrát obrázek (PNG, JPG) nebo vložit URL odkaz.</p>
+                  </div>
+                )}
+
+                {currentOrder.clientArtworkUrl ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold text-emerald-900">Podklady / tisková data</p>
+                      <a
+                        href={currentOrder.clientArtworkUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] font-bold text-emerald-700 hover:underline inline-flex items-center gap-1"
+                      >
+                        <ExternalLink size={12} /> Otevřít odkaz
+                      </a>
+                    </div>
+                    {currentOrder.clientArtworkUrl.startsWith('data:image/') || currentOrder.clientArtworkUrl.match(/\.(png|jpe?g|webp|gif)$/i) ? (
+                      <img
+                        src={currentOrder.clientArtworkUrl}
+                        alt="Grafické podklady klienta"
+                        className="h-56 w-full rounded-lg bg-white object-contain border border-emerald-100"
+                      />
+                    ) : (
+                      <div className="h-56 w-full rounded-lg bg-white border border-emerald-100 p-6 flex flex-col items-center justify-center text-center space-y-3">
+                        <FolderOpen size={36} className="text-emerald-600" />
+                        <div>
+                          <p className="text-xs font-bold text-slate-800">Složka s tiskovými daty</p>
+                          <p className="text-[11px] text-slate-500 mt-1">{currentOrder.clientArtworkFileName || 'Externí úložiště'}</p>
+                        </div>
+                        <a
+                          href={currentOrder.clientArtworkUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 inline-flex items-center gap-1.5 shadow-sm"
+                        >
+                          <ExternalLink size={14} /> Přejít na složku v novém okně
+                        </a>
+                      </div>
+                    )}
+                    <p className="text-[11px] text-emerald-800 font-medium">{currentOrder.clientArtworkFileName || 'Grafické podklady'}</p>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 flex flex-col items-center justify-center text-center space-y-2">
+                    <FolderOpen size={32} className="text-slate-300" />
+                    <p className="text-xs font-semibold text-slate-600">Zatím nebyl zadán odkaz na tisková data</p>
+                    <p className="text-[11px] text-slate-400 max-w-xs">Pro velkoformátový tisk (PDF v křivkách, TIFF) vložte odkaz na Google Disk níže.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Upload & Form Section */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5 space-y-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                  <Upload size={14} /> Nahrát nebo upravit grafické podklady
+                </h4>
+
+                <form onSubmit={handleSaveGraphics} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Visual Preview / Upload */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-800 block">
+                        Náhled grafického motivu (obrázek / PDF)
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,.pdf"
+                        onChange={handleArtworkFileSelect}
+                        disabled={uploadingArtwork}
+                        className="file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-sky-100 file:text-sky-800 hover:file:bg-sky-200 text-xs text-slate-600 block w-full cursor-pointer border border-slate-200 bg-white rounded-xl p-1.5"
+                      />
+                      <div className="pt-1">
+                        <span className="text-[11px] text-slate-500 block mb-1">Nebo zadejte přímé URL obrázku motivu:</span>
+                        <input
+                          type="text"
+                          value={artworkUrlInput}
+                          onChange={(e) => setArtworkUrlInput(e.target.value)}
+                          placeholder="https://.../motiv.png"
+                          className="input text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* External Cloud Storage URL */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <FolderOpen size={14} className="text-amber-600" /> Odkaz na externí úložiště s tiskovými daty
+                      </label>
+                      <input
+                        type="url"
+                        value={cloudDriveUrl}
+                        onChange={(e) => setCloudDriveUrl(e.target.value)}
+                        placeholder="https://drive.google.com/drive/folders/... nebo OneDrive"
+                        className="input text-xs"
+                      />
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Tisková data mívají stovky megabajtů (tiskové PDF v křivkách, TIFF pro tiskárnu). Pro výrobu stačí vložit odkaz na sdílenou složku.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <button
+                      type="submit"
+                      disabled={savingGraphics || uploadingArtwork}
+                      className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-bold text-white hover:bg-slate-800 transition shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {savingGraphics ? 'Ukládám podklady...' : (
+                        <>
+                          <CheckCircle2 size={14} /> Uložit grafické podklady
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           )}
 
           {/* Tab: Installation */}
           {activeTab === 'installation' && (
-            <div className="card space-y-4">
-              <h3 className="text-base font-bold text-slate-900">Plán a stav montáže</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                <div className="rounded-xl border border-slate-200 p-4 space-y-2">
-                  <span className="font-bold text-slate-900">Termín montáže</span>
-                  <p className="text-slate-600">{currentOrder.installationDate ? formatNavigationDate(currentOrder.installationDate) : 'Zatím nenaplánováno'}</p>
+            <div className="card space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <Calendar size={18} className="text-orange-600" /> Plán a stav montáže
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Plánování termínu montáže navigačních cedulí a předání montážnímu týmu.
+                  </p>
                 </div>
-                <div className="rounded-xl border border-slate-200 p-4 space-y-2">
-                  <span className="font-bold text-slate-900">Přiřazený montážní pracovník</span>
-                  <p className="text-slate-600">Montážní tým terén</p>
+
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/navigation/installations"
+                    className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white hover:bg-teal-700 shadow-sm transition"
+                  >
+                    <Camera size={14} /> Otevřít montážní rozhraní ↗
+                  </Link>
+                </div>
+              </div>
+
+              {/* Status and Date Planning Card */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="rounded-xl border border-slate-200 p-4 space-y-3 bg-slate-50/50">
+                  <span className="font-bold text-xs text-slate-900 block">Termín montáže v terénu</span>
+                  {currentOrder.installationDate ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-lg bg-orange-100 border border-orange-200 px-3 py-1.5 text-sm font-black text-orange-900">
+                          📅 {formatNavigationDate(currentOrder.installationDate)}
+                        </span>
+                        <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
+                          ✅ Termín stanoven
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowScheduleModal(true)}
+                        className="text-xs font-bold text-sky-700 hover:underline inline-flex items-center gap-1"
+                      >
+                        <Edit3 size={12} /> Změnit datum nebo harmonogram
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 p-2.5 rounded-lg">
+                        ⚠️ Termín montáže zatím nebyl stanoven.
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="date"
+                          value={quickInstallationDate}
+                          onChange={(e) => setQuickInstallationDate(e.target.value)}
+                          className="input text-xs max-w-44 bg-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveInstallationDate(quickInstallationDate)}
+                          disabled={savingInstallationDate || !quickInstallationDate}
+                          className="rounded-xl bg-orange-600 px-4 py-2 text-xs font-bold text-white hover:bg-orange-700 disabled:opacity-50 transition shadow-sm"
+                        >
+                          {savingInstallationDate ? 'Ukládám...' : 'Naplánovat termín'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-slate-200 p-4 space-y-3 bg-slate-50/50">
+                  <span className="font-bold text-xs text-slate-900 block">Přiřazený montážní tým</span>
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-teal-100 border border-teal-200 flex items-center justify-center text-teal-800 font-bold">
+                      👷
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Montážní tým terén</p>
+                      <p className="text-[11px] text-slate-500">Technici obdrží zakázku do mobilního rozhraní</p>
+                    </div>
+                  </div>
+                  {currentOrder.status === 'PRIPRAVENO_K_INSTALACI' && (
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange('INSTALACE')}
+                      className="w-full mt-2 rounded-xl bg-orange-600 px-4 py-2 text-xs font-bold text-white hover:bg-orange-700 shadow-sm transition"
+                    >
+                      Zahájit montáž v terénu ➔
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Points Summary for Installation */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Navigační body k instalaci ({currentOrder.points.length} ks)
+                </h4>
+                <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white overflow-hidden text-xs">
+                  {currentOrder.points.map((p, idx) => (
+                    <div key={p.id} className="p-3 flex flex-wrap items-center justify-between gap-3 hover:bg-slate-50">
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold text-slate-400">#{idx + 1}</span>
+                        <div>
+                          <p className="font-bold text-slate-900">{p.label}</p>
+                          <p className="text-[11px] text-slate-500">
+                            {p.navigationType} · {p.orientation || 'Standard'} · {p.address || `${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {p.installedPhotoUrl ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                            📷 Nainstalováno s fotkou
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                            ⏳ Čeká na montáž
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1088,6 +1467,26 @@ export function NavigationOrderDetailView({
         onSuccess={(updatedOrder) => {
           setCurrentOrder(updatedOrder);
           setSuccessMsg('✅ Kontaktní údaje byly úspěšně uloženy do CRM i zakázky.');
+        }}
+      />
+
+      {/* Modal: Edit Schedule, Dates & Client Order Code */}
+      <NavigationScheduleModal
+        isOpen={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        orderId={currentOrder.id}
+        orderNumber={currentOrder.orderNumber}
+        clientName={currentOrder.clientName}
+        initialRentStart={currentOrder.rentStart}
+        initialRentEnd={currentOrder.rentEnd}
+        initialInstallationDate={currentOrder.installationDate}
+        initialDeinstallationDate={currentOrder.deinstallationDate}
+        initialClientOrderCode={currentOrder.clientOrderCode}
+        initialTargetNote={currentOrder.targetNote}
+        onSuccess={(updatedOrder) => {
+          setCurrentOrder(updatedOrder);
+          setQuickInstallationDate(updatedOrder.installationDate ? new Date(updatedOrder.installationDate).toISOString().slice(0, 10) : '');
+          setSuccessMsg('✅ Termíny a harmonogram zakázky byly úspěšně uloženy.');
         }}
       />
 

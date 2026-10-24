@@ -67,6 +67,8 @@ export async function loadPlanningData(date: string, options: {
     if (o.navigationOrder?.points.some(p => (p.carrierId && !p.carrier) || (p.surfaceId && !p.surface))) throw new Error('Cross-tenant Navigation reference rejected.');
     const isWorkshop = (o.planningConstraints as Record<string, unknown> | null)?.scope === 'WORKSHOP';
     if (isWorkshop && !options.jobIds?.includes(o.id)) return [];
+    const isDispatchIntake = (o.planningConstraints as Record<string, unknown> | null)?.dispatchIntake === true;
+    if (isDispatchIntake) return [];
 
     const constraints = parseConstraints(o.planningConstraints);
     const assignedIds: string[] = [];

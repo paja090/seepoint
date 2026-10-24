@@ -38,6 +38,7 @@ export type PlanForMapping = {
 export type OrderForMapping = {
   id: string;
   status: string;
+  planningConstraints?: unknown;
 };
 
 /**
@@ -54,6 +55,13 @@ export function extractOrderRouteMap(
   const orderRouteMap = new Map<string, WorkOrderRouteInfo>();
   const doneOrderIds = new Set(orders.filter((o) => o.status === 'DONE').map((o) => o.id));
 
+  // Build pointId -> orderId map for tasks created from dispatch intake
+  const pointToOrderMap = new Map<string, string>();
+  for (const o of orders) {
+    const pId = (o.planningConstraints as { electionRemovalPointId?: string } | null)?.electionRemovalPointId;
+    if (pId) pointToOrderMap.set(pId, o.id);
+  }
+
   // Process plans (they should be ordered by version desc or we sort them)
   const sortedPlans = [...plans].sort((a, b) => b.version - a.version);
 
@@ -66,8 +74,10 @@ export function extractOrderRouteMap(
       const stops = crew.stops || [];
 
       for (const stop of stops) {
-        const orderId = (stop as { workOrderId?: string; parentWorkOrderId?: string }).workOrderId ||
+        const directOrderId = (stop as { workOrderId?: string; parentWorkOrderId?: string }).workOrderId ||
           (stop as { workOrderId?: string; parentWorkOrderId?: string }).parentWorkOrderId;
+        const pointId = (stop as { electionRemovalPointId?: string }).electionRemovalPointId;
+        const orderId = directOrderId || (pointId ? pointToOrderMap.get(pointId) : undefined);
 
         if (!orderId || (stop as { isWarehousePitstop?: boolean }).isWarehousePitstop) continue;
 
