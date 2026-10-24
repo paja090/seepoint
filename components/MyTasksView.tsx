@@ -62,7 +62,7 @@ export function MyTasksView({
   currentUserId: string;
   currentUserName: string;
 }) {
-  const [activeFilter, setActiveFilter] = useState<'ALL' | 'PENDING_ACK' | 'IN_PROGRESS' | 'DONE'>('ALL');
+  const [activeFilter, setActiveFilter] = useState<'ACTIVE' | 'ALL' | 'PENDING_ACK' | 'IN_PROGRESS' | 'DONE'>('ACTIVE');
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [completionNote, setCompletionNote] = useState('');
@@ -71,6 +71,7 @@ export function MyTasksView({
   const [errorMsg, setErrorMsg] = useState('');
 
   const filteredTasks = tasks.filter((t) => {
+    if (activeFilter === 'ACTIVE') return t.status !== 'DONE';
     if (activeFilter === 'PENDING_ACK') {
       return t.assignments.some((a) => !a.acknowledgedAt) && t.status !== 'DONE';
     }
@@ -119,28 +120,35 @@ export function MyTasksView({
         {/* Filter Tabs */}
         <div className="flex flex-wrap gap-1.5 rounded-2xl bg-slate-200/70 p-1 text-xs font-bold">
           <button
-            onClick={() => setActiveFilter('ALL')}
-            className={`rounded-xl px-3 py-1.5 transition ${activeFilter === 'ALL' ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-700 hover:text-slate-900'}`}
+            onClick={() => setActiveFilter('ACTIVE')}
+            className={`rounded-xl px-3 py-1.5 transition ${activeFilter === 'ACTIVE' ? 'bg-slate-950 text-white shadow-sm font-black' : 'text-slate-700 hover:text-slate-900'}`}
           >
-            Všechny ({tasks.length})
+            Aktivní zakázky ({tasks.filter((t) => t.status !== 'DONE').length})
           </button>
           <button
             onClick={() => setActiveFilter('PENDING_ACK')}
-            className={`rounded-xl px-3 py-1.5 transition ${activeFilter === 'PENDING_ACK' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-slate-700 hover:text-slate-900'}`}
+            className={`rounded-xl px-3 py-1.5 transition ${activeFilter === 'PENDING_ACK' ? 'bg-amber-500 text-slate-950 shadow-sm font-black' : 'text-slate-700 hover:text-slate-900'}`}
           >
             K převzetí ({tasks.filter((t) => t.assignments.some((a) => !a.acknowledgedAt) && t.status !== 'DONE').length})
           </button>
           <button
             onClick={() => setActiveFilter('IN_PROGRESS')}
-            className={`rounded-xl px-3 py-1.5 transition ${activeFilter === 'IN_PROGRESS' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-700 hover:text-slate-900'}`}
+            className={`rounded-xl px-3 py-1.5 transition ${activeFilter === 'IN_PROGRESS' ? 'bg-sky-600 text-white shadow-sm font-black' : 'text-slate-700 hover:text-slate-900'}`}
           >
             Probíhá ({tasks.filter((t) => t.status === 'IN_PROGRESS').length})
           </button>
           <button
             onClick={() => setActiveFilter('DONE')}
-            className={`rounded-xl px-3 py-1.5 transition ${activeFilter === 'DONE' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-700 hover:text-slate-900'}`}
+            className={`rounded-xl px-3 py-1.5 transition flex items-center gap-1 ${activeFilter === 'DONE' ? 'bg-emerald-600 text-white shadow-sm font-black' : 'text-slate-700 hover:text-slate-900'}`}
           >
-            Dokončené ({tasks.filter((t) => t.status === 'DONE').length})
+            <History size={13} />
+            <span>Historie / Dokončené ({tasks.filter((t) => t.status === 'DONE').length})</span>
+          </button>
+          <button
+            onClick={() => setActiveFilter('ALL')}
+            className={`rounded-xl px-3 py-1.5 transition ${activeFilter === 'ALL' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-700 hover:text-slate-900'}`}
+          >
+            Vše ({tasks.length})
           </button>
         </div>
       </div>

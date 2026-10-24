@@ -41,8 +41,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         assignedToEmployee: { select: { id: true, firstName: true, lastName: true, position: true } },
         createdByUser: { select: { id: true, name: true, email: true } },
       },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
+      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+      take: 150,
     }),
   ]);
 
