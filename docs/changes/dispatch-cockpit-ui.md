@@ -43,5 +43,5 @@ Nové tests/dispatch-presentation.test.ts ověřují identity více plánů, zac
 - Čistá kopie commitu d08bb86: 1124 testů, 1119 úspěšných, 0 selhání, 5 přeskočených volitelných testů; návratový kód 0. Externí databázové testy nebyly zapnuté.
 - TypeScript bez emitování a cílený ESLint: úspěch.
 - Prohlížečové scénáře dispatch-cockpit, dispatch-queue, dispatch-planning a mobile-route-focus: úspěch. Desktopový a mobilní screenshot byl vizuálně zkontrolován.
-- První úplné sestavení čisté kopie zkompilovalo aplikaci, ale kontrola typů narazila na výchozí 2GB heap Node (exit 134). Opakování používá procesní NODE_OPTIONS s limitem 4 GB; produkční konfigurace zůstává beze změny.
+- První úplné sestavení čisté kopie zkompilovalo aplikaci, ale kontrola typů narazila na výchozí 2GB heap Node (exit 134). Opakování s procesním NODE_OPTIONS 4 GB prošlo kompilací, kontrolou typů a generováním 138 statických stránek. Kvůli výraznému paměťovému tlaku na 8GB počítači byl kontrolní proces ukončen před potvrzením úspěšného konce buildu. Úplný build tedy není ověřený; před sloučením je potřeba jeho dokončení na prostředí s dostatečnou pamětí. Produkční konfigurace zůstává beze změny.
 - Ve sdíleném pracovním adresáři existují nesouvisející marketingové a produktové změny; nejsou součástí commitu ani čistého ověření.
