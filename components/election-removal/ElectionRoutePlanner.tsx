@@ -1,4 +1,6 @@
 'use client';
+import { dayInZone } from '@/lib/field-planning/profile';
+import { parseDepotInput } from '@/lib/field-planning/presentation';
 
 import { useState, useMemo, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
@@ -57,6 +59,8 @@ interface ElectionRoutePlannerProps {
   employees: ResourceEmployee[];
   vehicles: ResourceVehicle[];
   initialDepot?: { latitude: number; longitude: number };
+  timezone?: string;
+  initialPlanningDate?: string;
   initialSelectedPointIds?: string[];
   parentPlanId?: string;
   canManage?: boolean;
@@ -109,6 +113,8 @@ export function ElectionRoutePlanner({
   employees,
   vehicles,
   initialDepot,
+  timezone = 'Europe/Prague',
+  initialPlanningDate,
   initialSelectedPointIds,
   parentPlanId,
   fieldPlans,
@@ -120,9 +126,9 @@ export function ElectionRoutePlanner({
   const [isPending, startTransition] = useTransition();
 
   // Planning date & time configuration
-  const initialDate = campaign.targetDate
-    ? new Date(campaign.targetDate).toISOString().slice(0, 10)
-    : new Date().toISOString().slice(0, 10);
+  const initialDate = initialPlanningDate ?? (campaign.targetDate
+    ? dayInZone(new Date(campaign.targetDate), timezone)
+    : dayInZone(new Date(), timezone));
 
   const [date, setDate] = useState<string>(initialDate);
   const [startTime, setStartTime] = useState<string>('07:30');
@@ -133,10 +139,10 @@ export function ElectionRoutePlanner({
 
   // Warehouse (depot) location: where items are unloaded and crews return
   const [depotLat, setDepotLat] = useState<string>(
-    initialDepot?.latitude ? String(initialDepot.latitude) : '50.08804'
+    initialDepot?.latitude != null ? String(initialDepot.latitude) : ''
   );
   const [depotLng, setDepotLng] = useState<string>(
-    initialDepot?.longitude ? String(initialDepot.longitude) : '14.42076'
+    initialDepot?.longitude != null ? String(initialDepot.longitude) : ''
   );
   const [saveDepotAsDefault, setSaveDepotAsDefault] = useState<boolean>(false);
   const [showDepotMap, setShowDepotMap] = useState<boolean>(true);
@@ -363,6 +369,11 @@ export function ElectionRoutePlanner({
       setCalculationError('Vyberte prosím datum plánovaného výjezdu.');
       return;
     }
+    const depot = parseDepotInput(depotLat, depotLng);
+    if (!depot) {
+      setCalculationError('Vyplňte platné GPS skutečného depa v pokročilém nastavení výjezdu.');
+      return;
+    }
     const emptyCrews = crews.filter((c) => c.employeeIds.length === 0);
     if (emptyCrews.length > 0) {
       setCalculationError('Každá posádka musí mít přiřazeného alespoň jednoho pracovníka.');
@@ -406,10 +417,7 @@ export function ElectionRoutePlanner({
           warehouseUnloadMinutes,
           filterMediaType: selectedMediumFilter,
           selectedPointIds: targetPointIds,
-          depot: {
-            latitude: parseFloat(depotLat) || 50.08804,
-            longitude: parseFloat(depotLng) || 14.42076,
-          },
+          depot,
           saveDepotAsDefault,
           crews: crews.map((c) => ({
             id: c.id,
@@ -1275,8 +1283,8 @@ export function ElectionRoutePlanner({
             {showDepotMap && (
               <div className="space-y-1">
                 <LocationPickerMap
-                  latitude={parseFloat(depotLat) || null}
-                  longitude={parseFloat(depotLng) || null}
+                  latitude={parseDepotInput(depotLat, depotLng)?.latitude ?? null}
+                  longitude={parseDepotInput(depotLat, depotLng)?.longitude ?? null}
                   onChange={(coords) => {
                     setDepotLat(coords.latitude.toFixed(5));
                     setDepotLng(coords.longitude.toFixed(5));

@@ -72,6 +72,7 @@ export default async function ElectionRemovalPlanPage({
             employees={employees}
             vehicles={vehicles}
             initialDepot={profile?.depot}
+            timezone={profile?.timezone}
             parentPlanId={resolvedSearchParams?.parentPlanId}
             fieldPlans={fieldPlans}
             initialSelectedPointIds={initialSelectedPointIds ?? (resolvedSearchParams?.parentPlanId ? campaign.points.filter(p => p.assignedFieldPlanId === resolvedSearchParams.parentPlanId).map(p => p.id) : undefined)}

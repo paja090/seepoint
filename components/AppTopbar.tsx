@@ -30,6 +30,7 @@ const pageTitles: Array<[string, string]> = [
   ['/settlements', 'Vyúčtování'],
   ['/my-settlements', 'Moje vyúčtování'],
   ['/vehicles', 'Vozidla a vozíky'],
+  ['/work/dispatch', 'Dispečink práce'],
   ['/work/route', 'Pracovní výjezd'],
   ['/work', 'Plán práce'],
   ['/import', 'Import dat'],

@@ -20,13 +20,14 @@ const additions = [
   { href: '/academy', section: 'academy' as AppSection, module: 'academy' },
   { href: '/occupancy/ai', section: 'aiOccupancy' as AppSection, module: 'aiOccupancy' },
 ];
-const current = [...original, ...additions];
+// Dispatch replaces the old planner's menu entry; both pages remain available.
+const current = [...original.map(item => item.href === '/work/route' ? {...item, href:'/work/dispatch'} : item), ...additions];
 
-test('every original link is preserved exactly once and resolves to an existing page', () => {
+test('menu destinations are unique and original pages remain available', () => {
   assert.equal(original.length, 36);
   assert.deepEqual(hrefs(navigationHubs), current.map(i => i.href).sort());
   assert.equal(new Set(hrefs(navigationHubs)).size, current.length);
-  for (const { href } of current) assert.ok(existsSync(`app${href}/page.tsx`), href);
+  for (const { href } of [...original,...current]) assert.ok(existsSync(`app${href}/page.tsx`), href);
 });
 
 test('all roles retain the original visibility across plans, overrides and missing organization', () => {
@@ -67,7 +68,8 @@ test('nested paths choose the most specific item and hub without prefix collisio
     ['/clients/acme?tab=contacts', '/clients', 'sales'],
     ['/clients/dashboard', '/clients/dashboard', 'sales'],
     ['/offers/123/pricing', '/offers', 'sales'],
-    ['/work/route/', '/work/route', 'operations'],
+    ['/work/route/', '/work/dispatch', 'operations'],
+    ['/work/dispatch?date=2035-06-10', '/work/dispatch', 'operations'],
     ['/work/123', '/work', 'operations'],
     ['/planner', '/planner', 'agenda'],
     ['/my-tasks', '/my-tasks', 'agenda'],

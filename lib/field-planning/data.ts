@@ -1,3 +1,4 @@
+import { loadFieldJobs, isFieldJobId } from './field-jobs';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../db';
 import { requireTenantContext } from '../tenant-context';
@@ -15,7 +16,7 @@ export async function loadProfile(db: Prisma.TransactionClient = prisma): Promis
   return profileForNavigation(profile, await navigationAvailable(db));
 }
 export async function loadPlanningData(date: string, options: {
-  crews?: CrewInput[]; jobIds?: string[]; now?: string; reuseReservationIds?: string[]; excludePlanIds?: string[];
+  crews?: CrewInput[]; jobIds?: string[]; includeField?: boolean; now?: string; reuseReservationIds?: string[]; excludePlanIds?: string[];
 } = {}, db: Prisma.TransactionClient = prisma): Promise<PlanningInput> {
   const { organizationId } = requireTenantContext();
   const profile = await loadProfile(db);
@@ -51,8 +52,8 @@ export async function loadPlanningData(date: string, options: {
     if (emp.userId && busyUserIds.has(emp.userId)) busyEmployees.add(emp.id);
   }
   for (const plan of plans) {
-    const snapshot = plan.planningInputSnapshot as unknown as PlanningInput;
-    snapshot.crews.forEach(c => c.employeeIds.forEach(id => busyEmployees.add(id)));
+    const summary = plan.planningSummary as unknown as import('./contracts').PlanningResult;
+    summary.crews.filter(c => c.stops.some(s => !s.isWarehousePitstop)).forEach(c => c.employeeIds.forEach(id => busyEmployees.add(id)));
   }
   // Explicitly validate every canonical relation even though tenant Prisma also scopes queries.
   const assertRows = (rows: Array<{ organizationId: string } | null>) => {
@@ -103,6 +104,8 @@ export async function loadPlanningData(date: string, options: {
       scheduledAt: (nav.plannedInstallationAt ?? nav.installationDate ?? nav.createdAt).toISOString(), campaignDateFrom: nav.rentStart?.toISOString() ?? nav.crmOrder.dateFrom?.toISOString(),
       location: null, serviceMinutes: null, constraints: {}, updatedAt: nav.updatedAt.toISOString() + '/' + nav.crmOrder.updatedAt.toISOString() }, nav, employees, profile.navigationPointMinutes));
   }
+  const withField = options.includeField || options.jobIds?.some(isFieldJobId);
+  if (withField) jobs.push(...await loadFieldJobs(db, options.jobIds));
   if (options.jobIds) {
     // WorkOrder IDs from legacy plans expand into points; new plans carry individual point IDs.
     for (const id of new Set(options.jobIds)) if (!orders.some(o => o.id === id) && !jobs.some(j => j.id === id)) throw new Error('Zakázka nebo bod nebyl nalezen v aktivní organizaci.');
@@ -132,6 +135,7 @@ export async function loadPlanningData(date: string, options: {
         id: v.id,
         organizationId,
         name: v.name,
+        ...(withField ? {capacitySlots:v.capacitySlots,equipment:v.equipment} : {}),
         status: v.status === 'IN_USE' && reservations.some(r => r.vehicleId === v.id && (options.reuseReservationIds ?? []).includes(r.id) && r.status === 'ACTIVE') ? 'RESERVED' : v.status,
         reserved: externalReservations.length > 0,
       };

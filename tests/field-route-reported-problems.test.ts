@@ -9,7 +9,7 @@ test('return closes the shift idempotently without completing unfinished steps',
   const events = new Map<string, any>();
   const plan = {id:'plan', organizationId:'org', status:'ACTIVE', date:'2099-01-01', planningInputSnapshot:{jobs:[],profile:{timezone:'Europe/Prague'}}, planningSummary:{crews:[{id:'crew',employeeIds:['employee'],stops:[{fieldWorkStepId:'unfinished'}]}]}};
   const tx:any = {
-    organization:{findUnique:async()=>({plan:"ENTERPRISE",enabledModules:{navigation:false}})},
+    organization:{findUnique:async()=>({plan:"ENTERPRISE",enabledModules:{navigation:false,electionRemoval:true}})},
     fieldPlan:{findFirst:async()=>plan, findUnique:async()=>plan},
     employee:{findFirst:async()=>({id:'employee'})},
     fieldWorkStep:{count:async()=>1,updateMany:async()=>{throw Error('Must not complete unfinished work');}},

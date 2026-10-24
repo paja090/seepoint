@@ -65,7 +65,7 @@ export const navigationHubs: NavigationHub[] = [
     { label: 'Terén & Fotodokumentace', items: [
       ["/fotodokumentace","Fotodokumentace","camera","photoDocumentation"],
       ["/election-removal","Terénní práce","truck","electionRemoval"],
-      ["/work/route","Pracovní výjezd","route","work"]
+      ["/work/dispatch","Dispečink práce","route","work"]
     ] },
     { label: 'Zakázky & Výroba', items: [
       ["/work","Plán práce","briefcaseBusiness","work"],
@@ -121,8 +121,9 @@ export function matchesNavigationPath(pathname: string, href: string) {
 }
 
 export function findActiveNavigation(hubs: NavigationHub[], pathname: string) {
+  const activePath = pathname.replace(/^\/work\/route(?=\/|[?#]|$)/, '/work/dispatch');
   return hubs.flatMap(hub => hub.groups.flatMap(group => group.items.map(item => ({ hub, item }))))
-    .filter(({ item }) => matchesNavigationPath(pathname, item[0]))
+    .filter(({ item }) => matchesNavigationPath(activePath, item[0]))
     .sort((a, b) => b.item[0].length - a.item[0].length)[0];
 }
 

@@ -1,4 +1,6 @@
 'use client';
+import { hasApprovableWork } from '@/lib/field-planning/approval-rules';
+import { planningDayOffset, planningStopHref } from '@/lib/field-planning/presentation';
 import { PostponeRouteButton } from '@/components/election-removal/PostponeRouteButton';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -100,12 +102,16 @@ export function WorkRoutePlanner({
   navigation = false,
   initialJobIds,
   initialPlanId,
+  standardOnly = false,
+  unified = false,
 }: {
   navigation?: boolean;
   defaultDate: string;
   country: string | null;
   initialJobIds?: string[];
   initialPlanId?: string;
+  standardOnly?: boolean;
+  unified?: boolean;
 }) {
   const [date, setDate] = useState(defaultDate);
   const [startTime, setStartTime] = useState('08:00');
@@ -246,16 +252,23 @@ export function WorkRoutePlanner({
     const ticket = ++loadCounter.current;
     setError('');
     try {
-      const response = await fetch(`/api/work/route?date=${date}`);
+      const response = await fetch(`/api/work/route?date=${date}${unified ? '&source=dispatch'+(initialJobIds?.length?'&jobs='+encodeURIComponent(initialJobIds.join(',')):'') : standardOnly ? '&source=work' : ''}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       if (ticket !== loadCounter.current) return;
 
       setInputsChanged(false);
-      setLoaded(data);
 
+
+      if(initialPlanId && !(data.plans as PlanView[]).some(p=>p.id===initialPlanId)){
+        const selected=await fetch('/api/work/route?id='+encodeURIComponent(initialPlanId));
+        const value=await selected.json();if(!selected.ok)throw new Error(value.error || 'Výjezd není dostupný.');
+        if(ticket!==loadCounter.current)return;
+        data.plans=[value,...data.plans];
+      }
+      setLoaded(data);
       const activePlan = initialPlanId
-        ? (data.plans as PlanView[]).find((p: PlanView) => p.id === initialPlanId) ?? data.plans[0] ?? null
+        ? (data.plans as PlanView[]).find((p: PlanView) => p.id === initialPlanId) ?? null
         : data.plans[0] ?? null;
       setPlan(activePlan);
 
@@ -312,7 +325,7 @@ export function WorkRoutePlanner({
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Načtení plánovacích dat selhalo.');
     }
-  }, [date, initialJobIds, initialPlanId]);
+  }, [date, initialJobIds, initialPlanId, standardOnly, unified]);
 
   useEffect(() => {
     setPlan(null);
@@ -427,12 +440,7 @@ export function WorkRoutePlanner({
   const activeCrew = plan?.result.crews.find((c) => c.id === activeCrewId) ?? plan?.result.crews[0];
 
   const setDateOffset = (offsetDays: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + offsetDays);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    setDate(`${yyyy}-${mm}-${dd}`);
+    setDate(planningDayOffset(new Date(), loaded?.profile?.timezone ?? 'Europe/Prague', offsetDays));
   };
 
   return (
@@ -480,7 +488,7 @@ export function WorkRoutePlanner({
         </div>
       </header>
 
-      {plan && ['APPROVED', 'ACTIVE'].includes(plan.status) && plan.result.crews.some(c=>c.stops.some(s=>s.fieldWorkStepId)) && <div className="rounded-xl border border-sky-300 bg-sky-50 p-4"><PostponeRouteButton planId={plan.id} /></div>}
+      {plan && ['APPROVED', 'ACTIVE'].includes(plan.status) && (unified || plan.result.crews.some(c=>c.stops.some(s=>s.fieldWorkStepId))) && <div className="rounded-xl border border-sky-300 bg-sky-50 p-4"><PostponeRouteButton planId={plan.id} unified={unified} /></div>}
 
       {/* AI Telemetry & Calibration Section */}
       {telemetryOpen && (
@@ -528,7 +536,7 @@ export function WorkRoutePlanner({
             <button
               onClick={() => setDateOffset(0)}
               className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-                date === new Date().toISOString().slice(0, 10)
+                date === planningDayOffset(new Date(), loaded?.profile?.timezone ?? 'Europe/Prague', 0)
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -606,11 +614,11 @@ export function WorkRoutePlanner({
           {plan?.status === 'DRAFT' && (
             <button
               onClick={() => void handleAction('approve')}
-              disabled={busy || inputsChanged || Boolean(plan.result.conflicts.length || plan.result.unassigned.length)}
+              disabled={busy || inputsChanged || !hasApprovableWork(plan.result)}
               className="flex items-center gap-1.5 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white shadow hover:bg-emerald-600 disabled:opacity-40 transition"
             >
               <CheckCircle2 size={16} />
-              <span>Schválit a odeslat posádkám</span>
+              <span>{plan.result.unassigned.length ? 'Schválit naplánovanou část' : 'Schválit a odeslat posádkám'}</span>
             </button>
           )}
 
@@ -624,6 +632,12 @@ export function WorkRoutePlanner({
             </button>
           )}
 
+          {plan?.status === 'DRAFT' && plan.result.unassigned.length > 0 && (
+            <div role="status" className="w-full rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+              Schválí se pouze naplánovaná práce. Nezařazené úkoly ({plan.result.unassigned.length}) zůstanou k dalšímu naplánování.
+              <ul className="mt-2 list-disc pl-5">{plan.result.unassigned.map((alert, index) => <li key={index}>{alert.message}</li>)}</ul>
+            </div>
+          )}
           {/* Versions dropdown */}
           {Boolean(loaded?.plans?.length) && (
             <div className="flex items-center gap-1.5">
@@ -811,7 +825,7 @@ export function WorkRoutePlanner({
                 const assignedEmployees = loaded?.data?.employees.filter((e) => c.employeeIds.includes(e.id)) ?? [];
                 const availableToAdd =
                   loaded?.data?.employees.filter((e) => e.isActive && !c.employeeIds.includes(e.id)) ?? [];
-                const currentVehicle = loaded?.data?.vehicles.find((v) => v.id === c.vehicleId);
+
 
                 return (
                   <div
@@ -1310,12 +1324,12 @@ export function WorkRoutePlanner({
 
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <Link
-                            href={s.navigationOrderId ? `/navigation/orders/${s.navigationOrderId}` : `/work/${s.workOrderId}`}
+                          {planningStopHref(s) ? <Link
+                            href={planningStopHref(s)!}
                             className="font-bold text-xs sm:text-sm text-slate-900 hover:text-sky-700 hover:underline truncate"
                           >
                             {s.title}
-                          </Link>
+                          </Link> : <span className="font-bold text-xs sm:text-sm text-slate-900">{s.title}</span>}
 
                           <span className="text-xs font-bold text-sky-800 bg-sky-100/80 px-2.5 py-0.5 rounded-lg shrink-0">
                             Příjezd {formatTime(s.arrivalAt)} (práce {formatTime(s.startAt)}–{formatTime(s.endAt)})

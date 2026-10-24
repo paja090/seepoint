@@ -1,3 +1,5 @@
+import { requireFieldJobsEnabled } from './field-jobs';
+import { validateApprovalSelection } from './approval-rules';
 import { createHash } from 'node:crypto';
 import { Prisma, type FieldPlan } from '@prisma/client';
 import { prisma } from '../db';
@@ -46,7 +48,11 @@ export async function auditPlan(tx: Prisma.TransactionClient, id: string, actor:
 export async function getPlan(id: string, db: Prisma.TransactionClient = prisma) {
   const row = await db.fieldPlan.findUnique({ where: { id, organizationId: requireTenantContext().organizationId } });
   if (!row) throw new Error('NOT_FOUND: plán nebyl nalezen.');
-  if (!await navigationAvailable(db) && (row.planningInputSnapshot as unknown as PlanningInput).jobs.some(j => j.navigationPointId)) throw new Error('FORBIDDEN: Navigation není aktivní.');
+  // Older saved plans can contain only a profile; their persisted stops remain authoritative.
+  const jobs = (row.planningInputSnapshot as unknown as Partial<PlanningInput> | null)?.jobs ?? [];
+  const stops = (row.planningSummary as unknown as Partial<PlanningResult> | null)?.crews?.flatMap(crew => crew.stops ?? []) ?? [];
+  if (row.electionCampaignId || [...jobs, ...stops].some(job => job.fieldWorkStepId || job.electionRemovalPointId)) await requireFieldJobsEnabled(db);
+  if (!await navigationAvailable(db) && [...jobs, ...stops].some(job => job.navigationPointId)) throw new Error('FORBIDDEN: Navigation není aktivní.');
   return row;
 }
 export async function saveProfile(value: unknown, actor: PlannerActor) {
@@ -95,6 +101,7 @@ export async function generatePlan(raw: unknown, actor: PlannerActor) {
   if (prior) { await getPlan(prior.id); if (prior.requestHash !== requestHash) throw new Error('Klíč požadavku již patří jinému zadání.'); return planView(prior); }
   const parent = request.parentPlanId ? await getPlan(request.parentPlanId) : null;
   if (parent && (parent.date !== request.date || !['DRAFT', 'APPROVED', 'ACTIVE'].includes(parent.status))) throw new Error('Tento plán již nelze přepočítat.');
+  if(parent && parent.status!=='DRAFT' && (parent.planningSummary as unknown as PlanningResult).crews.some(c=>c.stops.some(s=>s.fieldWorkStepId)))throw new Error('Pro rozpracovaný smíšený výjezd použijte Pokračovat další den; změnu posádky nejprve vyřešte předáním materiálu.');
   const parentInput = parent?.planningInputSnapshot as unknown as PlanningInput | undefined;
   const parentCrews = parent && parent.status !== 'DRAFT' ? (parent.planningSummary as unknown as PlanningResult).crews : parentInput?.crews;
   const crews = request.crews ?? parentCrews;
@@ -130,7 +137,7 @@ export async function approvePlan(id: string, actor: PlannerActor, acceptEstimat
     if (row.status !== 'DRAFT') throw new Error('Schválit lze pouze návrh.');
     const input = row.planningInputSnapshot as unknown as PlanningInput;
     const result = row.planningSummary as unknown as PlanningResult;
-    if (!result.crews.length || result.conflicts.length || result.unassigned.length) throw new Error('Nejprve vyřešte konflikty a nepřiřazené úkoly; případně vytvořte návrh pro menší výběr.');
+    validateApprovalSelection(input, result);
     if (result.estimated && !acceptEstimated) throw new Error('Odhadované přejezdy vyžadují výslovné potvrzení manažerem.');
     const parent = row.parentPlanId ? await getPlan(row.parentPlanId, tx) : null;
     if (parent && !['DRAFT', 'APPROVED', 'ACTIVE'].includes(parent.status)) throw new Error('Předchozí plán byl již nahrazen nebo uzavřen.');
@@ -145,11 +152,13 @@ export async function approvePlan(id: string, actor: PlannerActor, acceptEstimat
       const members = current.employees.filter(e => crew.employeeIds.includes(e.id));
       if (members.length !== crew.employeeIds.length || members.some(e => !e.isActive || !e.available)) throw new Error('WORKER_UNAVAILABLE: pracovník již není dostupný.');
       for (const stop of crew.stops) {
-        const job = current.jobs.find(j => j.id === stopId(stop));
+        if(stop.isWarehousePitstop)continue;
+        const job = current.jobs.find(j => j.id === stopId(stop) || (j.delivery && 'field-step:'+j.delivery.id === stopId(stop)));
         if (!job || (job.constraints.requiredEmployeeIds ?? []).some(id => !crew.employeeIds.includes(id)) || (job.constraints.requiredPositions ?? []).some(position => !members.some(m => m.positions.includes(position)))) throw new Error('Požadavky na posádku již nejsou splněné.');
       }
       const v = current.vehicles.find(v => v.id === crew.vehicleId);
       if (crew.vehicleId && (!v || v.reserved || ['SERVICE', 'OUT_OF_SERVICE', 'IN_USE'].includes(v.status))) throw new Error('VEHICLE_CONFLICT: vozidlo již není dostupné.');
+      if(current.jobs.some(j=>j.fieldWorkStepId) && crew.vehicleId && hash(v)!==hash(input.vehicles.find(v=>v.id===crew.vehicleId)))throw new Error('Kapacita nebo vybavení vozidla se změnily; přepočítejte plán.');
       if (new Date(crew.departureAt).getTime() < Date.now() - 60000) throw new Error('Čas odjezdu již uplynul; přepočítejte zbývající plán.');
     }
     const { organizationId } = requireTenantContext();
@@ -174,20 +183,16 @@ export async function approvePlan(id: string, actor: PlannerActor, acceptEstimat
           if (!realization || realization.workOrderId !== stop.workOrderId) throw new Error('Vazba realizace se změnila.');
           await tx.crmRealization.update({ where: { id: realization.id, organizationId }, data: { plannedDate: new Date(stop.startAt), assignedUserId: realization.assignedUserId ?? members.find(m => m.userId)?.userId ?? null } });
         }
+        if (stop.isWarehousePitstop) continue;
         if (stop.electionRemovalPointId) {
-          const pt = await tx.electionRemovalPoint.findFirst({ where: { id: stop.electionRemovalPointId, organizationId } });
-          if (pt && !['CANCELLED'].includes(pt.status)) {
-            await tx.electionRemovalPoint.update({
-              where: { id: pt.id, organizationId },
-              data: {
-                assignedFieldPlanId: row.id,
-                assignedCrewId: crew.id,
-                plannedArrivalAt: new Date(stop.arrivalAt),
-                plannedOrder: stop.routeOrder,
-                status: pt.status === 'COMPLETED' ? 'COMPLETED' : 'ASSIGNED',
-              },
-            });
-          }
+          if(!stop.fieldWorkStepId || !stop.electionCampaignId)throw new Error('Terénní bod nemá strukturovaný krok.');
+          const job=current.jobs.find(j=>j.electionRemovalPointId===stop.electionRemovalPointId);
+          if(!job || job.electionCampaignId!==stop.electionCampaignId || ![job.fieldWorkStepId,job.delivery?.id].includes(stop.fieldWorkStepId))throw new Error('Vazba terénního kroku se změnila.');
+          const claimed=await tx.fieldWorkStep.updateMany({where:{id:stop.fieldWorkStepId,organizationId,pointId:stop.electionRemovalPointId,status:'PENDING',assignedFieldPlanId:null},data:{assignedFieldPlanId:row.id,assignedCrewId:crew.id,status:'ASSIGNED',version:{increment:1}}});
+          if(claimed.count!==1)throw new Error('Krok již přiřadil jiný dispečer. Přepočítejte plán.');
+          await tx.electionRemovalPoint.update({where:{id:stop.electionRemovalPointId,organizationId},data:{assignedFieldPlanId:row.id,assignedCrewId:crew.id,plannedArrivalAt:new Date(stop.arrivalAt),plannedOrder:stop.routeOrder,status:'ASSIGNED'}});
+          await tx.electionCampaign.update({where:{id:stop.electionCampaignId,organizationId},data:{status:'PLANNED'}});
+          continue;
         }
         if (!stop.workOrderId && (stop.navigationPointId || stop.electionRemovalPointId)) continue;
         if (assignedOrders.has(stop.workOrderId)) continue;
@@ -221,7 +226,7 @@ export async function approvePlan(id: string, actor: PlannerActor, acceptEstimat
     await tx.fieldPlan.update({ where: { id, organizationId }, data: { approvalSnapshot: json({ reservationIds }) } });
     if (row.electionCampaignId) await tx.electionCampaign.update({ where: { id: row.electionCampaignId, organizationId }, data: { status: 'PLANNED' } });
     if (parent) await tx.fieldPlan.update({ where: { id: parent.id, organizationId }, data: { status: 'CANCELLED' } });
-    await auditPlan(tx, id, actor, 'FIELD_PLAN_APPROVED', { acceptEstimated, reservationIds, supersededPlanId: parent?.id, navigationPointIds: result.crews.flatMap(c => c.stops.flatMap(s => s.navigationPointId ? [s.navigationPointId] : [])) });
+    await auditPlan(tx, id, actor, 'FIELD_PLAN_APPROVED', { acceptEstimated, unassigned: result.unassigned, reservationIds, supersededPlanId: parent?.id, navigationPointIds: result.crews.flatMap(c => c.stops.flatMap(s => s.navigationPointId ? [s.navigationPointId] : [])) });
     return planView(await getPlan(id, tx));
   }, db);
 }
@@ -295,6 +300,9 @@ export async function transferCrew(
     const crew = summary.crews.find(c => c.id === crewId);
     if (!crew) throw new Error('Posádka / trasa nebyla nalezena.');
 
+    if (row.status !== 'DRAFT' && crew.stops.some(stop => stop.fieldWorkStepId)) {
+      throw new Error('U rozpracované terénní trasy použijte předání práce. Pro stejnou posádku lze pokračovat další den.');
+    }
     const targetEmployee = await tx.employee.findFirst({
       where: { id: targetEmployeeId, organizationId, isActive: true },
       select: { id: true, firstName: true, lastName: true, userId: true, isActive: true },
@@ -409,4 +417,3 @@ export async function transferCrew(
     return planView(await getPlan(planId, tx));
   }, db);
 }
-

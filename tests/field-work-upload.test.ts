@@ -10,7 +10,7 @@ test('actual field photo upload associates phase and step; retry saves once; sta
   const point={id:'point',organizationId:'org',status:'ASSIGNED',steps:[step]};
   const plan={id:'plan',date:new Date().toISOString().slice(0,10),status:'APPROVED',planningInputSnapshot:{jobs:[],profile:{timezone:'UTC'}},planningSummary:{crews:[{id:'crew',employeeIds:['employee'],stops:[{jobId:'field-step:step',electionRemovalPointId:'point',fieldWorkStepId:'step'}]}]}};
   const tx:any={
-    organization:{findUnique:async()=>({plan:'BUSINESS',enabledModules:{navigation:false}})},
+    organization:{findUnique:async()=>({plan:'BUSINESS',enabledModules:{navigation:false,electionRemoval:true}})},
     fieldPlan:{findUnique:async({where}:any)=>where.id==='plan'&&where.organizationId==='org'?plan:null,findFirst:async()=>plan},
     employee:{findFirst:async()=>({id:'employee',userId:'worker',isActive:true})},
     electionRemovalPoint:{findFirst:async()=>point},

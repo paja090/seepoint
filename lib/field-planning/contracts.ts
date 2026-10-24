@@ -161,6 +161,7 @@ export type MyRouteDTO = {
   date?: string;
   routes: Array<{
     planId: string;
+    crewId?: string;
     crewName?: string | null;
     vehicleName: string | null;
     departureAt: string;
@@ -177,5 +178,3 @@ export type MyRouteDTO = {
     stops: MyRouteStop[];
   }>;
 };
-
-

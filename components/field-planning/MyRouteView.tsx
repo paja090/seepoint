@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { nextRouteStop } from '@/lib/field-planning/mobile-focus';
 import { buildGoogleMapsRouteSegments } from '@/lib/election-removal/point-metadata';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { fieldProblemTypes, type MyRouteDTO, type MyRouteCarrier } from '@/lib/field-planning/contracts';
@@ -46,6 +47,8 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
   const [photoCarrier, setPhotoCarrier] = useState<MyRouteCarrier>(null);
   const [activePhotoModalStopId, setActivePhotoModalStopId] = useState<string | null>(null);
   const [activeProblemModalStopId, setActiveProblemModalStopId] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState(false);
+  const [expandedRoutes, setExpandedRoutes] = useState<Record<string, boolean>>({});
   const [hideDoneStops, setHideDoneStops] = useState(true);
   const [groupByOrder, setGroupByOrder] = useState(false);
   const [uploadingJobId, setUploadingJobId] = useState<string | null>(null);
@@ -311,7 +314,6 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
       pendingKeys.current.delete(payloadKey);
       if (jobId) setFieldInputs(prev => ({ ...prev, [jobId]: {} }));
     } catch (e) {
-      pendingKeys.current.delete(payloadKey);
       setError(e instanceof Error ? e.message : 'Operace selhala.');
       if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
@@ -364,14 +366,14 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-950 flex items-center gap-2.5">
               <Navigation className="text-sky-600" size={28} />
-              <span>Moje trasa v terénu</span>
+              <span>Moje dnešní práce</span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
-              Plán montáží a výjezdů vaší posádky seřazený podle optimálních zastávek.
+              Navigovat → Zahájit → Vyfotit → Dokončit.
             </p>
           </div>
           <Link
-            href="/work/route"
+            href="/work/dispatch"
             className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs transition hover:bg-slate-50 hover:text-sky-700"
             title="Přepnout na plánování tras a dispečerskou mapu"
           >
@@ -472,10 +474,15 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
         </div>
       )}
 
-      {routesWithLiveETA.length > 0 && <MyRouteMap routes={routesWithLiveETA} height="h-[320px]" />}
+      {routesWithLiveETA.length > 0 && <section className="rounded-2xl border bg-white p-3">
+        <button type="button" aria-expanded={showMap} onClick={()=>setShowMap(!showMap)} className="w-full py-2 text-left text-sm font-semibold">{showMap?'Skrýt mapu':'Zobrazit mapu všech výjezdů'}</button>
+        {showMap && <MyRouteMap routes={routesWithLiveETA} height="h-[320px]" />}
+      </section>}
 
       {/* Route Cards */}
       {routesWithLiveETA.map((route) => {
+        const focusedStop = nextRouteStop(route.stops);
+        const remainingCount = route.stops.filter(s=>!['DONE','CANCELLED'].includes(s.status)).length;
         const doneCount = route.stops.filter((s) => s.status === 'DONE').length;
         const issueCount = route.stops.filter((s) => s.status === 'ISSUE').length;
         const totalCount = route.stops.length;
@@ -527,7 +534,7 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
           stopIndexMap.set(s.jobId, idx + 1);
         });
 
-        const renderSingleStop = (s: (typeof route.stops)[number], displayOrder: number) => {
+        const renderSingleStop = (s: (typeof route.stops)[number], displayOrder: number, focused = false) => {
           const isDone = s.status === 'DONE';
           const isInProgress = s.status === 'IN_PROGRESS';
           const isIssue = s.status === 'ISSUE';
@@ -553,6 +560,7 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                   : 'border-slate-200 bg-white'
               }`}
             >
+              {focused && <p className="text-sm font-bold text-sky-800">{isInProgress?'Právě pracujete':isIssue?'Zastávka potřebuje vyřešit':'Další zastávka'} · {displayOrder} / {totalCount}</p>}
               {/* Order / Campaign Pill */}
               {(s.orderTitle || s.campaignName) && (
                 <div className="flex items-center gap-1.5 pb-0.5">
@@ -764,7 +772,7 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                 )}
 
                 {/* Direct 1-Click Camera Shutter Button */}
-                <button
+                {(!focused || isInProgress || isDone) && <button
                   type="button"
                   disabled={!ready || busy || uploadingJobId === s.jobId}
                   onClick={() => triggerDirectCamera(route.planId, s.workOrderId, s.jobId)}
@@ -785,7 +793,7 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                       ? `Vyfotit (${s.photos.length})`
                       : 'Vyfotit'}
                   </span>
-                </button>
+                </button>}
 
                 {/* Start timer button if not yet in progress */}
                 {!isDone && s.status !== 'CANCELLED' && !isInProgress && (
@@ -820,7 +828,7 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                 )}
 
                 {/* Optional drawer trigger for uploading with custom note */}
-                {(s.navigationPointId || s.workOrderItemId || s.fieldWorkStepId || s.electionRemovalPointId) && !isDone && (
+                {(!focused || isInProgress) && (s.navigationPointId || s.workOrderItemId || s.fieldWorkStepId || s.electionRemovalPointId) && !isDone && (
                   <button
                     type="button"
                     onClick={() =>
@@ -851,13 +859,13 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                     }`}
                   >
                     <AlertTriangle size={14} />
-                    <span>{isIssue ? 'Upravit problém' : 'Problém?'}</span>
+                    <span>{isIssue ? 'Upravit problém' : 'Nahlásit problém'}</span>
                   </button>
                 )}
               </div>
 
               {/* Swipe to Complete slider to prevent accidental taps */}
-              {!isDone && s.status !== 'CANCELLED' && (
+              {!isDone && s.status !== 'CANCELLED' && (!focused || isInProgress) && (
                 <div className="pt-1.5">
                   <SwipeToConfirm
                     onConfirm={() =>
@@ -1198,6 +1206,10 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                 </div>
               </div>
 
+            <div aria-label="Aktuální zastávka" className="space-y-3">
+              <p className="text-sm font-semibold text-slate-700">Hotovo {doneCount} · Zbývá {remainingCount}{issueCount>0?' · K řešení '+issueCount:''}</p>
+              {focusedStop ? renderSingleStop(focusedStop, stopIndexMap.get(focusedStop.jobId) ?? 1, true) : <p role="status" className="rounded-2xl bg-emerald-50 p-4 font-semibold text-emerald-900">Všechny zastávky jsou vyřízené. Po návratu ukončete výjezd.</p>}
+            </div>
             <details className="rounded-2xl border border-slate-200 bg-white p-3.5"><summary className="cursor-pointer text-sm font-medium text-slate-700"><Timer size={14} className="mr-2 inline text-sky-600" />Časy a měření výjezdu · návrat ~{formatLiveClock(route.liveEstimatedEndAt, data.timezone)}</summary><div className="mt-3 space-y-2">
               {/* Live Shift ETA Banner */}
               <div className="rounded-xl border border-sky-200 bg-linear-to-r from-sky-50/90 via-indigo-50/30 to-white p-3 space-y-1.5 shadow-2xs">
@@ -1320,6 +1332,10 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
               </div>
             </div></details>
 
+            <button type="button" aria-expanded={Boolean(expandedRoutes[route.planId])} onClick={()=>setExpandedRoutes(prev=>({...prev,[route.planId]:!prev[route.planId]}))} className="w-full rounded-xl border bg-white p-3 text-left text-sm font-bold">
+              {expandedRoutes[route.planId]?'Skrýt ostatní zastávky':'Ostatní zastávky a přehled trasy'}{issueCount>0?' · Problémy: '+issueCount:''}
+            </button>
+            {expandedRoutes[route.planId] && <div className="space-y-4">
             {/* LIVE MAP */}
 
 
@@ -1404,7 +1420,7 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
               <div className="space-y-4 pt-1">
                 {orderGroups.map((group) => {
                   const visibleGroupStops = group.stops.filter(
-                    (s) => !hideDoneStops || s.status !== 'DONE'
+                    (s) => s.jobId !== focusedStop?.jobId && (!hideDoneStops || s.status !== 'DONE')
                   );
                   const groupDone = group.stops.filter(
                     (s) => s.status === 'DONE'
@@ -1465,7 +1481,7 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                           )
                         ) : (
                           <p className="text-xs text-slate-400 italic p-2 text-center">
-                            Všechny zastávky této zakázky jsou hotové.
+                            {group.stops.some(s=>s.jobId===focusedStop?.jobId) ? 'Aktuální zastávka je zobrazená výše.' : 'Všechny zastávky této zakázky jsou hotové.'}
                           </p>
                         )}
                       </div>
@@ -1476,7 +1492,7 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
             ) : (
               <div className="space-y-3">
                 {route.stops
-                  .filter((s) => !hideDoneStops || s.status !== 'DONE')
+                  .filter((s) => s.jobId !== focusedStop?.jobId && (!hideDoneStops || s.status !== 'DONE'))
                   .map((s, i, filteredStops) => {
                     const prevStop = i > 0 ? filteredStops[i - 1] : null;
                     const isNewOrder =
@@ -1527,6 +1543,7 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                   })}
               </div>
             )}
+            </div>}
           </section>
         );
       })}

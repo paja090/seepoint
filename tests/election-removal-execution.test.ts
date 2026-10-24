@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { executeStop } from '../lib/field-planning/execution';
 import { runWithTenantContext } from '../lib/tenant-context';
-import type { PlannerActor } from '../lib/field-planning/service';
+import { getPlan, type PlannerActor } from '../lib/field-planning/service';
 
 test('Field execution: Election removal points and pitstops execute seamlessly without requiring dummy WorkOrders', async t => {
   t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-12T08:00:00Z') });
@@ -22,6 +22,7 @@ test('Field execution: Election removal points and pitstops execute seamlessly w
   };
 
   let requestSequence = 0;
+  let fieldEnabled = true;
   const stepState: any = { id: 'step-1', pointId, organizationId: orgId, sequence: 1, kind: 'WORK', quantity: 1, completedQuantity: 0,
     version: 0, status: 'ASSIGNED', assignedFieldPlanId: planId, assignedCrewId: 'crew-1', photoType: 'CONTROL', startedAt: null };
   // State store for mocked DB
@@ -43,7 +44,7 @@ test('Field execution: Election removal points and pitstops execute seamlessly w
 
   const mockTx = {
     organization: {
-      findUnique: async () => ({ plan: 'ENTERPRISE', enabledModules: {} }),
+      findUnique: async () => ({ plan: 'ENTERPRISE', enabledModules: { electionRemoval: fieldEnabled } }),
     },
     employee: {
       findFirst: async () => ({
@@ -248,4 +249,9 @@ test('Field execution: Election removal points and pitstops execute seamlessly w
       assert.ok(auditLogs.some((l) => l.action === 'FIELD_POINT_COMPLETED'));
     });
   });
-});
+  await t.test('legacy snapshot still enforces the field module using persisted stops', async () => {
+    fieldEnabled = false;
+    await runWithTenantContext({ organizationId: orgId, source: 'test' }, async () => {
+      await assert.rejects(() => getPlan(planId, mockTx as any), /FORBIDDEN/);
+    });
+  });});
