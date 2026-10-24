@@ -1180,6 +1180,7 @@ export function WorkRoutePlanner({
             <RouteMap
               result={plan?.result}
               depot={loaded?.profile?.depot}
+              warehouses={loaded?.profile?.warehouses}
               active={activeCrew?.id ?? ''}
             />
           </div>

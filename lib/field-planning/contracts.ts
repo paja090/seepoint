@@ -1,5 +1,12 @@
 export type Coordinates = { latitude: number; longitude: number };
 export type CustomPlanningActivity = { key: string; label: string; defaultMinutes: number; category?: string };
+export type WarehousePlace = {
+  id: string;
+  name: string;
+  address?: string;
+  location: Coordinates;
+  isMain?: boolean;
+};
 export type PlanningProfile = {
   navigationPointMinutes?: Record<string, number>;
   timezone: string; country: string | null; depot: Coordinates; endLocation: Coordinates;
@@ -11,6 +18,7 @@ export type PlanningProfile = {
   vehicleRequired: boolean; requireHumanApproval: true; enabled: boolean;
   vehicleCapacitySlots?: number; warehouseUnloadMinutes?: number;
   routeMode?: 'SEPARATE_MEDIA' | 'MIXED';
+  warehouses?: WarehousePlace[];
 };
 export type JobConstraints = {
   windowStart?: string; windowEnd?: string; requiredEmployeeIds?: string[];

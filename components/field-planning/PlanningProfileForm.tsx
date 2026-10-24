@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
-import type { PlanningProfile } from '@/lib/field-planning/contracts';
-import { X, Settings2, Clock, MapPin, Gauge } from 'lucide-react';
+import type { PlanningProfile, WarehousePlace } from '@/lib/field-planning/contracts';
+import { X, Settings2, Clock, MapPin, Gauge, Package, Plus, Trash2, Building2 } from 'lucide-react';
 
 export function PlanningProfileForm({
   initial,
@@ -23,6 +23,46 @@ export function PlanningProfileForm({
   const [lng, setLng] = useState(initial ? String(initial.depot.longitude) : '');
   const [endLat, setEndLat] = useState(initial ? String(initial.endLocation.latitude) : '');
   const [endLng, setEndLng] = useState(initial ? String(initial.endLocation.longitude) : '');
+
+  // Warehouses state
+  const [warehouses, setWarehouses] = useState<WarehousePlace[]>(() => initial?.warehouses ?? []);
+  const [showAddWarehouse, setShowAddWarehouse] = useState(false);
+  const [newWhName, setNewWhName] = useState('');
+  const [newWhAddress, setNewWhAddress] = useState('');
+  const [newWhLat, setNewWhLat] = useState('');
+  const [newWhLng, setNewWhLng] = useState('');
+
+  function handleAddWarehouse() {
+    if (!newWhName.trim()) {
+      setError('Zadejte název skladu.');
+      return;
+    }
+    const wLat = Number(newWhLat);
+    const wLng = Number(newWhLng);
+    if (isNaN(wLat) || isNaN(wLng) || wLat < -90 || wLat > 90 || wLng < -180 || wLng > 180) {
+      setError('Zadejte platné GPS souřadnice skladu (např. 49.8270, 18.2618).');
+      return;
+    }
+    const newWarehouse: WarehousePlace = {
+      id: `wh-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: newWhName.trim(),
+      address: newWhAddress.trim() || undefined,
+      location: { latitude: wLat, longitude: wLng },
+      isMain: warehouses.length === 0,
+    };
+    setWarehouses(prev => [...prev, newWarehouse]);
+    setNewWhName('');
+    setNewWhAddress('');
+    setNewWhLat('');
+    setNewWhLng('');
+    setShowAddWarehouse(false);
+    setError('');
+  }
+
+  function handleRemoveWarehouse(id: string) {
+    setWarehouses(prev => prev.filter(w => w.id !== id));
+  }
+
   async function save(form: FormData) {
     setBusy(true);
     setError('');
@@ -63,6 +103,7 @@ export function PlanningProfileForm({
       vehicleRequired: form.has('vehicle'),
       requireHumanApproval: true,
       enabled: true,
+      warehouses,
     };
 
     try {
@@ -83,7 +124,7 @@ export function PlanningProfileForm({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
+      <div className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
@@ -116,18 +157,157 @@ export function PlanningProfileForm({
           <div className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">
               <MapPin size={14} className="text-sky-600" />
-              <span>Základna / Depo pro výjezd</span>
+              <span>Sídlo firmy / Hlavní depo</span>
             </div>
-            <p className="text-xs text-slate-500">Odkud posádky ráno vyjíždějí a kam se vrací.</p>
+            <p className="text-xs text-slate-500">Základna firmy, odkud posádky ráno vyjíždějí a kam se na konci směny vrací.</p>
 
             <div className="grid grid-cols-2 gap-3">
-              <label>Šířka výjezdu<input className="input" type="number" step="any" min={-90} max={90} required value={lat} onChange={e => setLat(e.target.value)} /></label>
-              <label>Délka výjezdu<input className="input" type="number" step="any" min={-180} max={180} required value={lng} onChange={e => setLng(e.target.value)} /></label>
-              <label>Šířka návratu<input className="input" type="number" step="any" min={-90} max={90} required value={endLat} onChange={e => setEndLat(e.target.value)} /></label>
-              <label>Délka návratu<input className="input" type="number" step="any" min={-180} max={180} required value={endLng} onChange={e => setEndLng(e.target.value)} /></label>
+              <label className="text-xs font-medium text-slate-700">Šířka výjezdu (Lat)<input className="input mt-1 w-full" type="number" step="any" min={-90} max={90} required value={lat} onChange={e => setLat(e.target.value)} /></label>
+              <label className="text-xs font-medium text-slate-700">Délka výjezdu (Lng)<input className="input mt-1 w-full" type="number" step="any" min={-180} max={180} required value={lng} onChange={e => setLng(e.target.value)} /></label>
+              <label className="text-xs font-medium text-slate-700">Šířka návratu (Lat)<input className="input mt-1 w-full" type="number" step="any" min={-90} max={90} required value={endLat} onChange={e => setEndLat(e.target.value)} /></label>
+              <label className="text-xs font-medium text-slate-700">Délka návratu (Lng)<input className="input mt-1 w-full" type="number" step="any" min={-180} max={180} required value={endLng} onChange={e => setEndLng(e.target.value)} /></label>
             </div>
-            <button type="button" className="text-sm text-sky-700 underline" onClick={() => { setEndLat(lat); setEndLng(lng); }}>Návrat na stejné místo jako výjezd</button>
-            <p className="text-xs text-slate-500">Zadejte GPS souřadnice svého depa. Žádné město není předvyplněné.</p>
+            <button type="button" className="text-xs text-sky-700 underline font-semibold mt-1" onClick={() => { setEndLat(lat); setEndLng(lng); }}>Návrat na stejné místo jako výjezd (sídlo)</button>
+            <p className="text-[11px] text-slate-500">Zadejte GPS souřadnice sídla firmy. Zde se vykreslí ikona 🏢 Sídlo firmy & Depo.</p>
+          </div>
+
+          {/* Sklady & Výdejní místa */}
+          <div className="space-y-3 rounded-2xl border border-amber-200/70 bg-amber-50/30 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-900">
+                <Package size={15} className="text-amber-700" />
+                <span>Sklady materiálu ({warehouses.length})</span>
+              </div>
+              {!showAddWarehouse && (
+                <button
+                  type="button"
+                  onClick={() => setShowAddWarehouse(true)}
+                  className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 transition"
+                >
+                  <Plus size={13} />
+                  <span>Přidat sklad</span>
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-slate-500">
+              Místa, kde má firma uskladněný materiál (bannery, desky, konstrukce). Zobrazují se ikonou 📦 na mapě dispečinku.
+            </p>
+
+            {/* Seznam skladů */}
+            {warehouses.length > 0 ? (
+              <div className="divide-y divide-amber-100 rounded-xl border border-amber-200/60 bg-white">
+                {warehouses.map((wh) => (
+                  <div key={wh.id} className="flex items-center justify-between gap-3 p-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-xs text-slate-900">{wh.name}</span>
+                        {wh.isMain && (
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                            Hlavní
+                          </span>
+                        )}
+                      </div>
+                      {wh.address && <p className="text-[11px] text-slate-500 truncate">{wh.address}</p>}
+                      <p className="text-[10px] text-slate-400 font-mono">
+                        GPS: {wh.location.latitude.toFixed(5)}, {wh.location.longitude.toFixed(5)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveWarehouse(wh.id)}
+                      className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition"
+                      title="Smazat sklad"
+                      aria-label={`Smazat sklad ${wh.name}`}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-amber-200 p-4 text-center text-xs text-slate-500">
+                Zatím nemáte zadaný žádný další sklad. Klikněte na <strong>Přidat sklad</strong>.
+              </div>
+            )}
+
+            {/* Formulář pro nový sklad */}
+            {showAddWarehouse && (
+              <div className="space-y-3 rounded-xl border border-amber-300 bg-white p-3 shadow-sm">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-xs font-bold text-slate-800">Nový sklad</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddWarehouse(false)}
+                    className="text-xs text-slate-400 hover:text-slate-600"
+                  >
+                    Zrušit
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="text-[11px] font-semibold text-slate-700">Název skladu *</label>
+                    <input
+                      type="text"
+                      placeholder="např. Centrální sklad Mariánské Hory"
+                      value={newWhName}
+                      onChange={(e) => setNewWhName(e.target.value)}
+                      className="input mt-1 w-full text-xs"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="text-[11px] font-semibold text-slate-700">Adresa (orientační)</label>
+                    <input
+                      type="text"
+                      placeholder="např. Fráni Šrámka 5, Ostrava"
+                      value={newWhAddress}
+                      onChange={(e) => setNewWhAddress(e.target.value)}
+                      className="input mt-1 w-full text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700">Zeměpisná šířka (Lat) *</label>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="49.8270"
+                      value={newWhLat}
+                      onChange={(e) => setNewWhLat(e.target.value)}
+                      className="input mt-1 w-full text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700">Zeměpisná délka (Lng) *</label>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="18.2618"
+                      value={newWhLng}
+                      onChange={(e) => setNewWhLng(e.target.value)}
+                      className="input mt-1 w-full text-xs"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-between items-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewWhLat(lat);
+                      setNewWhLng(lng);
+                    }}
+                    className="text-[11px] text-sky-700 underline"
+                  >
+                    Předvyplnit GPS ze sídla
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddWarehouse}
+                    className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition"
+                  >
+                    Vložit do seznamu
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           {/* Pracovní doba a přestávka */}
           <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/50 p-4">

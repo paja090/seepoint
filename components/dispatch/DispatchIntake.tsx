@@ -68,6 +68,13 @@ interface VehicleResource {
   type: string;
 }
 
+interface WarehouseResource {
+  id: string;
+  name: string;
+  address?: string;
+  location: { latitude: number; longitude: number };
+}
+
 interface StopEntry {
   id: string;
   operation: Operation;
@@ -129,6 +136,8 @@ export function DispatchIntake({
   // Resource options from API
   const [employees, setEmployees] = useState<EmployeeResource[]>([]);
   const [vehicles, setVehicles] = useState<VehicleResource[]>([]);
+  const [warehouses, setWarehouses] = useState<WarehouseResource[]>([]);
+  const [depot, setDepot] = useState<{ latitude: number; longitude: number } | null>(null);
   const [resourcesLoading, setResourcesLoading] = useState(true);
 
   // Common Trip / Assignment Fields
@@ -156,6 +165,8 @@ export function DispatchIntake({
           if (isMounted) {
             setEmployees(data.employees || []);
             setVehicles(data.vehicles || []);
+            setWarehouses(data.warehouses || []);
+            setDepot(data.depot || null);
           }
         }
       } catch {
@@ -719,12 +730,55 @@ export function DispatchIntake({
                         </select>
                       </div>
 
-                      {/* Transport destination if relocation */}
+                      {/* Transport destination if relocation or warehouse */}
                       {isTransport && (
                         <div className="space-y-2 rounded-xl bg-slate-50 border border-slate-200 p-3">
                           <label className="block text-xs font-bold text-slate-800">
                             Cílové místo předání / sklad
                           </label>
+
+                          {/* Quick selection of configured warehouses & company headquarters */}
+                          {(warehouses.length > 0 || depot) && (
+                            <div className="space-y-1.5 rounded-lg border border-amber-200 bg-amber-50/70 p-2.5">
+                              <span className="block text-[11px] font-bold text-amber-900">
+                                Rychlý výběr firemního skladu nebo sídla:
+                              </span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {depot && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      updateStop(index, {
+                                        destinationName: 'Sídlo firmy / Hlavní depo',
+                                        destinationLatitude: depot.latitude,
+                                        destinationLongitude: depot.longitude,
+                                      });
+                                    }}
+                                    className="inline-flex items-center gap-1 rounded-md border border-sky-300 bg-white px-2 py-1 text-[11px] font-semibold text-sky-800 shadow-xs hover:bg-sky-50 transition"
+                                  >
+                                    🏢 Sídlo firmy & Depo
+                                  </button>
+                                )}
+                                {warehouses.map((wh) => (
+                                  <button
+                                    key={wh.id}
+                                    type="button"
+                                    onClick={() => {
+                                      updateStop(index, {
+                                        destinationName: wh.name,
+                                        destinationLatitude: wh.location.latitude,
+                                        destinationLongitude: wh.location.longitude,
+                                      });
+                                    }}
+                                    className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-semibold text-amber-900 shadow-xs hover:bg-amber-50 transition"
+                                  >
+                                    📦 {wh.name}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
                           <input
                             required
                             maxLength={200}

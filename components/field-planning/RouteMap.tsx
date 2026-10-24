@@ -22,8 +22,36 @@ function escapeHtml(str: string): string {
   }[tag] || tag));
 }
 
+export type RouteMapWarehouse = {
+  id: string;
+  name: string;
+  address?: string;
+  location: Coordinates;
+  isMain?: boolean;
+};
+
 export type RouteMapPoint = { id: string; title: string; location: Coordinates };
-export function RouteMap({ result, depot, active, points, onPointSelect, selectedPointId }: { result?: PlanningResult; depot?: Coordinates; active: string; points?: RouteMapPoint[]; onPointSelect?: (id: string) => void; selectedPointId?: string }) {
+export function RouteMap({
+  result,
+  depot,
+  active,
+  points,
+  onPointSelect,
+  selectedPointId,
+  warehouses,
+  companyName = 'Sídlo firmy & Depo',
+  depotAddress,
+}: {
+  result?: PlanningResult;
+  depot?: Coordinates;
+  active: string;
+  points?: RouteMapPoint[];
+  onPointSelect?: (id: string) => void;
+  selectedPointId?: string;
+  warehouses?: RouteMapWarehouse[];
+  companyName?: string;
+  depotAddress?: string;
+}) {
   const element = useRef<HTMLDivElement>(null);
   const map = useRef<LeafletMap | null>(null);
   const layerInstance = useRef<TileLayer | null>(null);
@@ -43,6 +71,112 @@ export function RouteMap({ result, depot, active, points, onPointSelect, selecte
         subdomains: initialConfig.subdomains || ['a', 'b', 'c'],
       }).addTo(m);
       const bounds = L.latLngBounds([]); const colors = ['#0369a1', '#059669', '#9333ea', '#d97706'];
+
+      // Sídlo firmy & Hlavní depo
+      if (depot && typeof depot.latitude === 'number' && typeof depot.longitude === 'number') {
+        const depotPoint: [number, number] = [depot.latitude, depot.longitude];
+        const depotMarker = L.marker(depotPoint, {
+          zIndexOffset: 600,
+          icon: L.divIcon({
+            className: '',
+            html: `
+              <div style="
+                position: relative;
+                width: 36px;
+                height: 36px;
+                border-radius: 12px;
+                background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+                border: 2.5px solid #38bdf8;
+                box-shadow: 0 4px 12px rgba(15, 23, 42, 0.45);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 18px;
+                cursor: pointer;
+              ">
+                🏢
+                <span style="
+                  position: absolute;
+                  bottom: -7px;
+                  background: #0284c7;
+                  color: white;
+                  font-size: 9px;
+                  font-weight: 800;
+                  padding: 1px 5px;
+                  border-radius: 4px;
+                  border: 1px solid white;
+                  white-space: nowrap;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                ">Depo</span>
+              </div>
+            `,
+            iconAnchor: [18, 18],
+          }),
+        });
+        const depotTooltip = `
+          <div style="font-family:system-ui,-apple-system,sans-serif;font-size:12px;line-height:1.4;">
+            <strong style="font-size:13px;color:#0f172a;display:block;">🏢 ${escapeHtml(companyName || 'Sídlo firmy & Centrální Depo')}</strong>
+            ${depotAddress ? `<span style="color:#475569;font-size:11px;">${escapeHtml(depotAddress)}</span><br/>` : ''}
+            <span style="color:#0284c7;font-size:10px;font-weight:700;">Výchozí a návratová základna posádek</span>
+          </div>
+        `;
+        depotMarker.bindTooltip(depotTooltip, { direction: 'top', offset: [0, -12] }).addTo(m);
+        bounds.extend(depotPoint);
+      }
+
+      // Sklady
+      warehouses?.forEach(wh => {
+        if (!wh?.location || typeof wh.location.latitude !== 'number' || typeof wh.location.longitude !== 'number') return;
+        const whPoint: [number, number] = [wh.location.latitude, wh.location.longitude];
+        const whMarker = L.marker(whPoint, {
+          zIndexOffset: 550,
+          icon: L.divIcon({
+            className: '',
+            html: `
+              <div style="
+                position: relative;
+                width: 32px;
+                height: 32px;
+                border-radius: 10px;
+                background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+                border: 2px solid white;
+                box-shadow: 0 3px 10px rgba(180, 83, 9, 0.45);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 16px;
+                cursor: pointer;
+              ">
+                📦
+                <span style="
+                  position: absolute;
+                  bottom: -6px;
+                  background: #78350f;
+                  color: white;
+                  font-size: 8px;
+                  font-weight: 800;
+                  padding: 0.5px 3px;
+                  border-radius: 3px;
+                  border: 1px solid white;
+                  white-space: nowrap;
+                  text-transform: uppercase;
+                ">Sklad</span>
+              </div>
+            `,
+            iconAnchor: [16, 16],
+          }),
+        });
+        const whTooltip = `
+          <div style="font-family:system-ui,-apple-system,sans-serif;font-size:12px;line-height:1.4;">
+            <strong style="font-size:13px;color:#78350f;display:block;">📦 ${escapeHtml(wh.name)}</strong>
+            ${wh.address ? `<span style="color:#475569;font-size:11px;">${escapeHtml(wh.address)}</span><br/>` : ''}
+            <span style="color:#b45309;font-size:10px;font-weight:600;">Materiálový sklad / výdejní místo</span>
+          </div>
+        `;
+        whMarker.bindTooltip(whTooltip, { direction: 'top', offset: [0, -10] }).addTo(m);
+        bounds.extend(whPoint);
+      });
       result?.crews.forEach((crew, index) => {
         const color = colors[index % colors.length]; let previous = crew.startLocation ?? depot;
         crew.stops.forEach(stop => {
@@ -124,7 +258,7 @@ export function RouteMap({ result, depot, active, points, onPointSelect, selecte
       if (bounds.isValid()) m.fitBounds(bounds, { padding: [32, 32], maxZoom: 15 });
     });
     return () => { disposed = true; map.current?.remove(); map.current = null; };
-  }, [result, depot, active, points, onPointSelect, selectedPointId, mapType]);
+  }, [result, depot, active, points, onPointSelect, selectedPointId, mapType, warehouses, companyName, depotAddress]);
 
   useEffect(() => {
     if (!map.current || !layerInstance.current) return;
