@@ -47,7 +47,9 @@ export type OrderForMapping = {
 export function extractOrderRouteMap(
   plans: PlanForMapping[],
   orders: OrderForMapping[],
-  todayDateStr: string = new Date().toISOString().slice(0, 10)
+  todayDateStr: string = new Date().toISOString().slice(0, 10),
+  completedPointIds?: Set<string>,
+  completedNavPointIds?: Set<string>
 ): {
   orderRouteMap: Map<string, WorkOrderRouteInfo>;
   todayRoutes: TodayCrewRouteSummary[];
@@ -120,6 +122,8 @@ export function extractOrderRouteMap(
     const summary = plan.planningSummary as { crews?: PlannedCrew[] } | null;
     if (!summary?.crews || !Array.isArray(summary.crews)) continue;
 
+    const isPlanCompleted = plan.status === 'COMPLETED';
+
     for (const crew of summary.crews) {
       const crewName = crew.name || (crew.names?.length ? crew.names.join(', ') : 'Trasa');
       const validStops = (crew.stops || []).filter(
@@ -128,11 +132,21 @@ export function extractOrderRouteMap(
 
       if (validStops.length === 0) continue;
 
-      const completedCount = validStops.filter((s) => {
-        const oid = (s as { workOrderId?: string; parentWorkOrderId?: string }).workOrderId ||
-          (s as { workOrderId?: string; parentWorkOrderId?: string }).parentWorkOrderId;
-        return oid ? doneOrderIds.has(oid) : false;
-      }).length;
+      const completedCount = isPlanCompleted
+        ? validStops.length
+        : validStops.filter((s) => {
+            const oid =
+              (s as { workOrderId?: string; parentWorkOrderId?: string }).workOrderId ||
+              (s as { workOrderId?: string; parentWorkOrderId?: string }).parentWorkOrderId;
+            const pId = (s as { electionRemovalPointId?: string }).electionRemovalPointId;
+            const mappedOid = pId ? pointToOrderMap.get(pId) : undefined;
+            if (oid && doneOrderIds.has(oid)) return true;
+            if (mappedOid && doneOrderIds.has(mappedOid)) return true;
+            if (pId && completedPointIds?.has(pId)) return true;
+            const navId = (s as { navigationPointId?: string }).navigationPointId;
+            if (navId && completedNavPointIds?.has(navId)) return true;
+            return false;
+          }).length;
 
       todayRoutes.push({
         planId: plan.id,

@@ -6,6 +6,7 @@ import { overlapsAbsence } from '@/lib/work-absence-conflicts';
 import { getOrganizationWorkCategories } from '@/lib/work-categories-server';
 import { extractOrderRouteMap } from '@/lib/field-planning/order-route-mapper';
 import { syncCrmOrderToWorkOrderInTransaction } from '@/lib/crm/crm-work-sync';
+import { syncUnlinkedDispatchPointsInTransaction } from '@/lib/dispatch/dispatch-work-sync';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
   const initialCampaignDateFrom = cleanParam(params.campaignDateFrom) || '';
   const initialCampaignDateTo = cleanParam(params.campaignDateTo) || '';
 
-  // Ensure active CRM realizations are reflected in WorkOrders
+  // 1. Ensure active CRM realizations are reflected in WorkOrders
   const unlinkedCrmOrders = await prisma.crmOrder.findMany({
     where: {
       organizationId: user.organizationId,
@@ -43,7 +44,12 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
     }
   }
 
-  const [orders, clients, carriers, employees, categories, plans] = await Promise.all([
+  // 2. Ensure active dispatch intake points are reflected in WorkOrders
+  await prisma.$transaction(async (tx) => {
+    await syncUnlinkedDispatchPointsInTransaction(tx, user.organizationId);
+  });
+
+  const [orders, clients, carriers, employees, categories, plans, completedPoints, completedNavPoints] = await Promise.all([
     prisma.workOrder.findMany({
       include: {
         assignments: true,
@@ -79,9 +85,26 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
       orderBy: { version: 'desc' },
       take: 80,
     }),
+    prisma.electionRemovalPoint.findMany({
+      where: { organizationId: user.organizationId, status: 'COMPLETED' },
+      select: { id: true },
+    }),
+    prisma.navigationPoint.findMany({
+      where: { organizationId: user.organizationId, status: 'INSTALLED' },
+      select: { id: true },
+    }),
   ]);
 
-  const { orderRouteMap, todayRoutes } = extractOrderRouteMap(plans, orders);
+  const completedPointIds = new Set(completedPoints.map((p) => p.id));
+  const completedNavPointIds = new Set(completedNavPoints.map((p) => p.id));
+
+  const { orderRouteMap, todayRoutes } = extractOrderRouteMap(
+    plans,
+    orders,
+    undefined,
+    completedPointIds,
+    completedNavPointIds
+  );
 
   const currentUserName = user.employee
     ? `${user.employee.firstName} ${user.employee.lastName}`.trim()

@@ -1,0 +1,116 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { Prisma } from '@prisma/client';
+import { syncUnlinkedDispatchPointsInTransaction } from '../lib/dispatch/dispatch-work-sync';
+
+test('syncUnlinkedDispatchPointsInTransaction: returns 0 when no active campaigns exist', async () => {
+  const mockTx = {
+    electionCampaign: {
+      findMany: async () => [],
+    },
+  } as unknown as Prisma.TransactionClient;
+
+  const result = await syncUnlinkedDispatchPointsInTransaction(mockTx, 'org-1');
+  assert.equal(result, 0);
+});
+
+test('syncUnlinkedDispatchPointsInTransaction: creates WorkOrders for unlinked points and is idempotent', async () => {
+  const createdOrders: Array<Record<string, unknown>> = [];
+  const createdAssignments: Array<Record<string, unknown>> = [];
+
+  const unlinkedPoint = {
+    id: 'point-101',
+    label: 'Plzeňská x Horní',
+    description: 'Instalace Mini Tower',
+    operationType: 'INSTALL_OBJECT',
+    objectType: 'Mini Tower',
+    mediaType: 'MINI_TOWER',
+    quantity: 1,
+    serviceMinutes: 25,
+    latitude: 49.79,
+    longitude: 18.25,
+    deadlineAt: new Date('2026-10-25T12:00:00Z'),
+    status: 'ASSIGNED',
+    referenceUrl: null,
+    createdAt: new Date('2026-10-24T18:00:00Z'),
+  };
+
+  const campaign = {
+    id: 'camp-101',
+    name: 'Práce pro Náš Jih (2026-10-25)',
+    clientName: 'Náš Jih',
+    targetDate: new Date('2026-10-25T12:00:00Z'),
+    mediaDefaults: { preferredEmployeeId: 'emp-1' },
+    points: [unlinkedPoint],
+  };
+
+  const existingWorkOrders: Array<Record<string, unknown>> = [];
+
+  const mockTx = {
+    electionCampaign: {
+      findMany: async () => [campaign],
+    },
+    workOrder: {
+      findMany: async () => existingWorkOrders,
+      findUnique: async (args: { where: { id: string } }) => {
+        const found = existingWorkOrders.find((w) => w.id === args.where.id);
+        if (!found) return null;
+        return {
+          ...found,
+          items: [],
+          assignments: createdAssignments.filter((a) => a.workOrderId === args.where.id),
+        };
+      },
+      create: async (args: { data: Record<string, unknown> }) => {
+        const item = { id: `wo-${createdOrders.length + 1}`, ...args.data };
+        createdOrders.push(item);
+        existingWorkOrders.push(item);
+        return item;
+      },
+      update: async () => ({}),
+    },
+    employee: {
+      findUnique: async () => ({
+        id: 'emp-1',
+        firstName: 'Karel',
+        lastName: 'Technik',
+        userId: 'user-emp-1',
+      }),
+      findMany: async () => [],
+      findFirst: async () => null,
+    },
+    workAssignment: {
+      create: async (args: { data: Record<string, unknown> }) => {
+        createdAssignments.push(args.data);
+        return { id: 'assign-1', ...args.data };
+      },
+    },
+    workTask: {
+      findMany: async () => [],
+      deleteMany: async () => ({ count: 0 }),
+      create: async () => ({}),
+      createMany: async () => ({ count: 1 }),
+      updateMany: async () => ({ count: 0 }),
+    },
+    workOrderItem: {
+      findFirst: async () => null,
+      create: async () => ({}),
+    },
+  } as unknown as Prisma.TransactionClient;
+
+  // 1st run: creates work order
+  const count1 = await syncUnlinkedDispatchPointsInTransaction(mockTx, 'org-1');
+  assert.equal(count1, 1);
+  assert.equal(createdOrders.length, 1);
+  assert.equal(createdOrders[0].title, 'Plzeňská x Horní');
+  assert.equal(createdOrders[0].clientName, 'Náš Jih');
+  assert.equal(createdOrders[0].workType, 'INSTALLATION');
+  assert.equal(createdOrders[0].status, 'PLANNED');
+  assert.equal(createdAssignments.length, 1);
+  assert.equal(createdAssignments[0].workerName, 'Karel Technik');
+
+  // 2nd run: idempotent (0 created)
+  const count2 = await syncUnlinkedDispatchPointsInTransaction(mockTx, 'org-1');
+  assert.equal(count2, 0);
+  assert.equal(createdOrders.length, 1);
+});
