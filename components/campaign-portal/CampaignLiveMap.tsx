@@ -135,6 +135,9 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<LeafletMap | null>(null);
   const tileLayerRef = useRef<LeafletTileLayer | null>(null);
+  const markersLayerRef = useRef<import('leaflet').LayerGroup | null>(null);
+  const hasFittedBoundsRef = useRef(false);
+  const [mapReady, setMapReady] = useState(false);
   const [mapType, setMapType] = useState<'roadmap' | 'satellite'>('roadmap');
 
   const isNavigation = navigationPoints.length > 0;
@@ -169,7 +172,7 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
 
   const googleMapsRouteUrl = getGoogleMapsRouteUrl(allRouteCoords);
 
-  // Switch Google Maps tile layer dynamically when user clicks layer switcher
+  // Switch Google Maps tile layer dynamically when user clicks layer switcher without rebuilding map
   useEffect(() => {
     if (!tileLayerRef.current) return;
     const url =
@@ -179,12 +182,14 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
     tileLayerRef.current.setUrl(url);
   }, [mapType]);
 
+  // 1. Initialize Leaflet Map instance ONCE - never destroyed on prop updates
   useEffect(() => {
     if (!mapContainerRef.current) return;
     let isMounted = true;
 
     async function initMap() {
       if (typeof window === 'undefined') return;
+      if (mapInstanceRef.current) return;
 
       if (!document.getElementById('leaflet-css-portal')) {
         const link = document.createElement('link');
@@ -196,22 +201,13 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
 
       // Dynamically load leaflet
       const L = await import('leaflet');
+      if (!isMounted || !mapContainerRef.current || mapInstanceRef.current) return;
 
-      if (!isMounted || !mapContainerRef.current) return;
-
-      // Clean up previous instance
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-        tileLayerRef.current = null;
-      }
-
-      // Empty campaigns do not imply a location for the organization.
       let centerLat = 49.82;
       let centerLng = 15.48;
       let zoom = 8;
 
-      if (isNavigation && validNavPoints.length > 0) {
+      if (validNavPoints.length > 0) {
         zoom = 12;
         centerLat = validNavPoints.reduce((sum, p) => sum + p.latitude, 0) / validNavPoints.length;
         centerLng = validNavPoints.reduce((sum, p) => sum + p.longitude, 0) / validNavPoints.length;
@@ -232,7 +228,6 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
         attributionControl: true,
       });
 
-      // Google Maps Tile Layer (no browser API key needed, never 403 blocked)
       const tileUrl =
         mapType === 'satellite'
           ? 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
@@ -244,8 +239,34 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
       }).addTo(map);
 
       tileLayerRef.current = tileLayer;
+      markersLayerRef.current = L.layerGroup().addTo(map);
       mapInstanceRef.current = map;
+      setMapReady(true);
+    }
 
+    initMap();
+
+    return () => {
+      isMounted = false;
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        tileLayerRef.current = null;
+        markersLayerRef.current = null;
+        hasFittedBoundsRef.current = false;
+        setMapReady(false);
+      }
+    };
+  }, []);
+
+  // 2. Render Markers, Targets & Polylines onto existing markersLayer without tearing down the map
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const markersLayer = markersLayerRef.current;
+    if (!map || !markersLayer || !mapReady) return;
+
+    void import('leaflet').then((L) => {
+      markersLayer.clearLayers();
       const bounds = L.latLngBounds([]);
 
       // 🎯 Render Target Marker if navigation
@@ -298,8 +319,9 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
           </div>
         `;
 
-        const targetMarker = L.marker([target.latitude, target.longitude], { icon: targetIcon }).addTo(map);
+        const targetMarker = L.marker([target.latitude, target.longitude], { icon: targetIcon });
         targetMarker.bindPopup(targetPopup);
+        markersLayer.addLayer(targetMarker);
       }
 
       // 🧭 Render Navigation Points
@@ -367,7 +389,7 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
             </div>
           `;
 
-          const marker = L.marker([point.latitude, point.longitude], { icon: navIcon }).addTo(map);
+          const marker = L.marker([point.latitude, point.longitude], { icon: navIcon });
           marker.bindPopup(popupContent);
 
           if (onSelectNavigationPoint) {
@@ -375,6 +397,7 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
               onSelectNavigationPoint(point);
             });
           }
+          markersLayer.addLayer(marker);
         });
 
         // Render real road routes ONLY when routePolyline exists - do NOT draw straight lines through the air
@@ -383,11 +406,12 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
             try {
               const roadCoords = decodePolylinePoints(p.routePolyline);
               if (roadCoords.length > 1) {
-                L.polyline(roadCoords, {
+                const line = L.polyline(roadCoords, {
                   color: '#0284c7',
                   weight: 4,
                   opacity: 0.85,
-                }).addTo(map);
+                });
+                markersLayer.addLayer(line);
               }
             } catch {
               /* ignore decode error */
@@ -454,7 +478,7 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
             </div>
           `;
 
-          const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
+          const marker = L.marker([lat, lng], { icon: customIcon });
           marker.bindPopup(popupContent);
 
           if (onSelectCarrier) {
@@ -462,26 +486,22 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
               onSelectCarrier(item);
             });
           }
+          markersLayer.addLayer(marker);
         });
       }
 
+      // Fit bounds ONCE on initial load to avoid jumping / re-centering while user is browsing
       const totalPinsCount = isNavigation ? validNavPoints.length + (target ? 1 : 0) : pointsWithGps.length;
-      if (totalPinsCount > 1) {
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+      if (totalPinsCount > 0 && !hasFittedBoundsRef.current) {
+        if (totalPinsCount > 1) {
+          map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+        } else if (validNavPoints.length === 1) {
+          map.setView([validNavPoints[0].latitude, validNavPoints[0].longitude], 14);
+        }
+        hasFittedBoundsRef.current = true;
       }
-    }
-
-    initMap();
-
-    return () => {
-      isMounted = false;
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-        tileLayerRef.current = null;
-      }
-    };
-  }, [items, navigationPoints, target, isNavigation]);
+    });
+  }, [mapReady, items, navigationPoints, target, isNavigation, onSelectCarrier, onSelectNavigationPoint]);
 
   return (
     <div className="relative w-full rounded-3xl overflow-hidden border border-slate-200/90 shadow-sm bg-slate-900">

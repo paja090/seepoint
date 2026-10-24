@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowLeft, CheckCircle2, Clock3 } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
@@ -9,6 +9,7 @@ import { NavigationOfferWorkflowStepper } from '@/components/offers/NavigationOf
 import { SpecializedOfferSummary } from '@/components/offers/SpecializedOfferSummary';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Card } from '@/components/ui';
+import { OfferHistoryTimeline } from '@/components/offers/OfferHistoryTimeline';
 import { OfferValidationError } from '@/lib/offers/domain';
 import { toProposalOffer } from '@/lib/offers/presentation';
 import { getOffer } from '@/lib/offers/service';
@@ -16,21 +17,6 @@ import type { OfferView } from '@/lib/offers/view-model';
 import { requirePageAccess } from '@/lib/page-auth';
 
 export const dynamic = 'force-dynamic';
-
-const eventLabels: Record<string, string> = {
-  CREATED: 'Nabídka vytvořena',
-  UPDATED: 'Nabídka upravena',
-  DUPLICATED: 'Nabídka duplikována',
-  PUBLISHED: 'Veřejný odkaz vytvořen',
-  SENT: 'Nabídka odeslána',
-  VIEWED: 'Nabídka zobrazena klientem',
-  ACCEPTED: 'Nabídka přijata',
-  REJECTED: 'Nabídka zamítnuta',
-  EXPIRED: 'Platnost ukončena',
-  QUESTION: 'Klient položil otázku',
-  CONVERTED: 'Převedeno na obsazenost',
-  ARCHIVED: 'Nabídka archivována',
-};
 
 export default async function OfferDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requirePageAccess('offers');
@@ -122,29 +108,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
             </dl>
           </Card>
 
-          <Card>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Aktivita</p>
-              <h2 className="mt-1 text-lg font-semibold text-slate-950">Historie nabídky</h2>
-            </div>
-            {offer.events?.length ? (
-              <ol className="mt-5 space-y-4">
-                {offer.events.map((event) => (
-                  <li className="relative border-l border-slate-200 pb-1 pl-5 text-sm" key={event.id}>
-                    <span aria-hidden="true" className="absolute -left-1.5 top-1 size-3 rounded-full border-2 border-white bg-slate-400" />
-                    <p className="font-semibold text-slate-800">{eventLabels[event.type] ?? event.type}</p>
-                    <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                      <Clock3 aria-hidden="true" size={13} />
-                      {event.actorName || 'Systém'} · {new Date(event.createdAt).toLocaleString('cs-CZ')}
-                    </p>
-                    {event.message && <p className="mt-2 whitespace-pre-wrap text-slate-600">{event.message}</p>}
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="mt-5 text-sm text-slate-500">Zatím bez zaznamenané aktivity.</p>
-            )}
-          </Card>
+          <OfferHistoryTimeline events={offer.events} />
         </div>
 
         <OfferActions

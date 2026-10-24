@@ -491,16 +491,16 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
       <div className="overflow-hidden rounded-3xl border border-sky-800/60 bg-gradient-to-br from-sky-950 via-slate-900 to-slate-950 p-6 text-white shadow-xl lg:p-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-4 flex-1">
-            {targets[0]?.photoUrl ? (
+            {targets[0]?.photoUrl || targetPhotoUrl ? (
               <button
                 type="button"
-                onClick={() => setActiveLightboxImage(toPhotoFullUrl(String(targets[0].photoUrl)))}
+                onClick={() => setActiveLightboxImage(toPhotoFullUrl(String(targets[0]?.photoUrl || targetPhotoUrl)))}
                 className="h-16 w-24 sm:h-20 sm:w-32 rounded-2xl overflow-hidden border border-sky-400/40 shadow-lg bg-slate-900 shrink-0 relative group cursor-pointer text-left"
                 title="Kliknutím zvětšit fotografii cílové prodejny"
               >
                 <img
-                  src={targets[0].photoUrl}
-                  alt={targets[0].name}
+                  src={targets[0]?.photoUrl || (typeof targetPhotoUrl === 'string' ? targetPhotoUrl : undefined)}
+                  alt={targets[0]?.name || 'Prodejna'}
                   className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
                 />
                 <span className="absolute bottom-1 right-1 rounded-md bg-black/70 backdrop-blur-xs px-1.5 py-0.5 text-[9px] font-bold text-white flex items-center gap-0.5">
@@ -508,11 +508,12 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                   Prodejna
                 </span>
               </button>
-            ) : offer.client?.logoUrl ? (
-              <div className="h-16 w-24 sm:h-20 sm:w-32 rounded-2xl bg-white p-2 border border-sky-400/30 shadow-md flex items-center justify-center shrink-0">
-                <img src={offer.client.logoUrl} alt={offer.client.name} className="max-h-full max-w-full object-contain" />
+            ) : (
+              <div className="h-16 w-24 sm:h-20 sm:w-32 rounded-2xl bg-sky-950/70 border border-sky-400/30 flex flex-col items-center justify-center text-center p-2 shrink-0">
+                <Store size={22} className="text-sky-400 mb-1" />
+                <span className="text-[10px] font-bold text-sky-300">Cíl navigace</span>
               </div>
-            ) : null}
+            )}
             <div className="space-y-2 flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="rounded-xl bg-rose-500/20 p-2 text-rose-400 border border-rose-500/30">
