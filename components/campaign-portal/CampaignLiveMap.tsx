@@ -28,6 +28,7 @@ export interface NavigationMapPointInput {
   navigationType?: string | null;
   variant?: string | null;
   color?: string | null;
+  routePolyline?: string | null;
 }
 
 export interface NavigationTargetInput {
@@ -93,6 +94,41 @@ function formatDistance(point: NavigationMapPointInput): string {
     return `${point.calculatedDistanceMeters} m od cíle`;
   }
   return '';
+}
+
+function decodePolylinePoints(encoded: string): Array<[number, number]> {
+  if (!encoded) return [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+  const coordinates: Array<[number, number]> = [];
+
+  while (index < encoded.length) {
+    let result = 0;
+    let shift = 0;
+    let b: number;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20 && index < encoded.length);
+    const dlat = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lat += dlat;
+
+    result = 0;
+    shift = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20 && index < encoded.length);
+    const dlng = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lng += dlng;
+
+    coordinates.push([lat / 1e5, lng / 1e5]);
+  }
+
+  return coordinates;
 }
 
 export function CampaignLiveMap({ items = [], navigationPoints = [], target = null, onSelectCarrier, onSelectNavigationPoint }: Props) {
@@ -341,19 +377,23 @@ export function CampaignLiveMap({ items = [], navigationPoints = [], target = nu
           }
         });
 
-        // Connecting Route Line between points and target
-        const routeCoords: [number, number][] = validNavPoints.map((p) => [p.latitude, p.longitude]);
-        if (target && typeof target.latitude === 'number' && typeof target.longitude === 'number') {
-          routeCoords.push([target.latitude, target.longitude]);
-        }
-        if (routeCoords.length > 1) {
-          L.polyline(routeCoords, {
-            color: '#0284c7',
-            weight: 3.5,
-            dashArray: '6, 6',
-            opacity: 0.85,
-          }).addTo(map);
-        }
+        // Render real road routes ONLY when routePolyline exists - do NOT draw straight lines through the air
+        validNavPoints.forEach((p) => {
+          if (p.routePolyline) {
+            try {
+              const roadCoords = decodePolylinePoints(p.routePolyline);
+              if (roadCoords.length > 1) {
+                L.polyline(roadCoords, {
+                  color: '#0284c7',
+                  weight: 4,
+                  opacity: 0.85,
+                }).addTo(map);
+              }
+            } catch {
+              /* ignore decode error */
+            }
+          }
+        });
       } else {
         // Standard OOH Carriers
         pointsWithGps.forEach((item, index) => {

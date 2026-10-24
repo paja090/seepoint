@@ -3,7 +3,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { LocationPickerMap } from '@/components/election-removal/LocationPickerMap';
-import { ELECTION_REMOVAL_MEDIA_LABELS, type ElectionRemovalMediaType } from '@/lib/election-removal/constants';
+import { type ElectionRemovalMediaType } from '@/lib/election-removal/constants';
 import { dispositions, type Operation, type Disposition, operations } from '@/lib/election-removal/task-spec';
 import {
   User,
@@ -11,7 +11,6 @@ import {
   Calendar,
   Plus,
   Trash2,
-  MapPin,
   Clock,
   Briefcase,
   AlertCircle,
@@ -19,6 +18,40 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
+
+export interface PortfolioItem {
+  id: string;
+  name: string;
+  category: string;
+  dbMediaType: ElectionRemovalMediaType;
+  defaultMinutes: number;
+}
+
+export const PORTFOLIO_OBJECT_TYPES: PortfolioItem[] = [
+  // 1. OOH Velkoformát & Plochy
+  { id: 'BILLBOARD', name: 'Billboard (Euroformát 5,1 × 2,4 m)', category: 'Velkoformátové plochy (OOH)', dbMediaType: 'BANNER', defaultMinutes: 25 },
+  { id: 'BIGBOARD', name: 'Bigboard / Megaboard (9,6 × 3,6 m)', category: 'Velkoformátové plochy (OOH)', dbMediaType: 'BANNER', defaultMinutes: 45 },
+  { id: 'CITYLIGHT', name: 'Citylight / CLV vitrína (118,5 × 175 cm)', category: 'Velkoformátové plochy (OOH)', dbMediaType: 'CITY_POSTER', defaultMinutes: 15 },
+  { id: 'BANNER', name: 'Reklamní plachta / Banner', category: 'Velkoformátové plochy (OOH)', dbMediaType: 'BANNER', defaultMinutes: 20 },
+  { id: 'FACADE', name: 'Fasáda / Štítová stěna domu', category: 'Velkoformátové plochy (OOH)', dbMediaType: 'BANNER', defaultMinutes: 30 },
+  { id: 'LED_SCREEN', name: 'LED obrazovka / Digitální panel', category: 'Velkoformátové plochy (OOH)', dbMediaType: 'OTHER', defaultMinutes: 20 },
+  { id: 'PLOT', name: 'Plotová reklama / Oplocení stavby', category: 'Velkoformátové plochy (OOH)', dbMediaType: 'PLOT', defaultMinutes: 15 },
+
+  // 2. Mobiliář & Vlastní sítě SeePoint
+  { id: 'BENCH', name: 'Lavička (Promo Bench)', category: 'Městský mobiliář & Sítě', dbMediaType: 'BENCH', defaultMinutes: 10 },
+  { id: 'CITY_POSTER', name: 'Plakátovací plocha / City Poster', category: 'Městský mobiliář & Sítě', dbMediaType: 'CITY_POSTER', defaultMinutes: 15 },
+  { id: 'TOWER', name: 'Tower (reklamní věž 3stranná)', category: 'Městský mobiliář & Sítě', dbMediaType: 'TOWER', defaultMinutes: 25 },
+  { id: 'MINI_TOWER', name: 'Mini Tower (reklamní věž)', category: 'Městský mobiliář & Sítě', dbMediaType: 'MINI_TOWER', defaultMinutes: 20 },
+  { id: 'ACKO', name: 'Áčko (mobilní poutač / stojan)', category: 'Městský mobiliář & Sítě', dbMediaType: 'ACKO', defaultMinutes: 10 },
+  { id: 'PROMO_HORIZON', name: 'Promo Horizon', category: 'Městský mobiliář & Sítě', dbMediaType: 'OTHER', defaultMinutes: 15 },
+
+  // 3. Navigace
+  { id: 'NAVIGATION', name: 'Navigační směrovka (sloup VO)', category: 'Navigace & Označení', dbMediaType: 'OTHER', defaultMinutes: 20 },
+  { id: 'NAVIGATION_SIGN', name: 'Navigační tabule / Pylon', category: 'Navigace & Označení', dbMediaType: 'OTHER', defaultMinutes: 25 },
+
+  // 4. Ostatní
+  { id: 'OTHER', name: 'Jiné médium / nestandardní objekt', category: 'Ostatní', dbMediaType: 'OTHER', defaultMinutes: 15 },
+];
 
 interface EmployeeResource {
   id: string;
@@ -39,6 +72,8 @@ interface StopEntry {
   id: string;
   operation: Operation;
   label: string;
+  objectType: string;
+  customObjectType?: string;
   mediaType: ElectionRemovalMediaType;
   quantity: number;
   latitude: number | null;
@@ -62,18 +97,21 @@ const templates: Array<[Operation, string]> = [
   ['OTHER', 'Jiná práce'],
 ];
 
-function createEmptyStop(index: number, defaultOp: Operation = 'REPLACE_AD'): StopEntry {
+function createEmptyStop(index: number, defaultOp: Operation = 'REPLACE_AD', defaultObj: string = 'BILLBOARD'): StopEntry {
+  const portfolioObj = PORTFOLIO_OBJECT_TYPES.find((p) => p.id === defaultObj) || PORTFOLIO_OBJECT_TYPES[0];
   return {
     id: `stop-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     operation: defaultOp,
     label: '',
-    mediaType: 'OTHER',
+    objectType: defaultObj,
+    customObjectType: '',
+    mediaType: portfolioObj.dbMediaType,
     quantity: 1,
     latitude: null,
     longitude: null,
     description: '',
     disposition: defaultOp === 'RELOCATION' ? 'TRANSFER' : 'LEAVE',
-    serviceMinutes: 15,
+    serviceMinutes: portfolioObj.defaultMinutes,
   };
 }
 
@@ -134,7 +172,8 @@ export function DispatchIntake({
 
   const addStop = () => {
     const nextOp = stops[stops.length - 1]?.operation || 'REPLACE_AD';
-    const newStop = createEmptyStop(stops.length + 1, nextOp);
+    const nextObj = stops[stops.length - 1]?.objectType || 'BILLBOARD';
+    const newStop = createEmptyStop(stops.length + 1, nextOp, nextObj);
     setStops((prev) => [...prev, newStop]);
     setActiveStopIndex(stops.length);
   };
@@ -179,12 +218,18 @@ export function DispatchIntake({
 
     const formattedTasks = stops.map((s, idx) => {
       const isTransport = ['WAREHOUSE', 'TRANSFER', 'CLIENT'].includes(s.disposition);
+      const portfolioObj = PORTFOLIO_OBJECT_TYPES.find((p) => p.id === s.objectType);
+      const resolvedObjectName =
+        s.objectType === 'OTHER' && s.customObjectType?.trim()
+          ? s.customObjectType.trim()
+          : portfolioObj?.name || s.objectType;
+
       return {
-        label: s.label.trim() || `Zastávka ${idx + 1}: ${operations[s.operation]}`,
-        description: s.description.trim() || operations[s.operation],
+        label: s.label.trim() || `Zastávka ${idx + 1}: ${operations[s.operation]} (${resolvedObjectName})`,
+        description: s.description.trim() || `${operations[s.operation]} – ${resolvedObjectName}`,
         operationType: s.operation,
-        mediaType: s.mediaType,
-        objectType: s.mediaType,
+        mediaType: portfolioObj?.dbMediaType || 'OTHER',
+        objectType: resolvedObjectName,
         quantity: Number(s.quantity) || 1,
         latitude: s.latitude!,
         longitude: s.longitude!,
@@ -198,7 +243,7 @@ export function DispatchIntake({
         referenceUrl: s.referenceUrl || null,
         contact: '',
         accessInstructions: '',
-        serviceMinutes: s.serviceMinutes ? Number(s.serviceMinutes) : undefined,
+        serviceMinutes: s.serviceMinutes ? Number(s.serviceMinutes) : portfolioObj?.defaultMinutes || 15,
         requiredWorkers: 1,
       };
     });
@@ -237,7 +282,7 @@ export function DispatchIntake({
             Zadat práci do dispečinku
           </h2>
           <p className="mt-1 text-xs text-slate-500">
-            Přiřaďte pracovníka, auto a zadejte jednu nebo více zastávek s libovolnou činností.
+            Přiřaďte pracovníka, auto a zadejte zastávky pro libovolný objekt z portfolia firmy.
           </p>
         </div>
         {!embedded && (
@@ -247,7 +292,19 @@ export function DispatchIntake({
         )}
       </div>
 
-      <form onSubmit={submit} className="mt-4 space-y-6">
+      <form
+        onSubmit={submit}
+        onKeyDown={(e) => {
+          // Prevent accidental form submit when hitting Enter inside regular text inputs
+          if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
+            const inputType = (e.target as HTMLInputElement).type;
+            if (inputType !== 'submit') {
+              e.preventDefault();
+            }
+          }
+        }}
+        className="mt-4 space-y-6"
+      >
         {error && (
           <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs font-semibold text-rose-800 flex items-start gap-2">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -387,24 +444,28 @@ export function DispatchIntake({
           {/* Quick tab switcher when multiple stops */}
           {stops.length > 1 && (
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-              {stops.map((stop, i) => (
-                <button
-                  key={stop.id}
-                  type="button"
-                  onClick={() => setActiveStopIndex(i)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 border ${
-                    activeStopIndex === i
-                      ? 'bg-sky-800 text-white border-sky-800 shadow-sm'
-                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  <span className="opacity-80">#{i + 1}</span>
-                  <span>{operations[stop.operation] || 'Zastávka'}</span>
-                  {stop.latitude && stop.longitude && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                  )}
-                </button>
-              ))}
+              {stops.map((stop, i) => {
+                const pObj = PORTFOLIO_OBJECT_TYPES.find((p) => p.id === stop.objectType);
+                return (
+                  <button
+                    key={stop.id}
+                    type="button"
+                    onClick={() => setActiveStopIndex(i)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 border ${
+                      activeStopIndex === i
+                        ? 'bg-sky-800 text-white border-sky-800 shadow-sm'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="opacity-80">#{i + 1}</span>
+                    <span>{operations[stop.operation] || 'Zastávka'}</span>
+                    <span className="text-[10px] opacity-70">({pObj?.name.split(' ')[0] || 'Objekt'})</span>
+                    {stop.latitude && stop.longitude && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -413,6 +474,7 @@ export function DispatchIntake({
             {stops.map((stop, index) => {
               const isExpanded = stops.length === 1 || activeStopIndex === index;
               const isTransport = ['WAREHOUSE', 'TRANSFER', 'CLIENT'].includes(stop.disposition);
+              const portfolioObj = PORTFOLIO_OBJECT_TYPES.find((p) => p.id === stop.objectType);
 
               return (
                 <article
@@ -435,10 +497,10 @@ export function DispatchIntake({
                       </span>
                       <div className="min-w-0">
                         <h4 className="text-sm font-bold text-slate-900 truncate">
-                          {stop.label || `Zastávka #${index + 1}: ${operations[stop.operation]}`}
+                          {stop.label || `Zastávka #${index + 1}: ${operations[stop.operation]} · ${portfolioObj?.name || stop.objectType}`}
                         </h4>
                         <p className="text-[11px] text-slate-500 truncate">
-                          {operations[stop.operation]} · {ELECTION_REMOVAL_MEDIA_LABELS[stop.mediaType]} · {stop.quantity} ks
+                          {operations[stop.operation]} · {portfolioObj?.name || stop.objectType} · {stop.quantity} ks
                           {stop.latitude && stop.longitude ? ' · 📍 GPS vybrána' : ' · ⚠️ Chybí GPS'}
                         </p>
                       </div>
@@ -498,46 +560,57 @@ export function DispatchIntake({
                         </div>
                       </div>
 
-                      {/* Title & Media */}
+                      {/* Portfolio Object Selection & Quantity */}
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div>
                           <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Název / označení místa
+                            Typ objektu z portfolia
                           </label>
-                          <input
-                            required
-                            maxLength={200}
-                            value={stop.label}
-                            onChange={(e) => updateStop(index, { label: e.target.value })}
-                            placeholder={`Např. ${operations[stop.operation]} u nádraží...`}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs focus:ring-2 focus:ring-sky-600 focus:outline-none"
-                          />
+                          <select
+                            value={stop.objectType}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const found = PORTFOLIO_OBJECT_TYPES.find((p) => p.id === val);
+                              updateStop(index, {
+                                objectType: val,
+                                mediaType: found?.dbMediaType || 'OTHER',
+                                serviceMinutes: found?.defaultMinutes || stop.serviceMinutes || 15,
+                              });
+                            }}
+                            className="w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-medium focus:ring-2 focus:ring-sky-600 focus:outline-none"
+                          >
+                            {Object.entries(
+                              PORTFOLIO_OBJECT_TYPES.reduce((acc, item) => {
+                                acc[item.category] = acc[item.category] || [];
+                                acc[item.category].push(item);
+                                return acc;
+                              }, {} as Record<string, typeof PORTFOLIO_OBJECT_TYPES>)
+                            ).map(([category, items]) => (
+                              <optgroup key={category} label={category}>
+                                {items.map((item) => (
+                                  <option key={item.id} value={item.id}>
+                                    {item.name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            ))}
+                          </select>
+
+                          {stop.objectType === 'OTHER' && (
+                            <input
+                              type="text"
+                              value={stop.customObjectType || ''}
+                              onChange={(e) => updateStop(index, { customObjectType: e.target.value })}
+                              placeholder="Upřesněte typ objektu (např. Výloha, Světelný box, Pylon...)"
+                              className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs placeholder:text-slate-400 focus:ring-2 focus:ring-sky-600 focus:outline-none"
+                            />
+                          )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <label className="block text-xs font-semibold text-slate-700 mb-1">
-                              Typ objektu
-                            </label>
-                            <select
-                              value={stop.mediaType}
-                              onChange={(e) =>
-                                updateStop(index, {
-                                  mediaType: e.target.value as ElectionRemovalMediaType,
-                                })
-                              }
-                              className="w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs focus:ring-2 focus:ring-sky-600 focus:outline-none"
-                            >
-                              {Object.entries(ELECTION_REMOVAL_MEDIA_LABELS).map(([k, v]) => (
-                                <option key={k} value={k}>
-                                  {v}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-700 mb-1">
-                              Počet (ks)
+                              Počet kusů
                             </label>
                             <input
                               type="number"
@@ -550,7 +623,41 @@ export function DispatchIntake({
                               className="w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs focus:ring-2 focus:ring-sky-600 focus:outline-none"
                             />
                           </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              Odhad (min)
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={1440}
+                              value={stop.serviceMinutes || 15}
+                              onChange={(e) =>
+                                updateStop(index, {
+                                  serviceMinutes: Number(e.target.value) || 15,
+                                })
+                              }
+                              className="w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs focus:ring-2 focus:ring-sky-600 focus:outline-none"
+                            />
+                          </div>
                         </div>
+                      </div>
+
+                      {/* Title / Label of this stop */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Název / označení zastávky
+                        </label>
+                        <input
+                          required
+                          maxLength={200}
+                          value={stop.label}
+                          onChange={(e) => updateStop(index, { label: e.target.value })}
+                          placeholder={`Např. ${operations[stop.operation]} – ${portfolioObj?.name || 'místo'}...`}
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs focus:ring-2 focus:ring-sky-600 focus:outline-none"
+                        />
                       </div>
 
                       {/* Map Location Picker with Search */}
@@ -559,7 +666,7 @@ export function DispatchIntake({
                           Poloha zastávky #{index + 1}
                         </label>
                         <p className="text-[11px] text-slate-500">
-                          Vyhledejte adresu nebo klikněte kamkoliv do mapy.
+                          Zadejte adresu do vyhledávače výše a stiskněte Hledat, nebo klikněte do mapy.
                         </p>
                         <LocationPickerMap
                           latitude={stop.latitude}
@@ -591,44 +698,25 @@ export function DispatchIntake({
                       </div>
 
                       {/* Material handling */}
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Nakládání s materiálem
-                          </label>
-                          <select
-                            value={stop.disposition}
-                            onChange={(e) =>
-                              updateStop(index, {
-                                disposition: e.target.value as Disposition,
-                              })
-                            }
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs focus:ring-2 focus:ring-sky-600 focus:outline-none"
-                          >
-                            {Object.entries(dispositions).map(([k, v]) => (
-                              <option key={k} value={k}>
-                                {v}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Odhad času (minut)
-                          </label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={1440}
-                            value={stop.serviceMinutes || 15}
-                            onChange={(e) =>
-                              updateStop(index, {
-                                serviceMinutes: Number(e.target.value) || 15,
-                              })
-                            }
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs focus:ring-2 focus:ring-sky-600 focus:outline-none"
-                          />
-                        </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Nakládání s materiálem
+                        </label>
+                        <select
+                          value={stop.disposition}
+                          onChange={(e) =>
+                            updateStop(index, {
+                              disposition: e.target.value as Disposition,
+                            })
+                          }
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs focus:ring-2 focus:ring-sky-600 focus:outline-none"
+                        >
+                          {Object.entries(dispositions).map(([k, v]) => (
+                            <option key={k} value={k}>
+                              {v}
+                            </option>
+                          ))}
+                        </select>
                       </div>
 
                       {/* Transport destination if relocation */}

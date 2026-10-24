@@ -249,3 +249,164 @@ export function getPointPinVisual(point: {
     icon: category.icon,
   };
 }
+
+/**
+ * Formats a navigation point's primary title according to the standard:
+ * P{index + 1} – {street} – {distance} {direction}
+ * e.g. "P1 – Orlovská – 500 m rovně"
+ */
+export function formatNavigationPointDesignation(
+  point: {
+    label?: string | null;
+    address?: string | null;
+    pillarNumber?: string | null;
+    arrowDirectionEnum?: string | null;
+    arrowDirection?: string | null;
+    distanceSource?: string | null;
+    manualDistanceValue?: number | string | null;
+    manualDistanceUnit?: string | null;
+    calculatedDistanceMeters?: number | null;
+  },
+  index: number
+): {
+  code: string;
+  street: string;
+  distance: string;
+  direction: string;
+  fullTitle: string;
+} {
+  const code = `P${index + 1}`;
+
+  // 1. Resolve Direction in Czech lowercase
+  const rawDir = point.arrowDirectionEnum || point.arrowDirection || '';
+  let direction = '';
+  switch (rawDir) {
+    case 'RIGHT':
+    case 'Doprava':
+    case 'vpravo':
+    case 'doprava':
+      direction = 'vpravo';
+      break;
+    case 'LEFT':
+    case 'Doleva':
+    case 'vlevo':
+    case 'doleva':
+      direction = 'vlevo';
+      break;
+    case 'SLANTED_RIGHT':
+    case 'SLIGHT_RIGHT':
+    case 'Šikmo vpravo':
+      direction = 'šikmo vpravo';
+      break;
+    case 'SLANTED_LEFT':
+    case 'SLIGHT_LEFT':
+    case 'Šikmo vlevo':
+      direction = 'šikmo vlevo';
+      break;
+    case 'U_TURN':
+      direction = 'otočení';
+      break;
+    case 'ROUNDABOUT_1':
+      direction = 'kruhový obj. (1. výjezd)';
+      break;
+    case 'ROUNDABOUT_2':
+      direction = 'kruhový obj. (2. výjezd)';
+      break;
+    case 'ROUNDABOUT_3':
+      direction = 'kruhový obj. (3. výjezd)';
+      break;
+    case 'ROUNDABOUT_4':
+      direction = 'kruhový obj. (4. výjezd)';
+      break;
+    case 'ROUNDABOUT_5':
+      direction = 'kruhový obj. (5. výjezd)';
+      break;
+    case 'ROUNDABOUT':
+      direction = 'kruhový objezd';
+      break;
+    case 'TWO_WAY':
+      direction = 'obousměrně';
+      break;
+    case 'STRAIGHT':
+    case 'Rovně':
+    case 'rovně':
+      direction = 'rovně';
+      break;
+    default:
+      if (rawDir && !['NONE', 'UNKNOWN'].includes(rawDir)) {
+        direction = rawDir.toLowerCase();
+      } else {
+        direction = 'rovně';
+      }
+      break;
+  }
+
+  // 2. Resolve Distance
+  let distance = '';
+  const rawManual =
+    point.manualDistanceValue !== undefined && point.manualDistanceValue !== null
+      ? String(point.manualDistanceValue).trim().replace(',', '.')
+      : '';
+  if (
+    (point.distanceSource === 'MANUAL' || rawManual !== '') &&
+    rawManual !== '' &&
+    Number(rawManual) > 0
+  ) {
+    const unit = point.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm';
+    distance = `${point.manualDistanceValue} ${unit}`;
+  } else if (
+    typeof point.calculatedDistanceMeters === 'number' &&
+    point.calculatedDistanceMeters > 0
+  ) {
+    const rounded = Math.max(50, Math.round(point.calculatedDistanceMeters / 50) * 50);
+    if (rounded >= 1000) {
+      distance = `${(rounded / 1000).toFixed(1).replace('.', ',')} km`;
+    } else {
+      distance = `${rounded} m`;
+    }
+  }
+
+  // 3. Resolve Street / Location
+  let street = '';
+  if (point.label && /^P\d+\s*[-–]/i.test(point.label)) {
+    return {
+      code,
+      street: point.address || '',
+      distance,
+      direction,
+      fullTitle: point.label,
+    };
+  }
+
+  if (point.address && typeof point.address === 'string' && point.address.trim().length > 0) {
+    const firstPart = point.address.split(',')[0].trim();
+    street = firstPart.replace(/^ul(\.|\s+)/i, '');
+  } else if (
+    point.label &&
+    typeof point.label === 'string' &&
+    !/^navigační bod/i.test(point.label) &&
+    !/^bod \d+/i.test(point.label) &&
+    !/^sloup vo/i.test(point.label)
+  ) {
+    street = point.label.trim();
+  }
+
+  if (!street) {
+    street = point.pillarNumber ? `Sloup VO ${point.pillarNumber}` : `Pozice ${index + 1}`;
+  }
+
+  // 4. Assemble standard title: P1 – Orlovská – 500 m rovně
+  const parts: string[] = [code];
+  if (street) parts.push(street);
+  const distDir = [distance, direction].filter(Boolean).join(' ');
+  if (distDir) parts.push(distDir);
+
+  return {
+    code,
+    street,
+    distance,
+    direction,
+    fullTitle: parts.join(' – '),
+  };
+}
+

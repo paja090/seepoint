@@ -593,32 +593,25 @@ export function GoogleNavigationOfferMap({
 
       markersRef.current.push(marker);
 
-      // Route polyline to target
-      const pointTarget = (point.targetLatitude && point.targetLongitude)
-        ? { latitude: point.targetLatitude, longitude: point.targetLongitude }
-        : (point.targetId && targets ? targets.find((t) => t.id === point.targetId) : (targets && targets[0] ? targets[0] : target));
-
-      if (pointTarget) {
-        let polylinePath: Array<{ lat: number; lng: number }> = [pointPos, { lat: pointTarget.latitude, lng: pointTarget.longitude }];
-        if (point.routePolyline && googleMaps.geometry?.encoding) {
-          try {
-            const decoded = googleMaps.geometry.encoding.decodePath(point.routePolyline);
-            polylinePath = decoded.map((p) => ({ lat: p.lat(), lng: p.lng() }));
-          } catch {
-            /* fallback */
+      // Render real road route polyline ONLY if point has routePolyline - no straight lines through the air
+      if (point.routePolyline && googleMaps.geometry?.encoding) {
+        try {
+          const decoded = googleMaps.geometry.encoding.decodePath(point.routePolyline);
+          if (decoded && decoded.length > 1) {
+            const polylinePath = decoded.map((p) => ({ lat: p.lat(), lng: p.lng() }));
+            const polyline = new googleMaps.Polyline({
+              path: polylinePath,
+              geodesic: true,
+              strokeColor: isSelected ? '#ea580c' : '#0284c7',
+              strokeOpacity: isSelected ? 1 : 0.8,
+              strokeWeight: isSelected ? 5 : 4,
+              map,
+            });
+            polylinesRef.current.push(polyline);
           }
+        } catch {
+          /* ignore decode errors - do NOT fall back to straight line through the air */
         }
-
-        const polyline = new googleMaps.Polyline({
-          path: polylinePath,
-          geodesic: true,
-          strokeColor: isSelected ? '#ea580c' : '#0284c7',
-          strokeOpacity: isSelected ? 1 : 0.8,
-          strokeWeight: isSelected ? 5 : 4,
-          map,
-        });
-
-        polylinesRef.current.push(polyline);
       }
     });
 
