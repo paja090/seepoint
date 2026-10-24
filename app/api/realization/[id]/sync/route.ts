@@ -104,6 +104,29 @@ export async function POST(
           message = `Stav synchronizován: nahráno ${photographedPoints} z ${totalPoints} fotografií.`;
         }
       }
+    } else {
+      // Standard Media / Mixed Media Orders
+      const realizations = await prisma.crmRealization.findMany({
+        where: { crmOrderId: crmOrder.id, organizationId },
+        include: { photos: true },
+      });
+      const totalItems = realizations.length;
+      const photographedItems = realizations.filter((r) => r.photos.length > 0 || r.status === 'PHOTOGRAPHED' || r.status === 'COMPLETED').length;
+
+      if (body.action === 'ADVANCE_TO_BILLING') {
+        await prisma.crmRealization.updateMany({
+          where: { crmOrderId: crmOrder.id, organizationId, status: { not: 'COMPLETED' } },
+          data: { status: 'COMPLETED' },
+        });
+        await prisma.crmOrder.update({
+          where: { id: crmOrder.id },
+          data: { status: 'COMPLETED' },
+        });
+        advancedToBilling = true;
+        message = 'Fotodokumentace i realizace byla schválena. Zakázka byla posunuta do fáze Připraveno k fakturaci.';
+      } else {
+        message = `Stav synchronizován: nahrána fotodokumentace u ${photographedItems} z ${totalItems} ploch.`;
+      }
     }
 
     const profile = await getOrganizationRealizationProfile(organizationId);

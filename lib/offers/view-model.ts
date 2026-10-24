@@ -211,6 +211,8 @@ export type OfferView = {
     navigationOrderStatus?: string | null;
     crmOrderStatus?: string | null;
   } | null;
+  crmOrderId?: string | null;
+  navigationOrderId?: string | null;
 };
 
 export type OfferClientOption = { id: string; name: string; logoUrl?: string; companyId?: string | null; contactPerson?: string | null; email?: string | null; phone?: string | null; note?: string | null };

@@ -135,6 +135,9 @@ export type RealizationContext = {
   organizationId: string;
   orderId: string;
   orderNumber: string;
+  clientOrderCode?: string;
+  note?: string;
+  internalNote?: string;
   offerId?: string;
   offerTitle?: string;
   offerAcceptedAt?: Date;

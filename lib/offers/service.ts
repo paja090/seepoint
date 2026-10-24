@@ -534,6 +534,8 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
         crmOrderStatus,
       };
     })(),
+    crmOrderId: row.crmOrder?.id || null,
+    navigationOrderId: row.crmOrder?.navigationOrder?.id || null,
   };
   return publicView ? stripPublicOfferSecrets(serialized) : serialized;
 }

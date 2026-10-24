@@ -25,6 +25,8 @@ type OfferActionsProps = {
   isNoPriceConcept?: boolean;
   hasPublicLink?: boolean;
   portalToken?: string;
+  crmOrderId?: string | null;
+  navigationOrderId?: string | null;
 };
 
 const secondaryButton = 'inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50';
@@ -41,6 +43,8 @@ export function OfferActions({
   isNoPriceConcept,
   hasPublicLink,
   portalToken,
+  crmOrderId,
+  navigationOrderId,
 }: OfferActionsProps) {
   const router = useRouter();
   const [busy, setBusy] = useState('');
@@ -258,6 +262,16 @@ export function OfferActions({
               Převést na rezervaci
             </button>
           </>
+        )}
+
+        {(crmOrderId || status === 'ACCEPTED') && (
+          <a
+            href={offerType === 'NAVIGATION' && navigationOrderId ? `/navigation/orders/${navigationOrderId}` : `/realization/${crmOrderId || offerId}`}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm py-3 transition shadow-xs cursor-pointer"
+          >
+            <ExternalLink aria-hidden="true" size={16} />
+            <span>Otevřít zakázku v Realizaci</span>
+          </a>
         )}
 
         <div className="border-t border-slate-100 pt-3 space-y-2">
