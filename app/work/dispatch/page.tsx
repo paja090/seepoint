@@ -35,7 +35,7 @@ export default async function DispatchPage({ searchParams }: { searchParams?: Pr
     const jobs = query.jobs?.split(',').filter(Boolean);
     const points = query.points?.split(',').filter(Boolean);
     return <AppShell><div className="mx-auto w-full max-w-[1760px] space-y-6">
-      <DispatchBoard key={date+view} items={data.items} plans={data.plans} date={date} today={dayInZone(new Date(), profile?.timezone ?? 'Europe/Prague')} canCreate={fieldEnabled} messages={data.messages} timezone={profile?.timezone} depot={profile?.depot} view={view} progress={data.progress}/>
+      <DispatchBoard key={date+view} items={data.items} plans={data.plans} date={date} today={dayInZone(new Date(), profile?.timezone ?? 'Europe/Prague')} canCreate={fieldEnabled} messages={data.messages} timezone={profile?.timezone} depot={profile?.depot} warehouses={profile?.warehouses} profile={profile} country={user.organization?.country ?? null} view={view} progress={data.progress}/>
       <section id="planner" className="scroll-mt-20">{(campaign || query.planner === 'work') && <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold">Rozšířené plánování</h2><Link href={'/work/dispatch?date='+date} className="text-sm font-semibold text-sky-800">Zpět na přehled</Link></div>}
         {campaign && selectedPlan ? <div className="rounded-2xl border bg-white p-5 space-y-3"><h2 className="text-xl font-bold">{result?.planName || 'Výjezd'} · {selectedPlan.date}</h2>
           {result?.crews?.map(crew => <p key={crew.id}>{crew.name}: {crew.stops.length} zastávek</p>)}

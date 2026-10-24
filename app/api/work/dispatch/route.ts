@@ -3,12 +3,13 @@ import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { runWithTenantContext } from '@/lib/tenant-context';
 import { createDispatchWork } from '@/lib/dispatch/intake';
 import { prisma } from '@/lib/db';
+import { loadProfile } from '@/lib/field-planning/data';
 
 export async function GET() {
   const user = await requireApiAccess('work', 'workRoute');
   if (isApiDenied(user)) return user;
   return runWithTenantContext({ organizationId: user.organizationId!, userId: user.id, source: 'session' }, async () => {
-    const [employees, vehicles] = await Promise.all([
+    const [employees, vehicles, profile] = await Promise.all([
       prisma.employee.findMany({
         where: { organizationId: user.organizationId!, isActive: true },
         select: { id: true, firstName: true, lastName: true, phone: true, position: true },
@@ -22,8 +23,15 @@ export async function GET() {
         select: { id: true, name: true, registrationNumber: true, type: true },
         orderBy: { name: 'asc' },
       }),
+      loadProfile(),
     ]);
-    return NextResponse.json({ employees, vehicles });
+    return NextResponse.json({
+      employees,
+      vehicles,
+      warehouses: profile?.warehouses || [],
+      depot: profile?.depot || null,
+      profile,
+    });
   });
 }
 

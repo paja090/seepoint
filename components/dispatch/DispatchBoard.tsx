@@ -2,12 +2,13 @@
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, CalendarDays, CheckCheck, ChevronLeft, ChevronRight, ClipboardList, MapPin, Plus, RefreshCw, Search, SlidersHorizontal, Truck, Users } from 'lucide-react';
+import { ArrowRight, CalendarDays, CheckCheck, ChevronLeft, ChevronRight, ClipboardList, MapPin, Plus, RefreshCw, Search, Settings2, SlidersHorizontal, Truck, Users } from 'lucide-react';
 import { dispatchPlanningLinks, type DispatchItem, type DispatchPlan } from '@/lib/dispatch/queue';
 import { dispatchCrews, dispatchMapResult, dispatchPlanHref, dispatchStatus, dispatchTimeline, type DispatchProgress } from '@/lib/dispatch/presentation';
-import type { Coordinates } from '@/lib/field-planning/contracts';
+import type { Coordinates, PlanningProfile } from '@/lib/field-planning/contracts';
 import { plusDays } from '@/lib/planner/time';
-import { RouteMap } from '@/components/field-planning/RouteMap';
+import { RouteMap, type RouteMapWarehouse } from '@/components/field-planning/RouteMap';
+import { PlanningProfileForm } from '@/components/field-planning/PlanningProfileForm';
 import { WeekView } from '@/components/planner/WeekView';
 import { Timeline } from '@/components/planner/Timeline';
 import { DispatchIntake } from './DispatchIntake';
@@ -20,13 +21,42 @@ const emptyProgress: DispatchProgress = {};
 const noEdit = () => {};
 const control = 'min-w-0 w-full min-h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-700';
 type View = 'day' | 'week' | 'map';
-type Props = { items: DispatchItem[]; plans: DispatchPlan[]; date: string; today?: string; canCreate: boolean; messages: string[]; timezone?: string; depot?: Coordinates; view?: View; progress?: DispatchProgress };
+type Props = {
+  items: DispatchItem[];
+  plans: DispatchPlan[];
+  date: string;
+  today?: string;
+  canCreate: boolean;
+  messages: string[];
+  timezone?: string;
+  depot?: Coordinates;
+  view?: View;
+  progress?: DispatchProgress;
+  warehouses?: RouteMapWarehouse[];
+  profile?: PlanningProfile | null;
+  country?: string | null;
+};
 
-export function DispatchBoard({ items, plans, date, today = date, canCreate, messages, timezone = 'Europe/Prague', depot, view = 'day', progress = emptyProgress }: Props) {
+export function DispatchBoard({
+  items,
+  plans,
+  date,
+  today = date,
+  canCreate,
+  messages,
+  timezone = 'Europe/Prague',
+  depot,
+  view = 'day',
+  progress = emptyProgress,
+  warehouses,
+  profile,
+  country,
+}: Props) {
   const router = useRouter();
   const [query, setQuery] = useState(''), [state, setState] = useState('all'), [source, setSource] = useState('all');
   const [selected, setSelected] = useState<string[]>([]), [activeCrew, setActiveCrew] = useState('');
   const [panel, setPanel] = useState<{ type: 'work'; id: string } | { type: 'create' } | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   const [intakeBusy, setIntakeBusy] = useState(false);
   const closePanel = useCallback(() => { setPanel(null); setIntakeBusy(false); }, []);
   const openWork = useCallback((id: string) => setPanel({ type: 'work', id }), []);
@@ -87,9 +117,23 @@ export function DispatchBoard({ items, plans, date, today = date, canCreate, mes
         <p className="border-t border-slate-100 p-3 text-[11px] leading-4 text-slate-400">Pro {date}, starší práce a terénní zadání bez termínu.</p>
       </section>}
       <section aria-labelledby="dispatch-map-heading" className={(view === 'map' ? '' : 'hidden xl:block ') + 'min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm'}>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-1"><h2 id="dispatch-map-heading" className="font-bold">Mapa práce</h2><span className="text-[11px] text-slate-500">{points.length} míst z fronty · {crews.length} tras</span></div>
-        {mapResult || points.length || depot ? <RouteMap result={mapResult} depot={depot} active={activeCrew} points={points} onPointSelect={openWork} selectedPointId={detail?.id}/> : <div className="grid min-h-80 place-items-center rounded-xl bg-slate-50 p-8 text-center text-sm text-slate-500"><div><MapPin className="mx-auto mb-3"/>Zatím nejsou dostupné polohy prací ani trasy.<br/><Link href="/work/route" className="mt-3 inline-block font-semibold text-sky-800 underline">Nastavit depo a plánování</Link></div></div>}
-        <p className="mt-3 px-1 text-[11px] leading-5 text-slate-500"><span className="mr-1 inline-block size-2 rounded-full bg-slate-500"/>Místa z fronty · barevně uložené trasy. {activeCrew && <button type="button" onClick={() => setActiveCrew('')} className="font-semibold text-sky-800 underline">Zrušit zvýraznění</button>}</p>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-2">
+            <h2 id="dispatch-map-heading" className="font-bold">Mapa práce</h2>
+            <span className="text-[11px] text-slate-500">{points.length} míst z fronty · {crews.length} tras</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowSettings(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition"
+            title="Nastavit sídlo, sklady a parametry tras"
+          >
+            <Settings2 size={13} className="text-slate-500" />
+            <span>Nastavení depa a skladů</span>
+          </button>
+        </div>
+        {mapResult || points.length || depot ? <RouteMap result={mapResult} depot={depot} warehouses={warehouses} active={activeCrew} points={points} onPointSelect={openWork} selectedPointId={detail?.id}/> : <div className="grid min-h-80 place-items-center rounded-xl bg-slate-50 p-8 text-center text-sm text-slate-500"><div><MapPin className="mx-auto mb-3"/>Zatím nejsou dostupné polohy prací ani trasy.<br/><button type="button" onClick={() => setShowSettings(true)} className="mt-3 inline-block font-semibold text-sky-800 underline">Nastavit depo a sklady</button></div></div>}
+        <p className="mt-3 px-1 text-[11px] leading-5 text-slate-500"><span className="mr-1 inline-block size-2 rounded-full bg-slate-500"/>Místa z fronty · barevně trasy · 🏢 sídlo/depo · 📦 sklady. {activeCrew && <button type="button" onClick={() => setActiveCrew('')} className="font-semibold text-sky-800 underline">Zrušit zvýraznění</button>}</p>
       </section>
       <section aria-labelledby="dispatch-trips-heading" className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="mb-4 flex items-center justify-between gap-2"><h2 id="dispatch-trips-heading" className="font-bold">Výjezdy <span className="text-sm font-normal text-slate-400">{dayPlans.length}</span></h2><button type="button" aria-label="Obnovit přehled" onClick={() => router.refresh()} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><RefreshCw size={16}/></button></div>
         <div className="max-h-[640px] space-y-3 overflow-y-auto">{!dayPlans.length && <div className="py-10 text-center text-sm text-slate-500"><Truck className="mx-auto mb-3 text-slate-300"/>Zatím žádné výjezdy.<p className="mt-2 text-xs">Vyberte dostupnou práci ve frontě.</p></div>}{crews.map(({ key, plan, crew, title }) => {
@@ -108,5 +152,16 @@ export function DispatchBoard({ items, plans, date, today = date, canCreate, mes
     {panel && <DispatchDrawer title={panel.type === 'create' ? 'Přidat práci' : 'Detail práce'} onClose={closePanel} busy={intakeBusy}>
       {panel.type === 'create' ? <DispatchIntake embedded onClose={closePanel} onBusyChange={setIntakeBusy}/> : detail && <div className="space-y-6"><div><span className={'rounded-lg px-3 py-1 text-xs font-semibold ' + badge[detail.state]}>{labels[detail.state]}</span><h3 className="mt-4 break-words text-2xl font-bold">{detail.title}</h3><p className="mt-2 text-sm text-slate-500">{sourceLabels[detail.source]}</p></div><dl className="grid grid-cols-[90px_minmax(0,1fr)] gap-3 text-sm"><dt className="text-slate-500">Klient</dt><dd className="break-words">{detail.client || 'Neuveden'}</dd><dt className="text-slate-500">Místo</dt><dd className="break-words">{detail.address || 'Viz úplný detail práce'}</dd><dt className="text-slate-500">Množství</dt><dd>{detail.quantity} ks</dd></dl>{detail.reason && <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{detail.reason}</p>}<Link href={detail.detailUrl} className="flex min-h-11 items-center justify-between rounded-xl border border-slate-200 p-3 text-sm font-semibold">Úplný detail a podklady<ArrowRight size={16}/></Link>{detail.state === 'ready' && <button type="button" onClick={() => { setSelected(old => [...new Set([...old, detail.id])]); closePanel(); }} className="min-h-11 w-full rounded-xl bg-sky-800 px-4 text-sm font-bold text-white">Přidat do výběru pro plánování</button>}{detail.planId && <p className="text-xs text-slate-500">Práce je přiřazená výjezdu. Změny provádějte v jeho detailu.</p>}</div>}
     </DispatchDrawer>}
+    {showSettings && (
+      <PlanningProfileForm
+        initial={profile ?? null}
+        country={country ?? 'CZ'}
+        onSaved={() => {
+          setShowSettings(false);
+          router.refresh();
+        }}
+        onClose={() => setShowSettings(false)}
+      />
+    )}
   </div>;
 }
