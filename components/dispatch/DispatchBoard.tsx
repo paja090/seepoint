@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, CalendarDays, CheckCheck, ChevronLeft, ChevronRight, ClipboardList, MapPin, Plus, RefreshCw, Search, Settings2, SlidersHorizontal, Truck, Users } from 'lucide-react';
+import { ArrowRight, Building2, CalendarDays, CheckCheck, ChevronLeft, ChevronRight, ClipboardList, MapPin, Plus, RefreshCw, Search, Settings2, SlidersHorizontal, Truck, Users } from 'lucide-react';
 import { dispatchPlanningLinks, type DispatchItem, type DispatchPlan } from '@/lib/dispatch/queue';
 import { dispatchCrews, dispatchMapResult, dispatchPlanHref, dispatchStatus, dispatchTimeline, type DispatchProgress } from '@/lib/dispatch/presentation';
 import type { Coordinates, PlanningProfile } from '@/lib/field-planning/contracts';
@@ -92,6 +92,15 @@ export function DispatchBoard({
           <button type="button" aria-label="Další období" onClick={() => selectDay(plusDays(date, view === 'week' ? 7 : 1))} className="grid size-9 place-items-center rounded-lg hover:bg-white"><ChevronRight size={17}/></button>
         </div>
         <nav aria-label="Pohled dispečinku" className="flex rounded-xl bg-slate-100 p-1">{([['day', 'Dnes'], ['week', 'Týden'], ['map', 'Mapa']] as const).map(([id, label]) => <button key={id} type="button" aria-pressed={view === id} onClick={() => selectDay(id === 'day' ? today : date, id)} className={'min-h-9 rounded-lg px-3 text-sm font-semibold ' + (view === id ? 'bg-white text-sky-800 shadow-sm' : 'text-slate-500 hover:text-slate-900')}>{label}</button>)}</nav>
+        <button
+          type="button"
+          onClick={() => setShowSettings(true)}
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition"
+          title="Nastavení sídla firmy, centrálního depa, skladů a pravidel návratu"
+        >
+          <Building2 size={16} className="text-slate-600" />
+          <span>🏢 Sídlo & Sklady</span>
+        </button>
         {canCreate && <button type="button" onClick={() => setPanel({ type: 'create' })} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-sky-800 px-4 text-sm font-bold text-white hover:bg-sky-900"><Plus size={17}/>Přidat práci</button>}
       </div>
     </header>
@@ -102,7 +111,7 @@ export function DispatchBoard({
       </button>)}
       <div className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-4"><div><p className="text-xs font-medium text-slate-500">Dokončeno</p><p className="mt-1 text-2xl font-bold tabular-nums">{done ?? '—'}<span className="ml-2 text-xs font-normal text-slate-400">zastávek</span></p><p className="text-[10px] text-slate-500">{done === null ? 'Průběh ověřte v denním detailu' : 'Ve výjezdech vybraného dne'}</p></div><CheckCheck className="hidden text-emerald-600 sm:block" size={20}/></div>
     </section>
-    {view === 'week' ? <section aria-label="Týdenní výjezdy" className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">Výjezdy na 7 dní od {date}</h2><span className="text-xs text-slate-500">Časy z uložených plánů · změny v detailu výjezdu</span></div><WeekView date={date} timezone={timezone} items={timeline} tasks={[]} onEdit={noEdit}/></section> : <div className={'grid items-start gap-4 ' + (view === 'map' ? 'xl:grid-cols-[minmax(0,1fr)_280px]' : 'xl:grid-cols-[minmax(240px,0.95fr)_minmax(260px,1.45fr)_minmax(220px,0.8fr)]')}>
+    {view === 'week' ? <section aria-label="Týdenní výjezdy" className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">Výjezdy na 7 dní od {date}</h2><span className="text-xs text-slate-500">Časy z uložených plánů · změny v detailu výjezdu</span></div><WeekView date={date} timezone={timezone} items={timeline} tasks={[]} onEdit={noEdit}/></section> : <div className={'grid items-start gap-4 ' + (view === 'map' ? 'grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px]' : 'grid-cols-1 xl:grid-cols-[minmax(240px,0.95fr)_minmax(260px,1.45fr)_minmax(220px,0.8fr)]')}>
       {view !== 'map' && <section aria-labelledby="dispatch-queue-heading" className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="space-y-3 border-b border-slate-100 p-4"><div className="flex items-center justify-between"><h2 id="dispatch-queue-heading" className="font-bold">Fronta práce <span className="ml-1 text-sm font-normal text-slate-400">{visible.length}</span></h2><button type="button" aria-label="Zrušit filtry" onClick={() => { setState('all'); setSource('all'); setQuery(''); }} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><SlidersHorizontal size={17}/></button></div>
           <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:ring-2 focus-within:ring-sky-700"><Search size={16} className="shrink-0 text-slate-400"/><input aria-label="Hledat práci" placeholder="Klient, místo, práce…" value={query} onChange={event => setQuery(event.target.value)} className="min-h-10 min-w-0 w-full bg-transparent text-sm outline-none"/></label>
@@ -116,11 +125,17 @@ export function DispatchBoard({
         </article>)}</div>
         <p className="border-t border-slate-100 p-3 text-[11px] leading-4 text-slate-400">Pro {date}, starší práce a terénní zadání bez termínu.</p>
       </section>}
-      <section aria-labelledby="dispatch-map-heading" className={(view === 'map' ? '' : 'hidden xl:block ') + 'min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm'}>
+      <section aria-labelledby="dispatch-map-heading" className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h2 id="dispatch-map-heading" className="font-bold">Mapa práce</h2>
             <span className="text-[11px] text-slate-500">{points.length} míst z fronty · {crews.length} tras</span>
+            <span className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-800">
+              🏢 Sídlo/Depo {depot ? 'aktivní' : 'nenastaveno'}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+              📦 {(warehouses?.length || 0)} {(warehouses?.length === 1 ? 'sklad' : warehouses?.length && warehouses.length < 5 ? 'sklady' : 'skladů')}
+            </span>
           </div>
           <button
             type="button"
@@ -133,7 +148,14 @@ export function DispatchBoard({
           </button>
         </div>
         {mapResult || points.length || depot ? <RouteMap result={mapResult} depot={depot} warehouses={warehouses} active={activeCrew} points={points} onPointSelect={openWork} selectedPointId={detail?.id}/> : <div className="grid min-h-80 place-items-center rounded-xl bg-slate-50 p-8 text-center text-sm text-slate-500"><div><MapPin className="mx-auto mb-3"/>Zatím nejsou dostupné polohy prací ani trasy.<br/><button type="button" onClick={() => setShowSettings(true)} className="mt-3 inline-block font-semibold text-sky-800 underline">Nastavit depo a sklady</button></div></div>}
-        <p className="mt-3 px-1 text-[11px] leading-5 text-slate-500"><span className="mr-1 inline-block size-2 rounded-full bg-slate-500"/>Místa z fronty · barevně trasy · 🏢 sídlo/depo · 📦 sklady. {activeCrew && <button type="button" onClick={() => setActiveCrew('')} className="font-semibold text-sky-800 underline">Zrušit zvýraznění</button>}</p>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 px-1 text-[11px] leading-5 text-slate-500">
+          <p><span className="mr-1 inline-block size-2 rounded-full bg-slate-500"/>Místa z fronty · barevně trasy · 🏢 sídlo/depo · 📦 sklady. {activeCrew && <button type="button" onClick={() => setActiveCrew('')} className="font-semibold text-sky-800 underline">Zrušit zvýraznění</button>}</p>
+          {(!warehouses || warehouses.length === 0) && (
+            <button type="button" onClick={() => setShowSettings(true)} className="font-semibold text-amber-800 hover:underline">
+              + Přidat mezisklady v nastavení depa
+            </button>
+          )}
+        </div>
       </section>
       <section aria-labelledby="dispatch-trips-heading" className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="mb-4 flex items-center justify-between gap-2"><h2 id="dispatch-trips-heading" className="font-bold">Výjezdy <span className="text-sm font-normal text-slate-400">{dayPlans.length}</span></h2><button type="button" aria-label="Obnovit přehled" onClick={() => router.refresh()} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><RefreshCw size={16}/></button></div>
         <div className="max-h-[640px] space-y-3 overflow-y-auto">{!dayPlans.length && <div className="py-10 text-center text-sm text-slate-500"><Truck className="mx-auto mb-3 text-slate-300"/>Zatím žádné výjezdy.<p className="mt-2 text-xs">Vyberte dostupnou práci ve frontě.</p></div>}{crews.map(({ key, plan, crew, title }) => {

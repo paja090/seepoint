@@ -36,6 +36,7 @@ import {
   Compass,
   Navigation,
   RefreshCw,
+  Store,
 } from 'lucide-react';
 
 interface Props {
@@ -121,14 +122,6 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
   const [copied, setCopied] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    // Tichý refresh živého stavu každých 45 sekund
-    const interval = setInterval(() => {
-      router.refresh();
-    }, 45000);
-    return () => clearInterval(interval);
-  }, [router]);
-
   function handleRefresh() {
     setIsRefreshing(true);
     router.refresh();
@@ -136,28 +129,42 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
   }
 
   const isNavigation = offer.offerType === 'NAVIGATION' && Boolean(offer.navigation);
-  const navPoints = (offer.navigation?.points || []).filter((p) => p.isSelectedByClient !== false);
+
   const rawNavTargets = (offer.navigation as unknown as Record<string, unknown> | null)?.targets;
   const targetPhotoUrl = (offer.navigation as unknown as Record<string, unknown> | null)?.targetPhotoUrl as string | undefined;
-  const firstTargetPhoto = Array.isArray(rawNavTargets) && rawNavTargets[0]?.photoUrl ? (rawNavTargets[0].photoUrl as string) : undefined;
-  const storePhotoUrl = targetPhotoUrl || firstTargetPhoto || null;
+  const strategyTargets = (offer.campaignStrategy as Record<string, unknown> | null)?.targets;
+  const firstTargetPhoto = Array.isArray(rawNavTargets) && rawNavTargets[0]?.photoUrl
+    ? (rawNavTargets[0].photoUrl as string)
+    : Array.isArray(strategyTargets) && strategyTargets[0]?.photoUrl
+      ? (strategyTargets[0].photoUrl as string)
+      : undefined;
+  const storePhotoUrl = useMemo(() => targetPhotoUrl || firstTargetPhoto || null, [targetPhotoUrl, firstTargetPhoto]);
 
-  const navTarget = offer.navigation ? {
+  const navPoints = useMemo(
+    () => (offer.navigation?.points || []).filter((p) => p.isSelectedByClient !== false),
+    [offer.navigation?.points]
+  );
+
+  const navTarget = useMemo(() => (offer.navigation ? {
     latitude: offer.navigation.targetLatitude,
     longitude: offer.navigation.targetLongitude,
     name: offer.navigation.targetName,
     address: offer.navigation.targetAddress,
     photoUrl: storePhotoUrl,
-  } : null;
+  } : null), [offer.navigation, storePhotoUrl]);
 
-  const items = offer.items || [];
-  const allRouteCoords = isNavigation
-    ? [
-        ...navPoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude })),
-        ...(navTarget && navTarget.latitude && navTarget.longitude ? [{ latitude: navTarget.latitude, longitude: navTarget.longitude }] : []),
-      ]
-    : items.map((i) => ({ latitude: i.surface?.carrier?.latitude ?? null, longitude: i.surface?.carrier?.longitude ?? null }));
-  const googleMapsRouteUrl = getGoogleMapsRouteUrl(allRouteCoords);
+  const items = useMemo(() => offer.items || [], [offer.items]);
+
+  const allRouteCoords = useMemo(() => {
+    return isNavigation
+      ? [
+          ...navPoints.map((p) => ({ latitude: p.latitude, longitude: p.longitude })),
+          ...(navTarget && navTarget.latitude && navTarget.longitude ? [{ latitude: navTarget.latitude, longitude: navTarget.longitude }] : []),
+        ]
+      : items.map((i) => ({ latitude: i.surface?.carrier?.latitude ?? null, longitude: i.surface?.carrier?.longitude ?? null }));
+  }, [isNavigation, navPoints, navTarget, items]);
+
+  const googleMapsRouteUrl = useMemo(() => getGoogleMapsRouteUrl(allRouteCoords), [allRouteCoords]);
 
   const clientName = offer.client?.name || 'Klient';
   const campaignTitle = offer.campaignName || offer.title || (isNavigation ? `Navigační systém pro ${offer.navigation?.targetName || 'klienta'}` : 'Venkovní reklamní kampaň');
@@ -613,7 +620,7 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
           {/* Right: Agency Branding + Action Buttons */}
           <div className="flex items-center gap-2">
             {/* Agency / SeePoint Logo placed before Původní nabídka */}
-            <div className="hidden md:flex items-center gap-2 pr-3 mr-0.5 border-r border-slate-200">
+            <div className="hidden sm:flex items-center gap-2 pr-3 mr-0.5 border-r border-slate-200">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Realizuje</span>
               <OfferBrandMark branding={branding} className="h-6 max-w-28 object-contain" />
             </div>
@@ -753,6 +760,11 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
                     Prodejna
                   </span>
                 </button>
+              ) : isNavigation ? (
+                <div className="h-16 w-24 sm:h-20 sm:w-32 rounded-2xl bg-sky-950/70 border border-sky-400/30 flex flex-col items-center justify-center text-center p-2 shrink-0">
+                  <Store className="h-6 w-6 text-sky-400 mb-1" />
+                  <span className="text-[10px] font-bold text-sky-300">Cíl navigace</span>
+                </div>
               ) : offer.client?.logoUrl ? (
                 <div className="h-16 w-24 sm:h-20 sm:w-32 rounded-2xl bg-white p-2 border border-sky-400/30 shadow-lg flex items-center justify-center shrink-0">
                   <img src={offer.client.logoUrl} alt={clientName} className="max-h-full max-w-full object-contain" />

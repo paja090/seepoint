@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { PlanningProfile, WarehousePlace } from '@/lib/field-planning/contracts';
-import { X, Settings2, Clock, MapPin, Gauge, Package, Plus, Trash2, Building2 } from 'lucide-react';
+import { X, Settings2, Clock, MapPin, Gauge, Package, Plus, Trash2, Building2, Search } from 'lucide-react';
 
 export function PlanningProfileForm({
   initial,
@@ -23,6 +23,14 @@ export function PlanningProfileForm({
   const [lng, setLng] = useState(initial ? String(initial.depot.longitude) : '');
   const [endLat, setEndLat] = useState(initial ? String(initial.endLocation.latitude) : '');
   const [endLng, setEndLng] = useState(initial ? String(initial.endLocation.longitude) : '');
+  const [returnToDepot, setReturnToDepot] = useState(
+    initial ? initial.depot.latitude === initial.endLocation.latitude && initial.depot.longitude === initial.endLocation.longitude : true
+  );
+
+  // Address search states
+  const [depotAddressQuery, setDepotAddressQuery] = useState('');
+  const [depotSearching, setDepotSearching] = useState(false);
+  const [whSearching, setWhSearching] = useState(false);
 
   // Warehouses state
   const [warehouses, setWarehouses] = useState<WarehousePlace[]>(() => initial?.warehouses ?? []);
@@ -31,6 +39,50 @@ export function PlanningProfileForm({
   const [newWhAddress, setNewWhAddress] = useState('');
   const [newWhLat, setNewWhLat] = useState('');
   const [newWhLng, setNewWhLng] = useState('');
+
+  async function handleGeocodeDepot() {
+    if (!depotAddressQuery.trim()) return;
+    setDepotSearching(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(depotAddressQuery.trim())}`);
+      const data = await res.json();
+      if (Array.isArray(data) && data[0]) {
+        setLat(String(data[0].latitude));
+        setLng(String(data[0].longitude));
+        if (returnToDepot) {
+          setEndLat(String(data[0].latitude));
+          setEndLng(String(data[0].longitude));
+        }
+      } else {
+        setError('Adresu sídla se nepodařilo vyhledat. Zadejte GPS souřadnice ručně.');
+      }
+    } catch {
+      setError('Vyhledání adresy sídla selhalo.');
+    } finally {
+      setDepotSearching(false);
+    }
+  }
+
+  async function handleGeocodeWarehouse() {
+    if (!newWhAddress.trim()) return;
+    setWhSearching(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(newWhAddress.trim())}`);
+      const data = await res.json();
+      if (Array.isArray(data) && data[0]) {
+        setNewWhLat(String(data[0].latitude));
+        setNewWhLng(String(data[0].longitude));
+      } else {
+        setError('Adresu skladu se nepodařilo vyhledat. Zadejte GPS ručně.');
+      }
+    } catch {
+      setError('Vyhledání adresy skladu selhalo.');
+    } finally {
+      setWhSearching(false);
+    }
+  }
 
   function handleAddWarehouse() {
     if (!newWhName.trim()) {
@@ -154,21 +206,127 @@ export function PlanningProfileForm({
 
         <form action={save} className="mt-5 space-y-5">
           {/* Výjezdní místo / Depo */}
-          <div className="space-y-2 rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
+          <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/50 p-4">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">
               <MapPin size={14} className="text-sky-600" />
               <span>Sídlo firmy / Hlavní depo</span>
             </div>
-            <p className="text-xs text-slate-500">Základna firmy, odkud posádky ráno vyjíždějí a kam se na konci směny vrací.</p>
+            <p className="text-xs text-slate-500">
+              Základna firmy, odkud posádky ráno vyjíždějí a kam se na konci směny vrací. V mapě se zobrazuje jako ikona 🏢 Sídlo firmy & Depo.
+            </p>
+
+            {/* Vyhledat sídlo podle adresy */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-slate-700">Vyhledat sídlo podle adresy (automaticky vyplní GPS)</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Zadejte adresu firmy (např. Nádražní 120, Ostrava)..."
+                  value={depotAddressQuery}
+                  onChange={(e) => setDepotAddressQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleGeocodeDepot();
+                    }
+                  }}
+                  className="input w-full text-xs"
+                />
+                <button
+                  type="button"
+                  disabled={depotSearching || !depotAddressQuery.trim()}
+                  onClick={handleGeocodeDepot}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-sky-800 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-sky-900 transition disabled:opacity-50"
+                >
+                  <Search size={13} />
+                  <span>{depotSearching ? 'Hledám…' : 'Najít GPS'}</span>
+                </button>
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <label className="text-xs font-medium text-slate-700">Šířka výjezdu (Lat)<input className="input mt-1 w-full" type="number" step="any" min={-90} max={90} required value={lat} onChange={e => setLat(e.target.value)} /></label>
-              <label className="text-xs font-medium text-slate-700">Délka výjezdu (Lng)<input className="input mt-1 w-full" type="number" step="any" min={-180} max={180} required value={lng} onChange={e => setLng(e.target.value)} /></label>
-              <label className="text-xs font-medium text-slate-700">Šířka návratu (Lat)<input className="input mt-1 w-full" type="number" step="any" min={-90} max={90} required value={endLat} onChange={e => setEndLat(e.target.value)} /></label>
-              <label className="text-xs font-medium text-slate-700">Délka návratu (Lng)<input className="input mt-1 w-full" type="number" step="any" min={-180} max={180} required value={endLng} onChange={e => setEndLng(e.target.value)} /></label>
+              <label className="text-xs font-medium text-slate-700">
+                Šířka výjezdu (Lat) *
+                <input
+                  className="input mt-1 w-full font-mono"
+                  type="number"
+                  step="any"
+                  min={-90}
+                  max={90}
+                  required
+                  value={lat}
+                  onChange={(e) => {
+                    setLat(e.target.value);
+                    if (returnToDepot) setEndLat(e.target.value);
+                  }}
+                />
+              </label>
+              <label className="text-xs font-medium text-slate-700">
+                Délka výjezdu (Lng) *
+                <input
+                  className="input mt-1 w-full font-mono"
+                  type="number"
+                  step="any"
+                  min={-180}
+                  max={180}
+                  required
+                  value={lng}
+                  onChange={(e) => {
+                    setLng(e.target.value);
+                    if (returnToDepot) setEndLng(e.target.value);
+                  }}
+                />
+              </label>
             </div>
-            <button type="button" className="text-xs text-sky-700 underline font-semibold mt-1" onClick={() => { setEndLat(lat); setEndLng(lng); }}>Návrat na stejné místo jako výjezd (sídlo)</button>
-            <p className="text-[11px] text-slate-500">Zadejte GPS souřadnice sídla firmy. Zde se vykreslí ikona 🏢 Sídlo firmy & Depo.</p>
+
+            {/* Checkbox: Posádky se vrací do sídla */}
+            <label className="flex items-center gap-2 pt-1 text-xs font-semibold text-slate-800 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={returnToDepot}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setReturnToDepot(checked);
+                  if (checked) {
+                    setEndLat(lat);
+                    setEndLng(lng);
+                  }
+                }}
+                className="size-4 rounded accent-sky-800"
+              />
+              <span>Počítat s návratem posádky na firmu (do sídla) na konci směny</span>
+            </label>
+
+            {!returnToDepot && (
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200/60">
+                <label className="text-xs font-medium text-slate-700">
+                  Šířka návratu (Lat) *
+                  <input
+                    className="input mt-1 w-full font-mono"
+                    type="number"
+                    step="any"
+                    min={-90}
+                    max={90}
+                    required
+                    value={endLat}
+                    onChange={(e) => setEndLat(e.target.value)}
+                  />
+                </label>
+                <label className="text-xs font-medium text-slate-700">
+                  Délka návratu (Lng) *
+                  <input
+                    className="input mt-1 w-full font-mono"
+                    type="number"
+                    step="any"
+                    min={-180}
+                    max={180}
+                    required
+                    value={endLng}
+                    onChange={(e) => setEndLng(e.target.value)}
+                  />
+                </label>
+              </div>
+            )}
           </div>
 
           {/* Sklady & Výdejní místa */}
@@ -248,21 +406,38 @@ export function PlanningProfileForm({
                     <label className="text-[11px] font-semibold text-slate-700">Název skladu *</label>
                     <input
                       type="text"
-                      placeholder="např. Centrální sklad Mariánské Hory"
+                      placeholder="např. Sklad Mariánské Hory, Externí sklad..."
                       value={newWhName}
                       onChange={(e) => setNewWhName(e.target.value)}
                       className="input mt-1 w-full text-xs"
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="text-[11px] font-semibold text-slate-700">Adresa (orientační)</label>
-                    <input
-                      type="text"
-                      placeholder="např. Fráni Šrámka 5, Ostrava"
-                      value={newWhAddress}
-                      onChange={(e) => setNewWhAddress(e.target.value)}
-                      className="input mt-1 w-full text-xs"
-                    />
+                    <label className="text-[11px] font-semibold text-slate-700">Adresa skladu (vyhledá GPS)</label>
+                    <div className="flex gap-2 mt-1">
+                      <input
+                        type="text"
+                        placeholder="např. Fráni Šrámka 5, Ostrava"
+                        value={newWhAddress}
+                        onChange={(e) => setNewWhAddress(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleGeocodeWarehouse();
+                          }
+                        }}
+                        className="input w-full text-xs"
+                      />
+                      <button
+                        type="button"
+                        disabled={whSearching || !newWhAddress.trim()}
+                        onClick={handleGeocodeWarehouse}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-amber-700 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-amber-800 transition disabled:opacity-50"
+                      >
+                        <Search size={13} />
+                        <span>{whSearching ? 'Hledám…' : 'Najít GPS'}</span>
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="text-[11px] font-semibold text-slate-700">Zeměpisná šířka (Lat) *</label>
@@ -272,7 +447,7 @@ export function PlanningProfileForm({
                       placeholder="49.8270"
                       value={newWhLat}
                       onChange={(e) => setNewWhLat(e.target.value)}
-                      className="input mt-1 w-full text-xs"
+                      className="input mt-1 w-full text-xs font-mono"
                     />
                   </div>
                   <div>
@@ -283,7 +458,7 @@ export function PlanningProfileForm({
                       placeholder="18.2618"
                       value={newWhLng}
                       onChange={(e) => setNewWhLng(e.target.value)}
-                      className="input mt-1 w-full text-xs"
+                      className="input mt-1 w-full text-xs font-mono"
                     />
                   </div>
                 </div>

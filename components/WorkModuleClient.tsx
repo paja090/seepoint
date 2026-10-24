@@ -165,10 +165,10 @@ export function WorkModuleClient({
 
           <Link
             href="/work/dispatch"
-            className="flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-700 shadow-sm hover:bg-slate-50 transition"
+            className="flex items-center gap-2 rounded-2xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-xs font-black text-sky-900 shadow-sm hover:bg-sky-100 transition"
           >
-            <Route size={16} className="text-emerald-600" />
-            <span>🚗 Dispečink práce</span>
+            <Route size={16} className="text-sky-700" />
+            <span>🚗 Dispečink práce, Mapa & Sklady</span>
           </Link>
 
           {canCreateWorkOrder && (
@@ -181,6 +181,30 @@ export function WorkModuleClient({
             </button>
           )}
         </div>
+      </div>
+
+      {/* DISPATCH & MAP DIRECT ACCESS BANNER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-sky-200/90 bg-gradient-to-r from-sky-50 via-white to-sky-50/50 p-4 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-700 text-white shadow-sm">
+            <Route size={20} />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">
+              Interaktivní Dispečink práce, Mapa výjezdů & Sklady
+            </h2>
+            <p className="text-xs text-slate-500">
+              Denní mapa zastávek, ikona sídla firmy & centrálního depa, vyznačení skladů a plánování tras posádek.
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/work/dispatch"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-800 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-sky-900 transition shrink-0"
+        >
+          <span>Otevřít Dispečink a Mapu</span>
+          <ArrowRight size={14} />
+        </Link>
       </div>
 
       {/* TODAY'S FIELD CREWS / ROUTES BANNER */}
