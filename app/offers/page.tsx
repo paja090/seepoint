@@ -121,8 +121,11 @@ export default async function OffersPage({ searchParams }: { searchParams: Promi
       </div>
 
       <section className="mb-6">
-        <div className="mb-3 flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold text-slate-950">Obchodní trychtýř</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-950">Obchodní trychtýř</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Konverzní fáze nabídek od konceptu po schválení a převod do realizace.</p>
+          </div>
           <Link className="inline-flex items-center gap-1 text-sm font-semibold text-sky-700 hover:text-sky-900" href="/offers/new">
             Vytvořit nabídku
             <ArrowUpRight aria-hidden="true" size={15} />
