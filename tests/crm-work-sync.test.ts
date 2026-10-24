@@ -130,7 +130,7 @@ test('syncCrmOrderToWorkOrderInTransaction: creates central WorkOrder and WorkOr
 
   // Verify WorkOrder creation
   assert.ok(createdWorkOrderData);
-  const woData: any = createdWorkOrderData;
+  const woData = (createdWorkOrderData ?? {}) as Record<string, unknown>;
   assert.equal(woData.crmOrderId, 'crm-order-2');
   assert.equal(woData.title, 'Montáž: Kampaň Léto 2026');
   assert.equal(woData.clientName, 'ACME Corp s.r.o.');

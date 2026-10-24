@@ -343,7 +343,7 @@ export function NavigationOrderDetailView({
     setErrorMsg('');
     setSuccessMsg('');
     try {
-      const bodyPayload: Record<string, any> = {
+      const bodyPayload: Record<string, unknown> = {
         graphicArtworkUrl: artworkUrlInput.trim() || null,
       };
       if (cloudDriveUrl.trim()) {

@@ -64,7 +64,7 @@ export async function PATCH(
     }
 
     // 1. Update navigationOrder fields if provided
-    const navOrderUpdates: Record<string, any> = {};
+    const navOrderUpdates: Record<string, unknown> = {};
     if (body.rentStart !== undefined) navOrderUpdates.rentStart = body.rentStart ? new Date(body.rentStart) : null;
     if (body.rentEnd !== undefined) navOrderUpdates.rentEnd = body.rentEnd ? new Date(body.rentEnd) : null;
     if (body.installationDate !== undefined) navOrderUpdates.installationDate = body.installationDate ? new Date(body.installationDate) : null;
@@ -75,13 +75,13 @@ export async function PATCH(
     if (body.graphicsApprovedAt !== undefined) navOrderUpdates.graphicsApprovedAt = body.graphicsApprovedAt ? new Date(body.graphicsApprovedAt) : null;
 
     // 2. Update crmOrder fields if provided
-    const crmOrderUpdates: Record<string, any> = {};
+    const crmOrderUpdates: Record<string, unknown> = {};
     if (body.clientOrderCode !== undefined) crmOrderUpdates.clientOrderCode = body.clientOrderCode ? String(body.clientOrderCode).trim() : null;
     if (body.internalNote !== undefined) crmOrderUpdates.internalNote = body.internalNote ? String(body.internalNote).trim() : null;
     if (body.note !== undefined) crmOrderUpdates.note = body.note ? String(body.note).trim() : null;
 
     // 3. Update navigationOffer fields if provided
-    const navOfferUpdates: Record<string, any> = {};
+    const navOfferUpdates: Record<string, unknown> = {};
     if (body.graphicArtworkUrl !== undefined) navOfferUpdates.graphicArtworkUrl = body.graphicArtworkUrl ? String(body.graphicArtworkUrl).trim() : null;
     if (body.clientArtworkUrl !== undefined) navOfferUpdates.clientArtworkUrl = body.clientArtworkUrl ? String(body.clientArtworkUrl).trim() : null;
     if (body.clientArtworkFileName !== undefined) navOfferUpdates.clientArtworkFileName = body.clientArtworkFileName ? String(body.clientArtworkFileName).trim() : null;
