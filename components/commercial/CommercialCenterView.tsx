@@ -24,6 +24,7 @@ import {
   Layers,
   ExternalLink,
   Play,
+  X,
 } from 'lucide-react';
 import type {
   CommercialCenterData,
@@ -208,11 +209,31 @@ export function CommercialCenterView({ data }: { data: CommercialCenterData }) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const [attentionFilter, setAttentionFilter] = useState<AttentionFilter>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [offersSearchQuery, setOffersSearchQuery] = useState('');
   const [runningEntityId, setRunningEntityId] = useState<string | null>(null);
   const [orchestratorFeedback, setOrchestratorFeedback] = useState<{
     type: 'success' | 'error';
     message: string;
   } | null>(null);
+
+  const filteredOffersPipeline = useMemo(() => {
+    if (!offersSearchQuery.trim()) {
+      return {
+        drafts: data.offers.drafts,
+        sent: data.offers.sent,
+        accepted: data.offers.accepted,
+      };
+    }
+    const q = offersSearchQuery.toLowerCase().trim();
+    const matches = (o: { title: string; clientName?: string | null }) =>
+      Boolean(o.title?.toLowerCase().includes(q) || o.clientName?.toLowerCase().includes(q));
+
+    return {
+      drafts: data.offers.drafts.filter(matches),
+      sent: data.offers.sent.filter(matches),
+      accepted: data.offers.accepted.filter(matches),
+    };
+  }, [data.offers, offersSearchQuery]);
 
   // Derived metrics
   const metrics = useMemo(() => {
@@ -1256,13 +1277,40 @@ export function CommercialCenterView({ data }: { data: CommercialCenterData }) {
             </Link>
           </div>
 
+          {/* Search bar for Pipeline */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                value={offersSearchQuery}
+                onChange={(e) => setOffersSearchQuery(e.target.value)}
+                placeholder="Rychlé hledání klienta nebo názvu nabídky..."
+                className="w-full pl-10 pr-8 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition font-medium"
+              />
+              {offersSearchQuery && (
+                <button
+                  onClick={() => setOffersSearchQuery('')}
+                  type="button"
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                  title="Vymazat hledání"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 font-semibold">
+              Zobrazeno {filteredOffersPipeline.drafts.length + filteredOffersPipeline.sent.length + filteredOffersPipeline.accepted.length} z celkem {data.offers.drafts.length + data.offers.sent.length + data.offers.accepted.length} nabídek
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
             {/* Column 1: Koncepty ke schválení */}
             <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-black text-amber-900">
-                    1. Koncepty ({data.offers.drafts.length})
+                    1. Koncepty ({filteredOffersPipeline.drafts.length})
                   </span>
                   <p className="text-[11px] text-slate-500 mt-1">
                     Připraveno AI nebo obchodníkem ke kontrole
@@ -1273,13 +1321,13 @@ export function CommercialCenterView({ data }: { data: CommercialCenterData }) {
                 </span>
               </div>
 
-              {data.offers.drafts.length === 0 ? (
+              {filteredOffersPipeline.drafts.length === 0 ? (
                 <p className="py-8 text-center text-xs text-slate-400">
                   Žádné koncepty nabídek
                 </p>
               ) : (
-                <div className="space-y-2.5">
-                  {data.offers.drafts.map((o) => (
+                <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1 scrollbar-thin">
+                  {filteredOffersPipeline.drafts.map((o) => (
                     <div
                       key={o.id}
                       className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 hover:border-amber-300 hover:bg-amber-50/30 transition space-y-2"
@@ -1321,7 +1369,7 @@ export function CommercialCenterView({ data }: { data: CommercialCenterData }) {
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-black text-sky-900">
-                    2. Odeslané ({data.offers.sent.length})
+                    2. Odeslané ({filteredOffersPipeline.sent.length})
                   </span>
                   <p className="text-[11px] text-slate-500 mt-1">
                     Čekají na vyjádření klienta / follow-up
@@ -1332,13 +1380,13 @@ export function CommercialCenterView({ data }: { data: CommercialCenterData }) {
                 </span>
               </div>
 
-              {data.offers.sent.length === 0 ? (
+              {filteredOffersPipeline.sent.length === 0 ? (
                 <p className="py-8 text-center text-xs text-slate-400">
                   Žádné odeslané nabídky
                 </p>
               ) : (
-                <div className="space-y-2.5">
-                  {data.offers.sent.map((o) => (
+                <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1 scrollbar-thin">
+                  {filteredOffersPipeline.sent.map((o) => (
                     <div
                       key={o.id}
                       className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 hover:border-sky-300 hover:bg-sky-50/30 transition space-y-2"
@@ -1386,7 +1434,7 @@ export function CommercialCenterView({ data }: { data: CommercialCenterData }) {
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-black text-emerald-900">
-                    3. Přijaté ({data.offers.accepted.length})
+                    3. Přijaté ({filteredOffersPipeline.accepted.length})
                   </span>
                   <p className="text-[11px] text-slate-500 mt-1">
                     Schválené klientem k realizaci
@@ -1397,13 +1445,13 @@ export function CommercialCenterView({ data }: { data: CommercialCenterData }) {
                 </span>
               </div>
 
-              {data.offers.accepted.length === 0 ? (
+              {filteredOffersPipeline.accepted.length === 0 ? (
                 <p className="py-8 text-center text-xs text-slate-400">
                   Žádné přijaté nabídky
                 </p>
               ) : (
-                <div className="space-y-2.5">
-                  {data.offers.accepted.map((o) => (
+                <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1 scrollbar-thin">
+                  {filteredOffersPipeline.accepted.map((o) => (
                     <div
                       key={o.id}
                       className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 hover:border-emerald-300 hover:bg-emerald-50/30 transition space-y-2"
