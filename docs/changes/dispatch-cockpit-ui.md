@@ -51,3 +51,5 @@ Dne 24. 10. 2026 byl projekt a poslední preview ověřen pouze čtením. Vercel
 ### Dokončené sestavení 24. 10. 2026
 
 Standardní next build čisté kopie commitu d08bb86 následně dokončil všechny fáze a skončil návratovým kódem 0. Použit byl pouze procesní NODE_OPTIONS=--max-old-space-size=3072, existující cache a lokální testovací DATABASE_URL/DIRECT_URL; konfigurace aplikace nebyla změněna. Prošla kompilace, kontrola typů, generování 138 statických stránek, optimalizace a build traces. Výstup obsahuje /work/dispatch, /api/work/dispatch i /my-route. Log: tmp/dispatch-cockpit-final-build.log. Dřívější omezení nedokončeného buildu je tím vyřešené. Upozornění na dva lockfiles se týká umístění čisté kopie uvnitř pracovního adresáře. Tento výsledek není potvrzením vzdáleného end-to-end testu s databází; izolace preview zůstává neověřená. Žádný push, merge ani nasazení nebyly provedeny.
+
+Po následném výslovném souhlasu uživatele vzniklo izolované testovací nasazení. Aktuální výsledek a oddělení prostředí popisuje [dispatch-isolated-preview.md](dispatch-isolated-preview.md). Ostrý projekt zůstal beze změny.
