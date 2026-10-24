@@ -60,8 +60,19 @@ export function extractOrderRouteMap(
   // Build pointId -> orderId map for tasks created from dispatch intake
   const pointToOrderMap = new Map<string, string>();
   for (const o of orders) {
-    const pId = (o.planningConstraints as { electionRemovalPointId?: string } | null)?.electionRemovalPointId;
-    if (pId) pointToOrderMap.set(pId, o.id);
+    const constraints = o.planningConstraints as {
+      electionRemovalPointId?: string;
+      pointIds?: string[];
+      electionCampaignId?: string;
+    } | null;
+    if (constraints?.electionRemovalPointId) {
+      pointToOrderMap.set(constraints.electionRemovalPointId, o.id);
+    }
+    if (Array.isArray(constraints?.pointIds)) {
+      for (const pId of constraints.pointIds) {
+        pointToOrderMap.set(pId, o.id);
+      }
+    }
   }
 
   // Process plans (they should be ordered by version desc or we sort them)

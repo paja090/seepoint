@@ -105,6 +105,19 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
 
   if (!order) notFound();
 
+  const electionCampaignId = (order.planningConstraints as { electionCampaignId?: string } | null)?.electionCampaignId;
+  const electionCampaign = electionCampaignId
+    ? await prisma.electionCampaign.findUnique({
+        where: { id: electionCampaignId },
+        include: {
+          points: {
+            where: { status: { notIn: ['CANCELLED'] } },
+            orderBy: { createdAt: 'asc' },
+          },
+        },
+      })
+    : null;
+
   const realizations = order.crmOrderId && ['ADMIN', 'MANAGER'].includes(user.role) ? await prisma.crmRealization.findMany({ where: { organizationId: user.organizationId!, crmOrderId: order.crmOrderId }, select: { id: true, carrierId: true, surfaceId: true } }) : [];
   const scheduledDate = order.scheduledAt || order.createdAt;
   const startOfDay = new Date(scheduledDate);
@@ -405,6 +418,92 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
                           </Link>
                         )}
                       </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Campaign Field Points & Locations */}
+            {electionCampaign && electionCampaign.points.length > 0 && (
+              <section className="card space-y-4 border-amber-300 bg-amber-50/20">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 pb-3">
+                  <div>
+                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-amber-800">
+                      <MapPin size={16} className="text-amber-600" /> Lokace a body zakázky ({electionCampaign.points.length} míst)
+                    </div>
+                    <h2 className="mt-0.5 text-lg font-black text-slate-950">
+                      {electionCampaign.name}
+                    </h2>
+                    <p className="text-xs text-slate-600 font-medium mt-0.5">
+                      Klient: <strong>{electionCampaign.clientName}</strong> · Typ: <strong>{electionCampaign.points[0]?.objectType || electionCampaign.points[0]?.mediaType || 'Objekt'}</strong>
+                    </p>
+                  </div>
+
+                  <Link
+                    href="/work/dispatch"
+                    className="inline-flex items-center gap-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 text-xs font-black shadow-sm transition transform hover:-translate-y-0.5 shrink-0"
+                  >
+                    <span>Otevřít v dispečinku ↗</span>
+                  </Link>
+                </div>
+
+                <div className="space-y-3">
+                  {electionCampaign.points.map((point, idx) => (
+                    <div
+                      key={point.id}
+                      className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2 shadow-2xs transition hover:border-amber-400"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-xs font-black text-amber-800">
+                            {idx + 1}
+                          </span>
+                          <p className="font-extrabold text-sm text-slate-900">
+                            {point.label}
+                          </p>
+                        </div>
+                        <span
+                          className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+                            point.status === 'COMPLETED'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : point.status === 'IN_PROGRESS'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          {point.status === 'COMPLETED'
+                            ? '✓ Hotovo'
+                            : point.status === 'IN_PROGRESS'
+                            ? 'Probíhá'
+                            : 'Čeká na montáž'}
+                        </span>
+                      </div>
+
+                      {point.description && (
+                        <p className="text-xs text-slate-600">{point.description}</p>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                        <span>Počet: <strong>{point.quantity} ks</strong></span>
+                        {point.serviceMinutes && <span>Odhad: <strong>{point.serviceMinutes} min</strong></span>}
+                        {point.latitude && point.longitude && (
+                          <span>GPS: {point.latitude.toFixed(5)}, {point.longitude.toFixed(5)}</span>
+                        )}
+                      </div>
+
+                      {point.latitude && point.longitude && (
+                        <div className="flex flex-wrap items-center gap-4 text-xs font-bold pt-2 border-t border-slate-100">
+                          <a
+                            href={`https://www.google.com/maps/dir/?api=1&destination=${point.latitude},${point.longitude}&travelmode=driving`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-sky-700 hover:underline flex items-center gap-1"
+                          >
+                            Navigovat na toto místo v Google Maps ↗
+                          </a>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

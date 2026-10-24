@@ -552,6 +552,9 @@ export function WorkModuleClient({
             workers: o.assignments.map((a) => a.workerName),
             carrierCode: o.carrierCode,
             routeInfo: o.routeInfo,
+            quantity: o.quantity,
+            mediaLabel: o.mediaLabel,
+            locationNote: o.locationNote,
           }))}
         />
       )}

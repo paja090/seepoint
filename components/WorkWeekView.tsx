@@ -22,6 +22,9 @@ type WeekOrder = {
   workers: string[];
   carrierCode?: string;
   routeInfo?: WorkOrderRouteInfo | null;
+  quantity?: number | null;
+  mediaLabel?: string | null;
+  locationNote?: string | null;
 };
 
 type WorkWeekViewProps = { initialOrders: WeekOrder[] };
@@ -151,6 +154,13 @@ export function WorkWeekView({ initialOrders }: WorkWeekViewProps) {
             </div>
             <Link className="mt-3 block text-lg font-bold hover:text-sky-700" href={`/work/${order.id}`}>{order.title}</Link>
             <p className="mt-1 text-sm text-slate-600">{order.clientName} · {order.workers.join(', ') || 'nepřiřazený pracovník'}</p>
+            {(order.mediaLabel || order.locationNote) && (
+              <p className="mt-1 text-xs font-semibold text-sky-800">
+                {order.mediaLabel ? `📦 ${order.mediaLabel}` : ''}
+                {order.mediaLabel && order.locationNote ? ' · ' : ''}
+                {order.locationNote ? `📍 ${order.locationNote}` : ''}
+              </p>
+            )}
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">{workerStatusActions.map((action) => <button aria-pressed={order.status === action.status} className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${order.status === action.status ? action.activeClass : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`} disabled={savingId === order.id} key={action.status} onClick={() => void updateOrder(order, { status: action.status })} type="button">{action.label}</button>)}<button aria-pressed={order.ftdSent} className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${order.ftdSent ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`} disabled={savingId === order.id} onClick={() => void updateOrder(order, { ftdSent: !order.ftdSent })} type="button">Foto {order.ftdSent ? 'nahrána ✓' : 'nahrána'}</button></div>
           </article>;
         })}</div>}
@@ -195,6 +205,16 @@ export function WorkWeekView({ initialOrders }: WorkWeekViewProps) {
                   </div>
                   <Link className="mt-2 block text-sm font-bold hover:text-sky-700" href={`/work/${order.id}`}>{order.title}</Link>
                   <p className="mt-1 text-xs text-slate-600">{order.clientName}</p>
+                  {order.mediaLabel && (
+                    <span className="inline-block mt-1 text-[10px] font-bold text-sky-800 bg-sky-100 rounded px-1.5 py-0.5">
+                      📦 {order.mediaLabel}
+                    </span>
+                  )}
+                  {order.locationNote && (
+                    <p className="mt-1 text-[11px] text-slate-500 line-clamp-2" title={order.locationNote}>
+                      📍 {order.locationNote}
+                    </p>
+                  )}
                   <p className="mt-1 text-xs font-semibold text-slate-700">{formatWorkPrice(order.price)}</p>
                   <p className="mt-1 text-xs text-slate-500">Zadal/a: {order.requestedBy || 'Neuvedeno'}</p>
                   <p className="mt-1 text-xs text-slate-500">Pracovník: {order.workers.join(', ') || 'nepřiřazen'}{order.carrierCode ? ` · ${order.carrierCode}` : ''}</p>
