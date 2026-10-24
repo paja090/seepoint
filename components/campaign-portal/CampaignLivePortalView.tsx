@@ -593,33 +593,37 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
       {/* Top sticky bar */}
       <header className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/95 backdrop-blur-md px-4 sm:px-8 py-3.5 shadow-2xs print:hidden">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          {/* Left: ONLY Client Logo & Client Name */}
           <div className="flex items-center gap-3 min-w-0">
-            <div className="flex items-center gap-2 shrink-0">
-              <OfferBrandMark branding={branding} />
-            </div>
-            <div className="h-4 w-px bg-slate-300 hidden sm:block" />
-            <div className="flex items-center gap-2 min-w-0">
-              {offer.client?.logoUrl ? (
-                <div className="h-6 w-auto max-w-[70px] px-1 py-0.5 rounded-md bg-white border border-slate-200/90 shadow-2xs flex items-center shrink-0">
-                  <img src={offer.client.logoUrl} alt={clientName} className="max-h-full max-w-full object-contain" />
-                </div>
-              ) : null}
-              <span className="text-xs font-bold text-slate-700 truncate">
+            {offer.client?.logoUrl ? (
+              <div className="h-8 w-auto max-w-[110px] px-2 py-1 rounded-xl bg-white border border-slate-200/90 shadow-2xs flex items-center shrink-0">
+                <img src={offer.client.logoUrl} alt={clientName} className="max-h-full max-w-full object-contain" />
+              </div>
+            ) : null}
+            <div className="min-w-0">
+              <span className="text-xs font-black text-slate-900 truncate block">
                 {clientName}
               </span>
+              <span className="text-[10px] text-slate-500 font-medium truncate block">
+                {isNavigation ? 'Klientský portál realizace · Navigace' : 'Klientský portál kampaně'}
+              </span>
             </div>
-            <div className="h-4 w-px bg-slate-300 hidden md:block" />
-            <span className="text-xs font-medium text-slate-500 truncate hidden md:inline">
-              {isNavigation ? 'Městská navigace & outdoor' : 'Klientský Portál Kampaně'}
-            </span>
           </div>
+
+          {/* Right: Agency Branding + Action Buttons */}
           <div className="flex items-center gap-2">
+            {/* Agency / SeePoint Logo placed before Původní nabídka */}
+            <div className="hidden md:flex items-center gap-2 pr-3 mr-0.5 border-r border-slate-200">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Realizuje</span>
+              <OfferBrandMark branding={branding} className="h-6 max-w-28 object-contain" />
+            </div>
+
             {publicToken && (
               <a
                 href={`/offer/${publicToken}?view=proposal`}
                 className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-600 transition flex items-center gap-1.5 shadow-2xs"
               >
-                <ExternalLink className="h-3.5 w-3.5" />
+                <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
                 <span className="hidden sm:inline">Původní nabídka</span>
               </a>
             )}
@@ -1046,23 +1050,28 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
 
         {/* Realization Protocol Table */}
         <section className="bg-white border border-slate-200/90 p-6 sm:p-8 rounded-3xl space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-            <div>
-              <h2 className="text-lg font-black text-slate-900">
-                {isNavigation ? 'Soupis navigačních bodů a nosičů' : 'Souhrnný protokol o realizaci'}
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {isNavigation
-                  ? 'Oficiální pasport osazení navigačních a outdoor nosičů v terénu.'
-                  : 'Oficiální soupis reklamních ploch a jejich aktuální stav realizace.'}
-              </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className="hidden sm:flex shrink-0 p-1.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <OfferBrandMark branding={branding} className="h-6 max-w-28 object-contain" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-slate-900">
+                  {isNavigation ? 'Soupis navigačních bodů a nosičů' : 'Souhrnný protokol o realizaci'}
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {isNavigation
+                    ? `Oficiální pasport osazení navigačních a outdoor nosičů v terénu · Realizuje ${agencyName}`
+                    : `Oficiální soupis reklamních ploch a jejich aktuální stav realizace · Realizuje ${agencyName}`}
+                </p>
+              </div>
             </div>
             <button
               type="button"
               onClick={() => window.print()}
-              className="px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 transition flex items-center gap-1.5 shrink-0 cursor-pointer"
+              className="px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 transition flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs self-start sm:self-auto"
             >
-              <Printer className="h-3.5 w-3.5" />
+              <Printer className="h-3.5 w-3.5 text-slate-500" />
               <span>Vytisknout protokol</span>
             </button>
           </div>
@@ -1244,6 +1253,27 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
             )}
           </div>
         </section>
+
+        {/* Agency Guarantee Footer */}
+        <footer className="rounded-3xl border border-slate-200 bg-white p-5 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-4 text-xs print:hidden">
+          <div className="flex items-center gap-3.5">
+            <OfferBrandMark branding={branding} className="h-6 max-w-28 object-contain" />
+            <div>
+              <p className="font-extrabold text-slate-900">Realizace a pasportizace kampaně · {agencyName}</p>
+              <p className="text-[11px] text-slate-500">
+                Elektronický předávací protokol, geolokační pasportizace a fotodokumentace v terénu pro {clientName}.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => window.print()}
+            type="button"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 font-bold text-slate-700 hover:bg-slate-100 transition shadow-2xs self-stretch sm:self-auto justify-center"
+          >
+            <Printer size={13} className="text-slate-500" />
+            <span>Vytisknout předávací protokol</span>
+          </button>
+        </footer>
       </main>
 
       {/* Enlarged Photo Modal */}
