@@ -137,11 +137,17 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
 
   const isNavigation = offer.offerType === 'NAVIGATION' && Boolean(offer.navigation);
   const navPoints = (offer.navigation?.points || []).filter((p) => p.isSelectedByClient !== false);
+  const rawNavTargets = (offer.navigation as unknown as Record<string, unknown> | null)?.targets;
+  const targetPhotoUrl = (offer.navigation as unknown as Record<string, unknown> | null)?.targetPhotoUrl as string | undefined;
+  const firstTargetPhoto = Array.isArray(rawNavTargets) && rawNavTargets[0]?.photoUrl ? (rawNavTargets[0].photoUrl as string) : undefined;
+  const storePhotoUrl = targetPhotoUrl || firstTargetPhoto || null;
+
   const navTarget = offer.navigation ? {
     latitude: offer.navigation.targetLatitude,
     longitude: offer.navigation.targetLongitude,
     name: offer.navigation.targetName,
     address: offer.navigation.targetAddress,
+    photoUrl: storePhotoUrl,
   } : null;
 
   const items = offer.items || [];
@@ -719,7 +725,31 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
         <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-sky-950 text-white p-6 sm:p-8 rounded-3xl shadow-xl border border-sky-900/50 space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-sky-800/60 pb-6">
             <div className="flex items-start gap-4">
-              {offer.client?.logoUrl ? (
+              {storePhotoUrl ? (
+                <button
+                  type="button"
+                  onClick={() => setSelectedPhoto({
+                    url: storePhotoUrl,
+                    title: `Cílová prodejna: ${navTarget?.name || campaignTitle}`,
+                    carrierCode: 'PRODEJNA',
+                    address: navTarget?.address || '',
+                    format: 'Cíl navigace',
+                    isInstallation: false,
+                  })}
+                  className="h-16 w-24 sm:h-20 sm:w-32 rounded-2xl overflow-hidden border border-sky-400/40 shadow-lg bg-slate-900 shrink-0 relative group cursor-pointer text-left"
+                  title="Kliknutím zvětšit fotografii cílové prodejny"
+                >
+                  <img
+                    src={storePhotoUrl}
+                    alt={navTarget?.name || campaignTitle}
+                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <span className="absolute bottom-1 right-1 rounded-md bg-black/70 backdrop-blur-xs px-1.5 py-0.5 text-[9px] font-bold text-white flex items-center gap-0.5">
+                    <Maximize2 className="h-2.5 w-2.5" />
+                    Prodejna
+                  </span>
+                </button>
+              ) : offer.client?.logoUrl ? (
                 <div className="h-16 w-24 sm:h-20 sm:w-32 rounded-2xl bg-white p-2 border border-sky-400/30 shadow-lg flex items-center justify-center shrink-0">
                   <img src={offer.client.logoUrl} alt={clientName} className="max-h-full max-w-full object-contain" />
                 </div>
