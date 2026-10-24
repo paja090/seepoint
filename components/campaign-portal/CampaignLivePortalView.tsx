@@ -265,7 +265,7 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
         liveStatusDot = 'bg-amber-400';
         break;
       case 'TISK_VYROBA':
-        liveStatus = 'Výroba navigačních tabulí (DIBOND)';
+        liveStatus = 'Výroba navigačních ploch a tisk';
         liveStatusColor = 'bg-sky-500/20 text-sky-300 border-sky-500/40';
         liveStatusDot = 'bg-sky-400 animate-pulse';
         break;
@@ -453,9 +453,9 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
     },
     {
       icon: <Printer className="h-4 w-4" />,
-      label: 'Výroba DIBOND 3 mm',
+      label: 'Výroba a tisk ploch',
       sublabel: ['PRIPRAVENO_K_INSTALACI', 'INSTALACE', 'FOTODOKUMENTACE', 'PRIPRAVENO_K_FAKTURACI', 'FAKTUROVANO', 'DOKONCENO'].includes(navOrderStatus || '') || isDelivered || isInstalling || isInstalled
-        ? 'Panely vyrobeny'
+        ? 'Plochy vyrobeny'
         : isPrinting || navOrderStatus === 'TISK_VYROBA'
           ? 'Ve výrobě'
           : undefined,
@@ -703,7 +703,7 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
             <div>
               <h2 className="text-base font-black text-white">Technická specifikace navigačního systému</h2>
               <p className="mt-1 text-xs text-sky-200 leading-relaxed">
-                Panely jsou zhotoveny z prémiového hliníkového sendviče <strong>DIBOND® (tloušťka 3 mm)</strong> s UV stálým potiskem a ochrannou laminací. Uchycení na sloupy veřejného osvětlení je realizováno certifikovaným nerezovým systémem <strong>Bandimex</strong> bez poškození stožáru.
+                Plochy jsou zhotoveny z odolných certifikovaných materiálů s UV stálým potiskem a ochrannou laminací dle typu nosiče (směrovky na VO, áčka, pylony či bannery). Uchycení na sloupy veřejného osvětlení je realizováno certifikovaným nerezovým systémem <strong>Bandimex</strong> bez poškození stožáru.
               </p>
             </div>
           </div>
@@ -1122,7 +1122,7 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
                               </span>
                             )}
                             <span className="text-[10px] text-slate-500 font-medium">
-                              {panelVariant} · DIBOND® 3 mm
+                              {panelVariant}
                             </span>
                           </div>
                         </td>
