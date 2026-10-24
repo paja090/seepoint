@@ -23,8 +23,8 @@ export async function saveFieldTaskTx(tx: Prisma.TransactionClient, campaignId: 
     if (previous && (previous.startedAt || ['COMPLETED', 'CANCELLED'].includes(previous.status) || previous.steps.some(s => s.startedAt))) {
       throw new Error('Již zahájené nebo dokončené zadání nelze přepsat.');
     }
-    const { deliveryMinutes: _delivery, ...fields } = spec;
-    void _delivery; // Delivery duration belongs to its step only.
+    const { deliveryMinutes: _delivery, gpsConfirmed: _gps, destinationGpsConfirmed: _destGps, ...fields } = spec;
+    void _delivery; void _gps; void _destGps; // Step durations and validation flags belong to runtime/steps only.
     const data = { ...fields, layerName: spec.layerName ?? previous?.layerName ?? null, ...(legacyReview ? { assignedFieldPlanId: null, assignedCrewId: null, status: 'PENDING' as const } : {}), reviewRequired: false, baseServiceMinutes: Math.max(1, Math.ceil(spec.serviceMinutes / spec.quantity)) };
     
     let point;

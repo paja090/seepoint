@@ -294,6 +294,7 @@ export function DispatchIntake({
 
       <form
         onSubmit={submit}
+        noValidate
         onKeyDown={(e) => {
           // Prevent accidental form submit when hitting Enter inside regular text inputs
           if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
@@ -648,10 +649,9 @@ export function DispatchIntake({
                       {/* Title / Label of this stop */}
                       <div>
                         <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Název / označení zastávky
+                          Název / označení zastávky (volitelné)
                         </label>
                         <input
-                          required
                           maxLength={200}
                           value={stop.label}
                           onChange={(e) => updateStop(index, { label: e.target.value })}
@@ -770,46 +770,57 @@ export function DispatchIntake({
         </div>
 
         {/* 3. SUBMIT BAR */}
-        <div className="border-t border-slate-200 pt-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="text-xs text-slate-500">
-            <span>
-              {stops.length}{' '}
-              {stops.length === 1
-                ? 'zastávka'
-                : stops.length < 5
-                ? 'zastávky'
-                : 'zastávek'}
-            </span>
-            {employeeId && employees.find((e) => e.id === employeeId) && (
+        <div className="border-t border-slate-200 pt-4 space-y-3">
+          {error && (
+            <div
+              role="alert"
+              className="rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs font-semibold text-rose-800 flex items-start gap-2 shadow-2xs"
+            >
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+              <span>{error}</span>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-xs text-slate-500">
               <span>
-                {' '}
-                · 👷 {employees.find((e) => e.id === employeeId)?.lastName}
+                {stops.length}{' '}
+                {stops.length === 1
+                  ? 'zastávka'
+                  : stops.length < 5
+                  ? 'zastávky'
+                  : 'zastávek'}
               </span>
-            )}
-            {vehicleId && vehicles.find((v) => v.id === vehicleId) && (
-              <span>
-                {' '}
-                · 🚗 {vehicles.find((v) => v.id === vehicleId)?.name}
-              </span>
-            )}
-            {date && <span> · 📅 {date}</span>}
-          </div>
+              {employeeId && employees.find((e) => e.id === employeeId) && (
+                <span>
+                  {' '}
+                  · 👷 {employees.find((e) => e.id === employeeId)?.lastName}
+                </span>
+              )}
+              {vehicleId && vehicles.find((v) => v.id === vehicleId) && (
+                <span>
+                  {' '}
+                  · 🚗 {vehicles.find((v) => v.id === vehicleId)?.name}
+                </span>
+              )}
+              {date && <span> · 📅 {date}</span>}
+            </div>
 
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-xl bg-sky-800 hover:bg-sky-900 px-6 py-3 text-sm font-bold text-white shadow-md transition disabled:opacity-50"
-          >
-            {busy
-              ? 'Ukládám do dispečinku…'
-              : `Uložit práci (${stops.length} ${
-                  stops.length === 1
-                    ? 'bod'
-                    : stops.length < 5
-                    ? 'body'
-                    : 'bodů'
-                })`}
-          </button>
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-xl bg-sky-800 hover:bg-sky-900 px-6 py-3 text-sm font-bold text-white shadow-md transition disabled:opacity-50"
+            >
+              {busy
+                ? 'Ukládám do dispečinku…'
+                : `Uložit práci (${stops.length} ${
+                    stops.length === 1
+                      ? 'bod'
+                      : stops.length < 5
+                      ? 'body'
+                      : 'bodů'
+                  })`}
+            </button>
+          </div>
         </div>
       </form>
     </section>

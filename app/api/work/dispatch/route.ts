@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
-import { hasModuleAccess } from '@/lib/module-policy';
 import { runWithTenantContext } from '@/lib/tenant-context';
 import { createDispatchWork } from '@/lib/dispatch/intake';
 import { prisma } from '@/lib/db';
@@ -31,7 +30,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const user = await requireApiAccess('work', 'workRoute');
   if (isApiDenied(user)) return user;
-  if (!['ADMIN', 'MANAGER'].includes(user.role) || !hasModuleAccess(user, 'electionRemoval', 'electionRemoval')) {
+  if (!['ADMIN', 'MANAGER'].includes(user.role)) {
     return NextResponse.json({ error: 'Nemáte oprávnění zadávat terénní práci.' }, { status: 403 });
   }
   try {

@@ -102,6 +102,8 @@ export async function createDispatchWork(raw: unknown, actor: PlannerActor, db =
     for (const spec of specs) {
       const taskPayload = {
         ...spec,
+        gpsConfirmed: true,
+        destinationGpsConfirmed: Boolean(spec.destinationLatitude && spec.destinationLongitude),
         ...(targetDate ? { deadlineAt: targetDate } : {}),
       };
       const point = await saveFieldTaskTx(tx, campaign.id, taskPayload, actor);
