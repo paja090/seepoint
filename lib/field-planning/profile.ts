@@ -38,16 +38,19 @@ export function parseProfile(value: unknown): PlanningProfile {
   const warehouses = Array.isArray(p.warehouses)
     ? (p.warehouses as Array<Record<string, unknown>>)
         .filter((w) => w && typeof w.name === 'string' && coordinates(w.location))
-        .map((w) => ({
-          id: String(w.id || 'wh-' + Math.random().toString(36).slice(2, 9)),
-          name: String(w.name).trim(),
-          address: typeof w.address === 'string' ? w.address.trim() : undefined,
-          location: {
-            latitude: Number((w.location as any).latitude),
-            longitude: Number((w.location as any).longitude),
-          },
-          isMain: Boolean(w.isMain),
-        }))
+        .map((w) => {
+          const loc = w.location as { latitude: number | string; longitude: number | string };
+          return {
+            id: String(w.id || 'wh-' + Math.random().toString(36).slice(2, 9)),
+            name: String(w.name).trim(),
+            address: typeof w.address === 'string' ? w.address.trim() : undefined,
+            location: {
+              latitude: Number(loc.latitude),
+              longitude: Number(loc.longitude),
+            },
+            isMain: Boolean(w.isMain),
+          };
+        })
     : undefined;
   return { navigationPointMinutes, timezone: p.timezone, country: p.country as string | null, depot: p.depot, endLocation: p.endLocation,
     workdayStart: p.workdayStart as string, workdayEnd: p.workdayEnd as string,
@@ -105,5 +108,6 @@ export function zonedTime(day: string, time: string, timezone: string): number {
 export function profileForNavigation(profile: PlanningProfile, navigation: boolean): PlanningProfile {
   if (navigation) return profile;
   const { navigationPointMinutes: _hidden, ...rest } = profile;
+  void _hidden;
   return { ...rest, serviceMinutes: Object.fromEntries(Object.entries(profile.serviceMinutes).filter(([key]) => !key.startsWith('NAVIGATION_INSTALLATION'))) };
 }
