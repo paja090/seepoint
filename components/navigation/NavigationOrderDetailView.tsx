@@ -20,6 +20,7 @@ import {
   ExternalLink,
   FileText,
   FolderOpen,
+  ArrowRight,
 } from 'lucide-react';
 import type { NavigationOrderDetail, NavigationPointItem } from '@/lib/navigation/types';
 import {
@@ -36,7 +37,7 @@ import { NavigationInvoiceModal } from './NavigationInvoiceModal';
 import { NavigationContactModal } from './NavigationContactModal';
 import { NavigationScheduleModal } from './NavigationScheduleModal';
 
-export type NavigationTabKey = 'overview' | 'survey' | 'points' | 'graphics' | 'installation' | 'photos' | 'billing' | 'history';
+export type NavigationTabKey = 'overview' | 'contract' | 'survey' | 'points' | 'graphics' | 'installation' | 'photos' | 'billing' | 'history';
 
 export interface ActionableResolutionState {
   title?: string;
@@ -127,6 +128,13 @@ export function NavigationOrderDetailView({
 
   // Determine readiness checklist items
   const missingChecks = [
+    {
+      key: 'contract',
+      label: 'Smlouva / kód objednávky klienta',
+      isDone: Boolean(currentOrder.clientOrderCode || currentOrder.rentStart),
+      actionLabel: 'Smlouva & termíny',
+      tabTarget: 'contract',
+    },
     {
       key: 'graphics',
       label: 'Schválené grafické podklady',
@@ -471,6 +479,31 @@ export function NavigationOrderDetailView({
               </button>
             )}
 
+            {/* Quick direct phase switch selector */}
+            <div className="relative inline-block">
+              <select
+                disabled={transitioning}
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    void handleStatusChange(e.target.value);
+                  }
+                }}
+                className="btn border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-900 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer"
+                title="Přejít přímo do vybraného stavu bez postupného proklikávání"
+              >
+                <option value="" disabled>⚡ Přejít přímo do stavu... ▾</option>
+                {Object.entries(NAVIGATION_ORDER_STATUS_LABELS).map(([statusKey, statusName]) => {
+                  if (statusKey === currentOrder.status) return null;
+                  return (
+                    <option key={statusKey} value={statusKey}>
+                      ➔ {statusName}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
             <button
               onClick={() => setShowRevertModal(true)}
               className="btn border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:text-amber-800 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1"
@@ -532,34 +565,65 @@ export function NavigationOrderDetailView({
           </div>
         )}
 
-        {/* Visual Stepper */}
+        {/* Visual Stepper - Clickable Phase Buttons */}
         <div className="mt-5 border-t border-slate-100 pt-4">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+              Pracovní fáze zakázky (kliknutím otevřete záložku fáze)
+            </span>
+            <span className="text-[11px] font-semibold text-slate-400">
+              Krok {currentPhaseIndex + 1} z {NAVIGATION_PHASES.length} · {NAVIGATION_PHASES[currentPhaseIndex]?.label}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
             {NAVIGATION_PHASES.map((phase, idx) => {
               const isCompleted = currentPhaseIndex > idx;
               const isCurrent = currentPhaseIndex === idx;
 
+              const targetTab: NavigationTabKey =
+                phase.key === 'COMMERCIAL'
+                  ? 'overview'
+                  : phase.key === 'CONTRACT'
+                  ? 'contract'
+                  : phase.key === 'PRODUCTION'
+                  ? 'graphics'
+                  : phase.key === 'REALIZATION'
+                  ? 'installation'
+                  : 'billing';
+
               return (
-                <div
+                <button
+                  type="button"
                   key={phase.key}
-                  className={`rounded-xl border p-2.5 text-xs transition-all ${
+                  onClick={() => setActiveTab(targetTab)}
+                  className={`rounded-xl border p-2.5 text-xs text-left transition-all cursor-pointer group relative ${
                     isCurrent
-                      ? 'border-sky-500 bg-sky-50/80 font-bold text-sky-900 shadow-xs'
+                      ? 'border-sky-500 bg-sky-50 font-bold text-sky-900 shadow-xs ring-2 ring-sky-300'
                       : isCompleted
-                      ? 'border-emerald-200 bg-emerald-50/50 text-emerald-900 font-semibold'
-                      : 'border-slate-200 bg-slate-50/50 text-slate-400'
+                      ? 'border-emerald-200 bg-emerald-50/50 text-emerald-900 font-semibold hover:bg-emerald-100/70 hover:border-emerald-300'
+                      : 'border-slate-200 bg-slate-50/60 text-slate-600 hover:bg-white hover:border-sky-300 hover:shadow-xs'
                   }`}
+                  title={`Kliknutím otevřít fázi "${phase.label}"`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold">{phase.label}</span>
+                    <span className="text-[11px] font-bold group-hover:text-sky-700 transition">
+                      {phase.label}
+                    </span>
                     {isCompleted ? (
-                      <CheckCircle2 size={14} className="text-emerald-600" />
+                      <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
                     ) : isCurrent ? (
-                      <Clock size={14} className="text-sky-600 animate-pulse" />
-                    ) : null}
+                      <span className="flex items-center gap-1 text-[10px] text-sky-700 bg-sky-200/80 px-1.5 py-0.5 rounded font-black">
+                        <Clock size={11} className="text-sky-700 animate-pulse" />
+                        Aktivní
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 group-hover:text-sky-600 transition flex items-center gap-0.5">
+                        Otevřít <ArrowRight size={11} />
+                      </span>
+                    )}
                   </div>
                   <p className="text-[10px] text-slate-500 mt-1 line-clamp-1">{phase.description}</p>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -574,6 +638,7 @@ export function NavigationOrderDetailView({
           <div className="flex overflow-x-auto border-b border-slate-200 gap-4 pb-1">
             {[
               { id: 'overview', label: '📌 Přehled' },
+              { id: 'contract', label: '📄 Smlouva & Termíny' },
               { id: 'survey', label: '📍 Průzkum lokalit' },
               { id: 'points', label: `📍 Navigační body (${currentOrder.points.length})` },
               { id: 'graphics', label: '🎨 Grafika & Výroba' },
@@ -702,6 +767,170 @@ export function NavigationOrderDetailView({
                     <strong>Poznámka k realizaci:</strong> {currentOrder.targetNote}
                   </p>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Tab: Contract & Schedule */}
+          {activeTab === 'contract' && (
+            <div className="space-y-6">
+              {/* Header card with quick actions */}
+              <div className="card space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <FileText size={18} className="text-indigo-600" /> Smlouva a objednávka klienta
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Fáze 2: Evidence čísla objednávky či smlouvy, termíny nájmu a koordinace podkladů.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowScheduleModal(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-xs font-bold text-white transition shadow-xs cursor-pointer"
+                    >
+                      <Edit3 size={13} /> Upravit smlouvu a harmonogram
+                    </button>
+                    <Link
+                      href="/navigation/contracts"
+                      target="_blank"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 transition"
+                      title="Otevřít celofiremní registr smluv VO v novém okně"
+                    >
+                      📋 Evidence smluv VO ↗
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 pt-2">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        Číslo objednávky / smlouvy klienta
+                      </span>
+                      {currentOrder.clientOrderCode ? (
+                        <span className="rounded-md bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[10px] font-black text-emerald-800">
+                          ✓ Zadáno
+                        </span>
+                      ) : (
+                        <span className="rounded-md bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-black text-amber-800">
+                          ⚠️ Doplnit
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-lg font-black text-slate-900 font-mono">
+                      {currentOrder.clientOrderCode || (
+                        <span className="text-sm font-semibold text-slate-400 italic font-sans">
+                          Dosud nezadáno (např. SML-2026/042 nebo interní číslo klienta)
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Nemusíte smlouvu složitě zakládat jinde – stačí zde vyplnit kód smlouvy/objednávky a uložit termíny. Ty se automaticky propíší do fakturace a klientských protokolů.
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                      Klient & Smluvní strana
+                    </span>
+                    <p className="text-base font-bold text-slate-900">
+                      {currentOrder.clientName}
+                    </p>
+                    <div className="text-xs text-slate-600 space-y-1">
+                      {currentOrder.contactPerson && <p><strong>Kontakt:</strong> {currentOrder.contactPerson}</p>}
+                      {currentOrder.contactEmail && <p><strong>E-mail:</strong> {currentOrder.contactEmail}</p>}
+                      {currentOrder.contactPhone && <p><strong>Telefon:</strong> {currentOrder.contactPhone}</p>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Harmonogram pronájmu a montáže */}
+              <div className="card space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <Calendar size={16} className="text-amber-600" /> Smluvní harmonogram a termíny realizace
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setShowScheduleModal(true)}
+                    className="text-xs font-bold text-sky-600 hover:text-sky-800 transition cursor-pointer"
+                  >
+                    Upravit termíny ➔
+                  </button>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-xl border border-slate-100 bg-white p-3.5 shadow-2xs">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Začátek pronájmu</span>
+                    <p className="text-sm font-black text-slate-900">
+                      {currentOrder.rentStart ? formatNavigationDate(currentOrder.rentStart) : 'Neuveden'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-100 bg-white p-3.5 shadow-2xs">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Konec pronájmu</span>
+                    <p className="text-sm font-black text-slate-900">
+                      {currentOrder.rentEnd ? formatNavigationDate(currentOrder.rentEnd) : 'Neuveden'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-100 bg-white p-3.5 shadow-2xs">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Plánovaná montáž</span>
+                    <p className="text-sm font-black text-slate-900">
+                      {currentOrder.installationDate ? formatNavigationDate(currentOrder.installationDate) : 'Nenaplánováno'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-100 bg-white p-3.5 shadow-2xs">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Plánovaná demontáž</span>
+                    <p className="text-sm font-black text-slate-900">
+                      {currentOrder.deinstallationDate ? formatNavigationDate(currentOrder.deinstallationDate) : 'Dle konce nájmu'}
+                    </p>
+                  </div>
+                </div>
+
+                {currentOrder.targetNote && (
+                  <div className="rounded-xl bg-amber-50/70 border border-amber-200 p-3 text-xs text-amber-900">
+                    <strong>Poznámka k realizaci:</strong> {currentOrder.targetNote}
+                  </div>
+                )}
+              </div>
+
+              {/* Phase advance banner to Production */}
+              <div className="rounded-2xl border border-purple-200 bg-gradient-to-r from-purple-50 via-indigo-50 to-sky-50 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-black text-purple-950 flex items-center gap-2">
+                    <span>🎨</span> Další krok: Grafické podklady a Výroba
+                  </h4>
+                  <p className="text-xs text-purple-800">
+                    Máte podepsanou smlouvu nebo potvrzenou objednávku? Přejděte rovnou k nahrání grafiky a zadání do tiskové výroby.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('graphics')}
+                    className="inline-flex items-center gap-2 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs px-4 py-2.5 shadow-xs cursor-pointer transition"
+                  >
+                    <span>Otevřít Grafiku & Výrobu</span>
+                    <ArrowRight size={14} />
+                  </button>
+                  {['POPTAVKA', 'NABIDKA', 'POTVRZENO_KLIENTEM', 'SMLOUVA_OBJEDNAVKA'].includes(currentOrder.status) && (
+                    <button
+                      type="button"
+                      disabled={transitioning}
+                      onClick={() => handleStatusChange('TISK_VYROBA')}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-purple-300 bg-white hover:bg-purple-50 text-purple-900 font-bold text-xs px-3 py-2.5 transition cursor-pointer"
+                      title="Přepnout stav zakázky přímo do Tisk / Výroba"
+                    >
+                      ⚡ Rovnou přepnout stav do Výroby
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )}
