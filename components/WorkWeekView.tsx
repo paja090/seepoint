@@ -62,7 +62,16 @@ function isOrderOverdue(order: WeekOrder, now = new Date()) {
 export function WorkWeekView({ initialOrders }: WorkWeekViewProps) {
   const [orders, setOrders] = useState(initialOrders);
   const [weekOffset, setWeekOffset] = useState(0);
-  const [focusMode, setFocusMode] = useState<FocusMode>('TODAY');
+  const [focusMode, setFocusMode] = useState<FocusMode>(() => {
+    const today = startOfDay();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const hasToday = initialOrders.some((o) => {
+      const d = new Date(o.scheduledAt);
+      return isOrderOverdue(o) || (d >= today && d < tomorrow);
+    });
+    return hasToday ? 'TODAY' : 'WEEK';
+  });
   const [workerFilter, setWorkerFilter] = useState('ALL');
   const [clientFilter, setClientFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
