@@ -38,3 +38,10 @@ Nový DispatchDrawer je prezentační obal s nativním dialogem (focus trap, Esc
 ## Ověření
 
 Nové tests/dispatch-presentation.test.ts ověřují identity více plánů, zachování tras a termínů, readonly kalendář, skutečný průběh a oprávnění k rozsahu posádek. Nové tests/dispatch-cockpit.browser.mjs ověřují desktop/mobil, skutečnou RouteMap se simulovanými dlaždicemi, filtry, boční panel a klávesnici, smíšený výběr, týden a časovou osu. Stávající test zadání upravuje pouze jméno tlačítka na Přidat práci. Screenshoty testovacího UI jsou v tmp/dispatch-cockpit-desktop.png a tmp/dispatch-cockpit-mobile.png; nejde o produkční data.
+### Výsledky ověření 24. 10. 2026
+
+- Čistá kopie commitu d08bb86: 1124 testů, 1119 úspěšných, 0 selhání, 5 přeskočených volitelných testů; návratový kód 0. Externí databázové testy nebyly zapnuté.
+- TypeScript bez emitování a cílený ESLint: úspěch.
+- Prohlížečové scénáře dispatch-cockpit, dispatch-queue, dispatch-planning a mobile-route-focus: úspěch. Desktopový a mobilní screenshot byl vizuálně zkontrolován.
+- První úplné sestavení čisté kopie zkompilovalo aplikaci, ale kontrola typů narazila na výchozí 2GB heap Node (exit 134). Opakování používá procesní NODE_OPTIONS s limitem 4 GB; produkční konfigurace zůstává beze změny.
+- Ve sdíleném pracovním adresáři existují nesouvisející marketingové a produktové změny; nejsou součástí commitu ani čistého ověření.
