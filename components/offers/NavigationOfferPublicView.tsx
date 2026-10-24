@@ -27,7 +27,7 @@ import type { OfferView } from '@/lib/offers/view-model';
 import { canDownloadInstallationSheet, canDownloadOfferPdf } from '@/lib/offers/navigation-document-access';
 import { canUploadNavigationArtwork } from '@/lib/offers/navigation-artwork-access';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
-import { getPointPinVisual } from '@/lib/offers/navigation-carrier-types';
+import { getPointPinVisual, formatNavigationPointDesignation } from '@/lib/offers/navigation-carrier-types';
 import { toPhotoFullUrl, toPhotoThumbnailUrl } from '@/lib/photo-url';
 import {
   RENTAL_DURATION_OPTIONS,
@@ -489,23 +489,29 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
       {/* Target Business Banner (Multiple branches supported) */}
       <div className="overflow-hidden rounded-3xl border border-sky-800/60 bg-gradient-to-br from-sky-950 via-slate-900 to-slate-950 p-6 text-white shadow-xl lg:p-8">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-2 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="rounded-xl bg-rose-500/20 p-2 text-rose-400 border border-rose-500/30">
-                <Store size={22} />
-              </span>
-              <span className="text-xs font-extrabold uppercase tracking-widest text-sky-400">
-                {targets.length > 1 ? `Cílové provozovny navigace (${targets.length} poboček)` : 'Cílová provozovna navigace'}
-              </span>
-            </div>
-            {targets.length === 1 ? (
-              <>
-                <h2 className="text-2xl font-black tracking-tight text-white md:text-3xl">
-                  {targets[0].name}
-                </h2>
-                <p className="text-sm font-medium text-slate-300">
-                  📍 {targets[0].address || `${targets[0].latitude.toFixed(5)}, ${targets[0].longitude.toFixed(5)}`}
-                </p>
+          <div className="flex items-start gap-4 flex-1">
+            {offer.client?.logoUrl && (
+              <div className="h-16 w-24 sm:h-20 sm:w-32 rounded-2xl bg-white p-2 border border-sky-400/30 shadow-md flex items-center justify-center shrink-0">
+                <img src={offer.client.logoUrl} alt={offer.client.name} className="max-h-full max-w-full object-contain" />
+              </div>
+            )}
+            <div className="space-y-2 flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="rounded-xl bg-rose-500/20 p-2 text-rose-400 border border-rose-500/30">
+                  <Store size={22} />
+                </span>
+                <span className="text-xs font-extrabold uppercase tracking-widest text-sky-400">
+                  {targets.length > 1 ? `Cílové provozovny navigace (${targets.length} poboček)` : 'Cílová provozovna navigace'}
+                </span>
+              </div>
+              {targets.length === 1 ? (
+                <>
+                  <h2 className="text-2xl font-black tracking-tight text-white md:text-3xl">
+                    {targets[0].name}
+                  </h2>
+                  <p className="text-sm font-medium text-slate-300">
+                    📍 {targets[0].address || `${targets[0].latitude.toFixed(5)}, ${targets[0].longitude.toFixed(5)}`}
+                  </p>
                 {targets[0].photoUrl ? (
                   <img
                     alt={`Cílová provozovna ${targets[0].name}`}
@@ -545,6 +551,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 ))}
               </div>
             )}
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -738,7 +745,9 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="font-bold text-slate-900 text-sm break-words">{point.label}</h4>
+                          <h4 className="font-bold text-slate-900 text-sm break-words">
+                            {formatNavigationPointDesignation(pObj, index).fullTitle}
+                          </h4>
                           {(() => {
                             const vis = getPointPinVisual({
                               color: typeof pObj.color === 'string' ? pObj.color : undefined,
@@ -917,7 +926,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             <table className="min-w-[1050px] w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-5 py-3">Navigační bod</th>
+                  <th className="px-5 py-3">Označení bodu & Nosič</th>
                   <th className="px-3 py-3">Vzdálenost do cíle</th>
                   <th className="px-3 py-3 text-right">Počet</th>
                   <th className="px-3 py-3 text-right">Pronájem ({durationOption.shortLabel})</th>
@@ -933,10 +942,12 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                   const pObj = point as unknown as Record<string, unknown>;
                   const effectivePoint = getPointWithDistanceOverride(pObj);
                   const editState = distanceEdits[point.id] || { value: '', unit: 'METERS' as const, source: 'CALCULATED' as const };
+                  const pointIndex = activePoints.indexOf(point);
+                  const desig = formatNavigationPointDesignation(pObj, pointIndex >= 0 ? pointIndex : 0);
                   return (
                     <tr key={point.id}>
                       <td className="px-5 py-4">
-                        <p className="font-bold text-slate-900">{point.label}</p>
+                        <p className="font-bold text-slate-900">{desig.fullTitle}</p>
                         <p className="mt-1 text-xs text-slate-500">{point.navigationType}{point.variant ? ` · ${point.variant}` : ''}</p>
                       </td>
                       <td className="px-3 py-4">

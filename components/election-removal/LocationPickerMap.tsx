@@ -236,12 +236,9 @@ export function LocationPickerMap({
     <div className="space-y-2">
       {/* Address Search Bar */}
       <div className="relative">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            executeSearch();
-          }}
+        <div
           className="flex items-center gap-1.5"
+          onClick={(e) => e.stopPropagation()}
         >
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -252,13 +249,22 @@ export function LocationPickerMap({
                 setSearchQuery(e.target.value);
                 if (searchError) setSearchError(null);
               }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  executeSearch();
+                }
+              }}
               placeholder="Vyhledat adresu nebo místo (např. Nádražní 12, Brno)..."
               className="w-full pl-8 pr-8 py-2 text-xs rounded-xl border border-slate-300 bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-600 focus:border-transparent shadow-2xs"
             />
             {searchQuery && (
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   setSearchQuery('');
                   setSearchResults([]);
                   setSearchError(null);
@@ -271,14 +277,19 @@ export function LocationPickerMap({
             )}
           </div>
           <button
-            type="submit"
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              executeSearch();
+            }}
             disabled={isSearching || searchQuery.trim().length < 3}
             className="px-3.5 py-2 text-xs font-bold rounded-xl bg-sky-700 text-white hover:bg-sky-800 disabled:opacity-50 transition shrink-0 flex items-center gap-1.5 shadow-2xs"
           >
             {isSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
             <span>Hledat</span>
           </button>
-        </form>
+        </div>
 
         {/* Search Results Dropdown */}
         {searchResults.length > 0 && (
