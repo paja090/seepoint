@@ -53,7 +53,17 @@ export async function PATCH(
     const hasNavOrder = Boolean(existing.navigationOrderId);
     const allItemsDone = existing.items.length > 0 && existing.items.every((i) => ['DONE', 'CANCELLED'].includes(i.executionStatus || ''));
 
-    if (usesItemExecution(existing.items) && !hasNavOrder && !allItemsDone) {
+    const campaignId = (existing.planningConstraints as { electionCampaignId?: string } | null)?.electionCampaignId;
+    let allCampaignPointsCompleted = false;
+    if (campaignId) {
+      const activePoints = await prisma.electionRemovalPoint.findMany({
+        where: { organizationId: existing.organizationId, campaignId, status: { not: 'CANCELLED' } },
+        select: { id: true, status: true },
+      });
+      allCampaignPointsCompleted = activePoints.length > 0 && activePoints.every((p) => p.status === 'COMPLETED');
+    }
+
+    if (usesItemExecution(existing.items) && !hasNavOrder && !allItemsDone && !allCampaignPointsCompleted) {
       return NextResponse.json({ error: 'Dokončete jednotlivé položky přes Moje trasa dnes.' }, { status: 409 });
     }
 
@@ -80,6 +90,14 @@ export async function PATCH(
         where: { workOrderId, status: { not: 'CANCELLED' } },
         data: { status: 'DONE' },
       });
+
+      // Synchronize linked election campaign status to COMPLETED
+      if (campaignId) {
+        await prisma.electionCampaign.update({
+          where: { id: campaignId, organizationId: existing.organizationId },
+          data: { status: 'COMPLETED' },
+        });
+      }
 
       // If linked to navigation order, check if all points are installed and advance status
       if (existing.navigationOrderId) {
