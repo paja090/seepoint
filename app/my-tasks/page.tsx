@@ -6,12 +6,20 @@ import { AccessDenied, canAccess } from '@/lib/rbac';
 import { requirePageAccess } from '@/lib/page-auth';
 import { MyTasksView, type MyTaskItem } from '@/components/MyTasksView';
 import { QuickInternalTasksView, type QuickTaskItem } from '@/components/tasks/QuickInternalTasksView';
+import { syncUnlinkedDispatchPointsInTransaction } from '@/lib/dispatch/dispatch-work-sync';
 
 export const dynamic = 'force-dynamic';
 
 export default async function MyTasksPage() {
   const user = await requirePageAccess('myTasks');
   if (!canAccess(user.role, 'myTasks')) return <AppShell><AccessDenied /></AppShell>;
+
+  // Ensure active dispatch intake points are reflected in WorkOrders
+  if (user.organizationId) {
+    await prisma.$transaction(async (tx) => {
+      await syncUnlinkedDispatchPointsInTransaction(tx, user.organizationId);
+    });
+  }
 
   const currentUserName = user.employee
     ? `${user.employee.firstName} ${user.employee.lastName}`.trim()

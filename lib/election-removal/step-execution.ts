@@ -78,23 +78,68 @@ export async function executeFieldStep(tx: Prisma.TransactionClient, stop: Plann
     const linkedWorkOrders = await tx.workOrder.findMany({
       where: {
         organizationId,
-        planningConstraints: { path: ['electionRemovalPointId'], equals: point.id },
+        OR: [
+          { planningConstraints: { path: ['electionRemovalPointId'], equals: point.id } },
+          { planningConstraints: { path: ['electionCampaignId'], equals: point.campaignId } },
+          { planningConstraints: { path: ['pointIds'], array_contains: point.id } },
+        ],
       },
-      select: { id: true },
+      include: {
+        items: true,
+      },
     });
     if (linkedWorkOrders.length > 0) {
-      const nextStatus = done ? 'DONE' : 'IN_PROGRESS';
+      const campaignPointsCount = await tx.electionRemovalPoint.count({
+        where: { organizationId, campaignId: point.campaignId, status: { not: 'CANCELLED' } },
+      });
+      const campaignCompletedCount = await tx.electionRemovalPoint.count({
+        where: { organizationId, campaignId: point.campaignId, status: 'COMPLETED' },
+      });
+      const allCampaignCompleted = campaignPointsCount > 0 && campaignCompletedCount === campaignPointsCount;
+
       for (const wo of linkedWorkOrders) {
+        const itemDesc = `${point.label}${point.description ? ` – ${point.description}` : ''}`;
+        const matchingItem = wo.items.find(
+          (i) =>
+            i.description === itemDesc ||
+            (i.description && i.description.startsWith(point.label)) ||
+            (wo.items.length === 1 && (wo.planningConstraints as any)?.electionRemovalPointId === point.id)
+        );
+
+        if (matchingItem && tx.workOrderItem?.update) {
+          await tx.workOrderItem.update({
+            where: { id: matchingItem.id },
+            data: {
+              executionStatus: done ? 'DONE' : 'IN_PROGRESS',
+              completedAt: done ? new Date() : null,
+            },
+          });
+        }
+
+        const isPerPoint = (wo.planningConstraints as any)?.electionRemovalPointId === point.id;
+        const shouldMarkWoDone = isPerPoint ? done : allCampaignCompleted;
+        const nextStatus = shouldMarkWoDone ? 'DONE' : 'IN_PROGRESS';
+
         await tx.workOrder.update({
           where: { id: wo.id },
-          data: { status: nextStatus },
+          data: {
+            status: nextStatus,
+            ...(shouldMarkWoDone ? { ftdSent: true } : {}),
+          },
         });
         if (tx.workTask?.updateMany) {
           await tx.workTask.updateMany({
-            where: { organizationId, workOrderId: wo.id },
+            where: { organizationId, workOrderId: wo.id, status: { not: 'CANCELLED' } },
             data: { status: nextStatus },
           });
         }
+      }
+
+      if (allCampaignCompleted) {
+        await tx.electionCampaign.update({
+          where: { id: point.campaignId, organizationId },
+          data: { status: 'COMPLETED' },
+        });
       }
     }
   }

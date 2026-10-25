@@ -1208,7 +1208,15 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
 
             <div aria-label="Aktuální zastávka" className="space-y-3">
               <p className="text-sm font-semibold text-slate-700">Hotovo {doneCount} · Zbývá {remainingCount}{issueCount>0?' · K řešení '+issueCount:''}</p>
-              {focusedStop ? renderSingleStop(focusedStop, stopIndexMap.get(focusedStop.jobId) ?? 1, true) : <p role="status" className="rounded-2xl bg-emerald-50 p-4 font-semibold text-emerald-900">Všechny zastávky jsou vyřízené. Po návratu ukončete výjezd.</p>}
+              {focusedStop ? (
+                renderSingleStop(focusedStop, stopIndexMap.get(focusedStop.jobId) ?? 1, true)
+              ) : (
+                <p role="status" className="rounded-2xl bg-emerald-50 p-4 font-semibold text-emerald-900">
+                  {route.tripCompletedAt
+                    ? '🎉 Dnešní výjezd byl úspěšně dokončen a návrat na základnu je zapsán. Všechny body jsou splněny.'
+                    : 'Všechny zastávky jsou vyřízené. Po návratu ukončete výjezd.'}
+                </p>
+              )}
             </div>
             <details className="rounded-2xl border border-slate-200 bg-white p-3.5"><summary className="cursor-pointer text-sm font-medium text-slate-700"><Timer size={14} className="mr-2 inline text-sky-600" />Časy a měření výjezdu · návrat ~{formatLiveClock(route.liveEstimatedEndAt, data.timezone)}</summary><div className="mt-3 space-y-2">
               {/* Live Shift ETA Banner */}

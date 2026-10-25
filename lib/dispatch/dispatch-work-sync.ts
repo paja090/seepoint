@@ -1,4 +1,4 @@
-import { Prisma, type WorkType } from '@prisma/client';
+import { Prisma, type WorkType, type WorkOrderStatus } from '@prisma/client';
 import { syncWorkOrderTasks } from '../work-task-sync';
 
 function mapOperationToWorkType(operationType: string | null | undefined): WorkType {
@@ -225,11 +225,20 @@ export async function syncUnlinkedDispatchPointsInTransaction(
         where: { organizationId, workOrderId: existing.id },
         select: { id: true, description: true },
       });
-      const existingDescs = new Set(existingItems.map((i) => i.description));
 
       for (const point of points) {
         const itemDesc = `${point.label}${point.description ? ` – ${point.description}` : ''}`;
-        if (!existingDescs.has(itemDesc)) {
+        const itemStatus: WorkOrderStatus =
+          point.status === 'COMPLETED'
+            ? 'DONE'
+            : point.status === 'IN_PROGRESS'
+            ? 'IN_PROGRESS'
+            : 'PLANNED';
+        const matched = existingItems.find(
+          (i) => i.description === itemDesc || (i.description && i.description.startsWith(point.label))
+        );
+
+        if (!matched) {
           await tx.workOrderItem.create({
             data: {
               organizationId,
@@ -237,15 +246,26 @@ export async function syncUnlinkedDispatchPointsInTransaction(
               description: itemDesc,
               quantity: point.quantity || 1,
               estimatedMinutes: point.serviceMinutes || 25,
-              executionStatus:
-                point.status === 'COMPLETED'
-                  ? 'DONE'
-                  : point.status === 'IN_PROGRESS'
-                  ? 'IN_PROGRESS'
-                  : 'PLANNED',
+              executionStatus: itemStatus,
+              completedAt: point.status === 'COMPLETED' ? new Date() : null,
+            },
+          });
+        } else if (tx.workOrderItem?.update) {
+          await tx.workOrderItem.update({
+            where: { id: matched.id },
+            data: {
+              executionStatus: itemStatus,
+              completedAt: point.status === 'COMPLETED' ? new Date() : null,
             },
           });
         }
+      }
+
+      if (allCompleted && tx.electionCampaign?.update) {
+        await tx.electionCampaign.update({
+          where: { id: campaign.id },
+          data: { status: 'COMPLETED' },
+        });
       }
 
       if (preferredEmployee && (!existing.assignments || existing.assignments.length === 0)) {
@@ -314,6 +334,7 @@ export async function syncUnlinkedDispatchPointsInTransaction(
               : point.status === 'IN_PROGRESS'
               ? 'IN_PROGRESS'
               : 'PLANNED',
+          completedAt: point.status === 'COMPLETED' ? new Date() : null,
         },
       });
     }

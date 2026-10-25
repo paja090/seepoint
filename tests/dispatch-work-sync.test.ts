@@ -67,6 +67,10 @@ test('syncUnlinkedDispatchPointsInTransaction: creates a single consolidated Wor
   const mockTx = {
     electionCampaign: {
       findMany: async () => [campaign],
+      update: async (args: { where: { id: string }; data: Record<string, unknown> }) => {
+        Object.assign(campaign, args.data);
+        return campaign;
+      },
     },
     workOrder: {
       findMany: async (args: { where: { planningConstraints?: Record<string, unknown> } }) => {
@@ -123,8 +127,14 @@ test('syncUnlinkedDispatchPointsInTransaction: creates a single consolidated Wor
       findMany: async () => createdItems,
       findFirst: async () => null,
       create: async (args: { data: Record<string, unknown> }) => {
-        createdItems.push(args.data);
-        return { id: `item-${createdItems.length}`, ...args.data };
+        const item = { id: `item-${createdItems.length + 1}`, ...args.data };
+        createdItems.push(item);
+        return item;
+      },
+      update: async (args: { where: { id: string }; data: Record<string, unknown> }) => {
+        const found = createdItems.find((i) => i.id === args.where.id);
+        if (found) Object.assign(found, args.data);
+        return found || {};
       },
       deleteMany: async () => ({ count: 0 }),
     },
@@ -148,4 +158,14 @@ test('syncUnlinkedDispatchPointsInTransaction: creates a single consolidated Wor
   const count2 = await syncUnlinkedDispatchPointsInTransaction(mockTx, 'org-1');
   assert.equal(count2, 0);
   assert.equal(createdOrders.length, 1);
+
+  // 3rd run: when points complete in the field, items and order transition to DONE
+  point1.status = 'COMPLETED';
+  point2.status = 'COMPLETED';
+  const count3 = await syncUnlinkedDispatchPointsInTransaction(mockTx, 'org-1');
+  assert.equal(count3, 0);
+  assert.equal(createdOrders[0].status, 'DONE');
+  assert.equal(createdItems[0].executionStatus, 'DONE');
+  assert.equal(createdItems[1].executionStatus, 'DONE');
+  assert.equal((campaign as any).status, 'COMPLETED');
 });
