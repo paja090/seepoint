@@ -167,5 +167,5 @@ test('syncUnlinkedDispatchPointsInTransaction: creates a single consolidated Wor
   assert.equal(createdOrders[0].status, 'DONE');
   assert.equal(createdItems[0].executionStatus, 'DONE');
   assert.equal(createdItems[1].executionStatus, 'DONE');
-  assert.equal((campaign as any).status, 'COMPLETED');
+  assert.equal((campaign as { status?: string }).status, 'COMPLETED');
 });

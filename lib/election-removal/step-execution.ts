@@ -99,11 +99,12 @@ export async function executeFieldStep(tx: Prisma.TransactionClient, stop: Plann
 
       for (const wo of linkedWorkOrders) {
         const itemDesc = `${point.label}${point.description ? ` – ${point.description}` : ''}`;
+        const constraints = wo.planningConstraints as { electionRemovalPointId?: string } | null;
         const matchingItem = wo.items.find(
           (i) =>
             i.description === itemDesc ||
             (i.description && i.description.startsWith(point.label)) ||
-            (wo.items.length === 1 && (wo.planningConstraints as any)?.electionRemovalPointId === point.id)
+            (wo.items.length === 1 && constraints?.electionRemovalPointId === point.id)
         );
 
         if (matchingItem && tx.workOrderItem?.update) {
@@ -116,7 +117,7 @@ export async function executeFieldStep(tx: Prisma.TransactionClient, stop: Plann
           });
         }
 
-        const isPerPoint = (wo.planningConstraints as any)?.electionRemovalPointId === point.id;
+        const isPerPoint = constraints?.electionRemovalPointId === point.id;
         const shouldMarkWoDone = isPerPoint ? done : allCampaignCompleted;
         const nextStatus = shouldMarkWoDone ? 'DONE' : 'IN_PROGRESS';
 
