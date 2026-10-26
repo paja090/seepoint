@@ -18,7 +18,7 @@ export function SaaSWorkflowSection() {
       desc: 'Výběr ploch, mapa a veřejný klientský odkaz',
       icon: FileText,
       color: 'text-indigo-400 border-indigo-800 bg-indigo-950/60',
-      details: 'Koncept s cenami i bez cen, schválení do 60 s',
+      details: 'Koncept s cenami i bez cen, hotovo do 3 minut',
     },
     {
       num: '03',
@@ -85,7 +85,7 @@ export function SaaSWorkflowSection() {
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-850">
+                <div className="pt-3 border-t border-slate-800">
                   <span className="text-xs font-bold text-slate-300 block leading-normal">{st.details}</span>
                 </div>
               </div>

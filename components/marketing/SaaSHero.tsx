@@ -138,16 +138,16 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
 
           <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-4 text-center space-y-1 hover:border-sky-700/60 transition group">
             <div className="text-sky-400 font-black text-2xl group-hover:scale-105 transition">
-              <AnimatedCounter target={57} prefix="Až -" suffix=" %" />
+              <AnimatedCounter target={30} prefix="Až -" suffix=" %" />
             </div>
             <div className="text-xs sm:text-sm font-bold text-slate-300">Úspora km při výjezdech</div>
           </div>
 
           <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-4 text-center space-y-1 hover:border-emerald-700/60 transition group">
             <div className="text-emerald-400 font-black text-2xl group-hover:scale-105 transition">
-              <AnimatedCounter target={60} prefix="Do " suffix=" s" />
+              <AnimatedCounter target={3} prefix="Do " suffix=" min" />
             </div>
-            <div className="text-xs sm:text-sm font-bold text-slate-300">AI Sestavení nabídky</div>
+            <div className="text-xs sm:text-sm font-bold text-slate-300">Hotová klientská nabídka</div>
           </div>
         </div>
       </div>

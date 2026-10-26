@@ -458,8 +458,8 @@ export function SaaSProductShowcase() {
                     <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
                       Původní neoptimalizovaná trasa (modelový příklad)
                     </span>
-                    <div className="text-2xl font-black text-rose-400">42.8 km · 110 min</div>
-                    <p className="text-sm text-slate-300">Náhodné pořadí zakázek dle data zadání (křížení po městě).</p>
+                    <div className="text-2xl font-black text-rose-400">44.6 km · 85 min</div>
+                    <p className="text-sm text-slate-300">Pořadí zakázek dle data zadání (zbytečné přejezdy tam a zpět).</p>
                     <div className="text-xs sm:text-sm text-slate-300 font-mono space-y-1 pt-2 border-t border-slate-900">
                       <div>1. Poruba → 2. Havířov → 3. Centrum → 4. Vítkovice</div>
                     </div>
@@ -478,13 +478,13 @@ export function SaaSProductShowcase() {
                       </span>
                       {routeOptimized && (
                         <span className="px-2.5 py-0.5 rounded bg-emerald-900 text-emerald-200 text-xs font-black">
-                          Modelová úspora: -57 % km
+                          Modelová úspora: -30 % km
                         </span>
                       )}
                     </div>
-                    <div className="text-2xl font-black text-emerald-400">18.4 km · 45 min</div>
+                    <div className="text-2xl font-black text-emerald-400">31.2 km · 55 min</div>
                     <p className="text-sm text-slate-200">
-                      Seřazeno podle nejkratší trasy s 1-klik otevřením do Google Maps / Waze.
+                      Logický průjezd městem s 1-klik otevřením trasy do Google Maps / Waze.
                     </p>
                     <div className="text-xs sm:text-sm text-emerald-300 font-mono space-y-1 pt-2 border-t border-emerald-900/60">
                       <div>1. Poruba → 2. Vítkovice → 3. Centrum → 4. Havířov</div>
