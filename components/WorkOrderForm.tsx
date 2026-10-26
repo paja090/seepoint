@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState, useRef } from 'react';
-import { agencyWorkCategories, type WorkScope } from '@/lib/work';
+import { agencyWorkCategories, workPriorityLabels, type WorkScope } from '@/lib/work';
 import type { WorkCategory } from '@/lib/work-categories';
 import {
   CheckCircle2,
