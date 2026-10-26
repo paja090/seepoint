@@ -12,6 +12,8 @@ export type SaaSAnalyticsEvent =
   | 'product_video_play'
   | 'product_video_completed'
   | 'product_video_cta_clicked'
+  | 'product_video_mode_change'
+  | 'product_video_chapter_jump'
   | 'network_interest_clicked';
 
 export function trackSaaSEvent(eventName: SaaSAnalyticsEvent, properties?: Record<string, unknown>) {
