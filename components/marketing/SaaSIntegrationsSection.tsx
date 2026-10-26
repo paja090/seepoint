@@ -17,7 +17,7 @@ export function SaaSIntegrationsSection() {
   ];
 
   return (
-    <section className="py-16 border-t border-slate-850 relative">
+    <section className="py-16 border-t border-slate-800 relative">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-10">
         {/* Section Header */}
         <div className="text-center space-y-3 max-w-3xl mx-auto">

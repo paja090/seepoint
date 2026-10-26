@@ -47,11 +47,11 @@ export function SaaSProductOrigin() {
             <div className="space-y-4">
               <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
                 <div>
-                  <span className="text-sm text-slate-300 font-medium block">Spravované nosiče</span>
-                  <strong className="text-2xl font-black text-white">800+ nosičů</strong>
+                  <span className="text-sm text-slate-300 font-medium block">Podporované formáty OOH</span>
+                  <strong className="text-2xl font-black text-white">6 typů médií</strong>
                 </div>
                 <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-purple-950 text-purple-300 border border-purple-800">
-                  Ostrava & Kraj
+                  Od CLP po Bigboardy
                 </span>
               </div>
 

@@ -3,7 +3,7 @@
 import { CheckCircle2, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 import { trackSaaSEvent } from '@/lib/analytics';
 
-export function SaaSPricingSection({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
+export function SaaSPricingSection({ onOpenDemoModal }: { onOpenDemoModal: (planName?: string) => void }) {
   const plans = [
     {
       name: 'START',
@@ -153,7 +153,7 @@ export function SaaSPricingSection({ onOpenDemoModal }: { onOpenDemoModal: () =>
                   type="button"
                   onClick={() => {
                     trackSaaSEvent('demo_cta_clicked', { source: `pricing_${plan.name}` });
-                    onOpenDemoModal();
+                    onOpenDemoModal(plan.name);
                   }}
                   className={`w-full py-3 rounded-2xl font-bold text-sm transition cursor-pointer flex items-center justify-center gap-2 ${
                     plan.highlight

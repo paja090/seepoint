@@ -31,7 +31,7 @@ export function SaaSAudienceStrip() {
   ];
 
   return (
-    <section className="py-8 bg-slate-950 border-y border-slate-850/80 relative z-20">
+    <section id="pro-koho" className="py-8 bg-slate-950 border-y border-slate-800/80 relative z-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-center sm:text-left">
           <span className="text-xs font-black uppercase tracking-wider text-purple-400">

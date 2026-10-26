@@ -5,16 +5,12 @@ import {
   Play,
   Pause,
   Sparkles,
-  MapPin,
-  FileText,
   Volume2,
   VolumeX,
   Maximize2,
   Zap,
   Film,
   Download,
-  Camera,
-  CheckCircle2,
 } from 'lucide-react';
 import { trackSaaSEvent } from '@/lib/analytics';
 
@@ -76,7 +72,7 @@ function formatTime(seconds: number) {
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 }
 
-export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
+export function SaaSProductVideoSection(_props?: { onOpenDemoModal?: () => void }) {
   const [mode, setMode] = useState<VideoMode>('short');
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -160,17 +156,23 @@ export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: 
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 space-y-10 relative z-10">
         {/* Section Header */}
         <div className="text-center space-y-3 max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-950/80 border border-purple-800/80 text-purple-300 text-xs font-black uppercase tracking-widest">
-            <Sparkles className="w-3.5 h-3.5 text-purple-300 animate-pulse" />
-            <span>PRODUKTOVÁ UKÁZKA</span>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-950/80 border border-purple-800/80 text-purple-300 text-xs font-black uppercase tracking-widest">
+              <Sparkles className="w-3.5 h-3.5 text-purple-300 animate-pulse" />
+              <span>PRODUKTOVÁ VIDEOPREZENTACE</span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-800/80 text-emerald-300 text-xs font-bold">
+              <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Český hlasový průvodce</span>
+            </div>
           </div>
 
           <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-            SeePoint OS v praxi.
+            SeePoint OS v praxi se zvukem.
           </h2>
 
           <p className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed">
-            Podívejte se na skutečnou aplikaci: od výběru nosičů a bleskového AI konceptu přes plánování posádek až po mobilní fotodokumentaci a fakturaci.
+            Poslechněte si komentovanou ukázku systému: od evidence nosičů a AI sestavení nabídky přes plánování tras až po mobilní fotodokumentaci a fakturaci.
           </p>
 
           {/* Mode Switcher Pills */}
@@ -179,7 +181,7 @@ export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: 
               <button
                 type="button"
                 onClick={() => handleModeChange('short')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
                   mode === 'short'
                     ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -191,14 +193,14 @@ export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: 
               <button
                 type="button"
                 onClick={() => handleModeChange('full')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
                   mode === 'full'
                     ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
                 <Film className="w-4 h-4 text-purple-300" />
-                <span>Kompletní ukázka (2:40 min)</span>
+                <span>Kompletní průchod (2:40 min)</span>
               </button>
             </div>
           </div>
@@ -243,23 +245,30 @@ export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: 
               <button
                 type="button"
                 onClick={handlePlayToggle}
-                aria-label="Přehrát video"
-                className="absolute inset-0 flex items-center justify-center bg-slate-950/40 hover:bg-slate-950/30 transition backdrop-blur-[2px] group cursor-pointer z-10"
+                aria-label="Přehrát video se zvukem"
+                className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950/40 hover:bg-slate-950/30 transition backdrop-blur-[2px] group cursor-pointer z-10"
               >
                 <div className="size-20 sm:size-24 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-center shadow-2xl group-hover:scale-110 transition transform border border-purple-400/50">
                   <Play className="w-8 h-8 sm:w-10 sm:h-10 fill-white translate-x-0.5" />
                 </div>
+                <span className="px-3.5 py-1 rounded-full bg-slate-950/85 border border-purple-500/40 text-xs font-bold text-purple-200 shadow-lg">
+                  🔊 Spustit video s českým komentářem
+                </span>
               </button>
             )}
 
             {/* Custom Control Bar at Bottom */}
-            <div className="absolute bottom-0 inset-x-0 p-3 sm:p-4 bg-gradient-to-t from-slate-950/90 via-slate-950/60 to-transparent flex items-center justify-between gap-3 z-20 opacity-0 group-hover/player:opacity-100 transition duration-300">
+            <div
+              className={`absolute bottom-0 inset-x-0 p-3 sm:p-4 bg-gradient-to-t from-slate-950/90 via-slate-950/60 to-transparent flex items-center justify-between gap-3 z-20 transition duration-300 ${
+                isPlaying ? 'opacity-100 sm:opacity-0 sm:group-hover/player:opacity-100' : 'opacity-100'
+              }`}
+            >
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={handlePlayToggle}
                   aria-label={isPlaying ? 'Pozastavit' : 'Přehrát'}
-                  className="p-2 rounded-xl bg-slate-900/80 hover:bg-purple-600 text-white border border-slate-700/60 transition"
+                  className="p-2 rounded-xl bg-slate-900/80 hover:bg-purple-600 text-white border border-slate-700/60 transition cursor-pointer"
                 >
                   {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white" />}
                 </button>
@@ -268,18 +277,18 @@ export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: 
                   type="button"
                   onClick={handleMuteToggle}
                   aria-label={isMuted ? 'Zapnout zvuk' : 'Ztlumit zvuk'}
-                  className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60 transition"
+                  className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60 transition cursor-pointer"
                 >
-                  {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4" />}
+                  {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
                 </button>
 
-                <div className="hidden sm:flex items-center gap-1 bg-slate-900/80 border border-slate-700/60 rounded-xl p-1 text-xs font-bold text-slate-300">
+                <div className="flex items-center gap-1 bg-slate-900/80 border border-slate-700/60 rounded-xl p-1 text-xs font-bold text-slate-300">
                   {[1, 1.25, 1.5].map((rate) => (
                     <button
                       key={rate}
                       type="button"
                       onClick={() => handleSpeedChange(rate)}
-                      className={`px-2 py-0.5 rounded-lg transition ${
+                      className={`px-2 py-0.5 rounded-lg transition cursor-pointer ${
                         playbackRate === rate ? 'bg-purple-600 text-white shadow-xs' : 'hover:text-white'
                       }`}
                     >
@@ -291,20 +300,20 @@ export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: 
 
               <div className="flex items-center gap-2">
                 <a
-                  href="/images/video/seepoint-demo.mp4"
-                  download="seepoint-demo.mp4"
+                  href={VIDEO_SOURCES[mode].src}
+                  download={mode === 'short' ? 'seepoint-demo-short.mp4' : 'seepoint-demo.mp4'}
                   title="Stáhnout video v MP4"
                   className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60 transition flex items-center gap-1.5 text-xs font-semibold"
                 >
                   <Download className="w-4 h-4" />
-                  <span className="hidden md:inline">Stáhnout</span>
+                  <span className="hidden md:inline">Stáhnout MP4</span>
                 </a>
 
                 <button
                   type="button"
                   onClick={handleFullscreen}
                   aria-label="Celá obrazovka"
-                  className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60 transition"
+                  className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60 transition cursor-pointer"
                 >
                   <Maximize2 className="w-4 h-4" />
                 </button>
@@ -317,9 +326,9 @@ export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: 
         <div className="space-y-3">
           <div className="flex items-center justify-between text-xs text-slate-400 px-1">
             <span className="font-bold uppercase tracking-wider text-purple-300">
-              Kapitoly ukázky ({activeChapters.length})
+              Kapitoly videa ({activeChapters.length})
             </span>
-            <span>Kliknutím na kapitolu skočíte přímo do videa</span>
+            <span>Kliknutím na kapitolu přeskočíte přímo na danou část</span>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -330,7 +339,7 @@ export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: 
                   key={chapter.time}
                   type="button"
                   onClick={() => jumpToChapter(chapter.time)}
-                  className={`group relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition border ${
+                  className={`group relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition border cursor-pointer ${
                     isActive
                       ? 'bg-purple-900/50 border-purple-500 text-white shadow-lg ring-1 ring-purple-500/50'
                       : 'bg-slate-900/70 border-slate-800 text-slate-300 hover:border-purple-600/60 hover:text-white hover:bg-slate-900'
@@ -348,64 +357,6 @@ export function SaaSProductVideoSection({ onOpenDemoModal }: { onOpenDemoModal: 
               );
             })}
           </div>
-        </div>
-
-        {/* 3 Key Takeaways Under Video */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2 text-center sm:text-left hover:border-purple-800/60 transition">
-            <div className="flex items-center justify-center sm:justify-start gap-2 text-purple-400">
-              <MapPin className="w-4 h-4" />
-              <strong className="text-sm font-black text-white">1. Hlasové AI dotazy & dostupnost</strong>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
-              Zeptejte se hlasem i textem přirozenou češtinou na volné billboardy a citypostery v libovolném městě a termínu.
-            </p>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2 text-center sm:text-left hover:border-indigo-800/60 transition">
-            <div className="flex items-center justify-center sm:justify-start gap-2 text-indigo-400">
-              <FileText className="w-4 h-4" />
-              <strong className="text-sm font-black text-white">2. AI Copilot: mediální koncept & strategie</strong>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
-              Automatický výběr nosičů, kalkulace rozpočtu a návrh 3 fází kampaně v přehledném odkazu přímo pro klienta.
-            </p>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2 text-center sm:text-left hover:border-emerald-800/60 transition">
-            <div className="flex items-center justify-center sm:justify-start gap-2 text-emerald-400">
-              <Camera className="w-4 h-4" />
-              <strong className="text-sm font-black text-white">3. Terén, montáž & fakturace na 1 klik</strong>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
-              Optimalizované trasy posádek, doložení fotodokumentace montáže ze smartphonu a okamžitá příprava faktury.
-            </p>
-          </div>
-        </div>
-
-        {/* Bottom CTA Bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-2xl bg-gradient-to-r from-purple-950/60 to-indigo-950/60 border border-purple-800/40">
-          <div className="space-y-1 text-center sm:text-left">
-            <h4 className="text-sm font-bold text-white flex items-center justify-center sm:justify-start gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>Chcete vidět SeePoint OS na vlastních datech vaší sítě?</span>
-            </h4>
-            <p className="text-xs text-slate-300">
-              Připravíme pro vás živou ukázku s importem vašich reklamních nosičů a ukázkou AI v reálném provozu.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              trackSaaSEvent('product_video_cta_clicked', { source: 'video_bottom_cta' });
-              onOpenDemoModal();
-            }}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-purple-600/30 transition shrink-0 cursor-pointer"
-          >
-            <Sparkles className="w-4 h-4 text-purple-200" />
-            <span>Domluvit živou ukázku systému</span>
-          </button>
         </div>
       </div>
     </section>

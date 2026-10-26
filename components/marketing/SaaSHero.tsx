@@ -73,15 +73,15 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
 
             {/* 3 Micro-Benefits Strip */}
             <div className="pt-3 grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs sm:text-sm font-bold text-slate-200">
-              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-purple-750 transition">
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-purple-700 transition">
                 <MapPin className="w-4 h-4 text-purple-400 shrink-0" />
                 <span className="leading-snug">Přehledná mapa všech nosičů</span>
               </div>
-              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-emerald-750 transition">
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-emerald-700 transition">
                 <BarChart3 className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span className="leading-snug">Přehled o volných kapacitách</span>
               </div>
-              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-sky-750 transition">
+              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-sky-700 transition">
                 <ShieldCheck className="w-4 h-4 text-sky-400 shrink-0" />
                 <span className="leading-snug">Ochranná pásma a pravidla</span>
               </div>
@@ -138,9 +138,9 @@ export function SaaSHero({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
 
           <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-4 text-center space-y-1 hover:border-sky-700/60 transition group">
             <div className="text-sky-400 font-black text-2xl group-hover:scale-105 transition">
-              <AnimatedCounter target={57} prefix="-" suffix=" %*" />
+              <AnimatedCounter target={57} prefix="Až -" suffix=" %" />
             </div>
-            <div className="text-xs sm:text-sm font-bold text-slate-300">Optimalizované trasy výjezdů</div>
+            <div className="text-xs sm:text-sm font-bold text-slate-300">Úspora km při výjezdech</div>
           </div>
 
           <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-4 text-center space-y-1 hover:border-emerald-700/60 transition group">

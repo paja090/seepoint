@@ -4,7 +4,15 @@ import { useState } from 'react';
 import { X, Sparkles, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { trackSaaSEvent } from '@/lib/analytics';
 
-export function SaaSDemoModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+export function SaaSDemoModal({
+  isOpen,
+  onClose,
+  initialContext,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  initialContext?: string | null;
+}) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [company, setCompany] = useState('');
@@ -30,7 +38,9 @@ export function SaaSDemoModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
           email,
           company,
           phone,
-          surfaceCount,
+          surfaceCount: initialContext
+            ? `${surfaceCount ? `${surfaceCount} · ` : ''}${initialContext}`
+            : surfaceCount,
           analyticsEvents: ['demo_form_submitted'],
         }),
       });
@@ -40,7 +50,7 @@ export function SaaSDemoModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
         throw new Error(data.error || 'Došlo k chybě při odesílání.');
       }
 
-      trackSaaSEvent('demo_form_submitted', { email, company, surfaceCount });
+      trackSaaSEvent('demo_form_submitted', { email, company, surfaceCount, context: initialContext || 'default' });
       setSuccessMessage(data.message || 'Děkujeme! Vaše žádost byla přijata.');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Došlo k neznámé chybě.';
@@ -65,13 +75,24 @@ export function SaaSDemoModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
 
         {/* Modal Header */}
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-950 text-purple-300 text-xs font-black uppercase tracking-wider border border-purple-800">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>SEEPOINT OS DEMO & VIZUALIZACE ZDARMA</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-950 text-purple-300 text-xs font-black uppercase tracking-wider border border-purple-800">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>SEEPOINT OS DEMO & VIZUALIZACE ZDARMA</span>
+            </div>
+            {initialContext && (
+              <span className="px-3 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 text-xs font-bold">
+                {initialContext}
+              </span>
+            )}
           </div>
           <h3 className="text-2xl font-black text-white tracking-tight">Domluvit ukázku & Vizualizace z Excelu zdarma</h3>
           <p className="text-sm text-slate-300 font-medium">
-            Projdeme s vámi SeePoint OS a zašleme vám **živou interaktivní mapu i klientskou nabídku z vašich vlastních nosičů zdarma**.
+            Projdeme s vámi SeePoint OS a zašleme vám{' '}
+            <strong className="text-white font-bold">
+              živou interaktivní mapu i klientskou nabídku z vašich vlastních nosičů zdarma
+            </strong>
+            .
           </p>
         </div>
 

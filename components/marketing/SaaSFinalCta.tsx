@@ -3,7 +3,7 @@
 import { Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 import { trackSaaSEvent } from '@/lib/analytics';
 
-export function SaaSFinalCta({ onOpenDemoModal }: { onOpenDemoModal: () => void }) {
+export function SaaSFinalCta({ onOpenDemoModal }: { onOpenDemoModal: (ctx?: string) => void }) {
   return (
     <section className="py-24 relative overflow-hidden">
       {/* Background Glowing Ambient */}
@@ -32,7 +32,7 @@ export function SaaSFinalCta({ onOpenDemoModal }: { onOpenDemoModal: () => void 
             type="button"
             onClick={() => {
               trackSaaSEvent('demo_cta_clicked', { source: 'final_cta_custom_data' });
-              onOpenDemoModal();
+              onOpenDemoModal('Vizualizace z vlastního Excelu (20 nosičů)');
             }}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 hover:from-purple-500 hover:to-indigo-600 text-white font-black text-base shadow-2xl transition transform active:scale-95 cursor-pointer"
           >
@@ -44,7 +44,7 @@ export function SaaSFinalCta({ onOpenDemoModal }: { onOpenDemoModal: () => void 
             type="button"
             onClick={() => {
               trackSaaSEvent('demo_cta_clicked', { source: 'final_cta_online_demo' });
-              onOpenDemoModal();
+              onOpenDemoModal('Online živé demo');
             }}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-200 font-extrabold text-sm border border-slate-700 shadow-xl transition cursor-pointer"
           >

@@ -12,32 +12,32 @@ export function SaaSFaqSection() {
       a: 'SeePoint OS je navržen pro provozovatele OOH médií (vlastníky billboardů, citylightů, laviček, towerů, navigací VO), reklamní agentury, obchodní týmy i montážníky v terénu, kteří potřebují mít přehled o obsazenosti, nabídkách a realizacích v jednom systému.',
     },
     {
-      q: 'Lze převést naše data z Excelu?',
-      a: 'Ano. Pomůžeme vám převést vaše stávající data nosičů, adresy, GPS souřadnice, technické parametry i kontakty na klienty bez nutnosti začínat od nuly.',
-    },
-    {
-      q: 'Musíme mít data ve stejném formátu?',
-      a: 'Nemusíte. Data nemusí přesně kopírovat naši šablonu. V rámci asistovaného importu vám pomůžeme upravit a napárovat vaše současné tabulky a soubory do struktury SeePoint OS.',
+      q: 'Lze převést naše data z Excelu, i když mají vlastní strukturu?',
+      a: 'Ano, data nemusí odpovídat žádné předem dané šabloně. V rámci asistovaného importu vám pomůžeme převést a napárovat vaše stávající tabulky nosičů, adresy, GPS souřadnice, fotografie i kontakty na klienty bez nutnosti začínat od nuly.',
     },
     {
       q: 'Jak dlouho trvá nasazení?',
       a: 'Základní spuštění systému s naimportovanou sítí nosičů a přístupy pro tým obvykle trvá jen několik pracovních dnů. Celý proces probíhá s naší asistencí.',
     },
     {
-      q: 'Funguje systém na mobilu?',
-      a: 'Ano. Systém obsahuje optimalizované mobilní rozhraní pro montážníky a techniky v terénu. Umožňuje 1-klikové spuštění GPS navigace k nosiči, zobrazení pracovního úkolu i nahrání fotodokumentace před a po instalaci.',
+      q: 'Funguje systém na mobilu v terénu?',
+      a: 'Ano. Systém obsahuje optimalizované mobilní rozhraní pro montážníky a techniky. Umožňuje 1-klikové spuštění GPS navigace k nosiči, zobrazení pracovního úkolu, nahrání fotodokumentace před a po instalaci i vyfocení účtenky za materiál.',
     },
     {
-      q: 'Jak fungují nabídky a obsazenost?',
-      a: 'Obchodník vidí volné plochy v reálném čase pro zvolený termín kampaně. Vybrané nosiče vloží do nabídky a systém vygeneruje reprezentativní prezentaci s mapou a fotkami dostupnou přes bezpečný veřejný klientský odkaz.',
+      q: 'Jak fungují klientské nabídky a hlídání obsazenosti?',
+      a: 'Obchodník vidí volné plochy v reálném čase pro zvolený termín kampaně (nebo se zeptá česky AI asistenta). Vybrané nosiče vloží do nabídky a systém vygeneruje interaktivní prezentaci s mapou a fotkami přes veřejný klientský odkaz, kde může klient kampaň rovnou schválit.',
     },
     {
-      q: 'Můžeme nejprve vidět demo?',
-      a: 'Určitě. Rádi vám systém předvedeme na reálném workflow venkovní reklamy nebo vám připravíme ukázku na vašich vlastních 20 nosičích. Stačí kliknout na tlačítko "Domluvit ukázku".',
+      q: 'Jsou v ceníku skryté poplatky nebo dlouhodobé závazky?',
+      a: 'Ne. Měsíční tarif zahrnuje kompletní cloudový provoz, mapové podklady i pravidelné aktualizace. Tarif můžete kdykoliv změnit podle toho, jak roste vaše síť nosičů.',
     },
     {
-      q: 'Jak jsou zabezpečena naše data?',
-      a: 'Systém využívá přísné oddělení organizací (multi-tenancy), propracované řízení přístupových rolí (RBAC), auditní protokolování změn v rezervacích a šifrovanou komunikaci přes HTTPS.',
+      q: 'Můžeme nejprve vidět demo na vlastních datech?',
+      a: 'Určitě. Pošlete nám vzorek 20 nosičů v Excelu a my vám zdarma připravíme živou ukázku vaší sítě na mapě včetně vzorové klientské nabídky. Stačí kliknout na tlačítko „Domluvit ukázku“.',
+    },
+    {
+      q: 'Jak jsou zabezpečena naše obchodní data?',
+      a: 'Systém využívá přísné oddělení organizací (multi-tenancy), řízení přístupových rolí (RBAC – obchodník, montážník, účetní, administrátor), auditní historii změn v rezervacích a šifrovanou komunikaci přes HTTPS.',
     },
   ];
 

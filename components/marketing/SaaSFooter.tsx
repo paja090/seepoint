@@ -31,12 +31,12 @@ export function SaaSFooter({ onOpenDemoModal }: { onOpenDemoModal: () => void })
           <div className="space-y-3">
             <h4 className="font-black text-white uppercase text-xs tracking-wider">Produkt</h4>
             <ul className="space-y-2.5 font-medium text-sm text-slate-300">
-              <li><a href="#produkt" className="hover:text-white transition">Inventory & Nosiče</a></li>
+              <li><a href="#video" className="hover:text-white transition">Komentované video</a></li>
               <li><a href="#produkt" className="hover:text-white transition">Mapa sítě & GPS</a></li>
               <li><a href="#produkt" className="hover:text-white transition">Obsazenost & Kalendář</a></li>
-              <li><a href="#produkt" className="hover:text-white transition">Generátor nabídek</a></li>
+              <li><a href="#produkt" className="hover:text-white transition">Klientské nabídky</a></li>
               <li><a href="#ai" className="hover:text-white transition">SeePoint AI Engine</a></li>
-              <li><a href="#reseni" className="hover:text-white transition">Navigace VO</a></li>
+              <li><a href="#navigace" className="hover:text-white transition">Navigace VO</a></li>
             </ul>
           </div>
 
@@ -48,6 +48,7 @@ export function SaaSFooter({ onOpenDemoModal }: { onOpenDemoModal: () => void })
               <li><a href="#pro-koho" className="hover:text-white transition">Reklamní agentury</a></li>
               <li><a href="#pro-koho" className="hover:text-white transition">Obchodní týmy</a></li>
               <li><a href="#pro-koho" className="hover:text-white transition">Realizační týmy</a></li>
+              <li><a href="#migrace" className="hover:text-white transition">Přechod z Excelu</a></li>
               <li><a href="#cenik" className="hover:text-white transition">Tarify & Ceník</a></li>
             </ul>
           </div>
@@ -71,9 +72,9 @@ export function SaaSFooter({ onOpenDemoModal }: { onOpenDemoModal: () => void })
           </div>
 
           <div className="flex items-center gap-6">
-            <span className="hover:text-slate-200 transition cursor-pointer">Ochrana osobních údajů</span>
-            <span className="hover:text-slate-200 transition cursor-pointer">Podmínky použití</span>
-            <span className="hover:text-slate-200 transition cursor-pointer">Cookies</span>
+            <a href="#zabezpeceni" className="hover:text-slate-200 transition">Zabezpečení dat</a>
+            <a href="#faq" className="hover:text-slate-200 transition">Časté dotazy</a>
+            <button type="button" onClick={onOpenDemoModal} className="hover:text-slate-200 transition cursor-pointer">Kontakt & Podpora</button>
           </div>
         </div>
       </div>

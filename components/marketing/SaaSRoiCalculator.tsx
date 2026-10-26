@@ -9,10 +9,14 @@ export function SaaSRoiCalculator({ onOpenDemoModal }: { onOpenDemoModal: () => 
   const [salesPersonCount, setSalesPersonCount] = useState<number>(3);
 
   // Model assumptions:
-  // Avg time saved per generated offer: ~30 mins.
-  // Estimated monthly offers per carrier: 0.35
-  const monthlyOffers = Math.round(carrierCount * 0.35);
-  const savedHoursPerMonth = Math.round((monthlyOffers * 30) / 60);
+  // 1) Offers generated per month scale with network size and commercial team size
+  // 2) Each offer + availability check saves ~25 mins vs manual Excel/Drive/PDF assembly
+  // 3) Each team member saves ~4.5h/month on internal status sync, WhatsApp photo hunting & dispatch handoff
+  const monthlyOffers = Math.round(carrierCount * 0.22 + salesPersonCount * 6);
+  const offerHoursSaved = (monthlyOffers * 25) / 60;
+  const teamCoordinationHoursSaved = salesPersonCount * 4.5 + carrierCount * 0.04;
+  const savedHoursPerMonth = Math.round(offerHoursSaved + teamCoordinationHoursSaved);
+  const savedWorkDaysPerMonth = (savedHoursPerMonth / 8).toFixed(1).replace('.0', '');
 
   const getSalesPersonLabel = (count: number) => {
     if (count === 1) return '1 osoba';
@@ -93,12 +97,22 @@ export function SaaSRoiCalculator({ onOpenDemoModal }: { onOpenDemoModal: () => 
                 <div className="flex items-center gap-3">
                   <Clock className="w-6 h-6 text-purple-400 shrink-0" />
                   <div>
-                    <span className="text-xs font-black uppercase text-purple-300 tracking-wider">Odhadovaná úspora času</span>
+                    <span className="text-xs font-black uppercase text-purple-300 tracking-wider">Odhadovaná úspora času týmu</span>
                     <h3 className="text-3xl font-black text-white font-mono">~{savedHoursPerMonth} hodin / měs</h3>
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-2.5 pt-1 text-xs">
+                  <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                    <span className="text-slate-400 block">Kapacita týmu navíc</span>
+                    <strong className="text-emerald-400 font-mono text-sm">~{savedWorkDaysPerMonth} prac. dnů / měs</strong>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                    <span className="text-slate-400 block">Odbavené nabídky</span>
+                    <strong className="text-purple-300 font-mono text-sm">~{monthlyOffers} nabídek / měs</strong>
+                  </div>
+                </div>
                 <p className="text-sm text-slate-200 font-medium leading-relaxed">
-                  Eliminace ručního dohledávání fotek, ověřování termínů na telefonu a opakovaného přepisování tabulek.
+                  Eliminace ručního dohledávání fotek, ověřování termínů po telefonu a přepisování tabulek mezi obchodem a terénem.
                 </p>
               </div>
 
