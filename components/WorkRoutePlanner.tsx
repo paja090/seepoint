@@ -290,17 +290,23 @@ export function WorkRoutePlanner({
 
       // Default selected jobs (preselect initialJobIds if provided from work plan)
       let jobsToSelect: string[] = [];
+      const activePlanJobIds = (activePlan?.result?.crews?.flatMap((c: { stops?: { jobId?: string; workOrderId?: string }[] }) =>
+        (c.stops ?? []).map((s) => s.jobId ?? s.workOrderId).filter(Boolean)
+      ) ?? []) as string[];
+
       if (initialJobIds && initialJobIds.length > 0) {
         const availableJobIds = new Set((data.data?.jobs as { id: string }[] | undefined)?.map((j) => j.id) ?? []);
-        jobsToSelect = initialJobIds.filter((id) => availableJobIds.has(id));
-        if (jobsToSelect.length > 0) {
+        const validInitial = initialJobIds.filter((id) => availableJobIds.has(id));
+        jobsToSelect = [...new Set([...activePlanJobIds, ...validInitial])];
+        if (validInitial.length > 0) {
           setInputsChanged(true);
           setActiveTab('jobs');
-          setToast(`Z plánu práce bylo vybráno ${jobsToSelect.length} zakázek k naplánování.`);
+          setToast(`Z plánu práce bylo vybráno ${validInitial.length} zakázek k naplánování.`);
           setTimeout(() => setToast(null), 4000);
         }
-      }
-      if (jobsToSelect.length === 0) {
+      } else if (activePlanJobIds.length > 0) {
+        jobsToSelect = [...new Set(activePlanJobIds)];
+      } else {
         jobsToSelect =
           data.data?.jobs
             ?.filter((j: { status: string }) => !['DONE', 'CANCELLED'].includes(j.status))
@@ -410,13 +416,19 @@ export function WorkRoutePlanner({
     });
   };
 
+  const currentPlanJobIds = new Set(
+    plan?.result.crews.flatMap((c) => c.stops.map((s) => s.jobId ?? s.workOrderId).filter(Boolean)) ?? []
+  );
+
   const visibleJobs =
     loaded?.data?.jobs.filter((j) => {
       const matchesSource =
         sourceFilter === 'all' ||
         (sourceFilter === 'navigation' && Boolean(j.navigationPointId)) ||
         (sourceFilter === 'work' && !j.navigationPointId);
-      const matchesReady = !readyOnly || !j.blockedReason;
+      const isCurrentPlanJob = currentPlanJobIds.has(j.id);
+      const isBlockedByOther = Boolean(j.blockedReason && (!isCurrentPlanJob || j.blockedReason !== 'Zastávka již patří jinému schválenému plánu.'));
+      const matchesReady = !readyOnly || !isBlockedByOther;
       const matchesQuery =
         !query.trim() ||
         [j.title, j.clientName, j.orderNumber, j.address]
@@ -596,10 +608,15 @@ export function WorkRoutePlanner({
             <button
               onClick={() => void handleAction('replan')}
               disabled={busy}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition"
+              className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-xs font-bold transition shadow-sm ${
+                inputsChanged && ['APPROVED', 'ACTIVE'].includes(plan.status)
+                  ? 'bg-sky-600 text-white hover:bg-sky-500'
+                  : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40'
+              }`}
+              title={inputsChanged ? 'Přepočítat trasu se změnami ve vybraných zakázkách' : 'Přepočítat časy a pořadí stávající trasy'}
             >
-              <RefreshCw size={14} />
-              <span>Přepočítat</span>
+              <RefreshCw size={14} className={busy ? 'animate-spin' : ''} />
+              <span>{inputsChanged && ['APPROVED', 'ACTIVE'].includes(plan.status) ? 'Přepočítat trasu se změnami' : 'Přepočítat'}</span>
             </button>
           )}
 
@@ -1097,11 +1114,15 @@ export function WorkRoutePlanner({
                               {j.clientName} · {j.address || 'Adresa nezadána'}
                             </p>
 
-                            {j.blockedReason && (
+                            {j.blockedReason && (!currentPlanJobIds.has(j.id) || j.blockedReason !== 'Zastávka již patří jinému schválenému plánu.') ? (
                               <p className="mt-1 text-[11px] font-semibold text-amber-700 bg-amber-50 rounded-lg p-1.5">
                                 ⚠️ {j.blockedReason}
                               </p>
-                            )}
+                            ) : currentPlanJobIds.has(j.id) ? (
+                              <p className="mt-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 rounded-lg p-1.5 flex items-center gap-1">
+                                <span>✓ Součást této trasy</span>
+                              </p>
+                            ) : null}
                           </div>
                         </div>
                       </div>
