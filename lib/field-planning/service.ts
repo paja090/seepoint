@@ -104,14 +104,25 @@ export async function generatePlan(raw: unknown, actor: PlannerActor) {
   if(parent && parent.status!=='DRAFT' && (parent.planningSummary as unknown as PlanningResult).crews.some(c=>c.stops.some(s=>s.fieldWorkStepId)))throw new Error('Pro rozpracovaný smíšený výjezd použijte Pokračovat další den; změnu posádky nejprve vyřešte předáním materiálu.');
   const parentInput = parent?.planningInputSnapshot as unknown as PlanningInput | undefined;
   const parentCrews = parent && parent.status !== 'DRAFT' ? (parent.planningSummary as unknown as PlanningResult).crews : parentInput?.crews;
-  const crews = request.crews ?? parentCrews;
+  const profile = await loadProfile();
+  if (!profile) throw new Error('Nejdříve nastavte vlastní depo v Nastavení depa.');
+  const crews = (request.crews ?? parentCrews)?.map(c => {
+    const matchingParentCrew = parentCrews?.find(pc => pc.id === c.id);
+    const fallbackLocation = matchingParentCrew?.startLocation ?? profile.depot;
+    return {
+      ...c,
+      startLocation: c.startLocation ?? fallbackLocation,
+    };
+  });
   if (parent && parent.status !== 'DRAFT' && hash(crews?.map(c => [c.id, c.employeeIds, c.vehicleId])) !== hash(parentCrews?.map(c => [c.id, c.employeeIds, c.vehicleId]))) throw new Error('V1 při přepočtu schváleného plánu zachovává posádky a rezervace.');
   if (parent && parent.status !== 'DRAFT' && crews?.some(c => !c.startLocation)) throw new Error('Při přepočtu potvrďte aktuální GPS výchozí bod každé posádky.');
-  const profile = await loadProfile();
-  const now = request.startTime && profile ? new Date(Math.max(Date.now(), zonedTime(request.date, request.startTime, profile.timezone))).toISOString() : undefined;
-  const input = await loadPlanningData(request.date, { crews, now, jobIds: parentInput?.jobs.map(j => j.id) ?? request.jobIds,
+  const now = request.startTime ? new Date(Math.max(Date.now(), zonedTime(request.date, request.startTime, profile.timezone))).toISOString() : undefined;
+  const targetJobIds = parent
+    ? (request.jobIds && request.jobIds.length > 0 ? request.jobIds : parentInput?.jobs.map(j => j.id))
+    : request.jobIds;
+  const input = await loadPlanningData(request.date, { crews, now, jobIds: targetJobIds,
     reuseReservationIds: reusableReservations(parent), excludePlanIds: parent ? [parent.id] : [] });
-  // No fresh orders are silently added during replanning. DONE/CANCELLED are removed by the engine.
+  // Fresh orders selected during replanning are merged into the route. DONE/CANCELLED are removed by the engine.
   const result = await planFieldWork(input, googleTravelProvider(input.profile));
   if (request.planName) {
     result.planName = request.planName;
