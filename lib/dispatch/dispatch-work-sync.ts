@@ -124,13 +124,14 @@ export async function syncUnlinkedDispatchPointsInTransaction(
     },
     select: {
       id: true,
+      title: true,
       status: true,
       planningConstraints: true,
       assignments: { select: { id: true, userId: true, workerName: true } },
     },
   });
 
-  const campaignIdToWorkOrder = new Map<string, { id: string; status: string; assignments: Array<{ userId: string | null; workerName: string }> }>();
+  const campaignIdToWorkOrder = new Map<string, { id: string; title: string; status: string; assignments: Array<{ userId: string | null; workerName: string }> }>();
   for (const wo of existingCampaignWorkOrders) {
     const cId = (wo.planningConstraints as { electionCampaignId?: string } | null)?.electionCampaignId;
     if (cId) campaignIdToWorkOrder.set(cId, wo);
@@ -170,18 +171,24 @@ export async function syncUnlinkedDispatchPointsInTransaction(
             points.length > 3 ? ' a další' : ''
           }`;
 
+    const firstPoint = points[0];
+    const isGenericCampaignName = campaign.name.startsWith('Průběžná terénní práce');
+    const smartCampaignTitle = isGenericCampaignName && firstPoint
+      ? `${objectType}: ${totalQuantity > 1 ? `${totalQuantity}× ` : ''}${firstPoint.label || locationSummary}`
+      : campaign.name;
+
     const description = [
-      `Zakázka z dispečinku: ${campaign.name}`,
-      `Klient: ${clientName}`,
+      `Zakázka z dispečinku: ${smartCampaignTitle}`,
+      clientName && clientName !== 'Běžná zakázka' ? `Klient: ${clientName}` : '',
       `Typ objektu: ${objectType}`,
-      `Celkem bodů k realizaci: ${points.length} ks (odhad celkem: ${estimatedHours} hod)`,
+      `Rozsah realizace: ${points.length} ${points.length === 1 ? 'stanoviště' : 'stanovišť'} (celkem ${totalQuantity} ks materiálu, odhad: ${estimatedHours} hod)`,
       '',
       'Seznam lokací k instalaci:',
-      ...points.map(
-        (p, idx) =>
-          `${idx + 1}. ${p.label}${p.description ? ` (${p.description})` : ''} – ${p.quantity || 1} ks (${p.serviceMinutes || 25} min)`
-      ),
-    ].join('\n');
+      ...points.map((p, idx) => {
+        const cleanDesc = p.description && p.description.trim() !== p.label.trim() ? ` – ${p.description.trim()}` : '';
+        return `${idx + 1}. ${p.label}${cleanDesc} (množství: ${p.quantity || 1} ks, odhad: ${p.serviceMinutes || 25} min)`;
+      }),
+    ].filter(Boolean).join('\n');
 
     const pointIds = points.map((p) => p.id);
 
@@ -202,9 +209,11 @@ export async function syncUnlinkedDispatchPointsInTransaction(
 
     if (existing) {
       // Update existing consolidated WorkOrder to reflect current points/status
+      const shouldUpdateTitle = existing.title.startsWith('Průběžná terénní práce');
       await tx.workOrder.update({
         where: { id: existing.id },
         data: {
+          ...(shouldUpdateTitle ? { title: smartCampaignTitle } : {}),
           status: targetStatus,
           quantity: totalQuantity,
           estimatedHours,
@@ -287,7 +296,7 @@ export async function syncUnlinkedDispatchPointsInTransaction(
     const workOrder = await tx.workOrder.create({
       data: {
         organizationId,
-        title: campaign.name,
+        title: smartCampaignTitle,
         description,
         status: targetStatus,
         priority: 'NORMAL',
@@ -342,6 +351,7 @@ export async function syncUnlinkedDispatchPointsInTransaction(
     await syncWorkOrderTasks(workOrder.id, tx);
     campaignIdToWorkOrder.set(campaign.id, {
       id: workOrder.id,
+      title: smartCampaignTitle,
       status: targetStatus,
       assignments: preferredEmployee
         ? [{ userId: preferredEmployee.userId, workerName: `${preferredEmployee.firstName} ${preferredEmployee.lastName}`.trim() }]

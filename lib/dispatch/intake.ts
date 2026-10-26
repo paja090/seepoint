@@ -77,14 +77,25 @@ export async function createDispatchWork(raw: unknown, actor: PlannerActor, db =
     });
 
     if (!campaign) {
-      const name = clientName
-        ? `Práce pro ${clientName}${dateStr ? ` (${dateStr})` : ''}`
-        : `Průběžná terénní práce${dateStr ? ` (${dateStr})` : ''}`;
+      const firstSpec = specs[0];
+      const totalQty = specs.reduce((acc, s) => acc + (s.quantity || 1), 0);
+      const opName = firstSpec ? operations[firstSpec.operationType] || 'Práce' : 'Práce';
+      const isGenericLabel = !firstSpec?.label || firstSpec.label.startsWith('Zastávka ');
+      const locPart = isGenericLabel ? '' : ` – ${firstSpec.label}`;
+      const smartFallbackName = specs.length === 1 && firstSpec
+        ? `${opName}: ${totalQty > 1 ? `${totalQty}× ` : ''}${firstSpec.objectType}${locPart}`
+        : `${opName} (${totalQty} ks) – ${specs.length} míst`;
+
+      const finalName = typeof body.title === 'string' && body.title.trim()
+        ? body.title.trim()
+        : clientName
+        ? `${smartFallbackName} (${clientName})`
+        : smartFallbackName;
 
       campaign = await tx.electionCampaign.create({
         data: {
           organizationId,
-          name,
+          name: finalName,
           clientName: clientName || null,
           targetDate: targetDate,
           status: 'DRAFT',
@@ -120,10 +131,18 @@ export async function createDispatchWork(raw: unknown, actor: PlannerActor, db =
         : spec.operationType === 'RELOCATION' ? 'TRANSPORT'
         : 'OTHER';
 
+      const opLabel = operations[spec.operationType] || 'Práce';
+      const isGenericStopLabel = !spec.label || spec.label.startsWith('Zastávka ');
+      const singleOrderTitle = typeof body.title === 'string' && body.title.trim()
+        ? body.title.trim()
+        : isGenericStopLabel
+        ? `${opLabel}: ${spec.quantity > 1 ? `${spec.quantity}× ` : ''}${spec.objectType}`
+        : `${opLabel}: ${spec.quantity > 1 ? `${spec.quantity}× ` : ''}${spec.objectType} – ${spec.label}`;
+
       const workOrder = await tx.workOrder.create({
         data: {
           organizationId,
-          title: spec.label,
+          title: singleOrderTitle,
           description: spec.description || `${operations[spec.operationType]} – ${spec.objectType}`,
           status: 'PLANNED',
           priority: 'NORMAL',
