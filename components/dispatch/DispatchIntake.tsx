@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { LocationPickerMap } from '@/components/election-removal/LocationPickerMap';
 import { type ElectionRemovalMediaType } from '@/lib/election-removal/constants';
@@ -17,6 +17,11 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
+  Sparkles,
+  Wand2,
+  Mic,
+  MicOff,
+  CheckCircle2,
 } from 'lucide-react';
 
 export interface PortfolioItem {
@@ -141,10 +146,18 @@ export function DispatchIntake({
   const [resourcesLoading, setResourcesLoading] = useState(true);
 
   // Common Trip / Assignment Fields
+  const [title, setTitle] = useState('');
   const [clientName, setClientName] = useState('');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [employeeId, setEmployeeId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
+
+  // AI Assistant States
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSuccessMsg, setAiSuccessMsg] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
 
   // Stops list
   const [stops, setStops] = useState<StopEntry[]>([createEmptyStop(1)]);
@@ -153,6 +166,126 @@ export function DispatchIntake({
   const [requestKey] = useState(() => crypto.randomUUID());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      try {
+        recognitionRef.current?.stop();
+      } catch {
+        // ignore
+      }
+      setIsRecording(false);
+      return;
+    }
+    type SpeechRecog = {
+      lang: string;
+      continuous: boolean;
+      interimResults: boolean;
+      onstart: (() => void) | null;
+      onresult: ((event: { results?: Array<Array<{ transcript?: string }>> }) => void) | null;
+      onerror: (() => void) | null;
+      onend: (() => void) | null;
+      start: () => void;
+      stop: () => void;
+    };
+    type WindowWithSpeechRecog = Window & {
+      SpeechRecognition?: new () => SpeechRecog;
+      webkitSpeechRecognition?: new () => SpeechRecog;
+    };
+    const SpeechRecognition =
+      typeof window !== 'undefined'
+        ? (window as unknown as WindowWithSpeechRecog).SpeechRecognition ||
+          (window as unknown as WindowWithSpeechRecog).webkitSpeechRecognition
+        : null;
+    if (!SpeechRecognition) {
+      alert('Váš prohlížeč nepodporuje přímé diktování hlasem v tomto okně. Napište prosím zadání do textového pole.');
+      return;
+    }
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'cs-CZ';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.onstart = () => setIsRecording(true);
+      recognition.onresult = (event) => {
+        const transcript = event.results?.[0]?.[0]?.transcript;
+        if (transcript) {
+          setAiPrompt((prev) => (prev ? `${prev} ${transcript}` : transcript));
+        }
+      };
+      recognition.onerror = () => setIsRecording(false);
+      recognition.onend = () => setIsRecording(false);
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch {
+      setIsRecording(false);
+    }
+  };
+
+  const handleAiParse = async () => {
+    const p = aiPrompt.trim();
+    if (!p) return;
+    setAiLoading(true);
+    setAiSuccessMsg(null);
+    setError('');
+    try {
+      const res = await fetch('/api/ai/parse-dispatch-work', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: p }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'AI se nepodařilo zadání zpracovat.');
+
+      const parsed = data.parsed;
+      if (parsed.date) setDate(parsed.date);
+      if (parsed.employeeId) setEmployeeId(parsed.employeeId);
+      if (parsed.vehicleId) setVehicleId(parsed.vehicleId);
+      if (parsed.clientName) setClientName(parsed.clientName);
+      if (parsed.title) setTitle(parsed.title);
+
+      type ParsedStopInput = {
+        operation?: string;
+        objectType?: string;
+        label?: string;
+        quantity?: number;
+        latitude?: number | null;
+        longitude?: number | null;
+        description?: string;
+        serviceMinutes?: number;
+      };
+
+      if (Array.isArray(parsed.stops) && parsed.stops.length > 0) {
+        const newStops: StopEntry[] = parsed.stops.map((s: ParsedStopInput, idx: number) => {
+          const portfolioObj =
+            PORTFOLIO_OBJECT_TYPES.find((po) => po.id === s.objectType) || PORTFOLIO_OBJECT_TYPES[0];
+          return {
+            id: `stop-ai-${Date.now()}-${idx}`,
+            operation: (s.operation as Operation) || 'REPLACE_AD',
+            label: s.label || `Zastávka ${idx + 1}`,
+            objectType: portfolioObj.id,
+            mediaType: portfolioObj.dbMediaType,
+            quantity: Number(s.quantity) || 1,
+            latitude: s.latitude ?? null,
+            longitude: s.longitude ?? null,
+            description: s.description || '',
+            disposition: 'LEAVE',
+            serviceMinutes: Number(s.serviceMinutes) || portfolioObj.defaultMinutes,
+          };
+        });
+        setStops(newStops);
+        setActiveStopIndex(0);
+      }
+
+      setAiSuccessMsg(
+        `AI úspěšně předvyplnila formulář: „${parsed.title || 'Zadání práce'}“. Zkontrolujte prosím polohu v mapě.`
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'AI zpracování selhalo.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   // Load active employees and vehicles for dropdowns
   useEffect(() => {
@@ -265,6 +398,7 @@ export function DispatchIntake({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requestKey,
+          title: title.trim() || undefined,
           clientName: clientName.trim(),
           date: date || null,
           employeeId: employeeId || null,
@@ -323,6 +457,68 @@ export function DispatchIntake({
             <span>{error}</span>
           </div>
         )}
+
+        {/* AI QUICK INPUT BANNER */}
+        <div className="rounded-2xl border border-fuchsia-200 bg-gradient-to-br from-fuchsia-50/90 via-white to-sky-50/90 p-4 shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="p-1 rounded-lg bg-fuchsia-100 text-fuchsia-700">
+                <Sparkles className="w-4 h-4" />
+              </span>
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                ✨ AI Rychlé zadání (textem nebo hlasem)
+              </h3>
+            </div>
+            <span className="text-[10px] font-bold text-fuchsia-800 bg-fuchsia-100/80 px-2.5 py-0.5 rounded-full">
+              Gemini 3.6 Flash
+            </span>
+          </div>
+          <p className="text-xs text-slate-600">
+            Napište nebo nadiktujte zadání jednou větou. AI sama rozpozná typ média, počet kusů, termín i montážníka.
+          </p>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <input
+                type="text"
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAiParse();
+                  }
+                }}
+                placeholder="Např. Zítra polepit 4 billboardy u Mustang Arény v Ostravě, pojede Milan dodávkou..."
+                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-200 focus:outline-none shadow-2xs pr-10"
+              />
+              <button
+                type="button"
+                onClick={toggleRecording}
+                className={`absolute right-2 top-2 p-1 rounded-lg transition ${
+                  isRecording ? 'bg-rose-500 text-white animate-pulse' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                }`}
+                title={isRecording ? 'Zastavit nahrávání' : 'Diktovat hlasem'}
+              >
+                {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={handleAiParse}
+              disabled={aiLoading || !aiPrompt.trim()}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-fuchsia-600 to-indigo-600 hover:from-fuchsia-700 hover:to-indigo-700 text-white px-4 py-2.5 text-xs font-bold shadow-xs transition disabled:opacity-50 shrink-0"
+            >
+              <Wand2 className="w-4 h-4" />
+              <span>{aiLoading ? 'Rozpoznávám…' : 'Vyplnit pomocí AI'}</span>
+            </button>
+          </div>
+          {aiSuccessMsg && (
+            <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 p-2.5 text-xs font-medium text-emerald-800">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+              <span>{aiSuccessMsg}</span>
+            </div>
+          )}
+        </div>
 
         {/* 1. SELECTION: Date, Worker, Vehicle & Client */}
         <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-4 space-y-3.5">
@@ -419,18 +615,34 @@ export function DispatchIntake({
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-              <Briefcase className="w-3.5 h-3.5 text-slate-400" />
-              Klient (volitelné)
-            </label>
-            <input
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              maxLength={200}
-              placeholder="Např. ACME s.r.o., Komerční Banka..."
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs placeholder:text-slate-400 focus:ring-2 focus:ring-sky-600 focus:outline-none"
-            />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                <Briefcase className="w-3.5 h-3.5 text-slate-400" />
+                Klient (volitelné)
+              </label>
+              <input
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                maxLength={200}
+                placeholder="Např. ACME s.r.o., Komerční Banka..."
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs placeholder:text-slate-400 focus:ring-2 focus:ring-sky-600 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-sky-600" />
+                Výstižný název zakázky (volitelné)
+              </label>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                maxLength={200}
+                placeholder="Automaticky, např. Výlep 4× Billboard – Mustang Aréna"
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs placeholder:text-slate-400 focus:ring-2 focus:ring-sky-600 focus:outline-none"
+              />
+            </div>
           </div>
         </div>
 
