@@ -6,7 +6,8 @@ import { parseOpportunityCreateInput } from './policy';
 
 export async function searchLiveOpportunitiesWithGemini(
   profile: OrganizationRadarProfileData,
-  deadline = Date.now() + 60_000
+  deadline = Date.now() + 60_000,
+  existingLeadSummaries: string[] = []
 ): Promise<CreateOpportunityInput[]> {
   const rawKey =
     process.env.GEMINI_API_KEY ||
@@ -44,6 +45,10 @@ export async function searchLiveOpportunitiesWithGemini(
     ? `Doplňující sledovaná klíčová slova: ${profile.customKeywords.join(', ')}`
     : '';
 
+  const exclusionBlock = existingLeadSummaries.length > 0
+    ? `\nJIŽ EVIDOVANÉ PŘÍLEŽITOSTI V CRM (TYTO KONKRÉTNÍ AKCE/PRODEJNY UŽ V DATABÁZI MÁME – NEVRACEJ JE ZNOVU, NAJDI JINÉ NOVÉ SUBJEKTY A AKCE):\n- ${existingLeadSummaries.slice(0, 35).join('\n- ')}\n`
+    : '';
+
   const prompt = `Jsi specializovaný AI Obchodní radar pro venkovní reklamu (OOH - Out Of Home) v České republice.
 Dnešní datum je: ${todayISO}.
 ${extractionInstruction}
@@ -52,44 +57,47 @@ ${citiesStr}.
 ${keywordsStr}
 Dostupné typy venkovních reklamních ploch: ${mediaTypesStr}.
 Sledované kategorie: ${eventTypesStr}.
-
-Tvým úkolem je na českém internetu a ve zprávách vyhledat reálné aktuální a nadcházející události a obchodní příležitosti pro venkovní reklamu v uvedených lokalitách a regionech:
-1. Nové prodejny, pobočky, restaurace, autosalony, hobby markety, retail parky nebo nákupní centra, které se otevírají nebo nedávno otevřely.
-2. Nadcházející kulturní, hudební, divadelní, sportovní festivaly, veletrhy, výstavy nebo městské akce.
-3. Významné expanze firem, nová logistická či výrobní centra, náborové HR kampaně.
+${exclusionBlock}
+Tvým úkolem je na českém internetu, v regionálních denících, radničních zpravodajích a oborových médiích vyhledat reálné aktuální a nadcházející události a obchodní příležitosti pro venkovní reklamu (billboardy, citylighty, navigační šipky/tabule) v uvedených městech a regionech:
+1. Nové prodejny, pobočky, supermarkety, restaurace, kavárny, fastfoody, pekárny, hobby markety, retail parky nebo nákupní centra (které se připravují, otevírají nebo nedávno otevřely).
+2. Developerské a rezidenční projekty, prodej nových bytů, řadových domů či stavebních pozemků, nové komerční a průmyslové zóny.
+3. Autosalony, autoservisy, STK, mycí centra, showroomy nábytku, kuchyní, koupelen, podlah, stavebniny a zahradní centra.
+4. Soukromé kliniky, stomatologická a estetická centra, optiky, lékárny, fitness centra, wellness, aquaparky, ski areály a rodinné zábavní parky.
+5. Stěhování poboček na novou adresu, rebranding nebo znovuotevření po rekonstrukci (vysoká potřeba navigačních cedulí NAVIGATION_SIGN).
+6. Nadcházející kulturní, hudební, gastro a sportovní festivaly, koncerty, veletrhy, výstavy, dny otevřených dveří a velké náborové (HR) kampaně průmyslových firem v regionu.
 
 PŘÍSNÁ PRAVIDLA:
-- Hledej POUZE skutečné, ověřitelné události ze zpravodajských webů a médií pro uvedené lokality.
+- Hledej POUZE skutečné, ověřitelné události a firmy ze zpravodajských či firemních webů pro uvedené lokality (pokud je seznam měst zadán, pokryj rovnoměrně různá cílová města, nejen největší město).
 - NIKDY si nevymýšlej neexistující firmy ani smyšlené události.
-- Vždy uveď skutečnou URL adresu článku nebo média v poli "sourceUrl".
+- Vždy uveď skutečnou URL adresu článku nebo webu v poli "sourceUrl".
 - Pokud město v článku není jednoznačné, zadej "city": null.
 
-Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 4 až 6 nalezenými příležitostmi:
+Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 8 až 12 nalezenými příležitostmi:
 [
   {
-    "companyName": "Přesný název firmy, značky, pořadatele nebo akce",
+    "companyName": "Přesný název firmy, značky, developera, pořadatele nebo akce",
     "companyId": null,
     "website": "https://www.firma.cz nebo null",
-    "eventType": "NEW_BRANCH | STORE_OPENING | RESTAURANT_OPENING | RETAIL_PARK | EXPANSION | RELOCATION | MARKETING_EVENT | EVENT_EXHIBITION | OTHER",
+    "eventType": "NEW_BRANCH | STORE_OPENING | RESTAURANT_OPENING | CAR_DEALERSHIP | RETAIL_PARK | EXPANSION | RELOCATION | REOPENING | MARKETING_EVENT | EVENT_EXHIBITION | SEASONAL_CAMPAIGN | OTHER",
     "title": "Stručný atraktivní titulek příležitosti (max 8 slov)",
-    "evidenceFact": "Ověřený fakt z článku: co přesně se otevírá/děje a kdy (bez domněnek)",
-    "aiInterpretation": "AI interpretace: proč je tato událost komerčně relevantní pro venkovní OOH reklamu",
+    "evidenceFact": "Ověřený fakt z článku: co přesně se otevírá/staví/děje a kde (bez domněnek)",
+    "aiInterpretation": "AI interpretace: proč je tato událost komerčně relevantní pro venkovní OOH reklamu nebo navigační značení",
     "aiRecommendation": "Doporučený další krok (Next Best Action) pro obchodní tým",
-    "summary": "Stručné shrnutí události a proč potřebují billboardy/reklamu (2-3 věty)",
+    "summary": "Stručné shrnutí události a proč potřebují billboardy/navigační cedule (2-3 věty)",
     "city": "Město události nebo null",
     "region": "Kraj události nebo null",
     "address": "Ulice/lokalita nebo null",
     "eventDate": "Datum YYYY-MM-DD (pouze pokud je >= ${todayISO}, jinak null)",
     "sourceUrl": "Skutečná URL zprávy / článku",
     "sourceTitle": "Titulek článku nebo název zdroje",
-    "suggestedMediaTypes": ["BILLBOARD", "CITYLIGHT"]
+    "suggestedMediaTypes": ["BILLBOARD", "CITYLIGHT", "NAVIGATION_SIGN"]
   }
 ]`;
 
   const configuredOppModel = process.env.GEMINI_OPPORTUNITY_MODEL?.trim();
   const models = configuredOppModel
     ? [configuredOppModel]
-    : ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.8-flash'];
+    : ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
 
   let jsonText = '';
   let failure = 'Gemini nevrátil použitelnou odpověď.';
@@ -114,7 +122,13 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 4 až 6 nalezenými pří
       if (!resp.ok) { failure = `Gemini ${model}: HTTP ${resp.status}.`; continue; }
       if (resp.ok) {
         const data = await resp.json();
-        const rawPartText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const parts = Array.isArray(data.candidates?.[0]?.content?.parts)
+          ? data.candidates[0].content.parts
+          : [];
+        const rawPartText = parts
+          .map((p: { text?: string }) => (typeof p?.text === 'string' ? p.text : ''))
+          .join('\n')
+          .trim();
         if (rawPartText) {
           jsonText = rawPartText;
           break;

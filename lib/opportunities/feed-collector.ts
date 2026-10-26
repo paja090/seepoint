@@ -17,12 +17,12 @@ export type RawRssArticle = {
 export function buildDynamicRssQueries(profile: OrganizationRadarProfileData): string[] {
   const locations: string[] = [];
   if (profile.targetCities.length > 0) {
-    locations.push(...profile.targetCities.slice(0, 4));
+    locations.push(...profile.targetCities.slice(0, 5));
   }
-  if (profile.targetRegions.length > 0 && locations.length < 4) {
+  if (profile.targetRegions.length > 0 && locations.length < 6) {
     for (const r of profile.targetRegions) {
       if (!locations.includes(r)) locations.push(r);
-      if (locations.length >= 4) break;
+      if (locations.length >= 6) break;
     }
   }
   if (locations.length === 0) {
@@ -31,9 +31,9 @@ export function buildDynamicRssQueries(profile: OrganizationRadarProfileData): s
 
   const queries: string[] = [];
   const baseActions = [
-    '"nová prodejna" OR "nová pobočka" OR "otevření prodejny"',
-    '"retail park" OR "nákupní centrum" OR expanze',
-    'festival OR koncert OR veletrh OR výstava',
+    '(otevírá OR otevře OR "nová prodejna" OR "nová pobočka" OR supermarket OR showroom)',
+    '("retail park" OR "nákupní centrum" OR výstavba OR developer OR rezidence OR expanze)',
+    '(festival OR koncert OR veletrh OR výstava OR autosalon OR klinika)',
   ];
 
   for (const loc of locations) {
@@ -43,12 +43,12 @@ export function buildDynamicRssQueries(profile: OrganizationRadarProfileData): s
   }
 
   if (profile.customKeywords.length > 0) {
-    for (const kw of profile.customKeywords.slice(0, 3)) {
+    for (const kw of profile.customKeywords.slice(0, 4)) {
       queries.push(`${locations[0] || ''} "${kw}"`.trim());
     }
   }
 
-  return queries.slice(0, 10);
+  return queries.slice(0, 14);
 }
 
 export async function fetchRssArticles(rssUrl: string): Promise<RawRssArticle[]> {
@@ -101,7 +101,7 @@ export async function collectSignalsForProfile(
     rssUrls.push(`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=cs&gl=CZ&ceid=CZ:cs`);
   }
 
-  const fetchedGroups = await Promise.allSettled(rssUrls.slice(0, 10).map(fetchRssArticles));
+  const fetchedGroups = await Promise.allSettled(rssUrls.slice(0, 14).map(fetchRssArticles));
   const sourceErrors = fetchedGroups.filter(result => result.status === 'rejected').length;
   const rawArticles = fetchedGroups.flatMap(result => result.status === 'fulfilled' ? result.value : []);
 
@@ -120,7 +120,7 @@ export async function collectSignalsForProfile(
   // Preserve every distinct URL, including syndications with identical titles.
   // The original title/URL Stage 1 check still prioritizes one article per title in this batch.
   const articlesToPersist = fresh.filter((art, idx, all) => all.findIndex(c => c.link === art.link) === idx);
-  const toUpsert = articlesToPersist.slice(0, 30).map((art) => {
+  const toUpsert = articlesToPersist.slice(0, 50).map((art) => {
     const pubDate = art.pubDate ? new Date(art.pubDate) : null;
     const cleanTitle = art.publisher ? `${art.title} - ${art.publisher}` : art.title;
     return {
@@ -143,9 +143,13 @@ export async function collectSignalsForProfile(
   const persistedSignals = await prisma.radarSignal.findMany({
     where: {
       organizationId,
-      sourceUrl: { in: toUpsert.map((t) => t.sourceUrl) },
+      OR: [
+        { sourceUrl: { in: toUpsert.map((t) => t.sourceUrl) } },
+        { status: 'NEW', discoveredOpportunityId: null },
+      ],
     },
-    take: 30,
+    orderBy: { createdAt: 'desc' },
+    take: 45,
   });
 
   // Prioritize NEW unprocessed signals first

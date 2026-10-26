@@ -81,10 +81,21 @@ export async function runDiscoveryForOrganization(
       const rssPromise = collectSignalsForProfile(profile, organizationId).catch(() => ({ rawFound: 0, uniqueSignals: [], sourceErrors: 1, stage1DuplicateCount: 0 }));
 
       try {
-        // 1. Live Web Search Grounding via Gemini 3.6 Flash (real-time regional opportunities)
+        // Fetch already discovered opportunities so Live Search avoids returning the exact same headlines repeatedly
+        const existingOpps = await prisma.salesOpportunity.findMany({
+          where: { organizationId, mergedIntoId: null },
+          select: { companyName: true, city: true, title: true },
+          orderBy: { createdAt: 'desc' },
+          take: 35,
+        });
+        const existingLeadSummaries = existingOpps.map((o) =>
+          [o.companyName, o.city ? `(${o.city})` : '', '–', o.title].filter(Boolean).join(' ')
+        );
+
+        // 1. Live Web Search Grounding via Gemini Flash (real-time regional opportunities)
         try {
-          const liveDeadline = Math.max(startTime + Math.floor(timeBudgetMs * 0.75), deadline - 15_000);
-          const liveResults = await searchLiveOpportunitiesWithGemini(profile, liveDeadline);
+          const liveDeadline = Math.max(startTime + Math.min(48_000, Math.floor(timeBudgetMs * 0.68)), deadline - 18_000);
+          const liveResults = await searchLiveOpportunitiesWithGemini(profile, liveDeadline, existingLeadSummaries);
           const boundedLiveResults = liveResults.slice(0, batchLimit);
           liveFoundCount = boundedLiveResults.length;
 
@@ -139,7 +150,7 @@ export async function runDiscoveryForOrganization(
               organizationId,
               userId: triggerType === 'CRON' ? null : userId,
               feature: 'SALES_RADAR',
-              modelName: 'gemini-3.6-flash',
+              modelName: 'gemini-2.5-flash',
               promptTokens: 1200,
               outputTokens: Math.max(liveFoundCount * 200, 300),
               costEstimateUsd: 0.003,
@@ -152,7 +163,7 @@ export async function runDiscoveryForOrganization(
           console.error('Live search grounding error in runner (continuing with RSS)', err);
         }
 
-        // 2. Targeted RSS Feeds Discovery (collect signals into DB)
+        // 2. Targeted RSS Feeds Discovery (collect signals into DB and analyze remaining slots)
         const { rawFound, uniqueSignals, sourceErrors, stage1DuplicateCount } = await rssPromise;
         errorsCount += sourceErrors;
         if (sourceErrors) warnings.push(`Nepodařilo se načíst ${sourceErrors} RSS zdrojů.`);
@@ -161,23 +172,25 @@ export async function runDiscoveryForOrganization(
           (s) => s.status === 'NEW' && !s.discoveredOpportunityId
         );
         const remainingSlots = Math.max(batchLimit - addedCount, 0);
-        const signalsToProcess = unanalyzedSignals.slice(0, remainingSlots);
+        const maxRssBatch = Math.min(remainingSlots, 6);
+        const signalsToProcess = unanalyzedSignals.slice(0, maxRssBatch);
 
         const shouldProcessRssAi =
-          liveFoundCount < 3 && addedCount + duplicateCount < 3 && Date.now() - startTime < timeBudgetMs;
+          remainingSlots > 0 && Date.now() < deadline - 4_000;
         let rssProcessedCount = 0;
 
         if (shouldProcessRssAi) {
-          for (const signal of signalsToProcess.slice(0, 2)) {
-            if (Date.now() - startTime > timeBudgetMs) {
-              console.log('Time budget reached in runner, stopping RSS parsing early');
+          for (const signal of signalsToProcess) {
+            if (Date.now() >= deadline - 4_000 || addedCount >= batchLimit) {
+              console.log('Time budget or batch limit reached in runner, stopping RSS parsing early');
               break;
             }
 
             rssProcessedCount++;
             try {
+              const signalInputText = [signal.sourceTitle, signal.rawText].filter(Boolean).join('\n\n');
               const parsed = await parseOpportunityFromAiInput(
-                signal.sourceTitle,
+                signalInputText,
                 signal.sourceUrl,
                 profile,
                 deadline
@@ -187,7 +200,7 @@ export async function runDiscoveryForOrganization(
                 organizationId,
                 userId: triggerType === 'CRON' ? null : userId,
                 feature: 'SALES_RADAR',
-                modelName: 'gemini-3.6-flash',
+                modelName: 'gemini-2.5-flash',
                 promptTokens: 800,
                 outputTokens: 250,
                 costEstimateUsd: 0.001,
