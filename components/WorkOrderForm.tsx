@@ -1,16 +1,18 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { agencyWorkCategories, workPriorityLabels, type WorkScope } from '@/lib/work';
 import type { WorkCategory } from '@/lib/work-categories';
 import { useQuickTaskVoice } from '@/components/tasks/useQuickTaskVoice';
 import { WorkOrderLocationPicker } from '@/components/WorkOrderLocationPicker';
 import {
   AlertCircle,
+  Bookmark,
   CheckCircle2,
   ShieldAlert,
   Sparkles,
+  Trash2,
   UserCheck,
   MapPin,
   Upload,
@@ -19,6 +21,19 @@ import {
   Mic,
   Loader2,
 } from 'lucide-react';
+
+type SavedPlaceItem = {
+  id: string;
+  name: string;
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+  contactName?: string;
+  contactPhone?: string;
+  openingHours?: string;
+  website?: string;
+  accessNote?: string;
+};
 
 type Option = { id: string; label: string };
 type CarrierOption = Option & { code: string };
@@ -220,6 +235,118 @@ export function WorkOrderForm({
   const [contactPhone, setContactPhone] = useState('');
   const [accessNote, setAccessNote] = useState('');
   const [selectedCarrierCode, setSelectedCarrierCode] = useState(initialCarrierCode || '');
+
+  // Saved Frequent Places
+  const [savedPlaces, setSavedPlaces] = useState<SavedPlaceItem[]>([]);
+  const [savingPlace, setSavingPlace] = useState(false);
+  const [savedPlaceFeedback, setSavedPlaceFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/work/saved-places')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (Array.isArray(data?.places)) {
+          setSavedPlaces(data.places);
+        }
+      })
+      .catch(() => {
+        // Silent fallback
+      });
+  }, []);
+
+  const handleSaveCurrentPlace = async () => {
+    const selectedClientLabel = clients.find((c) => c.id === clientId)?.label || '';
+    const defaultName =
+      customClientName.trim() ||
+      selectedClientLabel.trim() ||
+      contactName.trim() ||
+      locationAddress.split(',')[0]?.trim() ||
+      title.trim();
+    const promptedName = window.prompt(
+      'Pojmenujte toto časté místo (např. „Půjčovna ČEVAS Sviadnov“, „Sklad Frýdek“, „Tiskárna Ostrava“):',
+      defaultName
+    );
+    if (!promptedName || !promptedName.trim()) return;
+
+    setSavingPlace(true);
+    setSavedPlaceFeedback(null);
+    try {
+      const res = await fetch('/api/work/saved-places', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: promptedName.trim(),
+          address: locationAddress.trim(),
+          latitude: coords?.latitude ?? null,
+          longitude: coords?.longitude ?? null,
+          contactName: contactName.trim() || aiPlaceDetails?.contactName || undefined,
+          contactPhone: contactPhone.trim() || aiPlaceDetails?.contactPhone || undefined,
+          openingHours: aiPlaceDetails?.openingHours || undefined,
+          website: aiPlaceDetails?.website || undefined,
+          accessNote: accessNote.trim() || aiPlaceDetails?.accessNote || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Uložení místa selhalo.');
+      if (Array.isArray(data.places)) {
+        setSavedPlaces(data.places);
+      }
+      setSavedPlaceFeedback(`Místo „${promptedName.trim()}“ bylo uloženo mezi častá místa (AI ho příště automaticky pozná).`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Uložení místa selhalo.');
+    } finally {
+      setSavingPlace(false);
+    }
+  };
+
+  const handleSelectSavedPlace = (place: SavedPlaceItem) => {
+    if (place.address) setLocationAddress(place.address);
+    if (typeof place.latitude === 'number' && typeof place.longitude === 'number') {
+      setCoords({ latitude: place.latitude, longitude: place.longitude });
+    }
+    if (place.contactName) setContactName(place.contactName);
+    if (place.contactPhone) setContactPhone(place.contactPhone);
+    const noteParts: string[] = [];
+    if (place.openingHours) noteParts.push(`Otevírací doba: ${place.openingHours}`);
+    if (place.accessNote) {
+      if (!noteParts.some((pt) => place.accessNote?.includes(pt))) {
+        noteParts.push(place.accessNote);
+      } else {
+        noteParts.splice(0, noteParts.length, place.accessNote);
+      }
+    }
+    if (noteParts.length > 0) setAccessNote(noteParts.join(' · '));
+    if (!clientId && !customClientName) {
+      setCustomClientName(place.name);
+    }
+    if (scope === 'WORKSHOP') {
+      setShowWorkshopMap(true);
+    }
+    setAiPlaceDetails({
+      openingHours: place.openingHours,
+      contactPhone: place.contactPhone,
+      contactName: place.contactName || place.name,
+      website: place.website,
+      accessNote: place.accessNote,
+      locationAddress: place.address,
+    });
+    setSavedPlaceFeedback(`Načteno uložené místo: „${place.name}“ (${place.address || 'včetně GPS polohy'}).`);
+  };
+
+  const handleDeleteSavedPlace = async (id: string, name: string) => {
+    if (!window.confirm(`Opravdu odebrat „${name}“ z častých míst?`)) return;
+    try {
+      const res = await fetch(`/api/work/saved-places?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.places)) {
+        setSavedPlaces(data.places);
+      }
+    } catch {
+      // Ignore
+    }
+  };
 
   // Pricing Model
   const [priceType, setPriceType] = useState<'HOURLY' | 'FIXED' | 'PIECE_RATE'>('HOURLY');
@@ -501,10 +628,22 @@ export function WorkOrderForm({
         )}
 
         {aiPlaceDetails && (
-          <div className="rounded-2xl bg-white/90 border border-sky-200 p-3 text-xs text-slate-700 shadow-2xs space-y-1.5">
-            <div className="font-bold text-sky-900 flex items-center gap-1.5">
-              <MapPin size={14} className="text-sky-600 shrink-0" />
-              <span>AI dohledala podrobnosti o provozovně / místě (automaticky propsáno do formuláře):</span>
+          <div className="rounded-2xl bg-white/90 border border-sky-200 p-3 text-xs text-slate-700 shadow-2xs space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="font-bold text-sky-900 flex items-center gap-1.5">
+                <MapPin size={14} className="text-sky-600 shrink-0" />
+                <span>AI dohledala podrobnosti o provozovně / místě (automaticky propsáno do formuláře):</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveCurrentPlace}
+                disabled={savingPlace}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2.5 py-1 text-[11px] font-bold text-amber-900 transition cursor-pointer disabled:opacity-50"
+                title="Uložit toto místo včetně adresy, GPS, telefonu a otevírací doby pro příští zakázky"
+              >
+                <Bookmark size={12} className="text-amber-600" />
+                <span>{savingPlace ? 'Ukládám…' : '⭐ Uložit mezi častá místa'}</span>
+              </button>
             </div>
             <div className="grid gap-1.5 sm:grid-cols-2 pt-0.5">
               {aiPlaceDetails.openingHours && (
@@ -550,6 +689,13 @@ export function WorkOrderForm({
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {savedPlaceFeedback && (
+          <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-900 flex items-center gap-2 font-medium">
+            <Bookmark size={14} className="text-amber-600 flex-shrink-0" />
+            <span>{savedPlaceFeedback}</span>
           </div>
         )}
       </div>
@@ -708,6 +854,46 @@ export function WorkOrderForm({
               </button>
             </div>
 
+            {savedPlaces.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[11px] font-bold text-slate-500 block">
+                  ⭐ Častá místa firmy (kliknutím vyplníte adresu, GPS i otevírací dobu):
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {savedPlaces.map((sp) => (
+                    <div
+                      key={sp.id}
+                      className="inline-flex items-center rounded-xl border border-amber-200 bg-amber-50/70 text-xs font-semibold text-slate-800 shadow-2xs overflow-hidden"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSelectSavedPlace(sp)}
+                        className="px-2.5 py-1 hover:bg-amber-100/80 transition flex items-center gap-1.5 text-left cursor-pointer"
+                        title={[sp.address, sp.openingHours ? `Otevírací doba: ${sp.openingHours}` : '', sp.contactPhone]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      >
+                        <span>📍 {sp.name}</span>
+                        {sp.openingHours && (
+                          <span className="text-[10px] font-medium text-amber-800 bg-amber-100 px-1.5 py-0.2 rounded-md">
+                            {sp.openingHours}
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSavedPlace(sp.id, sp.name)}
+                        className="px-1.5 py-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                        title="Odebrat z častých míst"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {showWorkshopMap && (
               <div className="pt-2 space-y-2">
                 <WorkOrderLocationPicker
@@ -719,9 +905,22 @@ export function WorkOrderForm({
                 />
                 <div className="grid gap-2.5 sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Adresa nebo poznámka k místu
-                    </label>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <label className="text-xs font-bold text-slate-700 block">
+                        Adresa nebo poznámka k místu
+                      </label>
+                      {(locationAddress.trim() || coords) && (
+                        <button
+                          type="button"
+                          onClick={handleSaveCurrentPlace}
+                          disabled={savingPlace}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-lg px-2 py-0.5 transition cursor-pointer"
+                        >
+                          <Bookmark size={11} />
+                          <span>{savingPlace ? 'Ukládám…' : '⭐ Uložit do častých míst'}</span>
+                        </button>
+                      )}
+                    </div>
                     <input
                       className="input w-full text-xs font-semibold"
                       placeholder="Např. Vyzvednutí materiálu v půjčovně..."
@@ -770,6 +969,46 @@ export function WorkOrderForm({
               </span>
             </div>
 
+            {savedPlaces.length > 0 && (
+              <div className="rounded-xl bg-white/80 border border-emerald-200/80 p-2.5 space-y-1.5">
+                <span className="text-[11px] font-bold text-emerald-950 block">
+                  ⭐ Častá / uložená místa firmy (kliknutím předvyplníte adresu, GPS, kontakt i otevírací dobu):
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {savedPlaces.map((sp) => (
+                    <div
+                      key={sp.id}
+                      className="inline-flex items-center rounded-xl border border-amber-200 bg-amber-50/80 text-xs font-semibold text-slate-800 shadow-2xs overflow-hidden"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSelectSavedPlace(sp)}
+                        className="px-2.5 py-1 hover:bg-amber-100 transition flex items-center gap-1.5 text-left cursor-pointer"
+                        title={[sp.address, sp.openingHours ? `Otevírací doba: ${sp.openingHours}` : '', sp.contactPhone]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      >
+                        <span>📍 {sp.name}</span>
+                        {sp.openingHours && (
+                          <span className="text-[10px] font-medium text-amber-900 bg-amber-100 px-1.5 py-0.2 rounded-md">
+                            {sp.openingHours}
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSavedPlace(sp.id, sp.name)}
+                        className="px-1.5 py-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                        title="Odebrat z častých míst"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Interactive Aerial/Satellite Location Picker Map */}
             <div className="space-y-1.5 pt-1">
               <label className="text-xs font-bold text-slate-700 block">
@@ -786,9 +1025,22 @@ export function WorkOrderForm({
 
             <div className="grid gap-3 sm:grid-cols-2 pt-1">
               <div className="sm:col-span-2">
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Adresa místa montáže / výjezdu (kam posádka jede)
-                </label>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+                  <label className="text-xs font-bold text-slate-700 block">
+                    Adresa místa montáže / výjezdu (kam posádka jede)
+                  </label>
+                  {(locationAddress.trim() || coords) && (
+                    <button
+                      type="button"
+                      onClick={handleSaveCurrentPlace}
+                      disabled={savingPlace}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-lg px-2.5 py-0.5 transition cursor-pointer"
+                    >
+                      <Bookmark size={11} className="text-amber-600" />
+                      <span>{savingPlace ? 'Ukládám…' : '⭐ Uložit toto místo mezi častá'}</span>
+                    </button>
+                  )}
+                </div>
                 <input
                   className="input w-full text-xs font-semibold"
                   placeholder="Např. Ostravská 51, Sviadnov nebo Nádražní 45, Ostrava"
@@ -796,7 +1048,7 @@ export function WorkOrderForm({
                   onChange={(e) => setLocationAddress(e.target.value)}
                 />
                 <p className="text-[11px] text-slate-500 mt-1">
-                  💡 Vyplní se automaticky z mapy, vyhledávání nebo AI zadání. Pokud přesnou adresu nemáte, stačí slovní popis – neblokuje vytvoření zakázky.
+                  💡 Vyplní se automaticky z mapy, vyhledávání, uložených míst nebo AI zadání. Pokud přesnou adresu nemáte, stačí slovní popis – neblokuje vytvoření zakázky.
                 </p>
               </div>
 
