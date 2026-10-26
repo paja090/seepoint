@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { logAIUsage } from '@/lib/ai-usage';
 import { getGeminiApiKey } from '@/lib/ai-gemini';
 import { enterTenantContext } from '@/lib/tenant-context';
+import { getOrganizationSavedPlaces } from '@/lib/saved-places-server';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 40;
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
       day: '2-digit',
     }).format(new Date());
 
-    const [employees, vehicles] = await Promise.all([
+    const [employees, vehicles, savedPlaces] = await Promise.all([
       prisma.employee.findMany({
         where: { organizationId, isActive: true },
         select: { id: true, firstName: true, lastName: true, position: true },
@@ -53,6 +54,7 @@ export async function POST(request: Request) {
         select: { id: true, name: true, registrationNumber: true, type: true },
         orderBy: { name: 'asc' },
       }),
+      getOrganizationSavedPlaces(organizationId),
     ]);
 
     const employeeListStr = employees
@@ -61,6 +63,15 @@ export async function POST(request: Request) {
 
     const vehicleListStr = vehicles
       .map((v) => `- ID: "${v.id}", Název: "${v.name}" (${v.type}, RZ: ${v.registrationNumber || 'bez RZ'})`)
+      .join('\n');
+
+    const savedPlacesStr = savedPlaces
+      .map(
+        (p) =>
+          `- Název: "${p.name}", Adresa: "${p.address}", GPS: [${p.latitude ?? 'null'}, ${p.longitude ?? 'null'}]${
+            p.openingHours ? `, Otevírací doba: "${p.openingHours}"` : ''
+          }${p.contactPhone ? `, Tel: "${p.contactPhone}"` : ''}`
+      )
       .join('\n');
 
     const apiKey = getGeminiApiKey();
@@ -105,6 +116,9 @@ ${employeeListStr || 'Žádní zaměstnanci'}
 
 DOSTUPNÁ VOZIDLA:
 ${vehicleListStr || 'Žádná vozidla'}
+
+ULOŽENÁ ČASTÁ MÍSTA FIRMY (pokud zadání odpovídá některému z těchto míst, použij jeho přesnou adresu, GPS, otevírací dobu a telefon):
+${savedPlacesStr || 'Zatím žádná uložená místa'}
 
 PRAVIDLA PRO PARSOVÁNÍ A VYHLEDÁNÍ FIREM / PROVOZOVEN (POI):
 1. Datum ("date"): Pokud text říká "dnes", použij ${nowInTz}. Pokud "zítra", použij datum zítřka (YYYY-MM-DD). Pokud zazní den v týdnu (např. "ve středu"), dopočítej nejbližší příští daný den. Formát: YYYY-MM-DD.

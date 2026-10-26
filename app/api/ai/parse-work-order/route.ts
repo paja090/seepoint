@@ -5,6 +5,7 @@ import { logAIUsage } from '@/lib/ai-usage';
 import { getGeminiApiKey } from '@/lib/ai-gemini';
 import { enterTenantContext } from '@/lib/tenant-context';
 import { DEFAULT_WORK_CATEGORIES } from '@/lib/work-categories';
+import { getOrganizationSavedPlaces } from '@/lib/saved-places-server';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 40;
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
       day: '2-digit',
     }).format(new Date());
 
-    const [employees, clients] = await Promise.all([
+    const [employees, clients, savedPlaces] = await Promise.all([
       prisma.employee.findMany({
         where: { organizationId, isActive: true },
         select: { id: true, firstName: true, lastName: true, position: true },
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
         orderBy: { name: 'asc' },
         take: 100,
       }),
+      getOrganizationSavedPlaces(organizationId),
     ]);
 
     const employeeListStr = employees
@@ -56,6 +58,15 @@ export async function POST(request: Request) {
       .join('\n');
 
     const clientListStr = clients.map((c) => `- "${c.name}" (ID: ${c.id})`).join('\n');
+
+    const savedPlacesStr = savedPlaces
+      .map(
+        (p) =>
+          `- Název: "${p.name}", Adresa: "${p.address}", GPS: [${p.latitude ?? 'null'}, ${p.longitude ?? 'null'}]${
+            p.openingHours ? `, Otevírací doba: "${p.openingHours}"` : ''
+          }${p.contactPhone ? `, Tel: "${p.contactPhone}"` : ''}${p.accessNote ? `, Poznámka: "${p.accessNote}"` : ''}`
+      )
+      .join('\n');
 
     const categoryListStr = DEFAULT_WORK_CATEGORIES.map(
       (c) => `- Klíč: "${c.key}", Název: "${c.label}", Typ práce: ${c.scope === 'WORKSHOP' ? 'DÍLNA / TISK (WORKSHOP)' : 'VÝJEZD / TERÉN (FIELD)'}`
@@ -82,6 +93,9 @@ ${employeeListStr || 'Žádní zaměstnanci'}
 
 DOSTUPNÍ KLIENTI:
 ${clientListStr || 'Žádní klienti'}
+
+ULOŽENÁ ČASTÁ MÍSTA A PROVOZOVNY FIRMY (pokud zadání odpovídá některému z těchto míst, přednostně použij jeho uloženou adresu, GPS, otevírací dobu a telefon):
+${savedPlacesStr || 'Zatím žádná uložená místa'}
 
 PRAVIDLA PRO VYPLNĚNÍ A ODHADY ČASU:
 1. "scope": Zda je to na firmě ("WORKSHOP" - tisk, laminace, DTP, řezaná grafika, kašírování, expedice) nebo výjezd ("FIELD" - polep výlohy, montáž banneru na fasádu, výlep, montáž tabulí u klienta, vyzvednutí plošiny či materiálu v terénu).
@@ -280,6 +294,50 @@ Vrať VÝHRADNĚ platný JSON objekt:
       );
       if (foundClient) {
         parsed.clientId = foundClient.id;
+      }
+    }
+
+    // Match saved places if prompt, clientName, or locationAddress references a saved frequent place
+    if (savedPlaces.length > 0) {
+      const normPrompt = stripDiacritics(prompt);
+      const normClient = parsed.clientName ? stripDiacritics(parsed.clientName) : '';
+      const normLoc = parsed.locationAddress ? stripDiacritics(parsed.locationAddress) : '';
+      const matchedPlace = savedPlaces.find((sp) => {
+        const normSpName = stripDiacritics(sp.name);
+        if (normSpName.length < 3) return false;
+        return (
+          normPrompt.includes(normSpName) ||
+          (normClient && (normClient.includes(normSpName) || normSpName.includes(normClient))) ||
+          (normLoc && normLoc.includes(normSpName))
+        );
+      });
+      if (matchedPlace) {
+        if (!parsed.locationAddress && matchedPlace.address) {
+          parsed.locationAddress = matchedPlace.address;
+        }
+        if (
+          (parsed.latitude === null || parsed.longitude === null) &&
+          typeof matchedPlace.latitude === 'number' &&
+          typeof matchedPlace.longitude === 'number'
+        ) {
+          parsed.latitude = matchedPlace.latitude;
+          parsed.longitude = matchedPlace.longitude;
+        }
+        if (!parsed.contactName && matchedPlace.contactName) {
+          parsed.contactName = matchedPlace.contactName;
+        }
+        if (!parsed.contactPhone && matchedPlace.contactPhone) {
+          parsed.contactPhone = matchedPlace.contactPhone;
+        }
+        if (!parsed.openingHours && matchedPlace.openingHours) {
+          parsed.openingHours = matchedPlace.openingHours;
+        }
+        if (!parsed.website && matchedPlace.website) {
+          parsed.website = matchedPlace.website;
+        }
+        if (!parsed.accessNote && matchedPlace.accessNote) {
+          parsed.accessNote = matchedPlace.accessNote;
+        }
       }
     }
 
