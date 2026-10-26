@@ -122,7 +122,7 @@ Text: "${pageContent.slice(0, 3000)}"`;
 
   if (effectiveGeminiKey) {
     const configuredOppModel = process.env.GEMINI_OPPORTUNITY_MODEL?.trim();
-    const models = configuredOppModel ? [configuredOppModel] : ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
+    const models = configuredOppModel ? [configuredOppModel] : ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.5-flash'];
     for (const model of models) {
       try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;

@@ -97,7 +97,7 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 8 až 12 nalezenými př�
   const configuredOppModel = process.env.GEMINI_OPPORTUNITY_MODEL?.trim();
   const models = configuredOppModel
     ? [configuredOppModel]
-    : ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
+    : ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.8-flash'];
 
   let jsonText = '';
   let failure = 'Gemini nevrátil použitelnou odpověď.';
