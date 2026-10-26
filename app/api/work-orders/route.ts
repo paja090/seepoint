@@ -105,6 +105,14 @@ export async function POST(request: Request) {
   const pdfUrl = text(input, 'pdfUrl');
   const scope = text(input, 'scope') === 'WORKSHOP' ? 'WORKSHOP' : 'FIELD';
 
+  const rawLat = input.latitude ?? (input.location as Record<string, unknown> | null)?.latitude;
+  const rawLng = input.longitude ?? (input.location as Record<string, unknown> | null)?.longitude;
+  const latitude = typeof rawLat === 'number' ? rawLat : (rawLat ? Number.parseFloat(String(rawLat)) : undefined);
+  const longitude = typeof rawLng === 'number' ? rawLng : (rawLng ? Number.parseFloat(String(rawLng)) : undefined);
+  const hasGps = typeof latitude === 'number' && Number.isFinite(latitude) && typeof longitude === 'number' && Number.isFinite(longitude);
+
+  const locationAddress = text(input, 'locationAddress') || text(input, 'locationNote');
+
   const order = await prisma.workOrder.create({
     data: {
       title,
@@ -122,9 +130,19 @@ export async function POST(request: Request) {
       requestedBy,
       contactName: text(input, 'contactName'),
       contactPhone: text(input, 'contactPhone'),
-      locationNote: text(input, 'locationNote'),
+      locationNote: text(input, 'locationNote') || locationAddress,
       estimatedHours,
-      planningConstraints: { scope },
+      planningConstraints: {
+        scope,
+        ...(hasGps
+          ? {
+              latitude,
+              longitude,
+              location: { latitude, longitude },
+              ...(locationAddress ? { locationAddress } : {}),
+            }
+          : {}),
+      },
       pdfUrl,
       mediaLabel: text(input, 'mediaLabel'),
       quantity,
