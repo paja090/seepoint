@@ -83,8 +83,11 @@ ${clientListStr || 'Žádní klienti'}
 PRAVIDLA PRO VYPLNĚNÍ A ODHADY ČASU:
 1. "scope": Zda je to na firmě ("WORKSHOP" - tisk, laminace, DTP, řezaná grafika, kašírování, expedice) nebo výjezd ("FIELD" - polep výlohy, montáž banneru na fasádu, výlep, montáž tabulí u klienta).
 2. "categoryKey": Vyber nejvhodnější klíč z dostupných kategorií (např. PRINT, DTP, MANUFACTURE, FIELD_WRAPPING, FIELD_INSTALL, BILLBOARD_POSTING, atd.).
-3. "title": Vytvoř výstižný, reprezentativní název zakázky (např. "Tisk 4× PVC banner 3×1 m – Kofola" nebo "Polep dodávky Ford Transit – Stavomat").
-4. "clientName" a "clientId": Pokud zadání zmiňuje klienta, spáruj s existujícím ID nebo uveď jeho název. Pokud jde o interní údržbu/práci pro vlastní firmu, nastav "isInternal": true.
+3. "title": Vytvoř výstižný, reprezentativní název zakázky (např. "Tisk 4× PVC banner 3×1 m – Kofola", "Polep dodávky Ford Transit – Stavomat", nebo při výjezdu do firmy/půjčovny např. "Vyzvednutí montážní plošiny – ČEVAS Sviadnov").
+4. "clientName" a "clientId":
+   - Pokud zadání zmiňuje existujícího klienta, spáruj s existujícím ID nebo uveď jeho název.
+   - Pokud jde o výjezd do konkrétní firmy, dodavatele či půjčovny (např. půjčovna plošin ČEVAS group s.r.o. ve Sviadnově), uveď její oficiální název v "clientName".
+   - Pokud jde o interní údržbu/práci pro vlastní firmu na dílně, nastav "isInternal": true.
 5. "scheduledAt": Datum a čas zahájení práce (formát YYYY-MM-DDTHH:mm, např. "2026-10-27T08:00"). "dnes" = ${nowInTz}, "zítra" = den po dnešku, dny v týdnu dopočítej k nejbližšímu datu. Výchozí ranní čas je 08:00.
 6. "deadlineAt": Termín dokončení (YYYY-MM-DDTHH:mm), pokud byl zmíněn, jinak null.
 7. "estimatedHours": ODHAD ČASU V HODINÁCH (např. "1.5", "2", "4"):
@@ -103,7 +106,11 @@ PRAVIDLA PRO VYPLNĚNÍ A ODHADY ČASU:
 8. "workerNames": Pole jmen pracovníků (přesně podle dostupných zaměstnanců), kteří byli v zadání zmíněni (např. ["Karel Novák"]).
 9. "priority": "LOW" | "NORMAL" | "HIGH" | "URGENT" (pokud je zmíněno "spěchá", "urgentní", "ihned" -> URGENT / HIGH, jinak NORMAL).
 10. "locationAddress", "latitude", "longitude":
-   - Pokud zadání zmiňuje jakékoliv místo výjezdu, firmu, prodejnu, stavebniny, půjčovnu, adresu nebo město (např. "zítra pojedu pro plošinu do sviadnova tam je půjčovna" nebo "polep výlohy v Ostravě"), vyhledej pomocí Google Search přesný název dané firmy / místa a jeho reálnou adresu ("locationAddress") a zjisti přibližné GPS souřadnice: "latitude" (číslo) a "longitude" (číslo).
+   - Pokud zadání zmiňuje jakékoliv místo výjezdu, firmu, prodejnu, stavebniny, půjčovnu nářadí/plošin, subdodavatele, adresu nebo město (např. "půjčovna ve Sviadnově", "zítra pojedu pro plošinu do sviadnova tam je půjčovna", "stavebniny DEK Ostrava"):
+     * VŽDY aktivně použij Google Search nástroj k dohledání KONKRÉTNÍ firmy / provozovny v dané lokalitě. Např. pro "půjčovna ve Sviadnově" nebo "plošina Sviadnov" vyhledej specializovanou firmu a půjčovnu techniky/plošin ve Sviadnově (např. ČEVAS group s.r.o., Ostravská 51, Sviadnov).
+     * Zjisti její oficiální název, přesnou ulici s číslem popisným/orientačním, obec a PSČ (např. "Ostravská 51, 739 25 Sviadnov"), a přesné GPS souřadnice: "latitude" (číslo) a "longitude" (číslo).
+     * NIKDY nevracej pouze obecný název obce nebo souřadnice středu obce, pokud v obci existuje konkrétní hledaná provozovna/firma!
+     * Uveď nalezenou firmu v "clientName" a také ji zahrň do "title" (např. "Vyzvednutí montážní plošiny – ČEVAS Sviadnov").
    - Pokud jde o interní práci na dílně bez výjezdu ("WORKSHOP" - tisk, laminace, balení) nebo žádné konkrétní místo nebylo zmíněno, nastav "locationAddress": "", "latitude": null, "longitude": null.
 11. "description": Jasné, stručné instrukce pro pracovníky, shrnující co a jak mají udělat.
 

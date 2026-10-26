@@ -75,6 +75,11 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
     const maxCap = p.vehicleCapacitySlots;
     const unloadMins = p.warehouseUnloadMinutes ?? 15;
     let reason = job.blockedReason || (!coordinates(job.location) ? 'Chybí jednoznačná GPS lokalizace.' : !Number.isFinite(service) || service <= 0 ? 'Chybí nakonfigurovaná délka práce.' : 'Práce se nevejde do dostupnosti, časového okna nebo požadavků posádky.');
+    const reqWorkers = job.constraints.requiredEmployeeIds ?? [];
+    if (!job.blockedReason && reqWorkers.length > 0 && !result.crews.some(c => reqWorkers.every(id => c.employeeIds.includes(id)))) {
+      const reqNames = reqWorkers.map(id => input.employees.find(e => e.id === id)?.name || id).join(', ');
+      reason = `Práce vyžaduje konkrétního pracovníka (${reqNames}), který není v žádné dostupné posádce na tento den.`;
+    }
     let best: { crew: PlannedCrew; incoming: TravelLeg; returning: TravelLeg; arrival: number; begin: number; finish: number; returnAt: number; score: number;
       delivery?: { incoming: TravelLeg; arrival: number; finish: number };
       pitstop?: { incoming: TravelLeg; arrival: number; finish: number; unloadedSlots: number; unloadedMedium: string | null; isMediaConflict: boolean } } | null = null;
@@ -87,14 +92,33 @@ export async function planFieldWork(input: PlanningInput, travel: TravelProvider
         reason = `Úkol vyžaduje ${jobLoad} slotů; vozidlo má ${capacity ?? 0}. Vyberte větší vozidlo nebo explicitně rozdělte množství na samostatné práce.`;
         continue;
       }
-      if (crew.employeeIds.length < (job.constraints.requiredWorkers ?? 1)) continue;
-      if ((job.constraints.requiredEquipment ?? []).some(e => !vehicle?.equipment?.includes(e))) continue;
+      if (crew.employeeIds.length < (job.constraints.requiredWorkers ?? 1)) {
+        reason = `Práce vyžaduje alespoň ${job.constraints.requiredWorkers} pracovníky v posádce.`;
+        continue;
+      }
+      if ((job.constraints.requiredEquipment ?? []).some(e => !vehicle?.equipment?.includes(e))) {
+        reason = 'Posádka nebo vozidlo nemá potřebné vybavení.';
+        continue;
+      }
       if (job.sourceType === 'NAVIGATION_POINT' && !input.employees.find(e => e.id === crew.employeeIds[0])?.userId) continue;
-      if (crew.stops.length >= p.maximumJobsPerRoute) continue;
-      if ((job.constraints.vehicleRequired ?? p.vehicleRequired) && !crew.vehicleId) continue;
-      if ((job.constraints.requiredEmployeeIds ?? []).some(id => !crew.employeeIds.includes(id))) continue;
+      if (crew.stops.length >= p.maximumJobsPerRoute) {
+        reason = `Posádka již dosáhla maximálního počtu zastávek (${p.maximumJobsPerRoute}).`;
+        continue;
+      }
+      if ((job.constraints.vehicleRequired ?? p.vehicleRequired) && !crew.vehicleId) {
+        reason = 'Práce vyžaduje vozidlo, které posádka nemá.';
+        continue;
+      }
+      if ((job.constraints.requiredEmployeeIds ?? []).some(id => !crew.employeeIds.includes(id))) {
+        const reqNames = (job.constraints.requiredEmployeeIds ?? []).map(id => input.employees.find(e => e.id === id)?.name || id).join(', ');
+        reason = `Práce vyžaduje konkrétního pracovníka (${reqNames}), který není v této posádce.`;
+        continue;
+      }
       const positions = crew.employeeIds.flatMap(id => input.employees.find(e => e.id === id)!.positions);
-      if ((job.constraints.requiredPositions ?? []).some(position => !positions.includes(position))) continue;
+      if ((job.constraints.requiredPositions ?? []).some(position => !positions.includes(position))) {
+        reason = `Práce vyžaduje kvalifikaci: ${(job.constraints.requiredPositions ?? []).join(', ')}.`;
+        continue;
+      }
       const previous = crew.stops.at(-1);
       const currentLoad = crewLoadSlots.get(crew.id) ?? 0;
       const currentMedium = crewLoadMediaType.get(crew.id) ?? null;

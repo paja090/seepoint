@@ -76,6 +76,13 @@ export async function PATCH(
       },
     });
 
+    if (status === 'IN_PROGRESS') {
+      await prisma.workTask.updateMany({
+        where: { workOrderId, status: { notIn: ['DONE', 'CANCELLED'] } },
+        data: { status: 'IN_PROGRESS' },
+      });
+    }
+
     if (status === 'DONE') {
       // Synchronize all items of this work order to DONE
       if (existing.items.length > 0) {
