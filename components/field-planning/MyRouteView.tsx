@@ -1170,7 +1170,7 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {!route.tripStartedAt && (
+                  {!route.tripStartedAt && !route.tripCompletedAt && (
                     <button
                       type="button"
                       disabled={!ready || busy}
@@ -1184,7 +1184,7 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
                       </span>
                     </button>
                   )}
-                  {route.tripStartedAt && !route.tripCompletedAt && (
+                  {!route.tripCompletedAt && (route.tripStartedAt || remainingCount === 0) && (
                     <button
                       type="button"
                       disabled={!ready || busy}

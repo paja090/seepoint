@@ -71,6 +71,7 @@ export async function loadPlanningData(date: string, options: {
     if (isDispatchIntake) return [];
 
     const constraints = parseConstraints(o.planningConstraints);
+    const explicitRequired = constraints.requiredEmployeeIds ? [...constraints.requiredEmployeeIds] : undefined;
     const assignedIds: string[] = [];
     let blockedReason: string | undefined;
     for (const a of o.navigationOrder || usesItemExecution(o.items) ? [] : o.assignments) {
@@ -78,8 +79,23 @@ export async function loadPlanningData(date: string, options: {
       if (matches.length !== 1) blockedReason = 'Původní přiřazení pracovníka není jednoznačné; opravte je v Plánu práce.';
       else assignedIds.push(matches[0].id);
     }
-    constraints.requiredEmployeeIds = [...new Set([...(constraints.requiredEmployeeIds ?? []), ...assignedIds])];
-    if (constraints.requiredEmployeeIds.some(id => !employees.some(e => e.id === id))) throw new Error('Cross-tenant Worker rejected.');
+    if (explicitRequired && explicitRequired.length > 0) {
+      constraints.requiredEmployeeIds = [...new Set(explicitRequired)];
+      const busyExplicit = explicitRequired.filter(id => busyEmployees.has(id));
+        const busyNames = busyExplicit
+          .map(id => {
+            const emp = employees.find(e => e.id === id);
+            return emp ? `${emp.firstName} ${emp.lastName}`.trim() : id;
+          })
+          .join(', ');
+        blockedReason = `Povinný pracovník (${busyNames}) již má na tento den schválený jiný výjezd.`;
+    } else {
+      // If no explicit hard requirement was configured in planning constraints,
+      // route to assigned workers only if they are not already committed to another approved plan on this day.
+      const availableAssigned = assignedIds.filter(id => !busyEmployees.has(id));
+      constraints.requiredEmployeeIds = availableAssigned.length > 0 ? [...new Set(availableAssigned)] : undefined;
+    }
+    if (constraints.requiredEmployeeIds && constraints.requiredEmployeeIds.some(id => !employees.some(e => e.id === id))) throw new Error('Cross-tenant Worker rejected.');
     const points = o.items.map(i => i.carrier).filter(c => c !== null);
     const distinct = new Map(points.filter(coordinates).map(c => [`${c.latitude},${c.longitude}`, { latitude: c.latitude!, longitude: c.longitude! }]));
 
