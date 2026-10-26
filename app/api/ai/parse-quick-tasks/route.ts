@@ -71,8 +71,16 @@ export async function POST(request: Request) {
       dueDate?: string;
     }> = [];
 
+    const todayInPrague = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Prague',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
     if (apiKey) {
       const systemPrompt = `Jsi inteligentní asistent pro rozdělování interních provozních úkolů na dílně a ve firmě.
+Dnešní datum v systému je: ${todayInPrague} (časová zóna Europe/Prague).
 Tvým HLAVNÍM ÚKOLEM je vzít volný mluvený text/záznam hlasu od vedoucího a ROZPADNOUT HO na jednotlivé samostatné úkoly (Check-list položky).
 
 PŘÍKLAD VSTUPU: "Pavel zítra ráno zamete halu u vrat a odpoledne skočí do Hornbachu pro barvu a ještě uklidí ponk u pily"
@@ -84,10 +92,11 @@ PŘÍKLAD VÝSTUPU: 3 samostatné úkoly:
 Seznam aktivních zaměstnanců ve firmě:
 ${employeeListStr}
 
-PRAVIDLA PRO ROZPOZNÁNÍ ZAMĚSTNANCE:
+PRAVIDLA PRO ROZPOZNÁNÍ ZAMĚSTNANCE A TERMÍNU:
 1. Pokud text obsahuje slovíčka jako "já", "pro mě", "sebe", "sám sobě", "naplánovat sobě", přiřaď úkol přihlášenému uživateli ID "${actorEmployee?.id}".
-2. Pokud v textu zazní jméno (např. Petr, Pavel, Milan), přiřaď úkol danému zaměstnanci.
+2. Pokud v textu zazní jméno (např. Petr, Pavel, Milan, nebo skloňované "Pavlovi", "s Petrem"), přiřaď úkol danému zaměstnanci. Pokud je v souvětí více různých jmen pro různé úkoly, přiřaď každý úkol správnému člověku.
 3. Pokud zaměstnanec z textu nevyplývá a nebylo specifikováno jméno, použij jako výchozího zaměstnance ID "${defaultAssigneeId || actorEmployee?.id}".
+4. Termín ("dueDate"): Pokud text zmiňuje "dnes", použij "${todayInPrague}". Pokud "zítra", použij zítřejší datum. Pokud den v týdnu (např. "v pátek"), spočítej nejbližší příští daný den od ${todayInPrague}. Jinak null.
 
 Vracíš POUZE platný JSON objekt ve tvaru:
 {
@@ -124,9 +133,19 @@ Vrať čisté JSON bez jakýchkoliv markdown backticků.`;
 
           if (response.ok) {
             const data = await response.json();
-            const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const parts = Array.isArray(data.candidates?.[0]?.content?.parts)
+              ? data.candidates[0].content.parts
+              : [];
+            const rawText = parts
+              .map((p: { text?: string }) => (typeof p?.text === 'string' ? p.text : ''))
+              .join('\n')
+              .trim();
             const cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-            const parsed = JSON.parse(cleanJson);
+            const firstBrace = cleanJson.indexOf('{');
+            const lastBrace = cleanJson.lastIndexOf('}');
+            const parsed = JSON.parse(
+              firstBrace !== -1 && lastBrace !== -1 ? cleanJson.slice(firstBrace, lastBrace + 1) : cleanJson
+            );
             if (Array.isArray(parsed.tasks) && parsed.tasks.length > 0) {
               parsedTasks = parsed.tasks;
               usedModel = modelName;
@@ -160,23 +179,28 @@ Vrať čisté JSON bez jakýchkoliv markdown backticků.`;
         .map((s) => s.trim())
         .filter((s) => s.length > 3);
 
-      let matchedEmp = defaultAssigneeId
+      const findEmployeeInText = (textSegment: string, fallbackEmp: typeof employees[number] | undefined) => {
+        const lower = textSegment.toLowerCase();
+        for (const emp of employees) {
+          const fullName = `${emp.firstName} ${emp.lastName}`.toLowerCase();
+          if (lower.includes(emp.firstName.toLowerCase()) || lower.includes(fullName)) {
+            return emp;
+          }
+        }
+        return fallbackEmp;
+      };
+
+      const defaultEmp = defaultAssigneeId
         ? employees.find((e) => e.id === defaultAssigneeId)
         : actorEmployee || employees[0];
-
-      for (const emp of employees) {
-        const fullName = `${emp.firstName} ${emp.lastName}`.toLowerCase();
-        if (prompt.toLowerCase().includes(emp.firstName.toLowerCase()) || prompt.toLowerCase().includes(fullName)) {
-          matchedEmp = emp;
-          break;
-        }
-      }
+      let currentEmp = findEmployeeInText(prompt, defaultEmp);
 
       if (splitPhrases.length > 1) {
         for (const phrase of splitPhrases) {
+          currentEmp = findEmployeeInText(phrase, currentEmp);
           parsedTasks.push({
             title: phrase.slice(0, 100),
-            assignedToEmployeeId: matchedEmp?.id,
+            assignedToEmployeeId: currentEmp?.id,
             priority: 'MEDIUM',
           });
         }
@@ -184,7 +208,7 @@ Vrať čisté JSON bez jakýchkoliv markdown backticků.`;
         parsedTasks.push({
           title: prompt.trim().slice(0, 100),
           description: prompt.length > 100 ? prompt.trim() : undefined,
-          assignedToEmployeeId: matchedEmp?.id,
+          assignedToEmployeeId: currentEmp?.id,
           priority: 'MEDIUM',
         });
       }

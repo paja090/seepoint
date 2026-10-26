@@ -55,6 +55,14 @@ export function WorkOrderForm({
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuccessMsg, setAiSuccessMsg] = useState<string | null>(null);
+  const [aiPlaceDetails, setAiPlaceDetails] = useState<{
+    openingHours?: string;
+    contactPhone?: string;
+    contactName?: string;
+    website?: string;
+    accessNote?: string;
+    locationAddress?: string;
+  } | null>(null);
 
   const voice = useQuickTaskVoice(true, (transcript) => {
     setAiPrompt((prev) => (prev ? `${prev} ${transcript}` : transcript));
@@ -66,6 +74,7 @@ export function WorkOrderForm({
     if (!p) return;
     setAiLoading(true);
     setAiSuccessMsg(null);
+    setAiPlaceDetails(null);
     setError('');
     try {
       const res = await fetch('/api/ai/parse-work-order', {
@@ -101,11 +110,55 @@ export function WorkOrderForm({
       if (Array.isArray(data.workerNames) && data.workerNames.length > 0) {
         setSelectedWorkers(data.workerNames);
       }
-      if (data.locationAddress) setLocationAddress(data.locationAddress);
+      if (data.locationAddress) {
+        setLocationAddress(data.locationAddress);
+        if (data.scope === 'WORKSHOP') setShowWorkshopMap(true);
+      }
       if (typeof data.latitude === 'number' && typeof data.longitude === 'number') {
         setCoords({ latitude: data.latitude, longitude: data.longitude });
+        if (data.scope === 'WORKSHOP') setShowWorkshopMap(true);
+      }
+      if (typeof data.contactName === 'string' && data.contactName.trim()) {
+        setContactName(data.contactName.trim());
+      }
+      if (typeof data.contactPhone === 'string' && data.contactPhone.trim()) {
+        setContactPhone(data.contactPhone.trim());
+      }
+      const noteParts: string[] = [];
+      if (typeof data.openingHours === 'string' && data.openingHours.trim()) {
+        noteParts.push(`Otevírací doba: ${data.openingHours.trim()}`);
+      }
+      if (typeof data.accessNote === 'string' && data.accessNote.trim()) {
+        if (!noteParts.some((pt) => data.accessNote.includes(pt))) {
+          noteParts.push(data.accessNote.trim());
+        } else {
+          noteParts.splice(0, noteParts.length, data.accessNote.trim());
+        }
+      }
+      if (noteParts.length > 0) {
+        setAccessNote(noteParts.join(' · '));
+      }
+      if (typeof data.quantity === 'number' && data.quantity > 0) {
+        setQuantity(String(data.quantity));
       }
       if (data.description) setDescription(data.description);
+
+      if (
+        data.openingHours ||
+        data.contactPhone ||
+        data.contactName ||
+        data.website ||
+        data.accessNote
+      ) {
+        setAiPlaceDetails({
+          openingHours: data.openingHours || undefined,
+          contactPhone: data.contactPhone || undefined,
+          contactName: data.contactName || undefined,
+          website: data.website || undefined,
+          accessNote: data.accessNote || undefined,
+          locationAddress: data.locationAddress || undefined,
+        });
+      }
 
       const locSummary = data.locationAddress || (data.latitude && data.longitude ? 'zadána v mapě' : '');
       setAiSuccessMsg(
@@ -446,6 +499,59 @@ export function WorkOrderForm({
             <span>{aiSuccessMsg}</span>
           </div>
         )}
+
+        {aiPlaceDetails && (
+          <div className="rounded-2xl bg-white/90 border border-sky-200 p-3 text-xs text-slate-700 shadow-2xs space-y-1.5">
+            <div className="font-bold text-sky-900 flex items-center gap-1.5">
+              <MapPin size={14} className="text-sky-600 shrink-0" />
+              <span>AI dohledala podrobnosti o provozovně / místě (automaticky propsáno do formuláře):</span>
+            </div>
+            <div className="grid gap-1.5 sm:grid-cols-2 pt-0.5">
+              {aiPlaceDetails.openingHours && (
+                <div className="flex items-start gap-1.5 bg-amber-50/80 border border-amber-200/80 rounded-xl px-2.5 py-1.5 text-amber-950">
+                  <span className="font-bold shrink-0">🕒 Otevírací doba:</span>
+                  <span className="font-semibold">{aiPlaceDetails.openingHours}</span>
+                </div>
+              )}
+              {aiPlaceDetails.contactPhone && (
+                <div className="flex items-start gap-1.5 bg-emerald-50/80 border border-emerald-200/80 rounded-xl px-2.5 py-1.5 text-emerald-950">
+                  <span className="font-bold shrink-0">📞 Telefon:</span>
+                  <a
+                    href={`tel:${aiPlaceDetails.contactPhone}`}
+                    className="font-semibold underline hover:text-emerald-700"
+                  >
+                    {aiPlaceDetails.contactPhone}
+                  </a>
+                </div>
+              )}
+              {aiPlaceDetails.contactName && (
+                <div className="flex items-start gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
+                  <span className="font-bold shrink-0">👤 Kontakt / provozovna:</span>
+                  <span>{aiPlaceDetails.contactName}</span>
+                </div>
+              )}
+              {aiPlaceDetails.website && (
+                <div className="flex items-start gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5">
+                  <span className="font-bold shrink-0">🌐 Web:</span>
+                  <a
+                    href={aiPlaceDetails.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sky-700 underline truncate hover:text-sky-900"
+                  >
+                    {aiPlaceDetails.website}
+                  </a>
+                </div>
+              )}
+              {aiPlaceDetails.accessNote && (
+                <div className="sm:col-span-2 flex items-start gap-1.5 bg-sky-50/60 border border-sky-200/60 rounded-xl px-2.5 py-1.5 text-slate-800">
+                  <span className="font-bold shrink-0">ℹ️ Poznámka pro posádku:</span>
+                  <span>{aiPlaceDetails.accessNote}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 1. TOP SEGMENTED CONTROL: WORKSHOP VS FIELD */}
@@ -611,16 +717,40 @@ export function WorkOrderForm({
                   onCoordsChange={(newCoords) => setCoords(newCoords)}
                   scope={scope}
                 />
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    Adresa nebo poznámka k místu
-                  </label>
-                  <input
-                    className="input w-full text-xs font-semibold"
-                    placeholder="Např. Vyzvednutí materiálu v půjčovně..."
-                    value={locationAddress}
-                    onChange={(e) => setLocationAddress(e.target.value)}
-                  />
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Adresa nebo poznámka k místu
+                    </label>
+                    <input
+                      className="input w-full text-xs font-semibold"
+                      placeholder="Např. Vyzvednutí materiálu v půjčovně..."
+                      value={locationAddress}
+                      onChange={(e) => setLocationAddress(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Telefon / Kontakt na místě
+                    </label>
+                    <input
+                      className="input w-full text-xs font-medium"
+                      placeholder="+420..."
+                      value={contactPhone}
+                      onChange={(e) => setContactPhone(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Otevírací doba / Přístupová poznámka
+                    </label>
+                    <input
+                      className="input w-full text-xs font-medium"
+                      placeholder="Např. Po–Pá 6:30–16:00"
+                      value={accessNote}
+                      onChange={(e) => setAccessNote(e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
             )}
