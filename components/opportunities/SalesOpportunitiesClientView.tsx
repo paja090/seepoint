@@ -7,6 +7,7 @@ import { OpportunityCard, OpportunityItem } from './OpportunityCard';
 import { ManualOpportunityModal } from './ManualOpportunityModal';
 import { RadarDuplicateReview } from './RadarDuplicateReview';
 import { RadarSettingsModal } from './RadarSettingsModal';
+import { AiCrmRetentionBar } from './AiCrmRetentionBar';
 import { AiOfferGeneratorModal, ClientOption } from '@/components/offers/AiOfferGeneratorModal';
 import { RefreshCw, Radar } from 'lucide-react';
 
@@ -209,6 +210,21 @@ export function SalesOpportunitiesClientView({
           {feedback.message}
         </div>
       ) : null}
+
+      {/* AI Obchodník — Péče o stávající klienty v CRM */}
+      <AiCrmRetentionBar
+        onPrepareOffer={(tip) => {
+          setCopilotPreFill({
+            clientId: tip.clientId || undefined,
+            clientName: tip.clientName,
+            city: tip.city || undefined,
+            prompt: `${tip.headline}. ${tip.reason}`,
+            targetName: tip.clientName,
+            isNoPriceConcept: false,
+          });
+          setCopilotModalOpen(true);
+        }}
+      />
 
       {/* Filter Bar */}
       <OpportunityFiltersBar

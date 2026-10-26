@@ -2,9 +2,53 @@
 
 import { useState } from 'react';
 import { OpportunitySources } from './OpportunitySources';
-import { ExternalLink, MapPin, Calendar, Building2, Sparkles, UserCheck, Ban, ChevronDown, Check, ShieldCheck, BrainCircuit, Compass, Layers } from 'lucide-react';
+import {
+  ExternalLink,
+  MapPin,
+  Calendar,
+  Building2,
+  Sparkles,
+  UserCheck,
+  Ban,
+  ChevronDown,
+  Check,
+  ShieldCheck,
+  BrainCircuit,
+  Compass,
+  Layers,
+  Phone,
+  Mail,
+  Send,
+  Copy,
+  Loader2,
+  Bot,
+  Hammer,
+} from 'lucide-react';
 import type { OpportunityEventType, OpportunityStatus } from '@prisma/client';
 import type { OpportunityScoreReason } from '@/lib/opportunities/types';
+
+type AiSalesPitchData = {
+  contactName: string;
+  contactRole: string;
+  contactEmail: string;
+  contactPhone: string;
+  companyId: string;
+  dic: string;
+  website: string;
+  salesAngle: string;
+  recommendedProduction: string[];
+  emailSubject: string;
+  emailBody: string;
+  callScript: string[];
+  nearbyCarriers: Array<{
+    id: string;
+    code: string;
+    name: string;
+    type: string;
+    city: string;
+    distanceKm?: number;
+  }>;
+};
 
 export type OpportunityItem = {
   id: string;
@@ -119,6 +163,79 @@ export function OpportunityCard({
   onUpdateStatus: (id: string, status: OpportunityStatus, dismissedReason?: string) => void;
 }) {
   const [showReasons, setShowReasons] = useState(false);
+  const [salesPitch, setSalesPitch] = useState<AiSalesPitchData | null>(null);
+  const [pitchOpen, setPitchOpen] = useState(false);
+  const [pitchLoading, setPitchLoading] = useState(false);
+  const [pitchActionBusy, setPitchActionBusy] = useState(false);
+  const [pitchFeedback, setPitchFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const handleGenerateSalesPitch = async () => {
+    setPitchOpen(true);
+    setPitchLoading(true);
+    setPitchFeedback(null);
+    try {
+      const res = await fetch(`/api/sales/opportunities/${item.id}/ai-pitch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.pitch) {
+        throw new Error(data.error || 'AI Obchodníkovi se nepodařilo dohledat podklady.');
+      }
+      setSalesPitch(data.pitch);
+    } catch (err) {
+      setPitchFeedback({
+        ok: false,
+        text: err instanceof Error ? err.message : 'Chyba při přípravě oslovení.',
+      });
+    } finally {
+      setPitchLoading(false);
+    }
+  };
+
+  const handleExecutePitchAction = async (action: 'save_to_crm' | 'send_email' | 'log_call') => {
+    if (!salesPitch) return;
+    setPitchActionBusy(true);
+    setPitchFeedback(null);
+    try {
+      const res = await fetch(`/api/sales/opportunities/${item.id}/ai-pitch`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          contactName: salesPitch.contactName,
+          contactRole: salesPitch.contactRole,
+          contactEmail: salesPitch.contactEmail,
+          contactPhone: salesPitch.contactPhone,
+          companyId: salesPitch.companyId,
+          dic: salesPitch.dic,
+          website: salesPitch.website,
+          emailSubject: salesPitch.emailSubject,
+          emailBody: salesPitch.emailBody,
+          callNotes: salesPitch.callScript.join('\n'),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Akce selhala.');
+
+      const msg =
+        action === 'send_email'
+          ? `E-mail byl odeslán na ${salesPitch.contactEmail}, kontakt uložen do CRM a příležitost označena jako Kontaktováno.`
+          : action === 'log_call'
+          ? 'Telefonát byl zapsán do historie komunikace v CRM a příležitost označena jako Kontaktováno.'
+          : 'Dohledaný kontakt, IČO a web byly uloženy do CRM.';
+
+      setPitchFeedback({ ok: true, text: msg });
+      onChanged();
+    } catch (err) {
+      setPitchFeedback({
+        ok: false,
+        text: err instanceof Error ? err.message : 'Nepodařilo se provést akci.',
+      });
+    } finally {
+      setPitchActionBusy(false);
+    }
+  };
 
   const scoreBadge = getScoreBadge(item.opportunityScore);
   const eventMeta = eventTypeLabels[item.eventType] || eventTypeLabels.OTHER;
@@ -366,11 +483,43 @@ export function OpportunityCard({
       {/* Action Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800">
         <div className="flex flex-wrap items-center gap-2">
-          {/* Main Action: Prepare Campaign Concept */}
+          {/* Primary AI Sales Rep Action */}
+          <button
+            type="button"
+            onClick={() => {
+              if (salesPitch) {
+                setPitchOpen((prev) => !prev);
+              } else {
+                void handleGenerateSalesPitch();
+              }
+            }}
+            disabled={pitchLoading}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md transition disabled:opacity-60 cursor-pointer"
+          >
+            {pitchLoading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>AI Obchodník hledá kontakt & nosiče…</span>
+              </>
+            ) : (
+              <>
+                <Bot className="w-4 h-4" />
+                <span>
+                  {salesPitch
+                    ? pitchOpen
+                      ? 'Skrýt AI Obchodníka'
+                      : 'Otevřít AI Obchodníka (kontakt & e-mail)'
+                    : 'AI Obchodník: Dohledat kontakt & oslovit'}
+                </span>
+              </>
+            )}
+          </button>
+
+          {/* Secondary Action: Prepare Campaign Concept */}
           <button
             type="button"
             onClick={() => onPrepareProposal(item)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Připravit návrh kampaně</span>
@@ -392,7 +541,7 @@ export function OpportunityCard({
             <button
               type="button"
               onClick={() => onLinkCrm(item)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition cursor-pointer"
             >
               <Building2 className="w-3.5 h-3.5" />
               <span>Přidat / propojit s CRM</span>
@@ -404,7 +553,7 @@ export function OpportunityCard({
             <button
               type="button"
               onClick={() => onUpdateStatus(item.id, 'CONTACTED')}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 transition cursor-pointer"
             >
               <UserCheck className="w-3.5 h-3.5 text-sky-400" />
               <span>Označit jako kontaktováno</span>
@@ -417,13 +566,373 @@ export function OpportunityCard({
           <button
             type="button"
             onClick={() => onUpdateStatus(item.id, 'DISMISSED', 'Není v současné době relevantní')}
-            className="inline-flex items-center gap-1 text-slate-500 hover:text-rose-400 text-xs font-medium px-2 py-1 transition"
+            className="inline-flex items-center gap-1 text-slate-500 hover:text-rose-400 text-xs font-medium px-2 py-1 transition cursor-pointer"
           >
             <Ban className="w-3.5 h-3.5" />
             <span>Ignorovat</span>
           </button>
         ) : null}
       </div>
+
+      {/* AI OBCHODNÍK COCKPIT PANEL */}
+      {pitchOpen && (
+        <div className="rounded-2xl border border-emerald-700/60 bg-slate-950/95 p-4 space-y-4 shadow-xl">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-2 text-emerald-300 font-black text-sm">
+              <Bot className="w-5 h-5 text-emerald-400" />
+              <span>AI Obchodník — Kompletní příprava oslovení ({item.companyName})</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleGenerateSalesPitch}
+                disabled={pitchLoading}
+                className="text-xs font-bold text-slate-400 hover:text-emerald-300 underline cursor-pointer disabled:opacity-50"
+              >
+                {pitchLoading ? 'Obnovuji…' : '🔄 Znovu dohledat a přegenerovat'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPitchOpen(false)}
+                className="text-xs font-bold text-slate-400 hover:text-white px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 cursor-pointer"
+              >
+                Zavřít
+              </button>
+            </div>
+          </div>
+
+          {pitchLoading && !salesPitch && (
+            <div className="py-8 text-center space-y-2 text-slate-300 text-xs">
+              <Loader2 className="w-6 h-6 animate-spin text-emerald-400 mx-auto" />
+              <p className="font-bold text-sm text-emerald-300">
+                AI Obchodník prohledává web firmy, rejstřík ARES a vaše volné nosiče v okolí…
+              </p>
+              <p className="text-slate-400">
+                Dohledávám kontaktní osobu, telefon, e-mail a sestavuji nabídku na míru.
+              </p>
+            </div>
+          )}
+
+          {pitchFeedback && (
+            <div
+              className={`rounded-xl p-3 text-xs font-semibold border ${
+                pitchFeedback.ok
+                  ? 'bg-emerald-950/80 border-emerald-700 text-emerald-200'
+                  : 'bg-rose-950/80 border-rose-700 text-rose-200'
+              }`}
+            >
+              {pitchFeedback.text}
+            </div>
+          )}
+
+          {salesPitch && (
+            <div className="space-y-4">
+              {/* 1. Obchodní argument */}
+              {salesPitch.salesAngle && (
+                <div className="rounded-xl bg-emerald-950/40 border border-emerald-800/60 p-3 text-xs text-emerald-200">
+                  <span className="font-extrabold text-emerald-300 block mb-0.5">
+                    🎯 Proč teď nakoupí (hlavní obchodní argument):
+                  </span>
+                  <span>{salesPitch.salesAngle}</span>
+                </div>
+              )}
+
+              {/* 2. Dohledané kontakty a IČO (editovatelné) */}
+              <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3.5 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-extrabold text-sky-300 uppercase tracking-wider">
+                    👤 Dohledaný kontakt & údaje firmy (můžete upravit před uložením)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleExecutePitchAction('save_to_crm')}
+                    disabled={pitchActionBusy}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2.5 py-1 text-[11px] font-bold text-sky-300 transition cursor-pointer disabled:opacity-50"
+                  >
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span>💾 Uložit kontakt a firmu do CRM</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                      Jméno kontaktu / oddělení
+                    </label>
+                    <input
+                      className="w-full rounded-lg bg-slate-950 border border-slate-800 px-2.5 py-1.5 text-xs text-white font-semibold"
+                      value={salesPitch.contactName}
+                      onChange={(e) =>
+                        setSalesPitch({ ...salesPitch, contactName: e.target.value })
+                      }
+                      placeholder="Např. Ing. Jan Novák"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                      Role / Pozice
+                    </label>
+                    <input
+                      className="w-full rounded-lg bg-slate-950 border border-slate-800 px-2.5 py-1.5 text-xs text-white"
+                      value={salesPitch.contactRole}
+                      onChange={(e) =>
+                        setSalesPitch({ ...salesPitch, contactRole: e.target.value })
+                      }
+                      placeholder="Jednatel / Marketing"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                      IČO firmy
+                    </label>
+                    <input
+                      className="w-full rounded-lg bg-slate-950 border border-slate-800 px-2.5 py-1.5 text-xs text-white font-mono"
+                      value={salesPitch.companyId}
+                      onChange={(e) =>
+                        setSalesPitch({ ...salesPitch, companyId: e.target.value })
+                      }
+                      placeholder="8místné IČO"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                      E-mail příjemce
+                    </label>
+                    <input
+                      type="email"
+                      className="w-full rounded-lg bg-slate-950 border border-slate-800 px-2.5 py-1.5 text-xs text-emerald-300 font-semibold"
+                      value={salesPitch.contactEmail}
+                      onChange={(e) =>
+                        setSalesPitch({ ...salesPitch, contactEmail: e.target.value })
+                      }
+                      placeholder="email@firma.cz"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                      Telefon
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        className="w-full rounded-lg bg-slate-950 border border-slate-800 px-2.5 py-1.5 text-xs text-amber-300 font-semibold"
+                        value={salesPitch.contactPhone}
+                        onChange={(e) =>
+                          setSalesPitch({ ...salesPitch, contactPhone: e.target.value })
+                        }
+                        placeholder="+420 ..."
+                      />
+                      {salesPitch.contactPhone && (
+                        <a
+                          href={`tel:${salesPitch.contactPhone}`}
+                          className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-white px-2.5 py-1.5 text-xs font-bold transition"
+                          title="Zavolat na toto číslo"
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                          <span>Volat</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                      Web společnosti
+                    </label>
+                    <input
+                      className="w-full rounded-lg bg-slate-950 border border-slate-800 px-2.5 py-1.5 text-xs text-sky-300"
+                      value={salesPitch.website}
+                      onChange={(e) =>
+                        setSalesPitch({ ...salesPitch, website: e.target.value })
+                      }
+                      placeholder="https://..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Nalezené nosiče v okolí + Doporučená výroba */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3 space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-extrabold text-purple-300">
+                    <MapPin className="w-4 h-4 text-purple-400" />
+                    <span>Naše nosiče v okolí ({salesPitch.nearbyCarriers.length}):</span>
+                  </div>
+                  {salesPitch.nearbyCarriers.length > 0 ? (
+                    <ul className="space-y-1 text-xs text-slate-300">
+                      {salesPitch.nearbyCarriers.map((c) => (
+                        <li key={c.id} className="flex items-center justify-between gap-2">
+                          <span className="truncate">
+                            <strong className="text-white">{c.code}</strong> · {c.name} ({c.city})
+                          </span>
+                          {c.distanceKm !== undefined && (
+                            <span className="shrink-0 text-[11px] font-bold text-emerald-400">
+                              {c.distanceKm} km
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-slate-400">
+                      V bezprostředním okolí nebyly nalezeny přesné GPS souřadnice nosičů – nabídněte regionální síť nebo navigační systém.
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3 space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-extrabold text-amber-300">
+                    <Hammer className="w-4 h-4 text-amber-400" />
+                    <span>Doporučená výroba a montáž na klíč:</span>
+                  </div>
+                  {salesPitch.recommendedProduction.length > 0 ? (
+                    <ul className="space-y-1 text-xs text-slate-200">
+                      {salesPitch.recommendedProduction.map((prod, idx) => (
+                        <li key={idx} className="flex items-start gap-1.5">
+                          <span className="text-amber-400 font-bold">•</span>
+                          <span>{prod}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-slate-400">
+                      Polepy výloh, výroba světelné reklamy a tisk velkoformátových plachet.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* 4. Tahák do telefonu */}
+              {salesPitch.callScript.length > 0 && (
+                <div className="rounded-xl border border-amber-800/50 bg-amber-950/20 p-3.5 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-xs font-extrabold text-amber-300">
+                      <Phone className="w-4 h-4 text-amber-400" />
+                      <span>📞 Tahák na 30vteřinový telefonát:</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleExecutePitchAction('log_call')}
+                      disabled={pitchActionBusy}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600/90 hover:bg-amber-500 text-white px-3 py-1 text-[11px] font-bold transition cursor-pointer disabled:opacity-50"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Zavoláno – zapsat hovor do CRM & označit Kontaktováno</span>
+                    </button>
+                  </div>
+                  <ul className="space-y-1.5 text-xs text-amber-100/90">
+                    {salesPitch.callScript.map((line, i) => (
+                      <li key={i} className="leading-relaxed">
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* 5. Připravený e-mail k okamžitému odeslání */}
+              <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-3.5 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-xs font-extrabold text-emerald-300">
+                    <Mail className="w-4 h-4 text-emerald-400" />
+                    <span>✉️ Připravený osobní e-mail (můžete libovolně upravit):</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `${salesPitch.emailSubject}\n\n${salesPitch.emailBody}`
+                        );
+                        setPitchFeedback({
+                          ok: true,
+                          text: 'Předmět i text e-mailu byly zkopírovány do schránky.',
+                        });
+                      }}
+                      className="inline-flex items-center gap-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2.5 py-1 text-[11px] font-bold text-slate-200 transition cursor-pointer"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>Kopírovat text</span>
+                    </button>
+                    {salesPitch.contactEmail && (
+                      <a
+                        href={`mailto:${encodeURIComponent(
+                          salesPitch.contactEmail
+                        )}?subject=${encodeURIComponent(
+                          salesPitch.emailSubject
+                        )}&body=${encodeURIComponent(salesPitch.emailBody)}`}
+                        className="inline-flex items-center gap-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2.5 py-1 text-[11px] font-bold text-sky-300 transition"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>Otevřít v poště</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                      Předmět e-mailu
+                    </label>
+                    <input
+                      className="w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-1.5 text-xs font-bold text-white"
+                      value={salesPitch.emailSubject}
+                      onChange={(e) =>
+                        setSalesPitch({ ...salesPitch, emailSubject: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                      Text e-mailu
+                    </label>
+                    <textarea
+                      rows={7}
+                      className="w-full rounded-lg bg-slate-950 border border-slate-800 p-3 text-xs text-slate-100 leading-relaxed font-medium"
+                      value={salesPitch.emailBody}
+                      onChange={(e) =>
+                        setSalesPitch({ ...salesPitch, emailBody: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleExecutePitchAction('send_email')}
+                    disabled={pitchActionBusy || !salesPitch.contactEmail.trim()}
+                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 text-xs font-extrabold shadow-md transition cursor-pointer disabled:opacity-50"
+                  >
+                    {pitchActionBusy ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Odesílám a ukládám do CRM…</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>
+                          Odeslat e-mail ze SeePOINTu & uložit do CRM
+                          {salesPitch.contactEmail ? ` (${salesPitch.contactEmail})` : ''}
+                        </span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onPrepareProposal(item)}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-purple-950/80 hover:bg-purple-900 border border-purple-700/70 text-purple-200 px-3.5 py-2 text-xs font-bold transition cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Vytvořit k tomu vizuální nabídku s mapou</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </article>
   );
 }
