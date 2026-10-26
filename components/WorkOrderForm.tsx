@@ -1,10 +1,12 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { FormEvent, useState, useRef } from 'react';
+import { FormEvent, useState } from 'react';
 import { agencyWorkCategories, workPriorityLabels, type WorkScope } from '@/lib/work';
 import type { WorkCategory } from '@/lib/work-categories';
+import { useQuickTaskVoice } from '@/components/tasks/useQuickTaskVoice';
 import {
+  AlertCircle,
   CheckCircle2,
   ShieldAlert,
   Sparkles,
@@ -14,30 +16,12 @@ import {
   Hammer,
   Car,
   Mic,
-  MicOff,
   Loader2,
 } from 'lucide-react';
 
 type Option = { id: string; label: string };
 type CarrierOption = Option & { code: string };
 type EmployeeOption = { id: string; name: string };
-
-type BrowserSpeechRecognition = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onstart: (() => void) | null;
-  onresult: ((event: { results?: Array<Array<{ transcript?: string }>> }) => void) | null;
-  onerror: (() => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-};
-
-type WindowWithSpeech = Window & {
-  SpeechRecognition?: new () => BrowserSpeechRecognition;
-  webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
-};
 
 type WorkOrderFormProps = {
   clients: Option[];
@@ -69,49 +53,12 @@ export function WorkOrderForm({
   // AI Assistant State
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [aiSuccessMsg, setAiSuccessMsg] = useState<string | null>(null);
-  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
 
-  const toggleRecording = () => {
-    if (isRecording) {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch {}
-      }
-      setIsRecording(false);
-      return;
-    }
-    const SpeechRecognition =
-      typeof window !== 'undefined'
-        ? (window as unknown as WindowWithSpeech).SpeechRecognition ||
-          (window as unknown as WindowWithSpeech).webkitSpeechRecognition
-        : null;
-    if (!SpeechRecognition) {
-      alert('Váš prohlížeč nepodporuje přímé diktování hlasem v tomto okně. Napište prosím zadání do textového pole.');
-      return;
-    }
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'cs-CZ';
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.onstart = () => setIsRecording(true);
-      recognition.onresult = (event) => {
-        const transcript = event.results?.[0]?.[0]?.transcript;
-        if (transcript) {
-          setAiPrompt((prev) => (prev ? `${prev} ${transcript}` : transcript));
-        }
-      };
-      recognition.onerror = () => setIsRecording(false);
-      recognition.onend = () => setIsRecording(false);
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch {
-      setIsRecording(false);
-    }
-  };
+  const voice = useQuickTaskVoice(true, (transcript) => {
+    setAiPrompt((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    setAiSuccessMsg(null);
+  });
 
   const handleAiParse = async () => {
     const p = aiPrompt.trim();
@@ -412,22 +359,50 @@ export function WorkOrderForm({
             />
             <button
               type="button"
-              onClick={toggleRecording}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-xl transition-colors ${
-                isRecording
+              onClick={() => {
+                if (voice.state === 'recording') {
+                  voice.stop();
+                } else {
+                  voice.start();
+                }
+              }}
+              disabled={voice.state === 'transcribing' || aiLoading}
+              className={`absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors text-xs font-semibold ${
+                voice.state === 'recording'
                   ? 'bg-red-500 text-white animate-pulse'
-                  : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                  : voice.state === 'transcribing'
+                  ? 'bg-amber-100 text-amber-800'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
               }`}
-              title={isRecording ? 'Zastavit nahrávání' : 'Diktovat hlasem (česky)'}
+              title={
+                voice.state === 'recording'
+                  ? 'Klikněte pro zastavení nahrávání a přepis'
+                  : 'Diktovat hlasem (přepis přes Gemini AI)'
+              }
             >
-              {isRecording ? <MicOff size={16} /> : <Mic size={16} />}
+              {voice.state === 'recording' ? (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                  <span>{voice.seconds}s (Hotovo)</span>
+                </>
+              ) : voice.state === 'transcribing' ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Přepisuji…</span>
+                </>
+              ) : (
+                <>
+                  <Mic size={16} />
+                  <span className="hidden sm:inline">Diktovat</span>
+                </>
+              )}
             </button>
           </div>
 
           <button
             type="button"
             onClick={handleAiParse}
-            disabled={aiLoading || !aiPrompt.trim()}
+            disabled={aiLoading || !aiPrompt.trim() || voice.busy}
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-sky-600 px-5 py-2.5 font-bold text-xs sm:text-sm text-white shadow-sm transition hover:bg-sky-500 disabled:opacity-50"
           >
             {aiLoading ? (
@@ -443,6 +418,13 @@ export function WorkOrderForm({
             )}
           </button>
         </div>
+
+        {voice.error && (
+          <div className="rounded-xl bg-red-50 border border-red-200 p-2.5 text-xs text-red-700 flex items-center gap-2 font-medium">
+            <AlertCircle size={14} className="text-red-500 flex-shrink-0" />
+            <span>{voice.error}</span>
+          </div>
+        )}
 
         {aiSuccessMsg && (
           <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-2.5 text-xs text-emerald-800 flex items-center gap-2 font-medium">

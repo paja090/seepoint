@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   let organizationId: string | null = null;
   let userId: string | null = null;
   try {
-    const actor = await requireApiAccess('myTasks', 'myTasks');
+    const actor = await requireApiAccess(['myTasks', 'work']);
     if (isApiDenied(actor)) return actor;
     organizationId = actor.organizationId;
     userId = actor.id;

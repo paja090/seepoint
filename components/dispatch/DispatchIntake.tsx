@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuickTaskVoice } from '@/components/tasks/useQuickTaskVoice';
 import { LocationPickerMap } from '@/components/election-removal/LocationPickerMap';
 import { type ElectionRemovalMediaType } from '@/lib/election-removal/constants';
 import { dispositions, type Operation, type Disposition, operations } from '@/lib/election-removal/task-spec';
@@ -20,7 +21,6 @@ import {
   Sparkles,
   Wand2,
   Mic,
-  MicOff,
   CheckCircle2,
 } from 'lucide-react';
 
@@ -156,8 +156,11 @@ export function DispatchIntake({
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuccessMsg, setAiSuccessMsg] = useState<string | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const recognitionRef = useRef<{ stop: () => void } | null>(null);
+
+  const voice = useQuickTaskVoice(true, (transcript) => {
+    setAiPrompt((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    setAiSuccessMsg(null);
+  });
 
   // Stops list
   const [stops, setStops] = useState<StopEntry[]>([createEmptyStop(1)]);
@@ -166,61 +169,6 @@ export function DispatchIntake({
   const [requestKey] = useState(() => crypto.randomUUID());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-
-  const toggleRecording = () => {
-    if (isRecording) {
-      try {
-        recognitionRef.current?.stop();
-      } catch {
-        // ignore
-      }
-      setIsRecording(false);
-      return;
-    }
-    type SpeechRecog = {
-      lang: string;
-      continuous: boolean;
-      interimResults: boolean;
-      onstart: (() => void) | null;
-      onresult: ((event: { results?: Array<Array<{ transcript?: string }>> }) => void) | null;
-      onerror: (() => void) | null;
-      onend: (() => void) | null;
-      start: () => void;
-      stop: () => void;
-    };
-    type WindowWithSpeechRecog = Window & {
-      SpeechRecognition?: new () => SpeechRecog;
-      webkitSpeechRecognition?: new () => SpeechRecog;
-    };
-    const SpeechRecognition =
-      typeof window !== 'undefined'
-        ? (window as unknown as WindowWithSpeechRecog).SpeechRecognition ||
-          (window as unknown as WindowWithSpeechRecog).webkitSpeechRecognition
-        : null;
-    if (!SpeechRecognition) {
-      alert('Váš prohlížeč nepodporuje přímé diktování hlasem v tomto okně. Napište prosím zadání do textového pole.');
-      return;
-    }
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'cs-CZ';
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.onstart = () => setIsRecording(true);
-      recognition.onresult = (event) => {
-        const transcript = event.results?.[0]?.[0]?.transcript;
-        if (transcript) {
-          setAiPrompt((prev) => (prev ? `${prev} ${transcript}` : transcript));
-        }
-      };
-      recognition.onerror = () => setIsRecording(false);
-      recognition.onend = () => setIsRecording(false);
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch {
-      setIsRecording(false);
-    }
-  };
 
   const handleAiParse = async () => {
     const p = aiPrompt.trim();
@@ -493,25 +441,55 @@ export function DispatchIntake({
               />
               <button
                 type="button"
-                onClick={toggleRecording}
-                className={`absolute right-2 top-2 p-1 rounded-lg transition ${
-                  isRecording ? 'bg-rose-500 text-white animate-pulse' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                onClick={() => {
+                  if (voice.state === 'recording') {
+                    voice.stop();
+                  } else {
+                    voice.start();
+                  }
+                }}
+                disabled={voice.state === 'transcribing' || aiLoading}
+                className={`absolute right-2 top-1.5 px-2 py-1 rounded-lg flex items-center gap-1 text-xs font-semibold transition ${
+                  voice.state === 'recording'
+                    ? 'bg-rose-500 text-white animate-pulse'
+                    : voice.state === 'transcribing'
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
                 }`}
-                title={isRecording ? 'Zastavit nahrávání' : 'Diktovat hlasem'}
+                title={
+                  voice.state === 'recording'
+                    ? 'Klikněte pro zastavení nahrávání a přepis'
+                    : 'Diktovat hlasem (přepis přes Gemini AI)'
+                }
               >
-                {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                {voice.state === 'recording' ? (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                    <span>{voice.seconds}s</span>
+                  </>
+                ) : voice.state === 'transcribing' ? (
+                  <span className="text-[11px]">Přepisuji…</span>
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
               </button>
             </div>
             <button
               type="button"
               onClick={handleAiParse}
-              disabled={aiLoading || !aiPrompt.trim()}
+              disabled={aiLoading || !aiPrompt.trim() || voice.busy}
               className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-fuchsia-600 to-indigo-600 hover:from-fuchsia-700 hover:to-indigo-700 text-white px-4 py-2.5 text-xs font-bold shadow-xs transition disabled:opacity-50 shrink-0"
             >
               <Wand2 className="w-4 h-4" />
               <span>{aiLoading ? 'Rozpoznávám…' : 'Vyplnit pomocí AI'}</span>
             </button>
           </div>
+          {voice.error && (
+            <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 p-2.5 text-xs font-medium text-red-700">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+              <span>{voice.error}</span>
+            </div>
+          )}
           {aiSuccessMsg && (
             <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 p-2.5 text-xs font-medium text-emerald-800">
               <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
