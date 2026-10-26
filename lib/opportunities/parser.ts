@@ -30,19 +30,27 @@ export async function parseOpportunityFromAiInput(
   const effectiveGeminiKey = apiKey.startsWith('sk-') ? '' : apiKey;
 
   let pageContent = rawInput.trim();
-  let pageTitle = urlHint ? 'Externí článek' : 'Manuální vložení zprávy';
+  let pageTitle = urlHint ? rawInput.split('\n')[0]?.trim() || 'Externí článek' : 'Manuální vložení zprávy';
 
   // If a URL was provided, attempt to fetch its text content if it starts with http
   if (urlHint) {
     const article = await fetchPublicArticle(urlHint, deadline);
     const titleMatch = article.text.match(/<title>(.*?)<\/title>/i);
-    if (titleMatch?.[1]) pageTitle = titleMatch[1].replace(/<[^>]+>/g, '').trim().slice(0, 500);
+    const fetchedTitle = titleMatch?.[1]?.replace(/<[^>]+>/g, '').trim().slice(0, 500);
+    if (fetchedTitle && !/^google news$/i.test(fetchedTitle)) {
+      pageTitle = fetchedTitle;
+    }
     const bodyText = article.text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
       .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
+      .trim()
       .slice(0, 4000);
-    if (bodyText.length > 200) pageContent = bodyText;
+    if (bodyText.length > 200 && !/^google news/i.test(bodyText)) {
+      pageContent = rawInput.trim()
+        ? `${rawInput.trim()}\n\nObsah článku:\n${bodyText}`.slice(0, 4500)
+        : bodyText;
+    }
     urlHint = article.finalUrl;
   }
 
@@ -75,24 +83,25 @@ DŮLEŽITÉ PRAVIDLO PRO LOKALITU A REGION:
 - Pokud město v textu NENÍ uvedeno nebo je nejednoznačné, nastav VÝHRADNĚ "city": null. NIKDY si město nevymýšlej ani nedoplňuj výchozí město.
 - Pokud kraj/region není v textu jasný, nastav VÝHRADNĚ "region": null.
 
-VÍTANÉ NADCHÁZEJÍCÍ PŘÍLEŽITOSTI (isRelevant = true):
-- Nadcházející otevření nové prodejny, pobočky, restaurace, kavárny, autosalonu, provozovny
+VÍTANÉ PŘÍLEŽITOSTI (isRelevant = true):
+- Otevření nové prodejny, pobočky, restaurace, kavárny, autosalonu, kliniky, showroomu, provozovny nebo retail parku (včetně čerstvě otevřených poboček, které potřebují navigační cedule a povědomí)
+- Developerské projekty, výstavba bytů, komerčních hal a průmyslových zón
 - Nadcházející koncert, festival, divadelní představení, veletrh, výstava, sportovní turnaj
 - Stěhování firmy, přístavba, expanze, nábor zaměstnanců
 - Významná marketingová akce nebo sezónní kampaň
 
 VYŘAZOVANÉ ČLÁNKY (isRelevant = false):
-- PŘÍSNÉ PRAVIDLO PRO PROBĚHLÉ UDÁLOSTI: Pokud se akce nebo otevření prodejny již stalo v minulosti (před dnešním datem ${todayISO}), zadej "isRelevant": false.
-- Pouze obecné články bez konkrétní značky či akce (např. "Předpověď počasí", "Dopravní nehoda na dálnici")
+- PŘÍSNÉ PRAVIDLO PRO PROBĚHLÉ JEDNORÁZOVÉ AKCE: Pokud jde o jednorázový koncert, festival či sportovní zápas, který již proběhl v minulosti (před dnešním datem ${todayISO}), zadej "isRelevant": false.
+- Pouze obecné články bez konkrétní značky či komerčního subjektu (např. "Předpověď počasí", "Dopravní nehoda na dálnici", "Krimi zprávy")
 
 Vrať VÝHRADNĚ platný JSON (JSON format) s těmito poli:
 {
   "isRelevant": true nebo false,
   "relevanceReason": "Stručné odůvodnění",
-  "companyName": "Přesný konkrétní název firmy, značky, pořadatele nebo akce",
+  "companyName": "Přesný konkrétní název firmy, značky, developera, pořadatele nebo akce",
   "companyId": "IČO pokud je v textu uvedeno, jinak null",
   "website": "webová stránka firmy pokud je známa, jinak null",
-  "eventType": "NEW_BRANCH | STORE_OPENING | RESTAURANT_OPENING | CAR_DEALERSHIP | RETAIL_PARK | EXPANSION | RELOCATION | REOPENING | MARKETING_EVENT | SEASONAL_CAMPAIGN | OTHER",
+  "eventType": "NEW_BRANCH | STORE_OPENING | RESTAURANT_OPENING | CAR_DEALERSHIP | RETAIL_PARK | EXPANSION | RELOCATION | REOPENING | MARKETING_EVENT | EVENT_EXHIBITION | SEASONAL_CAMPAIGN | OTHER",
   "title": "Stručný atraktivní titulek příležitosti (max 8 slov)",
   "evidenceFact": "Ověřený fakt z článku: co přesně se stalo/děje a kdy (bez domněnek)",
   "aiInterpretation": "AI interpretace: proč je to relevantní pro venkovní reklamu (OOH)",
@@ -101,7 +110,7 @@ Vrať VÝHRADNĚ platný JSON (JSON format) s těmito poli:
   "city": "Město v ČR nebo null",
   "region": "Kraj v ČR nebo null",
   "address": "Přesná ulice/adresa pokud je známa, jinak null",
-  "eventDate": "Datum otevření/události YYYY-MM-DD pokud je známo, jinak null",
+  "eventDate": "Datum otevření/události YYYY-MM-DD (pouze pokud je >= ${todayISO}, jinak null)",
   "suggestedMediaTypes": ["seznam", "vhodných", "typů", "nosičů"]
 }
 
@@ -125,7 +134,13 @@ Text: "${pageContent.slice(0, 3000)}"`;
         });
         if (resp.ok) {
           const data = await resp.json();
-          jsonResultText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          const parts = Array.isArray(data.candidates?.[0]?.content?.parts)
+            ? data.candidates[0].content.parts
+            : [];
+          jsonResultText = parts
+            .map((p: { text?: string }) => (typeof p?.text === 'string' ? p.text : ''))
+            .join('\n')
+            .trim();
           if (jsonResultText) break;
         }
       } catch {
@@ -160,20 +175,29 @@ Text: "${pageContent.slice(0, 3000)}"`;
   if (jsonResultText) {
     try {
       const cleanJson = jsonResultText.replace(/```json/gi, '').replace(/```/gi, '').trim();
-      parsed = JSON.parse(cleanJson);
+      const objStart = cleanJson.indexOf('{');
+      const objEnd = cleanJson.lastIndexOf('}');
+      const jsonSlice = objStart !== -1 && objEnd !== -1 ? cleanJson.slice(objStart, objEnd + 1) : cleanJson;
+      parsed = JSON.parse(jsonSlice);
     } catch {
       // Fallback
     }
   }
   if (!jsonResultText || Object.keys(parsed).length === 0) throw new OpportunityValidationError('AI nevrátila použitelný strukturovaný výsledek.', 502);
 
+  const eventType = (Object.values(OpportunityEventType).includes(String(parsed.eventType) as OpportunityEventType)
+    ? parsed.eventType
+    : 'NEW_BRANCH') as OpportunityEventType;
+
   const eventDateStr = typeof parsed.eventDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.eventDate) ? parsed.eventDate : undefined;
-  const isPastEvent = Boolean(eventDateStr && eventDateStr < todayISO);
+  const isOneOffCulturalEvent = eventType === 'MARKETING_EVENT' || eventType === 'EVENT_EXHIBITION';
+  const isPastOneOffEvent = Boolean(eventDateStr && eventDateStr < todayISO && isOneOffCulturalEvent);
+  const validFutureEventDate = eventDateStr && eventDateStr >= todayISO ? eventDateStr : undefined;
 
   const isRelevant = parsed.isRelevant === true &&
     Boolean(parsed.companyName) &&
     String(parsed.companyName).trim().toLowerCase() !== 'nový potenciální klient' &&
-    !isPastEvent;
+    !isPastOneOffEvent;
   const companyName = String(parsed.companyName || '').trim() || 'Nespecifikovaná firma';
   const city = typeof parsed.city === 'string' && parsed.city.trim() && parsed.city.trim().toLowerCase() !== 'null'
     ? parsed.city.trim()
@@ -183,9 +207,6 @@ Text: "${pageContent.slice(0, 3000)}"`;
     : null;
   const title = String(parsed.title || '').trim() || `Příležitost ${companyName}`;
   const summary = String(parsed.summary || '').trim() || pageTitle;
-  const eventType = (Object.values(OpportunityEventType).includes(String(parsed.eventType) as OpportunityEventType)
-    ? parsed.eventType
-    : 'NEW_BRANCH') as OpportunityEventType;
 
   const defaultMedia = radarProfile?.preferredMediaTypes?.slice(0, 3) || ['BILLBOARD', 'CITYLIGHT'];
   const suggestedMediaTypes = Array.isArray(parsed.suggestedMediaTypes) && parsed.suggestedMediaTypes.length > 0
@@ -212,7 +233,7 @@ Text: "${pageContent.slice(0, 3000)}"`;
     city,
     region,
     address: typeof parsed.address === 'string' && parsed.address.trim() ? parsed.address.trim() : undefined,
-    eventDate: typeof parsed.eventDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.eventDate) ? parsed.eventDate : undefined,
+    eventDate: validFutureEventDate,
     sourceUrl: urlHint || 'https://radar.internal',
     sourceTitle: pageTitle,
     sourcePublishedAt: typeof parsed.sourcePublishedAt === 'string' ? parsed.sourcePublishedAt : undefined,
