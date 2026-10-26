@@ -30,8 +30,8 @@ const LIVE_EVENTS = [
     bg: 'bg-emerald-950/80 border-emerald-800',
     badge: 'Optimalizátor tras',
     badgeColor: 'bg-emerald-950 text-emerald-300 border-emerald-800',
-    title: 'Trasa výjezdu zkrácena o 24.4 km',
-    desc: 'Systém přeorganizoval 6 montážních bodů a ušetřil 57 % času.',
+    title: 'Trasa výjezdu zkrácena o 13.4 km',
+    desc: 'Systém seřadil 6 montážních bodů a ušetřil 30 % trasy.',
     time: 'Před 6 minutami',
   },
   {

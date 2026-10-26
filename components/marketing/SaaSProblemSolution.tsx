@@ -13,8 +13,8 @@ export function SaaSProblemSolution() {
     {
       title: 'Tvorba nabídek klientům',
       old: 'Ruční hledání fotek na Disku a skládání PDF několik hodin',
-      new: 'Klientská nabídka s interaktivní mapou a fotkami do 60 sekund',
-      metric: 'Do 60 sekund',
+      new: 'Klientská nabídka s interaktivní mapou a fotkami do 3 minut',
+      metric: 'Do 3 minut',
     },
     {
       title: 'Práce v terénu a realizace',

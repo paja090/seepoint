@@ -14,8 +14,8 @@ export function SaaSBentoOverview() {
     {
       icon: Zap,
       title: 'Rychlejší nabídky',
-      desc: 'Vytvoření klientské prezentace s fotkami, mapou a veřejným odkazem pro schválení do jedné minuty.',
-      badge: 'Do 60 sekund',
+      desc: 'Vytvoření klientské prezentace s fotkami, mapou a veřejným odkazem pro schválení do 3 minut.',
+      badge: 'Do 3 minut',
       color: 'text-indigo-400 border-indigo-800/60 bg-indigo-950/40',
     },
     {
@@ -35,7 +35,7 @@ export function SaaSBentoOverview() {
   ];
 
   return (
-    <section className="py-16 bg-slate-900/40 border-y border-slate-850" id="reseni">
+    <section className="py-16 bg-slate-900/40 border-y border-slate-800" id="reseni">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-10">
         {/* Section Header */}
         <div className="text-center space-y-3 max-w-3xl mx-auto">
@@ -64,7 +64,7 @@ export function SaaSBentoOverview() {
                     <div className={`p-3 rounded-2xl border ${b.color}`}>
                       <Icon className="w-5 h-5" />
                     </div>
-                    <span className="px-2.5 py-1 rounded-full text-xs font-black uppercase bg-slate-900 text-slate-300 border border-slate-750">
+                    <span className="px-2.5 py-1 rounded-full text-xs font-black uppercase bg-slate-900 text-slate-300 border border-slate-700">
                       {b.badge}
                     </span>
                   </div>
