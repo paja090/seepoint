@@ -10,7 +10,7 @@ export function SaaSNetworkSection({ onOpenDemoModal }: { onOpenDemoModal: () =>
   };
 
   return (
-    <section id="network" className="py-16 bg-slate-950 border-t border-slate-850 relative overflow-hidden">
+    <section id="network" className="py-16 bg-slate-950 border-t border-slate-800 relative overflow-hidden">
       {/* Subtle Ambient Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-gradient-to-r from-blue-900/15 to-purple-900/15 blur-[140px] rounded-full pointer-events-none" />
 

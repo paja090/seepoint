@@ -24,7 +24,7 @@ export function SaaSNavigationSection({ onOpenDemoModal }: { onOpenDemoModal: ()
   ];
 
   return (
-    <section className="py-16 bg-slate-950 border-t border-slate-800 relative overflow-hidden">
+    <section id="navigace" className="py-16 bg-slate-950 border-t border-slate-800 relative overflow-hidden">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
           {/* Left Feature Card */}

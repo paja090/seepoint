@@ -27,7 +27,7 @@ export function SaaSSecuritySection() {
   ];
 
   return (
-    <section className="py-16 bg-slate-900/30 border-t border-slate-850 relative">
+    <section id="zabezpeceni" className="py-16 bg-slate-900/30 border-t border-slate-800 relative">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-10">
         <div className="text-center space-y-3 max-w-3xl mx-auto">
           <span className="text-xs font-black uppercase tracking-wider text-purple-400">

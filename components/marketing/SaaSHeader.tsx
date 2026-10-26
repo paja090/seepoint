@@ -24,6 +24,7 @@ export function SaaSHeader({
   }, []);
 
   const navItems = [
+    { label: 'Video', href: '#video' },
     { label: 'Produkt', href: '#produkt' },
     { label: 'Jak to funguje', href: '#workflow' },
     { label: 'AI', href: '#ai' },
@@ -88,7 +89,7 @@ export function SaaSHeader({
           ) : (
             <Link
               href="/login"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800 text-slate-200 font-bold text-sm border border-slate-750 transition"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800 text-slate-200 font-bold text-sm border border-slate-700 transition"
             >
               <span>Přihlásit se</span>
             </Link>

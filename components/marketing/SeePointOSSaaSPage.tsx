@@ -7,7 +7,6 @@ import { SaaSAudienceStrip } from './SaaSAudienceStrip';
 import { SaaSProblemSolution } from './SaaSProblemSolution';
 import { SaaSProductVideoSection } from './SaaSProductVideoSection';
 import { SaaSProductShowcase } from './SaaSProductShowcase';
-import { SaaSBentoOverview } from './SaaSBentoOverview';
 import { SaaSWorkflowSection } from './SaaSWorkflowSection';
 import { SaaSProductOrigin } from './SaaSProductOrigin';
 import { SaaSCustomerReferences } from './SaaSCustomerReferences';
@@ -27,8 +26,12 @@ import { SaaSFooter } from './SaaSFooter';
 
 export function SeePointOSSaaSPage({ isLoggedIn }: { isLoggedIn?: boolean }) {
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
+  const [demoModalContext, setDemoModalContext] = useState<string | null>(null);
 
-  const openDemoModal = () => setIsDemoModalOpen(true);
+  const openDemoModal = (context?: string) => {
+    setDemoModalContext(typeof context === 'string' ? context : null);
+    setIsDemoModalOpen(true);
+  };
   const closeDemoModal = () => setIsDemoModalOpen(false);
 
   return (
@@ -45,7 +48,7 @@ export function SeePointOSSaaSPage({ isLoggedIn }: { isLoggedIn?: boolean }) {
             operatingSystem: 'Web',
             offers: {
               '@type': 'Offer',
-              price: '0',
+              price: '1900',
               priceCurrency: 'CZK',
             },
             description:
@@ -55,12 +58,12 @@ export function SeePointOSSaaSPage({ isLoggedIn }: { isLoggedIn?: boolean }) {
       />
 
       {/* Header */}
-      <SaaSHeader onOpenDemoModal={openDemoModal} isLoggedIn={isLoggedIn} />
+      <SaaSHeader onOpenDemoModal={() => openDemoModal()} isLoggedIn={isLoggedIn} />
 
       {/* Main Content Sections in Optimized Logical Order */}
       <main>
         {/* 1. Hero */}
-        <SaaSHero onOpenDemoModal={openDemoModal} />
+        <SaaSHero onOpenDemoModal={() => openDemoModal('Ukázka na vlastních nosičích')} />
 
         {/* 2. Krátký „Pro koho“ trust strip */}
         <SaaSAudienceStrip />
@@ -68,61 +71,58 @@ export function SeePointOSSaaSPage({ isLoggedIn }: { isLoggedIn?: boolean }) {
         {/* 3. Excel vs SeePoint */}
         <SaaSProblemSolution />
 
-        {/* 4. Produktové video / připravený video placeholder */}
-        <SaaSProductVideoSection onOpenDemoModal={openDemoModal} />
+        {/* 4. Produktové video s českým hlasovým průvodcem */}
+        <SaaSProductVideoSection onOpenDemoModal={() => openDemoModal()} />
 
         {/* 5. Interaktivní produktová ukázka (5 klíčových modulů) */}
         <SaaSProductShowcase />
 
-        {/* 6. Kompaktní hlavní přínosy */}
-        <SaaSBentoOverview />
-
-        {/* 7. Workflow proces */}
+        {/* 6. Workflow proces */}
         <SaaSWorkflowSection />
 
-        {/* 8. Vznikl v reálném provozu */}
+        {/* 7. Vznikl v reálném provozu */}
         <SaaSProductOrigin />
 
-        {/* 9. Budoucí klientské reference (skryté, dokud nejsou reálná data) */}
+        {/* 8. Budoucí klientské reference (skryté, dokud nejsou reálná data) */}
         <SaaSCustomerReferences />
 
-        {/* 10. SeePoint AI */}
-        <SaaSAiSection onOpenDemoModal={openDemoModal} />
+        {/* 9. SeePoint AI */}
+        <SaaSAiSection onOpenDemoModal={() => openDemoModal('SeePoint AI modul')} />
 
-        {/* 11. Mobilní aplikace pro terén */}
+        {/* 10. Mobilní aplikace pro terén */}
         <SaaSFieldMobileSection />
 
-        {/* 12. Navigace VO */}
-        <SaaSNavigationSection onOpenDemoModal={openDemoModal} />
+        {/* 11. Navigace VO */}
+        <SaaSNavigationSection onOpenDemoModal={() => openDemoModal('Modul Navigace VO')} />
 
-        {/* 13. Orientační ROI kalkulačka */}
-        <SaaSRoiCalculator onOpenDemoModal={openDemoModal} />
+        {/* 12. Orientační ROI kalkulačka */}
+        <SaaSRoiCalculator onOpenDemoModal={() => openDemoModal('Kalkulace úspory na vlastních datech')} />
 
-        {/* 14. SeePoint Network – prémiový teaser */}
-        <SaaSNetworkSection onOpenDemoModal={openDemoModal} />
+        {/* 13. SeePoint Network – prémiový teaser */}
+        <SaaSNetworkSection onOpenDemoModal={() => openDemoModal('Zájem o SeePoint Network')} />
 
-        {/* 15. Migrace a asistovaný onboarding */}
-        <SaaSOnboardingSection onOpenDemoModal={openDemoModal} />
+        {/* 14. Migrace a asistovaný onboarding */}
+        <SaaSOnboardingSection onOpenDemoModal={() => openDemoModal('Asistovaný převod z Excelu')} />
 
-        {/* 16. Integrace & Důvěra/Bezpečnost */}
+        {/* 15. Integrace & Důvěra/Bezpečnost */}
         <SaaSIntegrationsSection />
         <SaaSSecuritySection />
 
-        {/* 17. Přehledný ceník */}
-        <SaaSPricingSection onOpenDemoModal={openDemoModal} />
+        {/* 16. Přehledný ceník */}
+        <SaaSPricingSection onOpenDemoModal={(planName?: string) => openDemoModal(planName ? `Tarif ${planName}` : undefined)} />
 
-        {/* 18. Časté dotazy (FAQ) */}
+        {/* 17. Časté dotazy (FAQ) */}
         <SaaSFaqSection />
 
-        {/* 19. Final CTA s lead magnetem na vlastní data */}
-        <SaaSFinalCta onOpenDemoModal={openDemoModal} />
+        {/* 18. Final CTA s lead magnetem na vlastní data */}
+        <SaaSFinalCta onOpenDemoModal={(ctx?: string) => openDemoModal(ctx)} />
       </main>
 
       {/* Footer */}
-      <SaaSFooter onOpenDemoModal={openDemoModal} />
+      <SaaSFooter onOpenDemoModal={() => openDemoModal()} />
 
       {/* Demo Booking Modal */}
-      <SaaSDemoModal isOpen={isDemoModalOpen} onClose={closeDemoModal} />
+      <SaaSDemoModal isOpen={isDemoModalOpen} onClose={closeDemoModal} initialContext={demoModalContext} />
     </div>
   );
 }
