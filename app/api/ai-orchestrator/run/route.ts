@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 type RunBody = {
   triggerType: 'MAILBOX' | 'OFFER_ACCEPTED';
   entityId: string;
+  allowApproximateDefaults?: boolean;
 };
 
 export async function POST(request: Request) {
@@ -31,7 +32,9 @@ export async function POST(request: Request) {
 
   try {
     const run = triggerType === 'MAILBOX'
-      ? await orchestrateMailboxToOffer(entityId, auth)
+      ? await orchestrateMailboxToOffer(entityId, auth, {
+          allowApproximateDefaults: body.allowApproximateDefaults !== false,
+        })
       : await orchestrateOfferAccepted(entityId, auth);
 
     return NextResponse.json(run);

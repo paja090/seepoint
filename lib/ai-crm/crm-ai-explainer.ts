@@ -29,52 +29,52 @@ export async function generateClientAiExplanation(
   const prompt = buildExplanationPrompt(data);
 
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 300,
+    for (const modelName of ['gemini-3.6-flash', 'gemini-flash-latest']) {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 300,
+            },
+          }),
+        }
+      );
+
+      if (!res.ok) continue;
+
+      const json = (await res.json()) as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+        usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+      };
+
+      const text = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+      if (text) {
+        const promptTokens = json.usageMetadata?.promptTokenCount || 250;
+        const outputTokens = json.usageMetadata?.candidatesTokenCount || 60;
+        const costEstimateUsd = estimateGeminiFlashCostUsd({ promptTokens, outputTokens });
+
+        await logAIUsage({
+          organizationId: data.identity.organizationId,
+          userId: userId || null,
+          feature: 'ASSISTANT',
+          modelName,
+          promptTokens,
+          outputTokens,
+          costEstimateUsd,
+          metadata: {
+            source: 'CRM_INTELLIGENCE',
+            clientId: data.identity.id,
           },
-        }),
+        }).catch(() => null);
+
+        return text;
       }
-    );
-
-    if (!res.ok) {
-      return generateDeterministicTemplateExplanation(data);
-    }
-
-    const json = (await res.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-      usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
-    };
-
-    const text = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-    if (text) {
-      const promptTokens = json.usageMetadata?.promptTokenCount || 250;
-      const outputTokens = json.usageMetadata?.candidatesTokenCount || 60;
-      const costEstimateUsd = estimateGeminiFlashCostUsd({ promptTokens, outputTokens });
-
-      await logAIUsage({
-        organizationId: data.identity.organizationId,
-        userId: userId || null,
-        feature: 'ASSISTANT',
-        modelName: 'gemini-2.5-flash',
-        promptTokens,
-        outputTokens,
-        costEstimateUsd,
-        metadata: {
-          source: 'CRM_INTELLIGENCE',
-          clientId: data.identity.id,
-        },
-      }).catch(() => null);
-
-      return text;
     }
 
     return generateDeterministicTemplateExplanation(data);

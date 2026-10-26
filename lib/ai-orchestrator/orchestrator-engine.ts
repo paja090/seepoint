@@ -96,6 +96,8 @@ export type OrchestrateMailboxOptions = {
   automationLevel?: AutomationLevel;
   /** Vynuceně přeskočit kontrolu idempotence (pouze pro testy) */
   skipIdempotencyCheck?: boolean;
+  /** Pokud v e-mailu chybí přesné datum OD-DO nebo počet ploch, dosadit orientační výchozí hodnoty pro vytvoření konceptu nabídky */
+  allowApproximateDefaults?: boolean;
 };
 
 /**
@@ -119,7 +121,7 @@ export async function orchestrateMailboxToOffer(
     // Resolve automation level
     const org = await prisma.organization.findUnique({
       where: { id: organizationId },
-      select: { enabledModules: true },
+      select: { enabledModules: true, city: true },
     });
     const profile = getOrganizationOrchestratorProfile(org);
     const automationLevel = options?.automationLevel ?? profile.automationLevel;
@@ -210,21 +212,58 @@ export async function orchestrateMailboxToOffer(
     }
 
     // -----------------------------------------------------------------------
-    // Step 3: Check if NEEDS_MORE_INFORMATION → stop
+    // Step 3: Check if NEEDS_MORE_INFORMATION → apply defaults if allowed or stop
     // -----------------------------------------------------------------------
     if (commercialRequest.status === 'NEEDS_MORE_INFORMATION') {
-      const nba = determineNextBestActionForRequest(commercialRequest);
-      run.nextBestActions = [nba];
+      if (options?.allowApproximateDefaults) {
+        const now = new Date();
+        const fallbackFrom =
+          commercialRequest.dateFrom && !isNaN(commercialRequest.dateFrom.getTime())
+            ? commercialRequest.dateFrom
+            : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+        const fallbackTo =
+          commercialRequest.dateTo &&
+          !isNaN(commercialRequest.dateTo.getTime()) &&
+          commercialRequest.dateTo >= fallbackFrom
+            ? commercialRequest.dateTo
+            : new Date(Date.UTC(fallbackFrom.getUTCFullYear(), fallbackFrom.getUTCMonth() + 3, 0));
 
-      addStep(run, 'EVALUATE_READINESS', 'COMPLETED', {
-        output: {
-          ready: false,
-          missingRequirements: commercialRequest.missingRequirements,
-          nextAction: nba.actionType,
-        },
-      });
+        const fallbackCities =
+          commercialRequest.cities.length > 0
+            ? commercialRequest.cities
+            : [message.client?.billingCity || org?.city || ''].filter(Boolean);
 
-      return completeRun(run, 'NEEDS_INFORMATION');
+        const fallbackQuantity = commercialRequest.quantity?.exact
+          ? commercialRequest.quantity
+          : {
+              exact: commercialRequest.quantity?.min || commercialRequest.quantity?.max || 2,
+              min: commercialRequest.quantity?.min || 1,
+              max: commercialRequest.quantity?.max || 3,
+            };
+
+        commercialRequest = {
+          ...commercialRequest,
+          dateFrom: fallbackFrom,
+          dateTo: fallbackTo,
+          cities: fallbackCities,
+          quantity: fallbackQuantity,
+          status: 'READY_FOR_AVAILABILITY',
+        };
+        run.commercialRequest = commercialRequest;
+      } else {
+        const nba = determineNextBestActionForRequest(commercialRequest);
+        run.nextBestActions = [nba];
+
+        addStep(run, 'EVALUATE_READINESS', 'COMPLETED', {
+          output: {
+            ready: false,
+            missingRequirements: commercialRequest.missingRequirements,
+            nextAction: nba.actionType,
+          },
+        });
+
+        return completeRun(run, 'NEEDS_INFORMATION');
+      }
     }
 
     addStep(run, 'EVALUATE_READINESS', 'COMPLETED', { output: { ready: true } });
@@ -338,6 +377,12 @@ export async function orchestrateMailboxToOffer(
           availabilityResult,
           sourceCommercialRequestId: commercialRequest.id,
           campaignName: commercialRequest.campaignTitle || undefined,
+          ...(options?.allowApproximateDefaults && commercialRequest.dateFrom && commercialRequest.dateTo
+            ? {
+                dateFrom: commercialRequest.dateFrom,
+                dateTo: commercialRequest.dateTo,
+              }
+            : {}),
         },
         currentUser
       );

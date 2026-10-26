@@ -33,7 +33,10 @@ export type AiSalesPitchResult = {
     type: string;
     city: string;
     distanceKm?: number;
+    availabilityStatus?: 'AVAILABLE' | 'OCCUPIED';
+    availabilityLabel?: string;
   }>;
+  generatedAt?: string;
 };
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -112,11 +115,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       type: string;
       city: string;
       distanceKm?: number;
+      availabilityStatus?: 'AVAILABLE' | 'OCCUPIED';
+      availabilityLabel?: string;
     }> = [];
 
     if (typeof lat === 'number' && typeof lng === 'number') {
       const nearby = await findNearbyCarriers(organizationId, lat, lng, 8);
-      matchedCarriers = nearby.slice(0, 6).map((c) => ({
+      matchedCarriers = nearby.slice(0, 8).map((c) => ({
         id: c.id,
         code: c.code,
         name: c.name,
@@ -145,7 +150,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       });
       const existingIds = new Set(matchedCarriers.map((c) => c.id));
       for (const cc of cityCarriers) {
-        if (!existingIds.has(cc.id) && matchedCarriers.length < 6) {
+        if (!existingIds.has(cc.id) && matchedCarriers.length < 8) {
           matchedCarriers.push({
             id: cc.id,
             code: cc.code,
@@ -155,6 +160,61 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           });
         }
       }
+    }
+
+    // 2b. Enrich matchedCarriers with real-time Occupancy availability
+    if (matchedCarriers.length > 0) {
+      const now = new Date();
+      const in14Days = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+      const carrierIds = matchedCarriers.map((c) => c.id);
+
+      const activeOccupancies = await prisma.occupancy.findMany({
+        where: {
+          organizationId,
+          surface: { carrierId: { in: carrierIds } },
+          status: { in: ['OCCUPIED', 'RESERVED'] },
+          dateTo: { gte: now },
+          dateFrom: { lte: in14Days },
+        },
+        select: {
+          dateTo: true,
+          surface: { select: { carrierId: true } },
+        },
+        orderBy: { dateTo: 'desc' },
+      });
+
+      const occupiedUntilByCarrier = new Map<string, Date>();
+      for (const occ of activeOccupancies) {
+        const cId = occ.surface.carrierId;
+        const prev = occupiedUntilByCarrier.get(cId);
+        if (!prev || occ.dateTo > prev) {
+          occupiedUntilByCarrier.set(cId, occ.dateTo);
+        }
+      }
+
+      matchedCarriers = matchedCarriers
+        .map((c) => {
+          const occupiedUntil = occupiedUntilByCarrier.get(c.id);
+          if (occupiedUntil) {
+            return {
+              ...c,
+              availabilityStatus: 'OCCUPIED' as const,
+              availabilityLabel: `Obsazeno do ${occupiedUntil.toLocaleDateString('cs-CZ')}`,
+            };
+          }
+          return {
+            ...c,
+            availabilityStatus: 'AVAILABLE' as const,
+            availabilityLabel: 'Volný ihned',
+          };
+        })
+        .sort((a, b) => {
+          if (a.availabilityStatus !== b.availabilityStatus) {
+            return a.availabilityStatus === 'AVAILABLE' ? -1 : 1;
+          }
+          return (a.distanceKm ?? 99) - (b.distanceKm ?? 99);
+        })
+        .slice(0, 6);
     }
 
     // 3. Quick ARES lookup by companyName or companyId for verified IČO / official details
@@ -210,7 +270,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         ? matchedCarriers
             .map(
               (c) =>
-                `- [${c.code}] ${c.name} (${c.type}, ${c.city}${c.distanceKm !== undefined ? `, vzdálenost ${c.distanceKm} km od cíle` : ''})`
+                `- [${c.code}] ${c.name} (${c.type}, ${c.city}${c.distanceKm !== undefined ? `, vzdálenost ${c.distanceKm} km od cíle` : ''}, stav: ${c.availabilityLabel || 'Volný ihned'})`
             )
             .join('\n')
         : '- V naší síti v daném regionu disponujeme venkovními reklamními nosiči (billboardy, CLV, navigační cedule na sloupech VO).';
@@ -236,7 +296,7 @@ DETEKOVANÁ PŘÍLEŽITOST:
 - IČO / ARES kandidáti: ${opportunity.companyId || opportunity.client?.companyId || aresInfo || 'Dohledej na internetu'}
 - Stávající kontakty v našem CRM: ${existingCrmContacts}
 
-NAŠE DOSTUPNÉ REKLAMNÍ NOSIČE V OKOLÍ TÉTO AKCE:
+NAŠE DOSTUPNÉ REKLAMNÍ NOSIČE V OKOLÍ TÉTO AKCE (se stavem obsazenosti):
 ${carriersListStr}
 
 NAŠE VÝROBNÍ A MONTÁŽNÍ SLUŽBY (vlastní tiskárna, dílna a montážní posádky):
@@ -248,7 +308,7 @@ POKYNY PRO VYHLEDÁVÁNÍ A PŘÍPRAVU OSLOVENÍ:
    - Pokud máme už kontakt v CRM, ověř ho nebo doplň chybějící telefon/e-mail.
    - Nikdy si nevymýšlej neexistující e-mail nebo telefon! Pokud najdeš jen firemní recepci/info e-mail a telefon na prodejnu, uveď je.
 2. **VYBER KONKRÉTNÍ PRODUKTY A SLUŽBY NA MÍRU:**
-   - Zkombinuj naše dostupné reklamní nosiče v okolí (uveď jejich konkrétní lokality/kódy z našeho seznamu výše, pokud tam jsou) + naši výrobu a montáž přímo pro jejich akci (např. u nové prodejny/pobočky: polep výloh a vstupu, 3D světelné logo, navigační cedule k prodejně, reklamní plachty/bannery).
+   - Upřednostni nosiče, které mají stav "Volný ihned" (uveď jejich konkrétní lokality/kódy z našeho seznamu výše) + naši výrobu a montáž přímo pro jejich akci (např. u nové prodejny/pobočky: polep výloh a vstupu, 3D světelné logo, navigační cedule k prodejně, reklamní plachty/bannery).
 3. **NAPIŠ PERSONALIZOVANÝ, LIDSKÝ E-MAIL (emailSubject + emailBody):**
    - Žádné robotické klišé typu "Doufám, že se máte skvěle".
    - Piš věcně, přátelsky a konkrétně: zmiň jejich chystanou událost (${opportunity.title}) v dané lokalitě, rovnou jim nabídni konkrétní plochy v okolí + kompletní výrobu/polepy na klíč, a navrhni krátký telefonát nebo zaslání mapky volných ploch.
@@ -354,7 +414,32 @@ Vrať POUZE validní JSON v tomto formátu:
       emailBody: parsed.emailBody,
       callScript: Array.isArray(parsed.callScript) ? parsed.callScript : [],
       nearbyCarriers: matchedCarriers,
+      generatedAt: new Date().toISOString(),
     };
+
+    // Persist generated pitch into opportunity.scoreReasons so it remains saved across page reloads
+    const existingScoreMeta =
+      opportunity.scoreReasons &&
+      typeof opportunity.scoreReasons === 'object' &&
+      !Array.isArray(opportunity.scoreReasons)
+        ? (opportunity.scoreReasons as Record<string, unknown>)
+        : Array.isArray(opportunity.scoreReasons)
+        ? { reasons: opportunity.scoreReasons }
+        : {};
+
+    await prisma.salesOpportunity
+      .updateMany({
+        where: { id, organizationId },
+        data: {
+          companyId: result.companyId || opportunity.companyId,
+          website: result.website || opportunity.website,
+          scoreReasons: {
+            ...existingScoreMeta,
+            aiSalesPitch: result,
+          },
+        },
+      })
+      .catch(() => null);
 
     return NextResponse.json({ ok: true, pitch: result });
   } catch (error) {
@@ -569,13 +654,27 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       });
     }
 
-    // 5. Update SalesOpportunity status and metadata
+    // 5. Update SalesOpportunity status, metadata, and persisted aiSalesPitch
     const nextStatus =
       action === 'send_email' || action === 'log_call'
         ? 'CONTACTED'
         : opportunity.status === 'NEW'
         ? 'REVIEWED'
         : opportunity.status;
+
+    const existingScoreMeta =
+      opportunity.scoreReasons &&
+      typeof opportunity.scoreReasons === 'object' &&
+      !Array.isArray(opportunity.scoreReasons)
+        ? (opportunity.scoreReasons as Record<string, unknown>)
+        : Array.isArray(opportunity.scoreReasons)
+        ? { reasons: opportunity.scoreReasons }
+        : {};
+
+    const existingPitch =
+      existingScoreMeta.aiSalesPitch && typeof existingScoreMeta.aiSalesPitch === 'object'
+        ? (existingScoreMeta.aiSalesPitch as Record<string, unknown>)
+        : {};
 
     await prisma.salesOpportunity.updateMany({
       where: { id, organizationId },
@@ -584,6 +683,21 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         companyId: companyId || opportunity.companyId,
         website: website || opportunity.website,
         status: nextStatus,
+        scoreReasons: {
+          ...existingScoreMeta,
+          aiSalesPitch: {
+            ...existingPitch,
+            ...(contactName !== undefined ? { contactName } : {}),
+            ...(contactRole !== undefined ? { contactRole } : {}),
+            ...(contactEmail !== undefined ? { contactEmail } : {}),
+            ...(contactPhone !== undefined ? { contactPhone } : {}),
+            ...(companyId !== undefined ? { companyId } : {}),
+            ...(dic !== undefined ? { dic } : {}),
+            ...(website !== undefined ? { website } : {}),
+            ...(body.emailSubject !== undefined ? { emailSubject: body.emailSubject } : {}),
+            ...(body.emailBody !== undefined ? { emailBody: body.emailBody } : {}),
+          },
+        },
       },
     });
 

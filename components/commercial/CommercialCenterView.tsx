@@ -1233,10 +1233,10 @@ export function CommercialCenterView({ data }: { data: CommercialCenterData }) {
                             </Link>
                           )}
                           <Link
-                            href="/sales/opportunities"
+                            href={`/sales/opportunities?id=${opp.id}`}
                             className="inline-flex items-center gap-1 rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-700 transition"
                           >
-                            <span>Zobrazit v Radaru</span>
+                            <span>Otevřít AI Obchodníka</span>
                             <ArrowRight size={12} />
                           </Link>
                         </div>
