@@ -106,15 +106,17 @@ ${employeeListStr || 'Žádní zaměstnanci'}
 DOSTUPNÁ VOZIDLA:
 ${vehicleListStr || 'Žádná vozidla'}
 
-PRAVIDLA PRO PARSOVÁNÍ:
+PRAVIDLA PRO PARSOVÁNÍ A VYHLEDÁNÍ FIREM / PROVOZOVEN (POI):
 1. Datum ("date"): Pokud text říká "dnes", použij ${nowInTz}. Pokud "zítra", použij datum zítřka (YYYY-MM-DD). Pokud zazní den v týdnu (např. "ve středu"), dopočítej nejbližší příští daný den. Formát: YYYY-MM-DD.
 2. Počet kusů ("quantity"): Vyhledej přesný počet kusů k lepení/montáži (např. 4 billboardy -> quantity: 4).
-3. Čas ("serviceMinutes"): Pro výlep 1 billboardu počítej cca 25 minut (např. 4 billboardy = 100 min).
-4. Lokalita ("label" a "addressSearch"):
-   - "label": Stručný lidský název místa (např. "Mustang Aréna", "Mariánské náměstí", "OC Nová Karolina").
-   - "addressSearch": Hledaná adresa/místo včetně města pro mapové vyhledání (např. "Mustang Aréna, Ostrava" nebo "Mariánské náměstí, Ostrava").
+3. Čas ("serviceMinutes"): Pro výlep 1 billboardu počítej cca 25 minut (např. 4 billboardy = 100 min). Pro vyzvednutí plošiny/materiálu cca 30–45 minut.
+4. Lokalita ("label", "addressSearch", "latitude", "longitude", "openingHours", "contactPhone"):
+   - Pokud zadání zmiňuje firmu, půjčovnu plošin/techniky, stavebniny, prodejnu nebo orientační bod (např. "půjčovna ve Sviadnově", "ČEVAS Sviadnov", "Mustang Aréna"):
+     * VŽDY aktivně použij Google Search k dohledání přesného názvu firmy, přesné ulice s číslem popisným a obcí (např. "Ostravská 51, 739 25 Sviadnov"), GPS souřadnic ("latitude" a "longitude"), případně otevírací doby ("openingHours") a telefonu ("contactPhone").
+   - "label": Stručný lidský název místa a firmy (např. "ČEVAS Sviadnov – půjčovna plošin", "Mustang Aréna").
+   - "addressSearch": Přesná dohledaná adresa včetně ulice, č.p. a města (např. "Ostravská 51, 739 25 Sviadnov").
 5. Název zakázky ("title"): Vytvoř srozumitelný lidský název (např. "Výlep 4× Billboard – Mustang Aréna").
-6. Pokyny ("description"): Stručné jasné instrukce pro kluky na výjezdu (např. "Výměna reklamního výlepu na 4 ks billboardů").
+6. Pokyny ("description"): Stručné jasné instrukce pro kluky na výjezdu. Pokud jsi dohledal otevírací dobu nebo telefon provozovny, uveď je rovněž do popisu zastávky.
 
 Vrať VÝHRADNĚ platný JSON objekt ve tvaru:
 {
@@ -130,6 +132,10 @@ Vrať VÝHRADNĚ platný JSON objekt ve tvaru:
       "quantity": number,
       "label": string,
       "addressSearch": string,
+      "latitude": number nebo null,
+      "longitude": number nebo null,
+      "openingHours": string nebo null,
+      "contactPhone": string nebo null,
       "description": string,
       "serviceMinutes": number
     }
@@ -153,6 +159,8 @@ Vrať čisté JSON bez markdown backticků a bez zbytečného textu.`;
         serviceMinutes?: number;
         latitude?: number | null;
         longitude?: number | null;
+        openingHours?: string | null;
+        contactPhone?: string | null;
       }>;
     } | null = null;
 
@@ -167,9 +175,9 @@ Vrať čisté JSON bez markdown backticků a bez zbytečného textu.`;
             signal,
             body: JSON.stringify({
               contents: [{ parts: [{ text: `${systemPrompt}\n\nZadání vedoucího:\n"${prompt}"` }] }],
+              tools: [{ googleSearch: {} }],
               generationConfig: {
                 temperature: 0.1,
-                responseMimeType: 'application/json',
               },
             }),
           }
@@ -178,11 +186,21 @@ Vrať čisté JSON bez markdown backticků a bez zbytečného textu.`;
         if (!response.ok) continue;
 
         const data = await response.json();
-        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const parts = Array.isArray(data?.candidates?.[0]?.content?.parts)
+          ? data.candidates[0].content.parts
+          : [];
+        const rawText = parts
+          .map((p: { text?: string }) => (typeof p?.text === 'string' ? p.text : ''))
+          .join('\n')
+          .trim();
         if (!rawText) continue;
 
         const cleaned = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-        parsedResult = JSON.parse(cleaned);
+        const firstBrace = cleaned.indexOf('{');
+        const lastBrace = cleaned.lastIndexOf('}');
+        parsedResult = JSON.parse(
+          firstBrace !== -1 && lastBrace !== -1 ? cleaned.slice(firstBrace, lastBrace + 1) : cleaned
+        );
 
         await logAIUsage({
           organizationId,
@@ -205,27 +223,47 @@ Vrať čisté JSON bez markdown backticků a bez zbytečného textu.`;
       );
     }
 
-    // Geocode stops if addressSearch is present
+    // Geocode stops if latitude/longitude were not already resolved by Gemini Grounding
     for (const stop of parsedResult.stops) {
-      const q = stop.addressSearch?.trim() || stop.label?.trim();
-      if (q && q.length >= 3) {
-        try {
-          const geoRes = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=cz&q=${encodeURIComponent(q)}`,
-            {
-              headers: { 'User-Agent': 'SeePOINT-internal/1.0' },
-              signal: AbortSignal.timeout(3500),
+      const hasValidCoords =
+        typeof stop.latitude === 'number' &&
+        Number.isFinite(stop.latitude) &&
+        typeof stop.longitude === 'number' &&
+        Number.isFinite(stop.longitude);
+
+      const extraDetails: string[] = [];
+      if (stop.addressSearch?.trim()) extraDetails.push(`Adresa: ${stop.addressSearch.trim()}`);
+      if (stop.openingHours?.trim()) extraDetails.push(`Otevírací doba: ${stop.openingHours.trim()}`);
+      if (stop.contactPhone?.trim()) extraDetails.push(`Tel.: ${stop.contactPhone.trim()}`);
+      if (extraDetails.length > 0) {
+        const baseDesc = (stop.description || '').trim();
+        const missingDetails = extraDetails.filter((d) => !baseDesc.includes(d));
+        if (missingDetails.length > 0) {
+          stop.description = [baseDesc, missingDetails.join(' · ')].filter(Boolean).join(' | ');
+        }
+      }
+
+      if (!hasValidCoords) {
+        const q = stop.addressSearch?.trim() || stop.label?.trim();
+        if (q && q.length >= 3) {
+          try {
+            const geoRes = await fetch(
+              `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=cz&q=${encodeURIComponent(q)}`,
+              {
+                headers: { 'User-Agent': 'SeePOINT-internal/1.0' },
+                signal: AbortSignal.timeout(3500),
+              }
+            );
+            if (geoRes.ok) {
+              const geoRows = (await geoRes.json()) as Array<{ lat: string; lon: string }>;
+              if (Array.isArray(geoRows) && geoRows[0]) {
+                stop.latitude = Number(geoRows[0].lat);
+                stop.longitude = Number(geoRows[0].lon);
+              }
             }
-          );
-          if (geoRes.ok) {
-            const geoRows = (await geoRes.json()) as Array<{ lat: string; lon: string }>;
-            if (Array.isArray(geoRows) && geoRows[0]) {
-              stop.latitude = Number(geoRows[0].lat);
-              stop.longitude = Number(geoRows[0].lon);
-            }
+          } catch {
+            // ignore geocoding timeout
           }
-        } catch {
-          // ignore geocoding timeout
         }
       }
     }
