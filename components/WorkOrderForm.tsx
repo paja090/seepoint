@@ -5,6 +5,7 @@ import { FormEvent, useState } from 'react';
 import { agencyWorkCategories, workPriorityLabels, type WorkScope } from '@/lib/work';
 import type { WorkCategory } from '@/lib/work-categories';
 import { useQuickTaskVoice } from '@/components/tasks/useQuickTaskVoice';
+import { WorkOrderLocationPicker } from '@/components/WorkOrderLocationPicker';
 import {
   AlertCircle,
   CheckCircle2,
@@ -101,9 +102,17 @@ export function WorkOrderForm({
         setSelectedWorkers(data.workerNames);
       }
       if (data.locationAddress) setLocationAddress(data.locationAddress);
+      if (typeof data.latitude === 'number' && typeof data.longitude === 'number') {
+        setCoords({ latitude: data.latitude, longitude: data.longitude });
+      }
       if (data.description) setDescription(data.description);
 
-      setAiSuccessMsg(`AI úspěšně předvyplnila formulář: „${data.title}“ (odhad: ${data.estimatedHours || 2} h).`);
+      const locSummary = data.locationAddress || (data.latitude && data.longitude ? 'zadána v mapě' : '');
+      setAiSuccessMsg(
+        `AI úspěšně předvyplnila formulář: „${data.title}“ (odhad: ${data.estimatedHours || 2} h${
+          locSummary ? `, lokalita: ${locSummary}` : ''
+        }).`
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'AI zpracování selhalo.');
     } finally {
@@ -150,7 +159,9 @@ export function WorkOrderForm({
   const [estimatedHours, setEstimatedHours] = useState('2');
   const [description, setDescription] = useState('');
 
-  // Field Specifics
+  // Field Specifics & Map Coordinates
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [showWorkshopMap, setShowWorkshopMap] = useState(false);
   const [locationAddress, setLocationAddress] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
@@ -286,6 +297,9 @@ export function WorkOrderForm({
       workerNames: selectedWorkers.join(', '),
       estimatedHours: estimatedHours ? parseFloat(estimatedHours) : undefined,
       locationNote: fullLocationNote || undefined,
+      locationAddress: locationAddress.trim() || undefined,
+      latitude: coords?.latitude ?? undefined,
+      longitude: coords?.longitude ?? undefined,
       contactName: contactName.trim() || undefined,
       contactPhone: contactPhone.trim() || undefined,
       carrierCode: scope === 'FIELD' && selectedCarrierCode ? selectedCarrierCode : undefined,
@@ -571,26 +585,89 @@ export function WorkOrderForm({
           )}
         </div>
 
-        {/* FIELD SPECIFICS: Address, Contact & Carrier */}
-        {scope === 'FIELD' && (
-          <div className="sm:col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-3">
-            <div className="flex items-center gap-2 text-emerald-900 font-extrabold text-xs uppercase tracking-wider">
-              <MapPin size={16} className="text-emerald-600" />
-              <span>Lokalita realizace & Montážní informace</span>
+        {/* WORKSHOP OPTIONAL LOCATION: For pickups, supplier stops, deliveries */}
+        {scope === 'WORKSHOP' && (
+          <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-slate-700 font-bold text-xs">
+                <MapPin size={15} className="text-slate-500" />
+                <span>Místo expedice, vyzvednutí nebo dodání (volitelné pro dílnu)</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWorkshopMap((prev) => !prev)}
+                className="text-xs font-semibold text-sky-700 hover:text-sky-900 underline cursor-pointer"
+              >
+                {showWorkshopMap ? 'Skrýt mapu' : coords ? 'Zobrazit zadanou polohu v mapě' : 'Označit místo na mapě'}
+              </button>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            {showWorkshopMap && (
+              <div className="pt-2 space-y-2">
+                <WorkOrderLocationPicker
+                  locationAddress={locationAddress}
+                  onAddressChange={(newAddr) => setLocationAddress(newAddr)}
+                  coords={coords}
+                  onCoordsChange={(newCoords) => setCoords(newCoords)}
+                  scope={scope}
+                />
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Adresa nebo poznámka k místu
+                  </label>
+                  <input
+                    className="input w-full text-xs font-semibold"
+                    placeholder="Např. Vyzvednutí materiálu v půjčovně..."
+                    value={locationAddress}
+                    onChange={(e) => setLocationAddress(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* FIELD SPECIFICS: Address, Contact & Carrier */}
+        {scope === 'FIELD' && (
+          <div className="sm:col-span-2 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-emerald-900 font-extrabold text-xs uppercase tracking-wider">
+                <MapPin size={16} className="text-emerald-600" />
+                <span>Lokalita realizace & Montážní informace</span>
+              </div>
+              <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-100/80 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                🛰️ Letecká mapa & GPS cíl
+              </span>
+            </div>
+
+            {/* Interactive Aerial/Satellite Location Picker Map */}
+            <div className="space-y-1.5 pt-1">
+              <label className="text-xs font-bold text-slate-700 block">
+                Zadání místa v mapě (vyhledat adresu nebo zakliknout bod do letecké mapy pro navigaci posádky):
+              </label>
+              <WorkOrderLocationPicker
+                locationAddress={locationAddress}
+                onAddressChange={(newAddr) => setLocationAddress(newAddr)}
+                coords={coords}
+                onCoordsChange={(newCoords) => setCoords(newCoords)}
+                scope={scope}
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 pt-1">
               <div className="sm:col-span-2">
                 <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Adresa místa montáže (kam posádka jede) *
+                  Adresa místa montáže / výjezdu (kam posádka jede)
                 </label>
                 <input
                   className="input w-full text-xs font-semibold"
-                  placeholder="Např. Nádražní 45, Ostrava nebo Obchodní centrum Galerie"
+                  placeholder="Např. Ostravská 51, Sviadnov nebo Nádražní 45, Ostrava"
                   value={locationAddress}
                   onChange={(e) => setLocationAddress(e.target.value)}
-                  required
                 />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  💡 Vyplní se automaticky z mapy, vyhledávání nebo AI zadání. Pokud přesnou adresu nemáte, stačí slovní popis – neblokuje vytvoření zakázky.
+                </p>
               </div>
 
               <div>

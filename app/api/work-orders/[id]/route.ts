@@ -158,6 +158,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     await prisma.$transaction(async (tx) => {
       const current = await tx.workOrder.findUniqueOrThrow({ where: { id }, include: { items: { include: { photos: { select: { id: true } } } } } });
       const preserveItems = usesItemExecution(current.items) || current.items.some(i => i.photos.length);
+      const rawLat = input.latitude ?? (input.location as Record<string, unknown> | null)?.latitude;
+      const rawLng = input.longitude ?? (input.location as Record<string, unknown> | null)?.longitude;
+      const latitude = typeof rawLat === 'number' ? rawLat : (rawLat ? Number.parseFloat(String(rawLat)) : undefined);
+      const longitude = typeof rawLng === 'number' ? rawLng : (rawLng ? Number.parseFloat(String(rawLng)) : undefined);
+      const hasGps = typeof latitude === 'number' && Number.isFinite(latitude) && typeof longitude === 'number' && Number.isFinite(longitude);
+      const scope = text(input, 'scope');
+
+      const existingConstraints = (current.planningConstraints as Record<string, unknown> | null) || {};
+      const updatedConstraints = {
+        ...existingConstraints,
+        ...(scope ? { scope } : {}),
+        ...(hasGps
+          ? { latitude, longitude, location: { latitude, longitude } }
+          : input.clearCoords
+            ? { latitude: null, longitude: null, location: null }
+            : {}),
+      };
+
       await tx.workOrder.update({
         where: { id },
         data: {
@@ -177,6 +195,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           contactPhone: text(input, 'contactPhone') ?? null,
           locationNote: text(input, 'locationNote') ?? null,
           estimatedHours: text(input, 'estimatedHours') ? Number.parseFloat(text(input, 'estimatedHours')!) : null,
+          planningConstraints: updatedConstraints,
           pdfUrl: text(input, 'pdfUrl') ?? null,
           mediaLabel: text(input, 'mediaLabel') ?? null,
           quantity,

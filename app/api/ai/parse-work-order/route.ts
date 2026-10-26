@@ -102,7 +102,9 @@ PRAVIDLA PRO VYPLNĚNÍ A ODHADY ČASU:
      * Expedice a balení: "0.5" až "1"
 8. "workerNames": Pole jmen pracovníků (přesně podle dostupných zaměstnanců), kteří byli v zadání zmíněni (např. ["Karel Novák"]).
 9. "priority": "LOW" | "NORMAL" | "HIGH" | "URGENT" (pokud je zmíněno "spěchá", "urgentní", "ihned" -> URGENT / HIGH, jinak NORMAL).
-10. "locationAddress": Adresa montáže/výjezdu u klienta, pokud jde o FIELD práci.
+10. "locationAddress", "latitude", "longitude":
+   - Pokud zadání zmiňuje jakékoliv místo výjezdu, firmu, prodejnu, stavebniny, půjčovnu, adresu nebo město (např. "zítra pojedu pro plošinu do sviadnova tam je půjčovna" nebo "polep výlohy v Ostravě"), vyhledej pomocí Google Search přesný název dané firmy / místa a jeho reálnou adresu ("locationAddress") a zjisti přibližné GPS souřadnice: "latitude" (číslo) a "longitude" (číslo).
+   - Pokud jde o interní práci na dílně bez výjezdu ("WORKSHOP" - tisk, laminace, balení) nebo žádné konkrétní místo nebylo zmíněno, nastav "locationAddress": "", "latitude": null, "longitude": null.
 11. "description": Jasné, stručné instrukce pro pracovníky, shrnující co a jak mají udělat.
 
 Vrať VÝHRADNĚ platný JSON objekt:
@@ -119,6 +121,8 @@ Vrať VÝHRADNĚ platný JSON objekt:
   "priority": "LOW" | "NORMAL" | "HIGH" | "URGENT",
   "workerNames": string[],
   "locationAddress": string,
+  "latitude": number | null,
+  "longitude": number | null,
   "description": string
 }`;
 
@@ -135,6 +139,8 @@ Vrať VÝHRADNĚ platný JSON objekt:
       priority?: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
       workerNames?: string[];
       locationAddress?: string;
+      latitude?: number | null;
+      longitude?: number | null;
       description?: string;
     } | null = null;
 
@@ -149,9 +155,9 @@ Vrať VÝHRADNĚ platný JSON objekt:
             signal,
             body: JSON.stringify({
               contents: [{ parts: [{ text: `${systemPrompt}\n\nZadání vedoucího:\n"${prompt}"` }] }],
+              tools: [{ googleSearch: {} }],
               generationConfig: {
                 temperature: 0.1,
-                responseMimeType: 'application/json',
               },
             }),
           }
@@ -164,7 +170,20 @@ Vrať VÝHRADNĚ platný JSON objekt:
         if (!rawText) continue;
 
         const cleaned = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-        parsed = JSON.parse(cleaned);
+        const firstBrace = cleaned.indexOf('{');
+        const lastBrace = cleaned.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1) {
+          parsed = JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+        } else {
+          parsed = JSON.parse(cleaned);
+        }
+
+        if (parsed) {
+          const lat = typeof parsed.latitude === 'number' && !Number.isNaN(parsed.latitude) ? parsed.latitude : null;
+          const lng = typeof parsed.longitude === 'number' && !Number.isNaN(parsed.longitude) ? parsed.longitude : null;
+          parsed.latitude = lat;
+          parsed.longitude = lng;
+        }
 
         await logAIUsage({
           organizationId,
