@@ -116,6 +116,8 @@ export async function POST(request: Request) {
           isClientVisible: !employeeId && rawType !== 'DAMAGE' && rawType !== 'CHECK' && rawType !== 'EXPENSE_RECEIPT',
           note: form.get('note') ? String(form.get('note')).trim().slice(0, 1000) : null,
         },
+        // Returning image bytes in an upload response doubles database egress when using the DB fallback.
+        omit: { content: true },
       });
       if (navigationPointId) await tx.navigationPoint.update({ where: { id: navigationPointId }, data: { sitePhotoId: created.id } });
       return created;
