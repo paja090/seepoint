@@ -157,7 +157,7 @@ export function DispatchIntake({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuccessMsg, setAiSuccessMsg] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
 
   // Stops list
   const [stops, setStops] = useState<StopEntry[]>([createEmptyStop(1)]);
@@ -177,7 +177,26 @@ export function DispatchIntake({
       setIsRecording(false);
       return;
     }
-    const SpeechRecognition = typeof window !== 'undefined' ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition : null;
+    type SpeechRecog = {
+      lang: string;
+      continuous: boolean;
+      interimResults: boolean;
+      onstart: (() => void) | null;
+      onresult: ((event: { results?: Array<Array<{ transcript?: string }>> }) => void) | null;
+      onerror: (() => void) | null;
+      onend: (() => void) | null;
+      start: () => void;
+      stop: () => void;
+    };
+    type WindowWithSpeechRecog = Window & {
+      SpeechRecognition?: new () => SpeechRecog;
+      webkitSpeechRecognition?: new () => SpeechRecog;
+    };
+    const SpeechRecognition =
+      typeof window !== 'undefined'
+        ? (window as unknown as WindowWithSpeechRecog).SpeechRecognition ||
+          (window as unknown as WindowWithSpeechRecog).webkitSpeechRecognition
+        : null;
     if (!SpeechRecognition) {
       alert('Váš prohlížeč nepodporuje přímé diktování hlasem v tomto okně. Napište prosím zadání do textového pole.');
       return;
@@ -188,7 +207,7 @@ export function DispatchIntake({
       recognition.continuous = false;
       recognition.interimResults = false;
       recognition.onstart = () => setIsRecording(true);
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event) => {
         const transcript = event.results?.[0]?.[0]?.transcript;
         if (transcript) {
           setAiPrompt((prev) => (prev ? `${prev} ${transcript}` : transcript));
@@ -225,8 +244,19 @@ export function DispatchIntake({
       if (parsed.clientName) setClientName(parsed.clientName);
       if (parsed.title) setTitle(parsed.title);
 
+      type ParsedStopInput = {
+        operation?: string;
+        objectType?: string;
+        label?: string;
+        quantity?: number;
+        latitude?: number | null;
+        longitude?: number | null;
+        description?: string;
+        serviceMinutes?: number;
+      };
+
       if (Array.isArray(parsed.stops) && parsed.stops.length > 0) {
-        const newStops: StopEntry[] = parsed.stops.map((s: any, idx: number) => {
+        const newStops: StopEntry[] = parsed.stops.map((s: ParsedStopInput, idx: number) => {
           const portfolioObj =
             PORTFOLIO_OBJECT_TYPES.find((po) => po.id === s.objectType) || PORTFOLIO_OBJECT_TYPES[0];
           return {

@@ -2,28 +2,17 @@
 
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState, useRef } from 'react';
-import { agencyWorkCategories, workPriorityLabels, type WorkScope, type WorkPriority } from '@/lib/work';
+import { agencyWorkCategories, type WorkScope } from '@/lib/work';
 import type { WorkCategory } from '@/lib/work-categories';
 import {
-  AlertTriangle,
   CheckCircle2,
   ShieldAlert,
   Sparkles,
   UserCheck,
-  Phone,
   MapPin,
-  FileText,
-  Clock,
-  Paperclip,
   Upload,
-  Layers,
-  Wrench,
-  Printer,
-  Palette,
   Hammer,
-  Package,
   Car,
-  Calendar,
   Mic,
   MicOff,
   Loader2,
@@ -32,6 +21,23 @@ import {
 type Option = { id: string; label: string };
 type CarrierOption = Option & { code: string };
 type EmployeeOption = { id: string; name: string };
+
+type BrowserSpeechRecognition = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onstart: (() => void) | null;
+  onresult: ((event: { results?: Array<Array<{ transcript?: string }>> }) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type WindowWithSpeech = Window & {
+  SpeechRecognition?: new () => BrowserSpeechRecognition;
+  webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
+};
 
 type WorkOrderFormProps = {
   clients: Option[];
@@ -65,7 +71,7 @@ export function WorkOrderForm({
   const [aiLoading, setAiLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [aiSuccessMsg, setAiSuccessMsg] = useState<string | null>(null);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
 
   const toggleRecording = () => {
     if (isRecording) {
@@ -79,7 +85,8 @@ export function WorkOrderForm({
     }
     const SpeechRecognition =
       typeof window !== 'undefined'
-        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        ? (window as unknown as WindowWithSpeech).SpeechRecognition ||
+          (window as unknown as WindowWithSpeech).webkitSpeechRecognition
         : null;
     if (!SpeechRecognition) {
       alert('Váš prohlížeč nepodporuje přímé diktování hlasem v tomto okně. Napište prosím zadání do textového pole.');
@@ -91,7 +98,7 @@ export function WorkOrderForm({
       recognition.continuous = false;
       recognition.interimResults = false;
       recognition.onstart = () => setIsRecording(true);
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event) => {
         const transcript = event.results?.[0]?.[0]?.transcript;
         if (transcript) {
           setAiPrompt((prev) => (prev ? `${prev} ${transcript}` : transcript));
