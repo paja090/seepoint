@@ -47,7 +47,10 @@ type AiSalesPitchData = {
     type: string;
     city: string;
     distanceKm?: number;
+    availabilityStatus?: 'AVAILABLE' | 'OCCUPIED';
+    availabilityLabel?: string;
   }>;
+  generatedAt?: string;
 };
 
 export type OpportunityItem = {
@@ -151,20 +154,39 @@ const mediaLabels: Record<string, string> = {
 
 export function OpportunityCard({
   item,
+  isHighlighted = false,
   onPrepareProposal,
   onLinkCrm,
   onUpdateStatus,
   onChanged,
 }: {
   item: OpportunityItem;
+  isHighlighted?: boolean;
   onChanged: () => void;
   onPrepareProposal: (item: OpportunityItem) => void;
   onLinkCrm: (item: OpportunityItem) => void;
   onUpdateStatus: (id: string, status: OpportunityStatus, dismissedReason?: string) => void;
 }) {
+  const rawMeta = item.scoreReasons && typeof item.scoreReasons === 'object' && !Array.isArray(item.scoreReasons)
+    ? (item.scoreReasons as {
+        reasons?: OpportunityScoreReason[];
+        components?: {
+          relevance: number;
+          freshness: number;
+          locationFit: number;
+          companyFit: number;
+          confidence: number;
+        };
+        evidenceFact?: string | null;
+        aiInterpretation?: string | null;
+        aiRecommendation?: string | null;
+        aiSalesPitch?: AiSalesPitchData | null;
+      })
+    : null;
+
   const [showReasons, setShowReasons] = useState(false);
-  const [salesPitch, setSalesPitch] = useState<AiSalesPitchData | null>(null);
-  const [pitchOpen, setPitchOpen] = useState(false);
+  const [salesPitch, setSalesPitch] = useState<AiSalesPitchData | null>(rawMeta?.aiSalesPitch || null);
+  const [pitchOpen, setPitchOpen] = useState<boolean>(Boolean(isHighlighted && rawMeta?.aiSalesPitch));
   const [pitchLoading, setPitchLoading] = useState(false);
   const [pitchActionBusy, setPitchActionBusy] = useState(false);
   const [pitchFeedback, setPitchFeedback] = useState<{ ok: boolean; text: string } | null>(null);
@@ -239,21 +261,6 @@ export function OpportunityCard({
 
   const scoreBadge = getScoreBadge(item.opportunityScore);
   const eventMeta = eventTypeLabels[item.eventType] || eventTypeLabels.OTHER;
-  const rawMeta = item.scoreReasons && typeof item.scoreReasons === 'object' && !Array.isArray(item.scoreReasons)
-    ? (item.scoreReasons as {
-        reasons?: OpportunityScoreReason[];
-        components?: {
-          relevance: number;
-          freshness: number;
-          locationFit: number;
-          companyFit: number;
-          confidence: number;
-        };
-        evidenceFact?: string | null;
-        aiInterpretation?: string | null;
-        aiRecommendation?: string | null;
-      })
-    : null;
 
   const reasonsList = rawMeta?.reasons || (Array.isArray(item.scoreReasons) ? (item.scoreReasons as OpportunityScoreReason[]) : []);
   const components = rawMeta?.components;
@@ -268,7 +275,14 @@ export function OpportunityCard({
     : 'Datum nepotvrzeno';
 
   return (
-    <article className="ai-radar-card group rounded-2xl border border-slate-800 bg-slate-900/90 p-5 space-y-4 transition">
+    <article
+      id={`opportunity-card-${item.id}`}
+      className={`ai-radar-card group rounded-2xl border p-5 space-y-4 transition ${
+        isHighlighted
+          ? 'border-emerald-500/80 bg-slate-900 ring-2 ring-emerald-500/30 shadow-xl'
+          : 'border-slate-800 bg-slate-900/90'
+      }`}
+    >
       {/* Top Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3.5">
         <div className="flex flex-wrap items-center gap-2">
@@ -757,17 +771,29 @@ export function OpportunityCard({
                     <span>Naše nosiče v okolí ({salesPitch.nearbyCarriers.length}):</span>
                   </div>
                   {salesPitch.nearbyCarriers.length > 0 ? (
-                    <ul className="space-y-1 text-xs text-slate-300">
+                    <ul className="space-y-1.5 text-xs text-slate-300">
                       {salesPitch.nearbyCarriers.map((c) => (
-                        <li key={c.id} className="flex items-center justify-between gap-2">
+                        <li key={c.id} className="flex flex-wrap items-center justify-between gap-2">
                           <span className="truncate">
                             <strong className="text-white">{c.code}</strong> · {c.name} ({c.city})
                           </span>
-                          {c.distanceKm !== undefined && (
-                            <span className="shrink-0 text-[11px] font-bold text-emerald-400">
-                              {c.distanceKm} km
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span
+                              className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold border ${
+                                c.availabilityStatus === 'OCCUPIED'
+                                  ? 'bg-amber-950/70 text-amber-300 border-amber-800/60'
+                                  : 'bg-emerald-950/70 text-emerald-300 border-emerald-800/60'
+                              }`}
+                            >
+                              {c.availabilityStatus === 'OCCUPIED' ? '🟡 ' : '🟢 '}
+                              {c.availabilityLabel || 'Volný ihned'}
                             </span>
-                          )}
+                            {c.distanceKm !== undefined && (
+                              <span className="text-[11px] font-bold text-slate-400">
+                                {c.distanceKm} km
+                              </span>
+                            )}
+                          </div>
                         </li>
                       ))}
                     </ul>

@@ -49,11 +49,21 @@ export function SalesOpportunitiesClientView({
     }
   );
   const [filters, setFilters] = useState<FilterState>(initialFilters);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isAutoDiscovering, setIsAutoDiscovering] = useState(false);
   const [manualModalOpen, setManualModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlId = new URLSearchParams(window.location.search).get('id');
+      if (urlId) {
+        setHighlightedId(urlId);
+      }
+    }
+  }, []);
 
   // Copilot integration state
   const [copilotModalOpen, setCopilotModalOpen] = useState(false);
@@ -102,6 +112,7 @@ export function SalesOpportunitiesClientView({
 
   const handleResetFilters = () => {
     setFilters(initialFilters);
+    setHighlightedId(null);
   };
 
   const handleUpdateStatus = async (id: string, status: string, dismissedReason?: string) => {
@@ -236,6 +247,21 @@ export function SalesOpportunitiesClientView({
       <RadarDuplicateReview onChanged={fetchOpportunities} />
 
       {/* Card List */}
+      {highlightedId && items.some((i) => i.id === highlightedId) && (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-700/60 bg-emerald-950/50 px-4 py-2.5 text-xs text-emerald-200">
+          <span className="font-bold">
+            🎯 Zvýrazněna vybraná příležitost z AI Obchodního centra (nahoře v seznamu).
+          </span>
+          <button
+            type="button"
+            onClick={() => setHighlightedId(null)}
+            className="rounded-lg bg-slate-900/80 border border-slate-700 px-2.5 py-1 text-[11px] font-bold text-slate-200 hover:text-white cursor-pointer"
+          >
+            Zrušit zvýraznění
+          </button>
+        </div>
+      )}
+
       <div className="space-y-4">
         {loading ? (
           <div className="flex items-center justify-center py-12 text-slate-400 gap-2">
@@ -251,16 +277,25 @@ export function SalesOpportunitiesClientView({
             </p>
           </div>
         ) : (
-          items.map((item) => (
-            <OpportunityCard
-              key={item.id}
-              item={item}
-              onChanged={fetchOpportunities}
-              onPrepareProposal={handlePrepareProposal}
-              onLinkCrm={handleLinkCrm}
-              onUpdateStatus={(id, status, reason) => handleUpdateStatus(id, status, reason)}
-            />
-          ))
+          [...items]
+            .sort((a, b) => {
+              if (highlightedId) {
+                if (a.id === highlightedId) return -1;
+                if (b.id === highlightedId) return 1;
+              }
+              return 0;
+            })
+            .map((item) => (
+              <OpportunityCard
+                key={item.id}
+                item={item}
+                isHighlighted={item.id === highlightedId}
+                onChanged={fetchOpportunities}
+                onPrepareProposal={handlePrepareProposal}
+                onLinkCrm={handleLinkCrm}
+                onUpdateStatus={(id, status, reason) => handleUpdateStatus(id, status, reason)}
+              />
+            ))
         )}
       </div>
 

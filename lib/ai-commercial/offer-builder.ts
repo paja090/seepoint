@@ -550,15 +550,17 @@ PRAVIDLA:
   "strategySummary": "string (shrnutí strategie a výběru lokalit)"
 }`;
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.3, response_mime_type: 'application/json' },
-        }),
-      });
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.3, response_mime_type: 'application/json' },
+          }),
+        }
+      );
 
       if (resp.ok) {
         const data = (await resp.json()) as {
@@ -668,6 +670,15 @@ PRAVIDLA:
 
   // 7. Compile Human Review Checklist
   const reviewChecklist: OfferReviewChecklistItem[] = [];
+
+  if (hasApproximateDates) {
+    reviewChecklist.push({
+      id: 'review-dates',
+      label: 'Potvrzení orientačního termínu kampaně',
+      detail: `Klient neuvedl přesné datum OD–DO. AI nastavila orientační rámec (${dateFromStr} až ${dateToStr}) – upřesněte jej s klientem.`,
+      status: 'warning',
+    });
+  }
 
   if (altCount > 0) {
     reviewChecklist.push({
