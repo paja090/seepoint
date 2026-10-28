@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { enterTenantContext } from '@/lib/tenant-context';
+import { buildLocalityDescription } from '@/lib/catalog/locality-description';
 import { normalizeClientName } from '@/lib/crm/domain';
 import { createOffer } from '@/lib/offers/service';
 import type { CurrentUser } from '@/lib/rbac';
@@ -92,80 +93,7 @@ function buildDisplaySurfaceTitle(surfaceName: string | null | undefined, carrie
   return sName;
 }
 
-function buildLocalityAiDescription(carrier: {
-  name?: string | null;
-  city?: string | null;
-  street?: string | null;
-  locality?: string | null;
-  address?: string | null;
-  type?: string | null;
-}): string {
-  const rawName = (carrier.name || '').trim();
-  const city = (carrier.city || '').trim();
-  const street = (carrier.street || '').trim();
-  const locality = (carrier.locality || '').trim();
-  const text = `${rawName} ${street} ${locality} ${carrier.address || ''}`.toLowerCase();
-
-  const locLabel = [
-    city,
-    locality && locality.toLowerCase() !== city.toLowerCase() ? locality : '',
-    street && !rawName.toLowerCase().includes(street.toLowerCase()) ? `ul. ${street}` : '',
-  ]
-    .filter(Boolean)
-    .join(' – ');
-
-  const smerMatch = rawName.match(/sm[ěe]r\s+([^,()]+)/i);
-  const smerText = smerMatch ? ` ve směru na ${smerMatch[1].trim()}` : '';
-
-  let formatContext = 'Atraktivní reklamní plocha';
-  if (carrier.type === 'PROMO_BENCH') {
-    formatContext = 'Reklamní lavička přímo v pěší zóně a u zastávky';
-  } else if (carrier.type === 'CITY_POSTER') {
-    formatContext = 'Osvětlená vitrína City Poster (CLP) v úrovni očí chodců i řidičů';
-  } else if (carrier.type === 'PROMO_HORIZON') {
-    formatContext = 'Vyvýšený reklamní horizont s výbornou viditelností z dálky';
-  } else if (carrier.type === 'PROMO_TOWER' || carrier.type === 'PROMO_MINITOWER') {
-    formatContext = 'Nepřehlédnutelná čtyřstranná reklamní věž (360° zásah)';
-  } else if (carrier.type === 'CITYLIGHT') {
-    formatContext = 'Prémiová prosvětlená vitrína Citylight (CLV) s 24/7 viditelností';
-  } else if (carrier.type === 'BILLBOARD') {
-    formatContext = 'Velkoformátový billboard u hlavního dopravního tahu';
-  } else if (carrier.type === 'BIGBOARD') {
-    formatContext = 'Dominantní bigboard s maximálním dosahem na hlavní tepně';
-  }
-
-  const highlights: string[] = [];
-  if (/mhd|zast[aá]vk|autobus|tramvaj|podchod|[žz]el\.?\s*st|n[aá]dra[žz]/i.test(text)) {
-    highlights.push('vysoká denní frekvence cestujících MHD a pěších');
-  }
-  if (
-    /kaufland|futurum|avion|tesco|lidl|penny|albert|billa|globus|obch\.?\s*d[uů]m|n[aá]kupn|oc\b|koksovna|baumax/i.test(
-      text
-    )
-  ) {
-    highlights.push('silný nákupní provoz a přímý zásah zákazníků obchodního centra');
-  }
-  if (/koupali[šs]t|baz[eé]n|stadion|ar[eé]na|park|zoo|dov|sport|h[aá]zen/i.test(text)) {
-    highlights.push('oblíbená volnočasová a návštěvnická zóna s dlouhou dobou kontaktu');
-  }
-  if (
-    /k[řr]i[žz]ovatk|kruhov|most|rudn[aá]|m[ií]steck[aá]|plze[ňn]sk[aá]|v[yý][šs]kovick[aá]|osvobozen[ií]|hlavn[ií]|t[řr]\./i.test(
-      text
-    )
-  ) {
-    highlights.push('intenzivní automobilová doprava a zpomalený provoz');
-  }
-  if (/nemocnic|poliklinik|[uú][řr]ad|po[šs]t|[šs]kol/i.test(text)) {
-    highlights.push('spádové místo občanské vybavenosti s celodenním pohybem obyvatel');
-  }
-  if (highlights.length === 0) {
-    highlights.push('stabilní denní pohyb místních obyvatel, chodců i projíždějících vozidel');
-  }
-
-  return `${formatContext} v lokalitě ${locLabel || city}${smerText}. Lokalitu charakterizuje ${highlights
-    .slice(0, 2)
-    .join(' a ')}.`;
-}
+const buildLocalityAiDescription = buildLocalityDescription;
 
 type SystemPriceListItem = {
   id: string;
@@ -447,7 +375,7 @@ export async function GET(request: Request) {
           carrier: {
             organizationId,
             archivedAt: null,
-            status: { not: 'MAINTENANCE' },
+            status: 'ACTIVE',
             type: { not: 'NAVIGATION' },
           },
         },
@@ -471,7 +399,7 @@ export async function GET(request: Request) {
               photos: {
                 where: { isPrivate: false, type: { not: 'EXPENSE_RECEIPT' } },
                 orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
-                take: 2,
+                take: 6,
                 select: { id: true, url: true },
               },
             },
@@ -479,7 +407,7 @@ export async function GET(request: Request) {
           photos: {
             where: { isPrivate: false, type: { not: 'EXPENSE_RECEIPT' } },
             orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
-            take: 2,
+            take: 6,
             select: { id: true, url: true },
           },
           occupancies: {
@@ -523,15 +451,24 @@ export async function GET(request: Request) {
       .map((s) => {
         const pricing = resolveSystemSurfacePricing(s, priceListItems, priceRules);
 
-        // Resolve photo URL
-        const primaryPhoto = s.photos[0] || s.carrier.photos[0] || null;
+        // Resolve photo gallery (surface photos first, then carrier photos, deduplicated)
+        const allPhotos = [...s.photos, ...s.carrier.photos].filter(
+          (photo, index, all) => all.findIndex((p) => p.id === photo.id) === index
+        );
+        const photoUrls = allPhotos.map(
+          (photo) =>
+            `/api/client/catalog/photos/${photo.id}?org=${encodeURIComponent(organizationId)}`
+        );
+        const primaryPhoto = allPhotos[0] || null;
         const photoUrl = primaryPhoto
           ? `/api/client/catalog/photos/${primaryPhoto.id}?org=${encodeURIComponent(organizationId)}&thumbnail=1`
           : null;
 
-        // Resolve availability in [dateFrom, dateTo]
+        // Availability: a surface is offered as free only when its system status is AVAILABLE
+        // and there is no occupancy overlapping the requested period.
         const latestOccupancy = s.occupancies[0] || null;
-        const isAvailable = !latestOccupancy;
+        const statusBlocked = String(s.status) !== 'AVAILABLE';
+        const isAvailable = !latestOccupancy && !statusBlocked;
         const occupiedUntil = latestOccupancy ? latestOccupancy.dateTo.toISOString().slice(0, 10) : null;
         const nextAvailableFrom = latestOccupancy
           ? new Date(latestOccupancy.dateTo.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
@@ -580,6 +517,7 @@ export async function GET(request: Request) {
           minQuantity: pricing.minQuantity,
           priceListName: pricing.priceListName,
           photoUrl,
+          photoUrls,
           isAvailable,
           occupiedUntil,
           nextAvailableFrom,
