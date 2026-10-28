@@ -42,6 +42,8 @@ export type CatalogSurfaceItem = {
   directionDescription: string;
   monthlyPrice: number;
   printInstallPrice: number;
+  minQuantity?: number;
+  priceListName?: string | null;
   photoUrl: string | null;
   isAvailable: boolean;
   occupiedUntil: string | null;
@@ -521,29 +523,49 @@ export function PublicInventoryCatalogView() {
                 <button
                   type="button"
                   onClick={() => setSelectedCity('')}
-                  className={`rounded-xl px-2.5 py-1 text-xs font-bold transition cursor-pointer ${
+                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
                     selectedCity === ''
-                      ? 'bg-sky-600 text-white'
+                      ? 'bg-sky-600 text-white shadow-sm'
                       : 'bg-slate-950 text-slate-300 border border-slate-800 hover:bg-slate-800'
                   }`}
                 >
-                  Všechna města ({items.length})
+                  Všechna města
                 </button>
-                {cities.slice(0, 12).map((city) => {
-                  const count = items.filter((i) => i.city === city).length;
+                {cities.map((city) => {
+                  const hasFreeInCity = items.some(
+                    (i) =>
+                      i.city.trim().toLowerCase() === city.trim().toLowerCase() &&
+                      (!selectedMediaType || i.mediaType === selectedMediaType) &&
+                      i.isAvailable
+                  );
                   const active = selectedCity.toLowerCase() === city.toLowerCase();
                   return (
                     <button
                       key={city}
                       type="button"
                       onClick={() => setSelectedCity(active ? '' : city)}
-                      className={`rounded-xl px-2.5 py-1 text-xs font-bold transition cursor-pointer ${
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
                         active
-                          ? 'bg-sky-600 text-white'
+                          ? 'bg-sky-600 text-white shadow-sm'
                           : 'bg-slate-950 text-slate-300 border border-slate-800 hover:bg-slate-800'
                       }`}
+                      title={
+                        hasFreeInCity
+                          ? `${city} – volné plochy k dispozici`
+                          : `${city} – zobrazit plochy`
+                      }
                     >
-                      {city} ({count})
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          hasFreeInCity ? 'bg-emerald-400' : 'bg-amber-400'
+                        }`}
+                      />
+                      <span>{city}</span>
+                      {active && hasFreeInCity && (
+                        <span className="text-[10px] font-semibold text-sky-100/90">
+                          · volné plochy
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -613,29 +635,44 @@ export function PublicInventoryCatalogView() {
           {/* LEFT 8 COLUMNS: SURFACE CARDS */}
           <div className="lg:col-span-8 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-bold text-slate-400">
-                Nalezeno <strong className="text-white">{filteredItems.length}</strong> reklamních
-                ploch{' '}
-                {selectedCity ? (
-                  <>
-                    v lokalitě <strong className="text-sky-300">{selectedCity}</strong>
-                  </>
-                ) : null}
-              </p>
+              <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-300">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-emerald-300">
+                  <span>🟢 Volné plochy k dispozici</span>
+                </span>
+                {selectedCity && (
+                  <span className="text-slate-400">
+                    Město: <strong className="text-sky-300">{selectedCity}</strong>
+                  </span>
+                )}
+                {selectedMediaType && (
+                  <span className="text-slate-400">
+                    Formát:{' '}
+                    <strong className="text-purple-300">
+                      {MEDIA_TYPE_LABELS[selectedMediaType]?.label || selectedMediaType}
+                    </strong>
+                  </span>
+                )}
+              </div>
 
               {filteredItems.some((i) => i.isAvailable) && (
                 <button
                   type="button"
                   onClick={() => {
+                    const batchSize =
+                      selectedMediaType === 'PROMO_BENCH'
+                        ? 6
+                        : selectedMediaType === 'PROMO_HORIZON'
+                          ? 10
+                          : 6;
                     const availIds = filteredItems
                       .filter((i) => i.isAvailable)
-                      .slice(0, 10)
+                      .slice(0, batchSize)
                       .map((i) => i.surfaceId);
                     setSelectedIds((prev) => Array.from(new Set([...prev, ...availIds])));
                   }}
                   className="text-xs font-bold text-emerald-400 hover:underline cursor-pointer"
                 >
-                  + Vybrat všechny volné plochy ve filtru (max. 10)
+                  + Přidat doporučený balíček volných ploch do nabídky
                 </button>
               )}
             </div>
@@ -644,7 +681,7 @@ export function PublicInventoryCatalogView() {
               <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-16 text-center space-y-3">
                 <Loader2 className="w-8 h-8 animate-spin text-emerald-400 mx-auto" />
                 <p className="text-sm font-bold text-slate-300">
-                  Načítám volné reklamní plochy a ceník…
+                  Načítám volné reklamní plochy a systémový ceník…
                 </p>
               </div>
             ) : filteredItems.length === 0 ? (
@@ -654,7 +691,7 @@ export function PublicInventoryCatalogView() {
                   Žádné plochy neodpovídají zvolenému filtru
                 </h3>
                 <p className="text-xs text-slate-400 max-w-md mx-auto">
-                  Zkuste zrušit filtr města nebo odškrtnout volbu „Pouze volné ve zvoleném termínu“.
+                  Zkuste zrušit filtr města nebo vybrat jiný formát reklamního nosiče.
                 </p>
                 <button
                   type="button"
@@ -702,11 +739,12 @@ export function PublicInventoryCatalogView() {
                           ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-950 to-indigo-950/60 p-4 text-center">
                               <span className="text-3xl mb-1">{mediaMeta.icon}</span>
-                              <span className="text-xs font-black text-slate-300">
+                              <span className="text-xs font-black text-slate-200">
                                 {mediaMeta.label}
                               </span>
-                              <span className="text-[11px] text-slate-500 mt-0.5">
-                                {item.size}
+                              <span className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">
+                                {item.city}
+                                {item.street ? ` · ${item.street}` : ''}
                               </span>
                             </div>
                           )}
@@ -725,7 +763,7 @@ export function PublicInventoryCatalogView() {
                               }`}
                             >
                               {item.isAvailable
-                                ? '🟢 Volné v termínu'
+                                ? '🟢 Volná plocha'
                                 : `🟡 Obsazeno do ${new Date(item.occupiedUntil!).toLocaleDateString('cs-CZ')}`}
                             </span>
                           </div>
@@ -754,22 +792,35 @@ export function PublicInventoryCatalogView() {
                         {/* Card Body */}
                         <div className="p-4 space-y-2.5">
                           <div>
-                            <div className="flex items-center gap-1.5 text-xs font-extrabold text-sky-400">
-                              <MapPin className="w-3.5 h-3.5 shrink-0" />
-                              <span>
-                                {item.city}
-                                {item.street ? ` · ${item.street}` : ''}
-                              </span>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 text-xs font-extrabold text-sky-400">
+                                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                                <span>
+                                  {item.city}
+                                  {item.street ? ` · ${item.street}` : ''}
+                                </span>
+                              </div>
+                              {item.minQuantity && item.minQuantity > 1 && (
+                                <span className="rounded-md bg-indigo-950/80 border border-indigo-700/60 px-2 py-0.5 text-[10px] font-bold text-indigo-200 shrink-0">
+                                  Ceník od {item.minQuantity} ks
+                                </span>
+                              )}
                             </div>
-                            <h3 className="text-sm font-black text-white mt-0.5 line-clamp-1">
+                            <h3 className="text-sm font-black text-white mt-1 line-clamp-1">
                               {item.surfaceName || item.carrierName}
                             </h3>
                           </div>
 
                           {item.directionDescription && (
-                            <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
-                              {item.directionDescription}
-                            </p>
+                            <div className="rounded-xl bg-slate-950/75 border border-slate-800/90 p-2.5 space-y-1">
+                              <div className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-purple-300">
+                                <Sparkles className="w-3 h-3 text-purple-400 shrink-0" />
+                                <span>Popis lokality & nosiče</span>
+                              </div>
+                              <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed">
+                                {item.directionDescription}
+                              </p>
+                            </div>
                           )}
 
                           {!item.isAvailable && item.nextAvailableFrom && (
@@ -811,6 +862,12 @@ export function PublicInventoryCatalogView() {
                             </strong>{' '}
                             bez DPH
                           </div>
+                          {item.printInstallPrice > 0 && (
+                            <div className="text-[10px] text-slate-500 mt-0.5">
+                              + výroba a instalace {item.printInstallPrice.toLocaleString('cs-CZ')}{' '}
+                              Kč / ks
+                            </div>
+                          )}
                         </div>
 
                         <button
