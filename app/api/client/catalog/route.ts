@@ -92,7 +92,7 @@ function buildDisplaySurfaceTitle(surfaceName: string | null | undefined, carrie
   return sName;
 }
 
-export function buildLocalityAiDescription(carrier: {
+function buildLocalityAiDescription(carrier: {
   name?: string | null;
   city?: string | null;
   street?: string | null;
