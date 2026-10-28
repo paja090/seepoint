@@ -45,6 +45,7 @@ export type CatalogSurfaceItem = {
   minQuantity?: number;
   priceListName?: string | null;
   photoUrl: string | null;
+  photoUrls?: string[];
   isAvailable: boolean;
   occupiedUntil: string | null;
   nextAvailableFrom: string | null;
@@ -116,6 +117,8 @@ export function PublicInventoryCatalogView() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [includePrintAndInstall, setIncludePrintAndInstall] = useState<boolean>(true);
   const [failedPhotos, setFailedPhotos] = useState<Record<string, boolean>>({});
+  const [detailItem, setDetailItem] = useState<CatalogSurfaceItem | null>(null);
+  const [detailPhotoIndex, setDetailPhotoIndex] = useState(0);
 
   // Checkout Form
   const [companyId, setCompanyId] = useState('');
@@ -725,7 +728,22 @@ export function PublicInventoryCatalogView() {
                     >
                       <div>
                         {/* Photo / Visual Header */}
-                        <div className="relative h-44 bg-slate-950 overflow-hidden border-b border-slate-800/80">
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            setDetailItem(item);
+                            setDetailPhotoIndex(0);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              setDetailItem(item);
+                              setDetailPhotoIndex(0);
+                            }
+                          }}
+                          title="Zobrazit detail, fotografie a okolí nosiče"
+                          className="relative h-44 bg-slate-950 overflow-hidden border-b border-slate-800/80 cursor-zoom-in"
+                        >
                           {showPhoto ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
@@ -764,7 +782,9 @@ export function PublicInventoryCatalogView() {
                             >
                               {item.isAvailable
                                 ? '🟢 Volná plocha'
-                                : `🟡 Obsazeno do ${new Date(item.occupiedUntil!).toLocaleDateString('cs-CZ')}`}
+                                : item.occupiedUntil
+                                  ? `🟡 Obsazeno do ${new Date(item.occupiedUntil).toLocaleDateString('cs-CZ')}`
+                                  : '🟡 Aktuálně obsazeno'}
                             </span>
                           </div>
 
@@ -779,6 +799,7 @@ export function PublicInventoryCatalogView() {
                                   href={`https://www.google.com/maps?q=&layer=c&cbll=${item.latitude},${item.longitude}`}
                                   target="_blank"
                                   rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
                                   className="inline-flex items-center gap-1 rounded-md bg-slate-950/90 hover:bg-sky-950 border border-slate-700 px-2 py-0.5 text-[10px] font-bold text-sky-300 transition"
                                   title="Zobrazit přesné místo na Google Street View"
                                 >
@@ -872,14 +893,19 @@ export function PublicInventoryCatalogView() {
 
                         <button
                           type="button"
+                          disabled={!item.isAvailable && !item.nextAvailableFrom}
                           onClick={() => toggleSurface(item.surfaceId)}
-                          className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-extrabold transition cursor-pointer shrink-0 ${
-                            isSelected
-                              ? 'bg-emerald-500 text-slate-950 shadow-md'
-                              : 'bg-slate-800 hover:bg-emerald-600 text-white border border-slate-700'
+                          className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-extrabold transition shrink-0 ${
+                            !item.isAvailable && !item.nextAvailableFrom
+                              ? 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
+                              : isSelected
+                                ? 'bg-emerald-500 text-slate-950 shadow-md cursor-pointer'
+                                : 'bg-slate-800 hover:bg-emerald-600 text-white border border-slate-700 cursor-pointer'
                           }`}
                         >
-                          {isSelected ? (
+                          {!item.isAvailable && !item.nextAvailableFrom ? (
+                            <span>Nedostupné</span>
+                          ) : isSelected ? (
                             <>
                               <Check className="w-4 h-4" />
                               <span>Vybráno</span>
@@ -898,6 +924,163 @@ export function PublicInventoryCatalogView() {
               </div>
             )}
           </div>
+
+          {/* DETAIL MODAL: photos, map and surroundings */}
+          {detailItem && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-6"
+              onClick={() => setDetailItem(null)}
+            >
+              <div
+                className="relative w-full max-w-4xl max-h-[92vh] overflow-y-auto rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={() => setDetailItem(null)}
+                  className="absolute top-3 right-3 z-10 rounded-full bg-slate-950/90 border border-slate-700 px-3 py-1 text-xs font-bold text-white hover:bg-slate-800 cursor-pointer"
+                >
+                  ✕ Zavřít
+                </button>
+
+                {(() => {
+                  const photos = detailItem.photoUrls ?? [];
+                  const hasPhotos = photos.length > 0;
+                  const currentIdx = Math.min(detailPhotoIndex, Math.max(photos.length - 1, 0));
+                  const hasCoords =
+                    typeof detailItem.latitude === 'number' &&
+                    typeof detailItem.longitude === 'number';
+                  return (
+                    <div className="space-y-4 p-4 sm:p-6">
+                      <div className="pr-20">
+                        <div className="text-xs font-extrabold text-sky-400">
+                          {detailItem.city}
+                          {detailItem.street ? ` · ${detailItem.street}` : ''}
+                        </div>
+                        <h3 className="text-lg font-black text-white">
+                          {detailItem.carrierCode} · {detailItem.surfaceName || detailItem.carrierName}
+                        </h3>
+                        <p className="text-xs text-slate-400">{detailItem.size}</p>
+                      </div>
+
+                      {hasPhotos ? (
+                        <div className="space-y-2">
+                          <div className="relative overflow-hidden rounded-2xl bg-slate-950 border border-slate-800">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={photos[currentIdx]}
+                              alt={`${detailItem.carrierCode} fotografie ${currentIdx + 1}`}
+                              className="w-full max-h-[55vh] object-contain"
+                            />
+                            {photos.length > 1 && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setDetailPhotoIndex((currentIdx - 1 + photos.length) % photos.length)
+                                  }
+                                  className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-slate-950/80 border border-slate-700 w-9 h-9 text-white font-black cursor-pointer hover:bg-slate-800"
+                                  aria-label="Předchozí fotografie"
+                                >
+                                  ‹
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setDetailPhotoIndex((currentIdx + 1) % photos.length)}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-slate-950/80 border border-slate-700 w-9 h-9 text-white font-black cursor-pointer hover:bg-slate-800"
+                                  aria-label="Další fotografie"
+                                >
+                                  ›
+                                </button>
+                              </>
+                            )}
+                          </div>
+                          {photos.length > 1 && (
+                            <div className="flex gap-2 overflow-x-auto">
+                              {photos.map((url, idx) => (
+                                <button
+                                  key={url}
+                                  type="button"
+                                  onClick={() => setDetailPhotoIndex(idx)}
+                                  className={`shrink-0 overflow-hidden rounded-lg border-2 cursor-pointer ${
+                                    idx === currentIdx ? 'border-emerald-400' : 'border-slate-800'
+                                  }`}
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={`${url}&thumbnail=1`}
+                                    alt={`Náhled ${idx + 1}`}
+                                    className="h-14 w-20 object-cover"
+                                  />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 p-6 text-center text-xs text-slate-400">
+                          Fotografie nosiče zatím není k dispozici – podívejte se na mapu a Street View níže.
+                        </div>
+                      )}
+
+                      {detailItem.directionDescription && (
+                        <p className="rounded-xl bg-slate-950/75 border border-slate-800 p-3 text-xs text-slate-300 leading-relaxed">
+                          {detailItem.directionDescription}
+                        </p>
+                      )}
+
+                      {hasCoords && (
+                        <div className="space-y-2">
+                          <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                            Okolí nosiče
+                          </div>
+                          <iframe
+                            title={`Mapa ${detailItem.carrierCode}`}
+                            src={`https://www.google.com/maps?q=${detailItem.latitude},${detailItem.longitude}&z=17&output=embed`}
+                            className="w-full h-72 rounded-2xl border border-slate-800"
+                            loading="lazy"
+                            referrerPolicy="no-referrer-when-downgrade"
+                          />
+                          <a
+                            href={`https://www.google.com/maps?q=&layer=c&cbll=${detailItem.latitude},${detailItem.longitude}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 px-4 py-2 text-xs font-extrabold text-white"
+                          >
+                            <Eye className="w-4 h-4" />
+                            <span>Otevřít Street View (pohled do okolí)</span>
+                          </a>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-3">
+                        <div>
+                          <div className="text-sm font-black text-white">
+                            {detailItem.monthlyPrice.toLocaleString('cs-CZ')} Kč / měsíc
+                          </div>
+                          <div className="text-[11px] text-slate-400">bez DPH</div>
+                        </div>
+                        {(detailItem.isAvailable || detailItem.nextAvailableFrom) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              toggleSurface(detailItem.surfaceId);
+                              setDetailItem(null);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-5 py-2.5 text-xs font-extrabold text-slate-950 cursor-pointer"
+                          >
+                            {selectedIds.includes(detailItem.surfaceId)
+                              ? 'Odebrat z nabídky'
+                              : 'Přidat do nabídky'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
 
           {/* RIGHT 4 COLUMNS: STICKY SELF-SERVICE OFFER CONFIGURATOR */}
           <div className="lg:col-span-4 lg:sticky lg:top-6 space-y-4">
