@@ -392,6 +392,15 @@ export function CommercialCenterView({ data }: { data: CommercialCenterData }) {
               <TrendingUp size={14} className="text-amber-400" />
               <span>CRM Intelligence</span>
             </Link>
+            <Link
+              href="/client/catalog"
+              target="_blank"
+              className="inline-flex items-center gap-1.5 rounded-2xl border border-emerald-500/40 bg-emerald-950/60 px-3.5 py-2.5 text-xs font-bold text-emerald-300 hover:bg-emerald-900/60 transition"
+            >
+              <Layers size={14} className="text-emerald-400" />
+              <span>Katalog ploch pro klienty</span>
+              <ExternalLink size={12} />
+            </Link>
           </div>
         </div>
 
