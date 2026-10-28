@@ -861,7 +861,33 @@ export function OpportunityCard({
                     <Mail className="w-4 h-4 text-emerald-400" />
                     <span>✉️ Připravený osobní e-mail (můžete libovolně upravit):</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const origin =
+                          typeof window !== 'undefined' ? window.location.origin : 'https://os.seepoint.cz';
+                        const catalogUrl = `${origin}/client/catalog${
+                          item.city ? `?city=${encodeURIComponent(item.city)}` : ''
+                        }`;
+                        if (!salesPitch.emailBody.includes('/client/catalog')) {
+                          setSalesPitch({
+                            ...salesPitch,
+                            emailBody: `${salesPitch.emailBody.trim()}\n\nPřehled našich volných reklamních ploch v lokalitě ${
+                              item.city || 'ČR'
+                            } včetně cen a možnosti online výběru najdete přímo zde:\n${catalogUrl}`,
+                          });
+                          setPitchFeedback({
+                            ok: true,
+                            text: 'Do textu e-mailu byl vložen přímý odkaz na Katalog volných ploch pro klienta.',
+                          });
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-700/70 px-2.5 py-1 text-[11px] font-bold text-emerald-300 transition cursor-pointer"
+                    >
+                      <Layers className="w-3 h-3" />
+                      <span>+ Vložit odkaz na Katalog ploch</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => {
