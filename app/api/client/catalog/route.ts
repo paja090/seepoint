@@ -14,7 +14,10 @@ const DEFAULT_MEDIA_PRICES: Record<string, number> = {
   CITYLIGHT: 3900,
   CITY_POSTER: 2500,
   PROMO_BENCH: 1900,
-  NAVIGATION_SIGN: 1500,
+  PROMO_HORIZON: 2900,
+  PROMO_TOWER: 4200,
+  PROMO_MINITOWER: 2800,
+  FACADE: 6500,
   LED_SCREEN: 8900,
   BANNER: 3500,
   OTHER: 3500,
@@ -26,7 +29,10 @@ const PRINT_INSTALL_UNIT_PRICE: Record<string, number> = {
   CITYLIGHT: 650,
   CITY_POSTER: 450,
   PROMO_BENCH: 950,
-  NAVIGATION_SIGN: 850,
+  PROMO_HORIZON: 950,
+  PROMO_TOWER: 1400,
+  PROMO_MINITOWER: 950,
+  FACADE: 2900,
   LED_SCREEN: 0,
   BANNER: 1400,
   OTHER: 1200,
@@ -151,10 +157,12 @@ export async function GET(request: Request) {
       prisma.advertisingSurface.findMany({
         where: {
           organizationId,
+          mediaType: { not: 'NAVIGATION_SIGN' },
           carrier: {
             organizationId,
             archivedAt: null,
             status: 'ACTIVE',
+            type: { not: 'NAVIGATION' },
           },
         },
         include: {
@@ -378,6 +386,12 @@ export async function POST(request: Request) {
         where: {
           id: { in: surfaceIds },
           organizationId,
+          mediaType: { not: 'NAVIGATION_SIGN' },
+          carrier: {
+            organizationId,
+            archivedAt: null,
+            type: { not: 'NAVIGATION' },
+          },
         },
         include: {
           carrier: {
