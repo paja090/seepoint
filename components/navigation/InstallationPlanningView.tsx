@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ArrowLeft,
   Search,
+  Truck,
 } from 'lucide-react';
 
 export type PlanningPointItem = {
@@ -83,6 +84,13 @@ export function InstallationPlanningView({
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
+  };
+
+  const handleSelectWholeOrder = (orderId: string) => {
+    const orderPoints = points.filter((p) => p.orderId === orderId);
+    if (orderPoints.length === 0) return;
+    setSelectedIds(orderPoints.map((p) => p.id));
+    setShowBulkModal(true);
   };
 
   async function handleSavePlan(e: React.FormEvent) {
@@ -161,6 +169,15 @@ export function InstallationPlanningView({
               <CalendarIcon size={15} /> Naplánovat vybrané ({selectedIds.length})
             </button>
           )}
+
+          <Link
+            href="/election-removal/new"
+            className="btn border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-800 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-xs"
+            title="Otevřít v automatickém optimalizátoru tras (Terénní práce & Denní trasy)"
+          >
+            <Truck size={15} className="text-purple-600" />
+            <span>Optimalizovat trasu v Terénních pracích ↗</span>
+          </Link>
 
           <button
             onClick={handlePrintSheet}
@@ -298,15 +315,24 @@ export function InstallationPlanningView({
                     <td className="p-3.5 font-semibold text-slate-800">
                       {p.installerName || <span className="text-slate-400">Nepřiřazen</span>}
                     </td>
-                    <td className="p-3.5 text-right">
+                    <td className="p-3.5 text-right whitespace-nowrap space-x-2">
                       <button
+                        type="button"
+                        onClick={() => handleSelectWholeOrder(p.orderId)}
+                        className="text-[11px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                        title="Vybrat a naplánovat všechny body této zakázky najednou"
+                      >
+                        ⚡ Celá zakázka
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => {
                           setSelectedIds([p.id]);
                           setShowBulkModal(true);
                         }}
-                        className="text-xs font-bold text-sky-700 hover:underline inline-flex items-center gap-0.5"
+                        className="text-xs font-bold text-sky-700 hover:underline inline-flex items-center gap-0.5 cursor-pointer"
                       >
-                        Naplánovat <ChevronRight size={12} />
+                        Naplánovat bod <ChevronRight size={12} />
                       </button>
                     </td>
                   </tr>
