@@ -29,6 +29,22 @@ export type TaskSpec = {
   loadSlots: number; requiredWorkers: number; requiredPositions: string[]; requiredEquipment: string[];
   deadlineAt: Date | null; windowStart: Date | null; windowEnd: Date | null;
   layerName?: string | null;
+  // Land & Cadastre Scouting
+  cadastralArea?: string | null;
+  cadastralAreaCode?: number | null;
+  parcelNumber?: string | null;
+  parcelId?: string | null;
+  landArea?: number | null;
+  landType?: string | null;
+  landOwnership?: string | null;
+  landownerName?: string | null;
+  landownerIco?: string | null;
+  landownerContact?: string | null;
+  landownerNote?: string | null;
+  monthlyRent?: number | null;
+  permitStatus?: string | null;
+  permitNote?: string | null;
+  permitValidUntil?: Date | null;
 };
 const text = (v: unknown, max = 4000) => { if (v == null) return ''; if (typeof v !== 'string' || v.length > max) throw new Error('Neplatný nebo příliš dlouhý text.'); return v.trim(); };
 const integer = (v: unknown, min: number, max: number) => { if (typeof v !== 'number' || !Number.isInteger(v) || v < min || v > max) throw new Error(`Zadejte celé číslo ${min}–${max}.`); return v; };
@@ -68,6 +84,22 @@ export function parseTaskSpec(raw: unknown): TaskSpec {
     carrierId: text(p.carrierId, 100) || null, surfaceId: text(p.surfaceId, 100) || null, referenceUrl,
     contact: text(p.contact, 500), accessInstructions: text(p.accessInstructions),
     layerName: text(p.layerName, 200) || null,
+    // Land & Cadastre Scouting
+    cadastralArea: text(p.cadastralArea, 200) || null,
+    cadastralAreaCode: typeof p.cadastralAreaCode === 'number' ? p.cadastralAreaCode : null,
+    parcelNumber: text(p.parcelNumber, 50) || null,
+    parcelId: text(p.parcelId, 50) || null,
+    landArea: typeof p.landArea === 'number' ? p.landArea : null,
+    landType: text(p.landType, 100) || null,
+    landOwnership: text(p.landOwnership, 50) || 'UNKNOWN',
+    landownerName: text(p.landownerName, 200) || null,
+    landownerIco: text(p.landownerIco, 20) || null,
+    landownerContact: text(p.landownerContact, 500) || null,
+    landownerNote: text(p.landownerNote, 2000) || null,
+    monthlyRent: typeof p.monthlyRent === 'number' ? p.monthlyRent : null,
+    permitStatus: text(p.permitStatus, 50) || 'SCOUTING',
+    permitNote: text(p.permitNote, 2000) || null,
+    permitValidUntil: p.permitValidUntil && Number.isFinite(new Date(String(p.permitValidUntil)).getTime()) ? new Date(String(p.permitValidUntil)) : null,
     serviceMinutes: integer(p.serviceMinutes ?? calculateServiceMinutes(mediaType, quantity, null, legacyOp).totalMinutes, 1, 1440),
     deliveryMinutes: integer(p.deliveryMinutes ?? Math.max(5, quantity * 3), 1, 1440), loadSlots,
     requiredWorkers: integer(p.requiredWorkers ?? 1, 1, 20), requiredPositions: list(p.requiredPositions), requiredEquipment: list(p.requiredEquipment) };
