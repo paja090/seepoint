@@ -27,7 +27,7 @@ export const SYSTEM_MODULES: SystemModule[] = [
     name: 'Evidence & Mapa nosičů',
     description: 'Interaktivní mapa nosičů, detailní karty, GPS souřadnice, fotodokumentace a filtry',
     category: 'overview',
-    routes: ['/map', '/carriers', '/field-survey', '/mobile-field-survey'],
+    routes: ['/map', '/carriers', '/land-permits', '/field-survey', '/mobile-field-survey'],
   },
   {
     id: 'mobileSurveys',

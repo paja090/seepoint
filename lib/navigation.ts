@@ -51,6 +51,7 @@ export const navigationHubs: NavigationHub[] = [
     { label: 'Evidence & Obsazenost', items: [
       ["/map","Mapa nosičů","map","map"],
       ["/carriers","Evidence nosičů","panelsTopLeft","carriers"],
+      ["/land-permits","Pozemky & Katastr (ČÚZK)","mapPinned","carriers"],
       ["/occupancy","Obsazenost ploch","calendarRange","occupancy"],
       ["/field-survey","Terénní průzkum ploch","camera","fieldSurvey"],
       ["/mobile-surveys","Průzkum lokalit","mapPinned","navigationProjects"]

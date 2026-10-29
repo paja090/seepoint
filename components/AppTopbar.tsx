@@ -20,6 +20,7 @@ const pageTitles: Array<[string, string]> = [
   ['/crm/intelligence', 'AI CRM Intelligence'],
   ['/map', 'Mapa nosičů'],
   ['/carriers', 'Evidence nosičů'],
+  ['/land-permits', 'Pozemky & Katastr (ČÚZK)'],
   ['/field-survey', 'Terénní průzkum ploch'],
   ['/occupancy', 'Obsazenost ploch'],
   ['/clients', 'Klienti'],

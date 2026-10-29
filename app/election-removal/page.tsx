@@ -64,6 +64,7 @@ export default async function ElectionRemovalPage() {
         <ProjectSubNav
           items={[
             { href: '/election-removal', label: '🚚 Zakázky a akce', badge: totalCampaigns },
+            { href: '/land-permits', label: '🗺️ Pozemky a Katastr (ČÚZK)' },
             { href: '/fotodokumentace?source=FIELD_WORK', label: '📷 Fotodokumentace zakázek' },
           ]}
         />
