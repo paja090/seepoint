@@ -20,7 +20,10 @@ import {
   ShieldCheck,
   ArrowRight,
   Sparkles,
+  Copy,
+  Check,
 } from 'lucide-react';
+import type { AiPlotAnalysis } from '@/lib/cadastre/ai-land-scout';
 
 interface LandPermitModalProps {
   point: ElectionRemovalPoint;
@@ -54,6 +57,57 @@ export function LandPermitModal({ point, onClose, onUpdated }: LandPermitModalPr
   const [saving, setSaving] = useState(false);
   const [converting, setConverting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  // AI Evaluation & Pitch State
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<AiPlotAnalysis | null>(null);
+  const [copiedPitch, setCopiedPitch] = useState(false);
+
+  const handleRunAiAnalysis = async () => {
+    setAiLoading(true);
+    setStatusMessage(null);
+    try {
+      const res = await fetch('/api/cadastre/ai-scout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'analyze',
+          plot: {
+            label: point.label,
+            parcelNumber,
+            cadastralArea,
+            landType,
+            latitude: point.latitude,
+            longitude: point.longitude,
+            landownerName,
+            monthlyRent: monthlyRent ? Number(monthlyRent) : null,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'AI analýza selhala');
+      }
+      if (data.analysis) {
+        setAiAnalysis(data.analysis);
+        if (!monthlyRent && data.analysis.estimatedFairRentCzk) {
+          setMonthlyRent(String(data.analysis.estimatedFairRentCzk));
+        }
+        setStatusMessage('✨ AI analýza a návrh dopisu byly úspěšně vygenerovány!');
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Chyba při volání AI');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleCopyPitch = () => {
+    if (!aiAnalysis?.outreachLetterTemplate) return;
+    navigator.clipboard.writeText(aiAnalysis.outreachLetterTemplate);
+    setCopiedPitch(true);
+    setTimeout(() => setCopiedPitch(false), 2500);
+  };
 
   // Identify parcel automatically via CUZK API
   const handleIdentifyFromCuzk = async () => {
@@ -266,7 +320,27 @@ export function LandPermitModal({ point, onClose, onUpdated }: LandPermitModalPr
                   ) : (
                     <>
                       <Search className="w-3.5 h-3.5" />
-                      <span>{parcelNumber ? 'Znovu ověřit v ČÚZK' : '🔎 Načíst parcelu z Katastru'}</span>
+                      <span>{parcelNumber ? 'Znovu ověřit v ČÚZK' : '🔎 Načíst parcelu'}</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={aiLoading}
+                  onClick={handleRunAiAnalysis}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-extrabold px-3 py-1.5 text-xs shadow transition cursor-pointer"
+                  title="Vygenerovat AI analýzu komerčního potenciálu a dopis pro majitele"
+                >
+                  {aiLoading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>AI analyzuje...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>⚡ AI Argumentář & Dopis</span>
                     </>
                   )}
                 </button>
@@ -326,6 +400,70 @@ export function LandPermitModal({ point, onClose, onUpdated }: LandPermitModalPr
               </div>
             )}
           </div>
+
+          {/* AI ANALYSIS & OUTREACH RESULT */}
+          {aiAnalysis && (
+            <div className="rounded-2xl border border-indigo-500/40 bg-gradient-to-br from-indigo-950/60 via-slate-950/80 to-purple-950/60 p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-indigo-500/20 pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-400">
+                    <Sparkles size={14} />
+                  </span>
+                  <span className="font-extrabold text-sm text-white">AI Komerční Analýza & Vyjednávací argumenty</span>
+                </div>
+                <span className="rounded-full bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 text-xs font-black text-amber-300">
+                  ⭐ Skóre: {aiAnalysis.overallScore}/10 ({aiAnalysis.trafficRating})
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px]">
+                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+                  <span className="text-slate-400 block font-bold">Doporučený nosič</span>
+                  <span className="text-white font-bold">{aiAnalysis.recommendedCarrier}</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-900/60">
+                  <span className="text-emerald-400 block font-bold">Férový nájem majiteli</span>
+                  <span className="text-emerald-300 font-bold">{aiAnalysis.estimatedFairRentCzk?.toLocaleString('cs-CZ')} Kč/měs.</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-purple-950/40 border border-purple-900/60">
+                  <span className="text-purple-400 block font-bold">Tržní hodnota kampaně</span>
+                  <span className="text-purple-300 font-bold">{aiAnalysis.estimatedCampaignValueCzk?.toLocaleString('cs-CZ')} Kč/měs.</span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1.5 text-[11px]">
+                <span className="font-bold text-indigo-300 block">Klíčové argumenty pro jednání s majitelem:</span>
+                <ul className="space-y-1 text-slate-300">
+                  {aiAnalysis.negotiationPoints.map((pt, i) => (
+                    <li key={i} className="flex items-start gap-1.5">
+                      <span className="text-indigo-400">✔</span>
+                      <span>{pt}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-300">Vzor oslovovacího dopisu / e-mailu pro majitele:</span>
+                  <button
+                    type="button"
+                    onClick={handleCopyPitch}
+                    className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-2 py-1 text-[11px] transition"
+                  >
+                    {copiedPitch ? <Check size={12} className="text-emerald-300" /> : <Copy size={12} />}
+                    <span>{copiedPitch ? 'Zkopírováno!' : 'Kopírovat dopis'}</span>
+                  </button>
+                </div>
+                <textarea
+                  readOnly
+                  rows={5}
+                  value={aiAnalysis.outreachLetterTemplate}
+                  className="w-full text-[11px] font-mono p-2.5 rounded-xl border border-slate-800 bg-slate-900/90 text-slate-200 focus:outline-none"
+                />
+              </div>
+            </div>
+          )}
 
           {/* SECTION 2: LAND OWNERSHIP & LANDLORD CONTACT */}
           <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
