@@ -27,6 +27,7 @@ import {
   Share2,
   TrendingDown,
   Users,
+  Info,
 } from 'lucide-react';
 import { CatalogInteractiveMap } from './CatalogInteractiveMap';
 
@@ -132,6 +133,8 @@ export function PublicInventoryCatalogView() {
   const [activePreset, setActivePreset] = useState<string | null>(null);
   // Share selection state
   const [copiedShare, setCopiedShare] = useState(false);
+  // Impressions methodology tooltip
+  const [showImpressionsInfo, setShowImpressionsInfo] = useState(false);
 
   // Checkout Form
   const [companyId, setCompanyId] = useState('');
@@ -1373,11 +1376,23 @@ export function PublicInventoryCatalogView() {
                   </button>
 
                   {/* Estimated Reach & Impressions */}
-                  <div className="rounded-2xl border border-sky-800/50 bg-sky-950/30 p-3 text-xs space-y-1">
-                    <div className="flex items-center gap-1.5 font-extrabold text-sky-300">
-                      <Users className="w-4 h-4 text-sky-400" />
-                      <span>Odhadovaný dosah kampaně</span>
+                  <div className="rounded-2xl border border-sky-800/50 bg-sky-950/30 p-3 text-xs space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 font-extrabold text-sky-300">
+                        <Users className="w-4 h-4 text-sky-400" />
+                        <span>Odhadovaný dosah kampaně</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowImpressionsInfo((prev) => !prev)}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-sky-400 hover:text-sky-200 cursor-pointer"
+                        title="Zobrazit metodiku výpočtu zásahu"
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                        <span>{showImpressionsInfo ? 'Skrýt detail' : 'Jak se počítá?'}</span>
+                      </button>
                     </div>
+
                     <div className="flex items-baseline justify-between text-slate-300 pt-0.5">
                       <span>Denní frekvence očí:</span>
                       <strong className="text-white font-extrabold">
@@ -1390,6 +1405,15 @@ export function PublicInventoryCatalogView() {
                         ~{pricingSummary.totalCampaignImpressions.toLocaleString('cs-CZ')} zhlédnutí
                       </span>
                     </div>
+
+                    {showImpressionsInfo && (
+                      <div className="mt-2 rounded-xl bg-slate-950/90 border border-slate-800 p-2.5 text-[11px] text-slate-300 leading-relaxed space-y-1">
+                        <div className="font-extrabold text-sky-300">Metodika výpočtu (OOH standard):</div>
+                        <p>
+                          Výpočet vychází z <strong>Celostátního sčítání dopravy ŘSD</strong> (intenzita průjezdu vozidel na daných tazích), průměrné obsazenosti vozidel v ČR (<strong>1,3 osoby na vůz</strong> dle MDČR) a denního obratu cestujících MHD a pěších u zastávek a nákupních center dle mezinárodního standardu venkovní reklamy <strong>OTC (Opportunity to Contact)</strong>.
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Volume Discount Progress Banner */}
