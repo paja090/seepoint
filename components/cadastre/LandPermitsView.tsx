@@ -326,7 +326,7 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
               </div>
               <div>
                 <span className="text-slate-400 block">Doporučený postup:</span>
-                <span className="font-semibold text-emerald-800">{identifiedData.ownershipClassification === 'MUNICIPAL' ? 'Žádost Radě obce (§39)' : 'Přímá dohoda s majitelem'}</span>
+                <span className="font-semibold text-emerald-800">Přímé jednání / Nahlížení KN</span>
               </div>
             </div>
 

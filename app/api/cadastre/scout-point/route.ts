@@ -64,7 +64,6 @@ export async function POST(req: Request) {
             label: label || `Pozemek ${parcelNumber || ''} (${cadastralArea || 'ČÚZK'})`.trim(),
             latitude: Number(latitude),
             longitude: Number(longitude),
-            address: cadastralArea || null,
             status: 'PENDING',
             operationType: 'OTHER',
             mediaType: 'OTHER',
