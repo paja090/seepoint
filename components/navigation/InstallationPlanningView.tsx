@@ -171,12 +171,12 @@ export function InstallationPlanningView({
           )}
 
           <Link
-            href="/election-removal/new"
-            className="btn border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-800 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-xs"
-            title="Otevřít v automatickém optimalizátoru tras (Terénní práce & Denní trasy)"
+            href="/work/dispatch"
+            className="btn border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-xs"
+            title="Otevřít denní trasy a dispečink výjezdů (mapa a rozvrh tras)"
           >
-            <Truck size={15} className="text-purple-600" />
-            <span>Optimalizovat trasu v Terénních pracích ↗</span>
+            <Truck size={15} className="text-sky-600" />
+            <span>Denní trasy a výjezdy (Dispečink) ↗</span>
           </Link>
 
           <button
