@@ -1246,6 +1246,13 @@ model AdvertisingCarrier {
   city                 String
   region               String?
   cadastralArea        String?
+  cadastralAreaCode    Int?
+  parcelNumber         String?
+  landOwnership        String?
+  landownerName        String?
+  landownerContact     String?
+  monthlyRent          Decimal?            @db.Decimal(10, 2)
+  permitValidUntil     DateTime?
   structureCode        String?
   mountingType         MountingType        @default(UNKNOWN)
   status               CarrierStatus       @default(ACTIVE)
@@ -4796,6 +4803,24 @@ model ElectionRemovalPoint {
   referenceUrl        String?
   contact             String?
   accessInstructions  String?
+
+  // Land & Cadastre Scouting
+  cadastralArea        String?
+  cadastralAreaCode    Int?
+  parcelNumber         String?
+  parcelId             String?
+  landArea             Float?
+  landType             String?
+  landOwnership        String?                    @default("UNKNOWN")
+  landownerName        String?
+  landownerIco         String?
+  landownerContact     String?
+  landownerNote        String?
+  monthlyRent          Decimal?                   @db.Decimal(10, 2)
+  permitStatus         String?                    @default("SCOUTING")
+  permitNote           String?
+  permitValidUntil     DateTime?
+
   requiredWorkers     Int @default(1)
   requiredPositions   String[] @default([])
   requiredEquipment   String[] @default([])

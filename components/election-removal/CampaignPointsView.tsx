@@ -18,6 +18,7 @@ import {
   Plus,
   X,
   Sparkles,
+  Building2,
 } from 'lucide-react';
 import {
   ELECTION_REMOVAL_MEDIA_LABELS,
@@ -27,6 +28,7 @@ import {
 import { ElectionRemovalMap } from './ElectionRemovalMap';
 import { LocationPickerMap } from './LocationPickerMap';
 import { parsePointMetadata, cleanLayerName, isGenericLayerName } from '@/lib/election-removal/point-metadata';
+import { LandPermitModal } from './LandPermitModal';
 
 
 interface CampaignPointsViewProps {
@@ -44,6 +46,7 @@ export function CampaignPointsView({
   const [updatingPointId, setUpdatingPointId] = useState<string | null>(null);
   const [selectedPointIds, setSelectedPointIds] = useState<Set<string>>(new Set());
   const [isBatchUpdating, setIsBatchUpdating] = useState<boolean>(false);
+  const [landPermitPoint, setLandPermitPoint] = useState<ElectionRemovalPoint | null>(null);
 
   const [layerFilter, setLayerFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -809,6 +812,7 @@ export function CampaignPointsView({
                 <th className="py-2.5 px-3">Vrstva</th>
                 <th className="py-2.5 px-3">Médium & Operace</th>
                 <th className="py-2.5 px-3">GPS / Navigace</th>
+                <th className="py-2.5 px-3">Pozemek & Katastr (ČÚZK)</th>
                 <th className="py-2.5 px-3 text-center">Stav</th>
                 <th className="py-2.5 px-3 text-right">Čas demontáže</th>
                 <th className="py-2.5 px-3 text-right">Akce</th>
@@ -817,7 +821,7 @@ export function CampaignPointsView({
             <tbody className="divide-y divide-slate-100">
               {filteredPoints.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-10 text-slate-400">
+                  <td colSpan={10} className="text-center py-10 text-slate-400">
                     Žádné body neodpovídají zvolenému filtru.
                   </td>
                 </tr>
@@ -980,6 +984,65 @@ export function CampaignPointsView({
                           )}
                         </div>
                       </td>
+                      <td className="py-2.5 px-3">
+                        <div className="flex flex-col gap-1 items-start">
+                          {pt.parcelNumber ? (
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <span
+                                  className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                    pt.landOwnership === 'PRIVATE'
+                                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                      : pt.landOwnership === 'MUNICIPAL'
+                                      ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                                      : pt.landOwnership === 'STATE'
+                                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                      : 'bg-slate-100 text-slate-700'
+                                  }`}
+                                >
+                                  {pt.landOwnership === 'PRIVATE'
+                                    ? '🟢 Soukromý'
+                                    : pt.landOwnership === 'MUNICIPAL'
+                                    ? '🔵 Město'
+                                    : pt.landOwnership === 'STATE'
+                                    ? '🟠 Stát'
+                                    : '⚪ Pozemek'}
+                                </span>
+                                <span className="font-mono font-bold text-slate-800 text-[11px]">
+                                  p. č. {pt.parcelNumber}
+                                </span>
+                              </div>
+                              {pt.cadastralArea && (
+                                <p className="text-[10px] text-slate-500 truncate max-w-[150px]">
+                                  {pt.cadastralArea}
+                                </p>
+                              )}
+                              {pt.parcelId && (
+                                <a
+                                  href={`https://nahlizenidokn.cuzk.cz/ZobrazObjekt.aspx?typ=par&id=${pt.parcelId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[10px] text-sky-600 hover:underline inline-flex items-center gap-0.5 font-semibold"
+                                >
+                                  <span>Katastr ČÚZK</span>
+                                  <ExternalLink className="w-2.5 h-2.5" />
+                                </a>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 italic">Nezjištěno</span>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setLandPermitPoint(pt)}
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-2 py-0.5 rounded-md transition cursor-pointer"
+                          >
+                            <Building2 className="w-3 h-3 text-sky-600" />
+                            <span>{pt.parcelNumber ? 'Detail & Povolení' : '🔎 Zjistit parcelu'}</span>
+                          </button>
+                        </div>
+                      </td>
                       <td className="py-2.5 px-3 text-center">
                         {getStatusBadge(pt.status)}
                       </td>
@@ -1004,6 +1067,17 @@ export function CampaignPointsView({
             </tbody>
           </table>
         </div>
+      )}
+
+      {landPermitPoint && (
+        <LandPermitModal
+          point={landPermitPoint}
+          onClose={() => setLandPermitPoint(null)}
+          onUpdated={(updated) => {
+            setPoints((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+            setLandPermitPoint(null);
+          }}
+        />
       )}
     </div>
   );
