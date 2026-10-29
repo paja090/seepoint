@@ -52,8 +52,7 @@ function getAiKeys() {
 }
 
 /**
- * Intelligent fallback suggestions for major Czech regions when no AI API key is configured
- * or when offline.
+ * Rich regional presets for major Czech cities (used when offline or as immediate instant results)
  */
 const REGIONAL_PRESETS: Record<string, AiScoutedLocation[]> = {
   ostrava: [
@@ -105,6 +104,86 @@ const REGIONAL_PRESETS: Record<string, AiScoutedLocation[]> = {
       commercialRationale: 'Vysoká koncentrace bonitních nakupujících. Zpomalení vozidel před vjezdem na kruhový objezd zajišťuje maximální čtecí čas reklamy.',
       acquisitionTip: 'Rychlá domluva se správcem soukromého pozemku přilehlého parkoviště či technického zázemí.',
     },
+    {
+      id: 'ova-4',
+      title: 'Mariánskohorská – vjezd do centra u Bauhausu',
+      addressOrJunction: 'Mariánskohorská / Novoveská, Ostrava',
+      city: 'Ostrava',
+      latitude: 49.831200,
+      longitude: 18.248300,
+      propertyType: 'PRIVATE_COMMERCIAL',
+      propertyTypeLabel: 'Areál hobby marketu / autosalon',
+      trafficEstimate: '34 000+ vozidel/den',
+      visibilityScore: 9.5,
+      recommendedCarrierType: 'Bigboard 9,6 × 3,6 m',
+      estimatedMonthlyRentCzk: 6000,
+      commercialRationale: 'Hlavní spojnice z Poruby do centra Ostravy. Trvalý proud vozidel a vynikající úhel pohledu z mírného stoupání.',
+      acquisitionTip: 'Nabídnout majiteli pozemku barterovou reklamu na SeePOINT síti pro zvýšení návštěvnosti jeho provozovny.',
+    },
+    {
+      id: 'ova-5',
+      title: 'Plzeňská – u Ostravar Arény / ČEZ Arény',
+      addressOrJunction: 'Plzeňská / Závodní, Ostrava - Zábřeh',
+      city: 'Ostrava',
+      latitude: 49.804200,
+      longitude: 18.251100,
+      propertyType: 'SERVICES_GAS',
+      propertyTypeLabel: 'Čerpací stanice / Pneuservis',
+      trafficEstimate: '42 000+ vozidel/den',
+      visibilityScore: 9.7,
+      recommendedCarrierType: 'LED totem nebo Bigboard 9,6 × 3,6 m',
+      estimatedMonthlyRentCzk: 8000,
+      commercialRationale: 'Masivní denní provoz a statisíce návštěvníků sportovních i kulturních akcí v aréně. Široká světelná křižovatka s dlouhým stáním na červenou.',
+      acquisitionTip: 'Oslovit majitele soukromé části pozemku podél plotu – nosič nezabere parkovací místa pro zákazníky.',
+    },
+    {
+      id: 'ova-6',
+      title: '17. listopadu – Poruba u VŠB-TUO',
+      addressOrJunction: 'ul. 17. listopadu / Opavská, Ostrava - Poruba',
+      city: 'Ostrava',
+      latitude: 49.833500,
+      longitude: 18.163200,
+      propertyType: 'PRIVATE_COMMERCIAL',
+      propertyTypeLabel: 'Komerční parter / soukromý pozemek',
+      trafficEstimate: '29 000+ vozidel/den',
+      visibilityScore: 9.2,
+      recommendedCarrierType: 'Billboard 5,1 × 2,4 m nebo CLV panel',
+      estimatedMonthlyRentCzk: 5000,
+      commercialRationale: 'Centrum největšího ostravského obvodu. Hustá pěší i automobilová frekvence studentů a obyvatel Poruby.',
+      acquisitionTip: 'Ideální formát pro prémiový eurobillboard nebo podsvícený citylight u vjezdu do areálu.',
+    },
+    {
+      id: 'ova-7',
+      title: 'Bohumínská – výpadovka na Karvinou',
+      addressOrJunction: 'Bohumínská / Těšínská, Slezská Ostrava',
+      city: 'Ostrava',
+      latitude: 49.840200,
+      longitude: 18.299500,
+      propertyType: 'LOGISTICS_INDUSTRIAL',
+      propertyTypeLabel: 'Stavebniny / velkoobchodní dvůr',
+      trafficEstimate: '23 000+ vozidel/den',
+      visibilityScore: 9.0,
+      recommendedCarrierType: 'Billboard 5,1 × 2,4 m (oboustranný)',
+      estimatedMonthlyRentCzk: 4000,
+      commercialRationale: 'Tranzitní tah směr Bohumín a Polsko. Dlouhý rovný úsek s výbornou viditelností na plotový prostor skladového areálu.',
+      acquisitionTip: 'Rychlé schválení se soukromým majitelem areálu bez nutnosti stavebního řízení pro lehký nosič.',
+    },
+    {
+      id: 'ova-8',
+      title: 'Výškovická – nákupní centrum Kotva',
+      addressOrJunction: 'Výškovická / Čujkovova, Ostrava - Zábřeh',
+      city: 'Ostrava',
+      latitude: 49.791500,
+      longitude: 18.232100,
+      propertyType: 'RETAIL_PARK',
+      propertyTypeLabel: 'Obchodní středisko / služby',
+      trafficEstimate: '21 000+ vozidel/den',
+      visibilityScore: 9.1,
+      recommendedCarrierType: 'Billboard 5,1 × 2,4 m',
+      estimatedMonthlyRentCzk: 4500,
+      commercialRationale: 'Spádová nákupní lokalita celého sídliště Zábřeh a Výškovice. Pomalý průjezd vozidel a tramvajová křižovatka.',
+      acquisitionTip: 'Předložit správci areálu referenční smlouvu SeePOINT s garantovanou čtvrtletní platbou předem.',
+    },
   ],
   praha: [
     {
@@ -138,6 +217,38 @@ const REGIONAL_PRESETS: Record<string, AiScoutedLocation[]> = {
       estimatedMonthlyRentCzk: 8000,
       commercialRationale: 'Dynamicky rostoucí rezidenční a komerční čtvrť. Ploty podél silnice přímo lákají pro instalaci euroformátů.',
       acquisitionTip: 'Přímá domluva s místním servisem či velkoobchodem – SeePOINT garantuje převzetí veškeré byrokracie.',
+    },
+    {
+      id: 'prg-3',
+      title: 'Strakonická – výpadovka směr Příbram a Písek',
+      addressOrJunction: 'Strakonická u Zbraslavi / Radotína, Praha 5',
+      city: 'Praha',
+      latitude: 49.981200,
+      longitude: 14.391500,
+      propertyType: 'PRIVATE_COMMERCIAL',
+      propertyTypeLabel: 'Areál čerpací stanice / autosalón',
+      trafficEstimate: '48 000+ vozidel/den',
+      visibilityScore: 9.6,
+      recommendedCarrierType: 'Bigboard 9,6 × 3,6 m',
+      estimatedMonthlyRentCzk: 11000,
+      commercialRationale: 'Masivní víkendový i denní tah z jižních Čech do metropole. Skvělá dálková viditelnost.',
+      acquisitionTip: 'Využít nezastavěný pás u plotu, který majiteli negeneruje žádný zisk.',
+    },
+    {
+      id: 'prg-4',
+      title: 'Jižní spojka – nájezd Vídeňská / Kačerov',
+      addressOrJunction: 'Jižní spojka u Kačerova, Praha 4',
+      city: 'Praha',
+      latitude: 50.038500,
+      longitude: 14.461200,
+      propertyType: 'LOGISTICS_INDUSTRIAL',
+      propertyTypeLabel: 'Průmyslový a technický areál',
+      trafficEstimate: '75 000+ vozidel/den',
+      visibilityScore: 9.9,
+      recommendedCarrierType: 'Megaboard nebo Bigboard 9,6 × 3,6 m',
+      estimatedMonthlyRentCzk: 16000,
+      commercialRationale: 'Jedna z nejfrekventovanějších dopravních tepen ve střední Evropě.',
+      acquisitionTip: 'Dlouhodobý lukrativní kontrakt pro vlastníka pozemku.',
     },
   ],
   brno: [
@@ -173,77 +284,185 @@ const REGIONAL_PRESETS: Record<string, AiScoutedLocation[]> = {
       commercialRationale: 'Denní dojíždění z Blanenska a Kuřimi do Technologického parku v Brně.',
       acquisitionTip: 'Nabídnout majiteli pozemku barterovou reklamu pro jeho vlastní provozovnu zdarma.',
     },
+    {
+      id: 'brn-3',
+      title: 'Olomoucká – výpadovka na D1 a Vyškov',
+      addressOrJunction: 'Olomoucká u Černovické terasy, Brno',
+      city: 'Brno',
+      latitude: 49.184500,
+      longitude: 16.652100,
+      propertyType: 'LOGISTICS_INDUSTRIAL',
+      propertyTypeLabel: 'Logistické centrum / průmyslový park',
+      trafficEstimate: '32 000+ vozidel/den',
+      visibilityScore: 9.4,
+      recommendedCarrierType: 'Bigboard 9,6 × 3,6 m (oboustranný)',
+      estimatedMonthlyRentCzk: 7500,
+      commercialRationale: 'Příjezd do největší brněnské průmyslové zóny Černovická terasa s desítkami tisíc zaměstnanců.',
+      acquisitionTip: 'Využít oplocení soukromého areálu s přímým výhledem z dálničního přivaděče.',
+    },
+    {
+      id: 'brn-4',
+      title: 'Jihlavská – u Fakultní nemocnice Bohunice',
+      addressOrJunction: 'Jihlavská / Kamenice, Brno - Bohunice',
+      city: 'Brno',
+      latitude: 49.172400,
+      longitude: 16.571200,
+      propertyType: 'RETAIL_PARK',
+      propertyTypeLabel: 'Obchodní centrum Campus Square',
+      trafficEstimate: '39 000+ vozidel/den',
+      visibilityScore: 9.5,
+      recommendedCarrierType: 'Billboard 5,1 × 2,4 m nebo LED panel',
+      estimatedMonthlyRentCzk: 8000,
+      commercialRationale: 'Kampus Masarykovy univerzity, FN Bohunice a nákupní centrum Campus. Koncentrovaná cílová skupina.',
+      acquisitionTip: 'Oslovit soukromého vlastníka přilehlých komerčních prostor či parkoviště.',
+    },
   ],
 };
 
+function generateExtendedPresetFallback(cityOrArea: string, count = 8): AiScoutedLocation[] {
+  const norm = cityOrArea.trim().toLowerCase();
+  for (const [key, list] of Object.entries(REGIONAL_PRESETS)) {
+    if (norm.includes(key)) {
+      return list.slice(0, count);
+    }
+  }
+
+  // Realistic generic suggestions for any Czech city
+  return [
+    {
+      id: `gen-${Date.now()}-1`,
+      title: `Hlavní vjezdový koridor a obchvat (${cityOrArea})`,
+      addressOrJunction: `Výpadová silnice I. třídy u vjezdu do města, ${cityOrArea}`,
+      city: cityOrArea,
+      latitude: 49.820000,
+      longitude: 18.260000,
+      propertyType: 'PRIVATE_COMMERCIAL',
+      propertyTypeLabel: 'Soukromý komerční areál / oplocení',
+      trafficEstimate: '26 000+ vozidel/den',
+      visibilityScore: 9.5,
+      recommendedCarrierType: 'Bigboard 9,6 × 3,6 m (osvětlený)',
+      estimatedMonthlyRentCzk: 5500,
+      commercialRationale: 'Vysoká čelní viditelnost před vjezdem do města, dlouhý nájezdový úhel pro řidiče.',
+      acquisitionTip: 'Oslovit majitele soukromého areálu na parcele – snadné schválení bez průtahů na zastupitelstvu obce.',
+    },
+    {
+      id: `gen-${Date.now()}-2`,
+      title: `Světelná křižovatka u retail zóny (${cityOrArea})`,
+      addressOrJunction: `Křížení obchodní zóny a průtahu městem, ${cityOrArea}`,
+      city: cityOrArea,
+      latitude: 49.835000,
+      longitude: 18.280000,
+      propertyType: 'RETAIL_PARK',
+      propertyTypeLabel: 'Obchodní a nákupní areál',
+      trafficEstimate: '29 000+ vozidel/den',
+      visibilityScore: 9.6,
+      recommendedCarrierType: 'Billboard 5,1 × 2,4 m (oboustranný)',
+      estimatedMonthlyRentCzk: 6000,
+      commercialRationale: 'Zpomalení a stání vozidel na světlech zaručuje detailní zhlédnutí reklamního sdělení.',
+      acquisitionTip: 'Navrhnout majiteli dlouhodobou nájemní smlouvu s pravidelnou čtvrtletní platbou předem.',
+    },
+    {
+      id: `gen-${Date.now()}-3`,
+      title: `Průmyslová zóna – plot logistického areálu (${cityOrArea})`,
+      addressOrJunction: `Příjezdová komunikace k logistickému parku, ${cityOrArea}`,
+      city: cityOrArea,
+      latitude: 49.812000,
+      longitude: 18.245000,
+      propertyType: 'LOGISTICS_INDUSTRIAL',
+      propertyTypeLabel: 'Průmyslový / skladový areál',
+      trafficEstimate: '22 000+ vozidel/den',
+      visibilityScore: 9.1,
+      recommendedCarrierType: 'Bigboard 9,6 × 3,6 m',
+      estimatedMonthlyRentCzk: 4500,
+      commercialRationale: 'Trvalý proud zaměstnanců, dodavatelů a kamionové dopravy. Bezpečný odstup od silnice na soukromém pozemku.',
+      acquisitionTip: 'Garantovat převzetí veškerého servisu a pojištění, nulové starosti pro správce areálu.',
+    },
+    {
+      id: `gen-${Date.now()}-4`,
+      title: `Areál čerpací stanice / pneuservisu (${cityOrArea})`,
+      addressOrJunction: `Čerpací stanice u frekventovaného tahu, ${cityOrArea}`,
+      city: cityOrArea,
+      latitude: 49.825000,
+      longitude: 18.291000,
+      propertyType: 'GAS_STATION_SERVICES',
+      propertyTypeLabel: 'Služby motoristům / čerpací stanice',
+      trafficEstimate: '31 000+ vozidel/den',
+      visibilityScore: 9.4,
+      recommendedCarrierType: 'Billboard 5,1 × 2,4 m nebo LED totem',
+      estimatedMonthlyRentCzk: 5000,
+      commercialRationale: 'Pravidelný proud řidičů, kteří na místě tankují a mají čas vnímat reklamní plochu.',
+      acquisitionTip: 'Možnost bezplatného umístění navigační směrovky pro majitele servisu na nosiči.',
+    },
+    {
+      id: `gen-${Date.now()}-5`,
+      title: `Kruhový objezd na obchvatu (${cityOrArea})`,
+      addressOrJunction: `Okružní křižovatka na silnici I. třídy, ${cityOrArea}`,
+      city: cityOrArea,
+      latitude: 49.845000,
+      longitude: 18.265000,
+      propertyType: 'PRIVATE_COMMERCIAL',
+      propertyTypeLabel: 'Soukromý pozemek u kruhového objezdu',
+      trafficEstimate: '27 000+ vozidel/den',
+      visibilityScore: 9.3,
+      recommendedCarrierType: 'Billboard 5,1 × 2,4 m oboustranný',
+      estimatedMonthlyRentCzk: 4800,
+      commercialRationale: 'Zpomalení vozidel před kruhovým objezdem zaručuje prodloužený kontakt s reklamou.',
+      acquisitionTip: 'Jednání přímo s majitelem přilehlé zahrady či dvora u obchvatu.',
+    },
+    {
+      id: `gen-${Date.now()}-6`,
+      title: `Centrální městský koridor (${cityOrArea})`,
+      addressOrJunction: `Páteřní městská třída, ${cityOrArea}`,
+      city: cityOrArea,
+      latitude: 49.832000,
+      longitude: 18.272000,
+      propertyType: 'PRIVATE_COMMERCIAL',
+      propertyTypeLabel: 'Soukromá zástavba / obchodní dům',
+      trafficEstimate: '24 000+ vozidel/den',
+      visibilityScore: 9.2,
+      recommendedCarrierType: 'CLV panel nebo štítová stěna',
+      estimatedMonthlyRentCzk: 6500,
+      commercialRationale: 'Vysoký podíl pěších i pomalé městské dopravy v centru.',
+      acquisitionTip: 'Nabídnout majiteli moderní osvětlený nosič, který zlepší vzhled zanedbaného plotu.',
+    },
+  ].slice(0, count);
+}
+
 /**
  * AI Scout for attractive advertising locations in a given city or region.
+ * Returns requested number of strategic plots (default 8 to 12).
  */
 export async function scoutAdvertisingLocationsAi(
   cityOrArea: string,
-  preferredFocus = 'ALL'
+  preferredFocus = 'ALL',
+  count = 8,
+  offset = 0
 ): Promise<AiScoutedLocation[]> {
   const normalizedQuery = cityOrArea.trim().toLowerCase();
   const { geminiKey, openAiKey } = getAiKeys();
 
-  // If no AI key configured, use our tailored regional database
+  // If no AI key configured, return our extended presets
   if (!geminiKey && !openAiKey) {
-    for (const [key, list] of Object.entries(REGIONAL_PRESETS)) {
-      if (normalizedQuery.includes(key)) {
-        return list;
-      }
-    }
-    // Generic fallback with realistic coordinates based on Czech hub patterns
-    return [
-      {
-        id: `scout-${Date.now()}-1`,
-        title: `Komerční tah a vjezd do města (${cityOrArea})`,
-        addressOrJunction: `Hlavní výpadová komunikace / obchvat, ${cityOrArea}`,
-        city: cityOrArea,
-        latitude: 49.820000,
-        longitude: 18.260000,
-        propertyType: 'PRIVATE_COMMERCIAL',
-        propertyTypeLabel: 'Soukromý komerční areál / oplocení',
-        trafficEstimate: '20 000+ vozidel/den',
-        visibilityScore: 9.2,
-        recommendedCarrierType: 'Billboard 5,1 × 2,4 m nebo Bigboard 9,6 × 3,6 m',
-        estimatedMonthlyRentCzk: 4500,
-        commercialRationale: 'Vysoká čelní viditelnost před vjezdem do města, dlouhý nájezdový úhel pro řidiče.',
-        acquisitionTip: 'Oslovit majitele soukromého areálu na parcele – snadné schválení bez průtahů na zastupitelstvu obce.',
-      },
-      {
-        id: `scout-${Date.now()}-2`,
-        title: `Světelná křižovatka u nákupního centra (${cityOrArea})`,
-        addressOrJunction: `Křížení s retail zónou, ${cityOrArea}`,
-        city: cityOrArea,
-        latitude: 49.835000,
-        longitude: 18.280000,
-        propertyType: 'RETAIL_PARK',
-        propertyTypeLabel: 'Obchodní a nákupní areál',
-        trafficEstimate: '25 000+ vozidel/den',
-        visibilityScore: 9.5,
-        recommendedCarrierType: 'Billboard 5,1 × 2,4 m (oboustranný)',
-        estimatedMonthlyRentCzk: 5500,
-        commercialRationale: 'Zpomalení a stání vozidel na světlech zaručuje detailní zhlédnutí reklamního sdělení.',
-        acquisitionTip: 'Navrhnout majiteli dlouhodobou nájemní smlouvu s pravidelnou čtvrtletní platbou předem.',
-      },
-    ];
+    const list = generateExtendedPresetFallback(cityOrArea, count + offset);
+    return list.slice(offset, offset + count);
   }
 
   const promptText = `Jsi špičkový expert na venkovní reklamu (OOH - Out-of-Home, billboardy, bigboardy, LED totemy) a akvizici pozemků v České republice pro SeePOINT.
-Tvým úkolem je navrhnout 3 až 4 konkrétní, vysoce lukrativní LOKALITY / SOUKROMÉ POZEMKY pro umístění nových reklamních nosičů ve městě/lokalitě: "${cityOrArea}".
+Tvým úkolem je navrhnout PŘESNĚ ${count} konkrétních, vysoce lukrativních LOKALIT / SOUKROMÝCH POZEMKŮ pro umístění nových reklamních nosičů ve městě/lokalitě: "${cityOrArea}".
 Zaměření vyhledávání: "${preferredFocus}".
+Číslo stránky / posun (offset): ${offset}. Navrhni jiné různorodé tahy a křižovatky v různých čtvrtích města.
 
 DŮLEŽITÁ PRAVIDLA PRO REKLAMNÍ POZEMKY:
-1. Zaměř se prioritně na SOUKROMÉ POZEMKY (areály firem, autoservisy, stavebniny, logistické parky, benzinové stanice, soukromé oplocené dvory u frekventovaných silnic I. a II. třídy, křižovatek či obchvatů).
+1. Zaměř se prioritně na SOUKROMÉ POZEMKY (areály firem, autoservisy, stavebniny, logistické parky, čerpací stanice, soukromé oplocené dvory u frekventovaných silnic I. a II. třídy, křižovatek či obchvatů).
 2. Soukromé pozemky jsou pro SeePOINT mnohem lepší než městské, protože dohoda o nájmu je rychlá a přímá (nemusí se čekat na schválení rady obce a záměr §39).
 3. U každé lokality uveď reálné přibližné GPS souřadnice odpovídající danému městu/lokalitě v ČR (WGS-84).
 4. Odhadni férový měsíční nájem v CZK, který vyjednavač nabídne majiteli pozemku (obvykle 3 000 až 12 000 Kč/měsíc dle atraktivity).
+5. Vrať celkem ${count} různých položek.
 
 Odpověz VÝHRADNĚ jako validní JSON bez markdownu kolem (žádné \`\`\`json):
 [
   {
-    "id": "jedinečné id např. loc-1",
+    "id": "loc-${offset}-1",
     "title": "Stručný název lokality (např. Vjezdová komunikace - plot autoservisu)",
     "addressOrJunction": "Konkrétní ulice nebo křížení ulic",
     "city": "${cityOrArea}",
@@ -263,22 +482,31 @@ Odpověz VÝHRADNĚ jako validní JSON bez markdownu kolem (žádné \`\`\`json)
   try {
     let jsonString = '';
     if (geminiKey) {
-      const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': geminiKey,
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText }] }],
-        }),
-      });
+      // Cascade through valid Gemini model names
+      const geminiModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest', 'gemini-1.5-pro'];
+      for (const model of geminiModels) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': geminiKey,
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptText }] }],
+            }),
+          });
 
-      if (resp.ok) {
-        const data = await resp.json();
-        const parts = data.candidates?.[0]?.content?.parts || [];
-        jsonString = parts.map((p: { text?: string }) => p.text || '').join('');
+          if (resp.ok) {
+            const data = await resp.json();
+            const parts = data.candidates?.[0]?.content?.parts || [];
+            jsonString = parts.map((p: { text?: string }) => p.text || '').join('');
+            if (jsonString) break;
+          }
+        } catch {
+          // try next model
+        }
       }
     } else if (openAiKey) {
       const resp = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -290,7 +518,7 @@ Odpověz VÝHRADNĚ jako validní JSON bez markdownu kolem (žádné \`\`\`json)
         body: JSON.stringify({
           model: 'gpt-4o-mini',
           messages: [{ role: 'user', content: promptText }],
-          temperature: 0.2,
+          temperature: 0.3,
         }),
       });
 
@@ -308,14 +536,12 @@ Odpověz VÝHRADNĚ jako validní JSON bez markdownu kolem (žádné \`\`\`json)
       }
     }
   } catch (err) {
-    console.error('[AI Scout] Generation error, using fallback:', err);
+    console.error('[AI Scout] Generation error, using extended fallback:', err);
   }
 
-  // Fallback to presets
-  for (const [key, list] of Object.entries(REGIONAL_PRESETS)) {
-    if (normalizedQuery.includes(key)) return list;
-  }
-  return REGIONAL_PRESETS.ostrava;
+  // Fallback to extended regional presets
+  const list = generateExtendedPresetFallback(cityOrArea, count + offset);
+  return list.slice(offset, offset + count);
 }
 
 /**
@@ -360,20 +586,28 @@ Vrať VÝHRADNĚ validní JSON bez formátování kolem:
   try {
     let jsonString = '';
     if (geminiKey) {
-      const resp = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': geminiKey,
-          },
-          body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] }),
+      const geminiModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest'];
+      for (const model of geminiModels) {
+        try {
+          const resp = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': geminiKey,
+              },
+              body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] }),
+            }
+          );
+          if (resp.ok) {
+            const data = await resp.json();
+            jsonString = data.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || '').join('');
+            if (jsonString) break;
+          }
+        } catch {
+          // try next model
         }
-      );
-      if (resp.ok) {
-        const data = await resp.json();
-        jsonString = data.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || '').join('');
       }
     } else if (openAiKey) {
       const resp = await fetch('https://api.openai.com/v1/chat/completions', {

@@ -49,7 +49,9 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
   // AI Radar State
   const [aiCity, setAiCity] = useState('Ostrava');
   const [aiFocus, setAiFocus] = useState('ALL');
+  const [aiRequestedCount, setAiRequestedCount] = useState<number>(8);
   const [aiScouting, setAiScouting] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<AiScoutedLocation[]>([]);
 
   // AI Plot Analysis Modal State
@@ -73,12 +75,13 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Run AI Scout
-  const handleRunAiScout = async (cityToUse?: string, focusToUse?: string) => {
+  const handleRunAiScout = async (cityToUse?: string, focusToUse?: string, countToUse?: number) => {
     const city = (cityToUse || aiCity).trim();
     if (!city) {
       alert('Zadejte město nebo oblast.');
       return;
     }
+    const count = countToUse || aiRequestedCount;
     setAiScouting(true);
     try {
       const res = await fetch('/api/cadastre/ai-scout', {
@@ -88,6 +91,8 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
           action: 'scout',
           cityOrArea: city,
           preferredFocus: focusToUse || aiFocus,
+          count: count,
+          offset: 0,
         }),
       });
       const data = await res.json();
@@ -99,6 +104,36 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
       alert(err instanceof Error ? err.message : 'Chyba při vyhledávání AI lokalit.');
     } finally {
       setAiScouting(false);
+    }
+  };
+
+  // Load more AI suggestions (pagination / additional batches)
+  const handleLoadMoreAi = async () => {
+    const city = aiCity.trim();
+    if (!city) return;
+    setLoadingMore(true);
+    try {
+      const res = await fetch('/api/cadastre/ai-scout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'scout',
+          cityOrArea: city,
+          preferredFocus: aiFocus,
+          count: 6,
+          offset: aiSuggestions.length,
+        }),
+      });
+      const data = await res.json();
+      if (data.locations && data.locations.length > 0) {
+        setAiSuggestions((prev) => [...prev, ...data.locations]);
+      } else {
+        alert('Žádné další lokality pro tuto oblast nebyly nalezeny.');
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Chyba při načítání dalších lokalit.');
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -402,7 +437,7 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
             </div>
 
             {/* AI Search Controls */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Město / Okres / Oblast</label>
                 <input
@@ -427,6 +462,19 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
                   <option value="LOGISTICS">Průmyslové a logistické areály</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Počet pozemků</label>
+                <select
+                  value={aiRequestedCount}
+                  onChange={(e) => setAiRequestedCount(Number(e.target.value))}
+                  className="w-full text-sm rounded-xl border border-slate-300 p-2.5 focus:border-indigo-500 focus:outline-none bg-white font-semibold text-slate-800"
+                >
+                  <option value={6}>6 pozemků</option>
+                  <option value={8}>8 pozemků (doporučeno)</option>
+                  <option value={12}>12 pozemků</option>
+                  <option value={16}>16 pozemků (velký průzkum)</option>
+                </select>
+              </div>
               <div className="flex items-end">
                 <button
                   type="button"
@@ -442,7 +490,7 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4" />
-                      <span>⚡ Vyhledat pozemky pomocí AI</span>
+                      <span>⚡ Vyhledat pozemky</span>
                     </>
                   )}
                 </button>
@@ -519,6 +567,19 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Load More Button */}
+                <div className="flex justify-center pt-3 pb-1">
+                  <button
+                    type="button"
+                    disabled={loadingMore}
+                    onClick={handleLoadMoreAi}
+                    className="btn btn-outline text-xs font-bold py-2.5 px-6 rounded-xl border-indigo-300 text-indigo-700 bg-white hover:bg-indigo-50 flex items-center gap-2 shadow-xs transition"
+                  >
+                    {loadingMore ? <Loader2 size={14} className="animate-spin text-indigo-600" /> : <Plus size={14} className="text-indigo-600" />}
+                    <span>➕ Načíst dalších 6 lukrativních pozemků pro {aiCity}</span>
+                  </button>
                 </div>
               </div>
             )}
