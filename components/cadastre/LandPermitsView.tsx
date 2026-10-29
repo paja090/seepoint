@@ -11,17 +11,9 @@ import {
   AlertCircle,
   Loader2,
   Plus,
-  ShieldCheck,
-  Building,
-  User,
-  DollarSign,
-  ArrowRight,
-  Filter,
-  Layers,
-  Sparkles,
 } from 'lucide-react';
 import { LandPermitModal } from '@/components/election-removal/LandPermitModal';
-import Link from 'next/link';
+import type { CuzkParcelInfo } from '@/lib/cadastre/cuzk-service';
 
 interface LandPermitsViewProps {
   initialPoints: ElectionRemovalPoint[];
@@ -37,7 +29,7 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
   const [plotLabel, setPlotLabel] = useState('');
   const [identifying, setIdentifying] = useState(false);
   const [savingPlot, setSavingPlot] = useState(false);
-  const [identifiedData, setIdentifiedData] = useState<any | null>(null);
+  const [identifiedData, setIdentifiedData] = useState<CuzkParcelInfo | null>(null);
   const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   // Filters
