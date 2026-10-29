@@ -82,7 +82,7 @@ export async function PATCH(request: Request) {
 
           await prisma.navigationPoint.update({
             where: { id: pointId, organizationId: orgId },
-            data: { status: 'INSTALLED', installedAt: now, installedUserId: user.id },
+            data: { status: 'INSTALLED', installerUserId: user.id },
           });
 
           if (point.navigationOrder) {
@@ -197,7 +197,7 @@ export async function PATCH(request: Request) {
         if (workOrder.navigationOrder) {
           await prisma.navigationPoint.updateMany({
             where: { navigationOrderId: workOrder.navigationOrder.id, organizationId: orgId },
-            data: { status: 'INSTALLED', installedAt: now, installedUserId: user.id },
+            data: { status: 'INSTALLED', installerUserId: user.id },
           });
           await prisma.navigationOrder.update({
             where: { id: workOrder.navigationOrder.id, organizationId: orgId },
