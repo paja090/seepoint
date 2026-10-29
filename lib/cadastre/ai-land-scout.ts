@@ -127,7 +127,7 @@ const REGIONAL_PRESETS: Record<string, AiScoutedLocation[]> = {
       city: 'Ostrava',
       latitude: 49.804200,
       longitude: 18.251100,
-      propertyType: 'SERVICES_GAS',
+      propertyType: 'GAS_STATION_SERVICES',
       propertyTypeLabel: 'Čerpací stanice / Pneuservis',
       trafficEstimate: '42 000+ vozidel/den',
       visibilityScore: 9.7,
@@ -328,7 +328,7 @@ function generateExtendedPresetFallback(cityOrArea: string, count = 8): AiScoute
   }
 
   // Realistic generic suggestions for any Czech city
-  return [
+  const genericList: AiScoutedLocation[] = [
     {
       id: `gen-${Date.now()}-1`,
       title: `Hlavní vjezdový koridor a obchvat (${cityOrArea})`,
@@ -425,7 +425,8 @@ function generateExtendedPresetFallback(cityOrArea: string, count = 8): AiScoute
       commercialRationale: 'Vysoký podíl pěších i pomalé městské dopravy v centru.',
       acquisitionTip: 'Nabídnout majiteli moderní osvětlený nosič, který zlepší vzhled zanedbaného plotu.',
     },
-  ].slice(0, count);
+  ];
+  return genericList.slice(0, count);
 }
 
 /**
