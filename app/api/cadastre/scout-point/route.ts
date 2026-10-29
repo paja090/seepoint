@@ -65,7 +65,7 @@ export async function POST(req: Request) {
             latitude: Number(latitude),
             longitude: Number(longitude),
             address: cadastralArea || null,
-            status: 'PLANNED',
+            status: 'PENDING',
             operationType: 'OTHER',
             mediaType: 'OTHER',
             quantity: 1,

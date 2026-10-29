@@ -13,7 +13,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { LandPermitModal } from '@/components/election-removal/LandPermitModal';
-import type { CuzkParcelInfo } from '@/lib/cadastre/cuzk-service';
+import type { CadastralParcelResult } from '@/lib/cadastre/cuzk-service';
 
 interface LandPermitsViewProps {
   initialPoints: ElectionRemovalPoint[];
@@ -29,7 +29,7 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
   const [plotLabel, setPlotLabel] = useState('');
   const [identifying, setIdentifying] = useState(false);
   const [savingPlot, setSavingPlot] = useState(false);
-  const [identifiedData, setIdentifiedData] = useState<CuzkParcelInfo | null>(null);
+  const [identifiedData, setIdentifiedData] = useState<CadastralParcelResult | null>(null);
   const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   // Filters
@@ -112,7 +112,7 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
           cadastralAreaCode: identifiedData?.cadastralAreaCode || null,
           landArea: identifiedData?.areaSqm || null,
           landType: identifiedData ? `${identifiedData.landTypeName}${identifiedData.landUseName ? ` · ${identifiedData.landUseName}` : ''}` : null,
-          landOwnership: identifiedData?.ownershipClassification || 'UNKNOWN',
+          landOwnership: 'UNKNOWN',
           permitStatus: 'SCOUTING',
         }),
       });
@@ -296,12 +296,12 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
                 <span className="text-xs px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold">
                   k.ú. {identifiedData.cadastralAreaName} ({identifiedData.cadastralAreaCode})
                 </span>
-                <span className={`text-xs px-2 py-0.5 rounded-md font-bold ${identifiedData.ownershipClassification === 'PRIVATE_COMPANY' ? 'bg-amber-100 text-amber-900' : identifiedData.ownershipClassification === 'MUNICIPAL' ? 'bg-sky-100 text-sky-900' : 'bg-slate-100 text-slate-800'}`}>
-                  {identifiedData.ownershipClassification === 'PRIVATE_COMPANY' ? '🏢 Soukromá firma' : identifiedData.ownershipClassification === 'MUNICIPAL' ? '🏛️ Obecní / Městský' : '👤 Soukromá osoba / Neurčeno'}
+                <span className="text-xs px-2 py-0.5 rounded-md font-bold bg-emerald-100 text-emerald-900">
+                  🗺️ ČÚZK RÚIAN
                 </span>
               </div>
               <a
-                href={identifiedData.cuzkViewerUrl}
+                href={identifiedData.cuzkViewUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="btn btn-outline text-xs font-bold text-sky-700 hover:text-sky-800 flex items-center gap-1.5 py-1 px-2.5 rounded-lg border-sky-300 bg-sky-50"
