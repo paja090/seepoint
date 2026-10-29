@@ -22,7 +22,13 @@ import {
   ArrowRight,
   ShieldCheck,
   Eye,
+  Map,
+  LayoutGrid,
+  Share2,
+  TrendingDown,
+  Users,
 } from 'lucide-react';
+import { CatalogInteractiveMap } from './CatalogInteractiveMap';
 
 export type CatalogSurfaceItem = {
   surfaceId: string;
@@ -120,6 +126,13 @@ export function PublicInventoryCatalogView() {
   const [detailItem, setDetailItem] = useState<CatalogSurfaceItem | null>(null);
   const [detailPhotoIndex, setDetailPhotoIndex] = useState(0);
 
+  // View Mode: Cards vs Map
+  const [viewMode, setViewMode] = useState<'cards' | 'map'>('cards');
+  // Quick Presets: null | 'SHOPPING' | 'TRANSIT' | 'TRAFFIC'
+  const [activePreset, setActivePreset] = useState<string | null>(null);
+  // Share selection state
+  const [copiedShare, setCopiedShare] = useState(false);
+
   // Checkout Form
   const [companyId, setCompanyId] = useState('');
   const [dic, setDic] = useState('');
@@ -149,17 +162,50 @@ export function PublicInventoryCatalogView() {
     dateTo: string;
   } | null>(null);
 
-  // Initialize filters from URL params (?city=...&mediaType=...&org=...)
+  // Initialize filters & selection from URL params (?city=...&mediaType=...&vyber=...&view=...)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const cityParam = params.get('city');
     const mediaParam = params.get('mediaType');
     const orgQ = params.get('org');
+    const viewParam = params.get('view');
+    const vyberParam = params.get('vyber') || params.get('ids');
+
     if (cityParam) setSelectedCity(cityParam);
     if (mediaParam) setSelectedMediaType(mediaParam);
     if (orgQ) setOrgParam(orgQ);
+    if (viewParam === 'map') setViewMode('map');
+    if (vyberParam) {
+      const ids = vyberParam
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (ids.length > 0) setSelectedIds(ids);
+    }
   }, []);
+
+  const handleShareOffer = async () => {
+    if (typeof window === 'undefined') return;
+    try {
+      const url = new URL(window.location.href);
+      if (selectedIds.length > 0) {
+        url.searchParams.set('vyber', selectedIds.join(','));
+      } else {
+        url.searchParams.delete('vyber');
+      }
+      if (viewMode === 'map') {
+        url.searchParams.set('view', 'map');
+      } else {
+        url.searchParams.delete('view');
+      }
+      await navigator.clipboard.writeText(url.toString());
+      setCopiedShare(true);
+      setTimeout(() => setCopiedShare(false), 2500);
+    } catch {
+      // Fallback
+    }
+  };
 
   const loadCatalog = useCallback(async () => {
     setLoading(true);
@@ -215,9 +261,28 @@ export function PublicInventoryCatalogView() {
         const hay = `${item.carrierCode} ${item.surfaceName} ${item.carrierName} ${item.city} ${item.street} ${item.directionDescription}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
+
+      // Quick presets filter
+      if (activePreset === 'SHOPPING') {
+        const text = `${item.carrierCode} ${item.surfaceName} ${item.carrierName} ${item.street} ${item.directionDescription}`.toLowerCase();
+        if (!/kaufland|avion|futurum|tesco|lidl|albert|billa|globus|baumax|oc\b|obchodn/i.test(text)) {
+          return false;
+        }
+      } else if (activePreset === 'TRANSIT') {
+        const text = `${item.carrierCode} ${item.surfaceName} ${item.carrierName} ${item.street} ${item.directionDescription}`.toLowerCase();
+        if (!/mhd|zast[aá]vk|autobus|tramvaj|n[aá]dra[žz]|stanice/i.test(text)) {
+          return false;
+        }
+      } else if (activePreset === 'TRAFFIC') {
+        const text = `${item.carrierCode} ${item.surfaceName} ${item.carrierName} ${item.street} ${item.directionDescription}`.toLowerCase();
+        if (!/rudn[aá]|m[ií]steck[aá]|plze[ňn]sk[aá]|v[yý][šs]kovick[aá]|t[řr][ií]d|k[řr][ií][žz]ovatk|most|okruh|fr\./i.test(text)) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [items, onlyAvailable, selectedCity, selectedMediaType, searchQuery]);
+  }, [items, onlyAvailable, selectedCity, selectedMediaType, searchQuery, activePreset]);
 
   const selectedSurfaces = useMemo(() => {
     const set = new Set(selectedIds);
@@ -225,19 +290,47 @@ export function PublicInventoryCatalogView() {
   }, [items, selectedIds]);
 
   const pricingSummary = useMemo(() => {
-    const monthlyRentSum = selectedSurfaces.reduce((acc, s) => acc + s.monthlyPrice, 0);
-    const totalRent = monthlyRentSum * monthsCount;
+    const baseMonthlyRentSum = selectedSurfaces.reduce((acc, s) => acc + s.monthlyPrice, 0);
+    const totalBaseRent = baseMonthlyRentSum * monthsCount;
+
+    // Volume discount tiers:
+    // 5+ surfaces: 10% discount on total rent
+    // 3-4 surfaces: 5% discount on total rent
+    // 1-2 surfaces: 0% discount
+    const surfaceCount = selectedSurfaces.length;
+    const discountPercent = surfaceCount >= 5 ? 0.1 : surfaceCount >= 3 ? 0.05 : 0;
+    const discountAmount = Math.round(totalBaseRent * discountPercent);
+    const discountedRent = totalBaseRent - discountAmount;
+
     const printInstallSum = includePrintAndInstall
       ? selectedSurfaces.reduce((acc, s) => acc + s.printInstallPrice, 0)
       : 0;
-    const totalWithoutVat = totalRent + printInstallSum;
+
+    const totalWithoutVat = discountedRent + printInstallSum;
     const totalWithVat = Math.round(totalWithoutVat * 1.21);
+
+    // Cumulative estimated impressions per day and for total campaign
+    const dailyImpressions = selectedSurfaces.reduce((sum, s) => {
+      const type = (s.mediaType || s.carrierType || '').toUpperCase();
+      if (type.includes('BILLBOARD') || type.includes('BIGBOARD')) return sum + 12000;
+      if (type.includes('HORIZON') || type.includes('TOWER')) return sum + 10500;
+      if (type.includes('POSTER') || type.includes('LIGHT') || type.includes('CLP') || type.includes('CLV')) return sum + 7500;
+      if (type.includes('BENCH')) return sum + 4000;
+      return sum + 5000;
+    }, 0);
+    const totalCampaignImpressions = dailyImpressions * monthsCount * 30;
+
     return {
-      monthlyRentSum,
-      totalRent,
+      monthlyRentSum: baseMonthlyRentSum,
+      totalRent: totalBaseRent,
+      discountPercent,
+      discountAmount,
+      discountedRent,
       printInstallSum,
       totalWithoutVat,
       totalWithVat,
+      dailyImpressions,
+      totalCampaignImpressions,
     };
   }, [selectedSurfaces, monthsCount, includePrintAndInstall]);
 
@@ -516,6 +609,66 @@ export function PublicInventoryCatalogView() {
               </div>
             </div>
 
+            {/* Quick Strategy Presets */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-800/80">
+              <span className="text-[11px] font-bold text-amber-400 mr-1 flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Rychlé filtry & balíčky:</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePreset(null);
+                  setSelectedCity('');
+                  setSelectedMediaType('');
+                  setSearchQuery('');
+                }}
+                className={`rounded-xl px-2.5 py-1 text-xs font-bold transition cursor-pointer ${
+                  activePreset === null && !selectedMediaType && !searchQuery
+                    ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
+                    : 'bg-slate-950 text-slate-300 border border-slate-800 hover:bg-slate-800'
+                }`}
+              >
+                🌟 Všechny lokality
+              </button>
+              <button
+                type="button"
+                onClick={() => setActivePreset(activePreset === 'SHOPPING' ? null : 'SHOPPING')}
+                className={`rounded-xl px-2.5 py-1 text-xs font-bold transition cursor-pointer ${
+                  activePreset === 'SHOPPING'
+                    ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
+                    : 'bg-slate-950 text-slate-300 border border-slate-800 hover:bg-slate-800'
+                }`}
+                title="Plochy u nákupních center Kaufland, OC Futurum, Avion Shopping Park, Tesco, Lidl..."
+              >
+                🛒 Nákupní centra & Supermarkety
+              </button>
+              <button
+                type="button"
+                onClick={() => setActivePreset(activePreset === 'TRANSIT' ? null : 'TRANSIT')}
+                className={`rounded-xl px-2.5 py-1 text-xs font-bold transition cursor-pointer ${
+                  activePreset === 'TRANSIT'
+                    ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
+                    : 'bg-slate-950 text-slate-300 border border-slate-800 hover:bg-slate-800'
+                }`}
+                title="Plochy a lavičky u zastávek MHD, autobusových a vlakových nádraží s vysokým pohybem pěších"
+              >
+                🚌 Zastávky MHD & Nádraží
+              </button>
+              <button
+                type="button"
+                onClick={() => setActivePreset(activePreset === 'TRAFFIC' ? null : 'TRAFFIC')}
+                className={`rounded-xl px-2.5 py-1 text-xs font-bold transition cursor-pointer ${
+                  activePreset === 'TRAFFIC'
+                    ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
+                    : 'bg-slate-950 text-slate-300 border border-slate-800 hover:bg-slate-800'
+                }`}
+                title="Plochy na hlavních tazích, okruzích a frekventovaných křižovatkách"
+              >
+                🚗 Dopravní tahy & Křižovatky
+              </button>
+            </div>
+
             {/* City & MediaType Filter Pills */}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800/80">
               <div className="flex flex-wrap items-center gap-1.5">
@@ -637,7 +790,7 @@ export function PublicInventoryCatalogView() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* LEFT 8 COLUMNS: SURFACE CARDS */}
           <div className="lg:col-span-8 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-300">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-emerald-300">
                   <span>🟢 Volné plochy k dispozici</span>
@@ -655,29 +808,80 @@ export function PublicInventoryCatalogView() {
                     </strong>
                   </span>
                 )}
+                {activePreset && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 text-[11px] font-bold text-amber-300">
+                    <span>
+                      {activePreset === 'SHOPPING'
+                        ? '🛒 Nákupní centra'
+                        : activePreset === 'TRANSIT'
+                          ? '🚌 Zastávky MHD'
+                          : '🚗 Dopravní tahy'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setActivePreset(null)}
+                      className="ml-1 text-amber-400 hover:text-white cursor-pointer"
+                      title="Zrušit tento balíček"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                )}
               </div>
 
-              {filteredItems.some((i) => i.isAvailable) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const batchSize =
-                      selectedMediaType === 'PROMO_BENCH'
-                        ? 6
-                        : selectedMediaType === 'PROMO_HORIZON'
-                          ? 10
-                          : 6;
-                    const availIds = filteredItems
-                      .filter((i) => i.isAvailable)
-                      .slice(0, batchSize)
-                      .map((i) => i.surfaceId);
-                    setSelectedIds((prev) => Array.from(new Set([...prev, ...availIds])));
-                  }}
-                  className="text-xs font-bold text-emerald-400 hover:underline cursor-pointer"
-                >
-                  + Přidat doporučený balíček volných ploch do nabídky
-                </button>
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* View Switcher: Cards vs Map */}
+                <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-1 rounded-2xl shadow-md">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('cards')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold rounded-xl transition cursor-pointer ${
+                      viewMode === 'cards'
+                        ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span>Karty ({filteredItems.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('map')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-extrabold rounded-xl transition cursor-pointer ${
+                      viewMode === 'map'
+                        ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    <Map className="w-3.5 h-3.5" />
+                    <span>
+                      Mapa ({filteredItems.filter((i) => typeof i.latitude === 'number' && typeof i.longitude === 'number').length})
+                    </span>
+                  </button>
+                </div>
+
+                {filteredItems.some((i) => i.isAvailable) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const batchSize =
+                        selectedMediaType === 'PROMO_BENCH'
+                          ? 6
+                          : selectedMediaType === 'PROMO_HORIZON'
+                            ? 10
+                            : 6;
+                      const availIds = filteredItems
+                        .filter((i) => i.isAvailable)
+                        .slice(0, batchSize)
+                        .map((i) => i.surfaceId);
+                      setSelectedIds((prev) => Array.from(new Set([...prev, ...availIds])));
+                    }}
+                    className="text-xs font-bold text-emerald-400 hover:underline cursor-pointer"
+                  >
+                    + Balíček volných ({Math.min(6, filteredItems.filter((i) => i.isAvailable).length)})
+                  </button>
+                )}
+              </div>
             </div>
 
             {loading ? (
@@ -702,6 +906,7 @@ export function PublicInventoryCatalogView() {
                     setSelectedCity('');
                     setSelectedMediaType('');
                     setSearchQuery('');
+                    setActivePreset(null);
                     setOnlyAvailable(false);
                   }}
                   className="rounded-xl bg-slate-800 hover:bg-slate-700 px-4 py-2 text-xs font-bold text-white cursor-pointer"
@@ -709,6 +914,16 @@ export function PublicInventoryCatalogView() {
                   Zobrazit všechny plochy
                 </button>
               </div>
+            ) : viewMode === 'map' ? (
+              <CatalogInteractiveMap
+                items={filteredItems}
+                selectedIds={selectedIds}
+                onToggleSurface={toggleSurface}
+                onOpenDetail={(item) => {
+                  setDetailItem(item);
+                  setDetailPhotoIndex(0);
+                }}
+              />
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {filteredItems.map((item) => {
@@ -1138,6 +1353,79 @@ export function PublicInventoryCatalogView() {
                     ))}
                   </div>
 
+                  {/* Share Selection URL button */}
+                  <button
+                    type="button"
+                    onClick={handleShareOffer}
+                    className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-950/80 hover:bg-slate-800 py-2 px-3 text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer"
+                  >
+                    {copiedShare ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span className="text-emerald-400 font-extrabold">Odkaz na výběr zkopírován!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Share2 className="w-4 h-4 text-sky-400" />
+                        <span>Sdílet tento výběr (zkopírovat odkaz)</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Estimated Reach & Impressions */}
+                  <div className="rounded-2xl border border-sky-800/50 bg-sky-950/30 p-3 text-xs space-y-1">
+                    <div className="flex items-center gap-1.5 font-extrabold text-sky-300">
+                      <Users className="w-4 h-4 text-sky-400" />
+                      <span>Odhadovaný dosah kampaně</span>
+                    </div>
+                    <div className="flex items-baseline justify-between text-slate-300 pt-0.5">
+                      <span>Denní frekvence očí:</span>
+                      <strong className="text-white font-extrabold">
+                        ~{pricingSummary.dailyImpressions.toLocaleString('cs-CZ')} kontaktů / den
+                      </strong>
+                    </div>
+                    <div className="flex items-baseline justify-between text-slate-400 text-[11px]">
+                      <span>Celkem za {monthsCount} měs.:</span>
+                      <span className="text-sky-300 font-bold">
+                        ~{pricingSummary.totalCampaignImpressions.toLocaleString('cs-CZ')} zhlédnutí
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Volume Discount Progress Banner */}
+                  <div className="rounded-2xl border p-3 text-xs space-y-1 transition bg-slate-950/80 border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold flex items-center gap-1 text-slate-200">
+                        <TrendingDown className="w-3.5 h-3.5 text-emerald-400" />
+                        Množstevní sleva
+                      </span>
+                      {pricingSummary.discountPercent > 0 && (
+                        <span className="rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-black text-emerald-300">
+                          -{(pricingSummary.discountPercent * 100).toFixed(0)} %
+                        </span>
+                      )}
+                    </div>
+                    {selectedSurfaces.length < 3 ? (
+                      <p className="text-[11px] text-slate-400">
+                        💡 Přidejte ještě{' '}
+                        <strong className="text-emerald-300">{3 - selectedSurfaces.length}</strong>{' '}
+                        {3 - selectedSurfaces.length === 1 ? 'plochu' : 'plochy'} a odemknete{' '}
+                        <strong className="text-emerald-300">slevu 5 %</strong> na celou kampaň!
+                      </p>
+                    ) : selectedSurfaces.length < 5 ? (
+                      <p className="text-[11px] text-slate-300">
+                        🎉 Skvělé, máte slevu 5 %! Přidejte ještě{' '}
+                        <strong className="text-emerald-300">{5 - selectedSurfaces.length}</strong>{' '}
+                        {5 - selectedSurfaces.length === 1 ? 'plochu' : 'plochy'} pro maximální{' '}
+                        <strong className="text-emerald-300">slevu 10 %</strong>!
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-emerald-400 font-bold">
+                        🔥 Maximální množstevní sleva 10 % uplatněna na celou kampaň!
+                      </p>
+                    )}
+                  </div>
+
                   {/* Optional Print & Installation Checkbox */}
                   <label className="flex items-start gap-2.5 rounded-2xl border border-amber-800/50 bg-amber-950/25 p-3 text-xs cursor-pointer select-none">
                     <input
@@ -1162,12 +1450,18 @@ export function PublicInventoryCatalogView() {
                   <div className="rounded-2xl bg-slate-950 border border-slate-800 p-3.5 space-y-1.5 text-xs">
                     <div className="flex justify-between text-slate-400">
                       <span>
-                        Pronájem ({selectedSurfaces.length} ploch × {monthsCount} měs.):
+                        Základní nájem ({selectedSurfaces.length} ploch × {monthsCount} měs.):
                       </span>
-                      <strong className="text-slate-200">
+                      <span className={pricingSummary.discountAmount > 0 ? 'line-through text-slate-500' : 'text-slate-200 font-bold'}>
                         {pricingSummary.totalRent.toLocaleString('cs-CZ')} Kč
-                      </strong>
+                      </span>
                     </div>
+                    {pricingSummary.discountAmount > 0 && (
+                      <div className="flex justify-between text-emerald-400 font-bold">
+                        <span>Množstevní sleva ({(pricingSummary.discountPercent * 100).toFixed(0)} %):</span>
+                        <span>- {pricingSummary.discountAmount.toLocaleString('cs-CZ')} Kč</span>
+                      </div>
+                    )}
                     {includePrintAndInstall && (
                       <div className="flex justify-between text-slate-400">
                         <span>Tisk a instalace (orientačně):</span>
