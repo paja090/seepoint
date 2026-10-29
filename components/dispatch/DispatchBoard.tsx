@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Building2, CalendarDays, CheckCheck, ChevronLeft, ChevronRight, ClipboardList, MapPin, Plus, RefreshCw, Search, Settings2, SlidersHorizontal, Truck, Users } from 'lucide-react';
+import { ArrowRight, Building2, CalendarDays, Check, CheckCheck, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, MapPin, Plus, RefreshCw, Search, Settings2, SlidersHorizontal, Truck, Users } from 'lucide-react';
 import { dispatchPlanningLinks, type DispatchItem, type DispatchPlan } from '@/lib/dispatch/queue';
 import { dispatchCrews, dispatchMapResult, dispatchPlanHref, dispatchStatus, dispatchTimeline, type DispatchProgress } from '@/lib/dispatch/presentation';
 import type { Coordinates, PlanningProfile } from '@/lib/field-planning/contracts';
@@ -60,6 +60,29 @@ export function DispatchBoard({
   const [intakeBusy, setIntakeBusy] = useState(false);
   const closePanel = useCallback(() => { setPanel(null); setIntakeBusy(false); }, []);
   const openWork = useCallback((id: string) => setPanel({ type: 'work', id }), []);
+  const [completingId, setCompletingId] = useState<string | null>(null);
+
+  const handleMarkDone = useCallback(async (itemId: string) => {
+    if (completingId) return;
+    setCompletingId(itemId);
+    try {
+      const res = await fetch('/api/work/dispatch', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Nepodařilo se označit úkol jako hotový.');
+      }
+      closePanel();
+      router.refresh();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Chyba při dokončování úkolu.');
+    } finally {
+      setCompletingId(null);
+    }
+  }, [completingId, closePanel, router]);
 
   useEffect(() => {
     const handleOpenIntake = () => setPanel({ type: 'create' });
@@ -125,9 +148,23 @@ export function DispatchBoard({
           <label className="flex min-h-8 items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={allVisibleSelected} disabled={!readyVisible.length} onChange={toggleVisible} className="size-4 accent-sky-800"/>Vybrat dostupné ({readyVisible.length})</label>
         </div>
         {groups.length > 0 && <div className="space-y-2 border-b border-sky-100 bg-sky-50 p-3" aria-live="polite"><div className="flex items-center justify-between text-xs"><strong>Vybráno {groups.reduce((sum, group) => sum + group.count, 0)} prací</strong><button type="button" onClick={() => setSelected([])} className="min-h-8 underline">Zrušit výběr</button></div>{groups.map(group => <Link key={group.key} href={group.url} className="flex min-h-10 items-center justify-between gap-2 rounded-xl bg-sky-800 px-3 py-2 text-xs font-bold text-white hover:bg-sky-900">Naplánovat: {group.label} ({group.count})<ArrowRight size={15}/></Link>)}{groups.length > 1 && <p className="text-xs text-sky-900">Výběr je rozdělen do menších návrhů. Každý ověří dostupnost posádek a vozidel.</p>}</div>}
-        <div className="max-h-[560px] divide-y divide-slate-100 overflow-y-auto">{!visible.length && <p className="px-4 py-12 text-center text-sm text-slate-500">Tomuto výběru neodpovídá žádná práce.</p>}{visible.map(item => <article key={item.id} className={'flex gap-3 px-4 py-3 transition hover:bg-slate-50 ' + (selected.includes(item.id) ? 'bg-sky-50/50' : '')}>
-          <input type="checkbox" aria-label={'Vybrat ' + item.title} disabled={item.state !== 'ready'} checked={selected.includes(item.id)} onChange={event => setSelected(old => event.target.checked ? [...old, item.id] : old.filter(id => id !== item.id))} className="mt-2 size-4 shrink-0 accent-sky-800"/>
+        <div className="max-h-[560px] divide-y divide-slate-100 overflow-y-auto">{!visible.length && <p className="px-4 py-12 text-center text-sm text-slate-500">Tomuto výběru neodpovídá žádná práce.</p>}{visible.map(item => <article key={item.id} className={'flex items-center gap-3 px-4 py-3 transition hover:bg-slate-50 ' + (selected.includes(item.id) ? 'bg-sky-50/50' : '')}>
+          <input type="checkbox" aria-label={'Vybrat ' + item.title} disabled={item.state !== 'ready'} checked={selected.includes(item.id)} onChange={event => setSelected(old => event.target.checked ? [...old, item.id] : old.filter(id => id !== item.id))} className="size-4 shrink-0 accent-sky-800"/>
           <button type="button" onClick={() => openWork(item.id)} className="min-w-0 flex-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-700"><div className="flex flex-wrap items-center justify-between gap-1"><span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{sourceLabels[item.source]}</span><span className={'rounded-md px-2 py-1 text-[10px] font-medium ' + badge[item.state]}>{labels[item.state]}</span></div><h3 className="mt-1 break-words text-sm font-semibold">{item.title}</h3><p className="mt-1 break-words text-xs leading-5 text-slate-500">{[item.client, item.address, item.quantity + ' ks'].filter(Boolean).join(' · ')}</p>{item.reason && <p className="mt-1 line-clamp-2 text-xs text-amber-800">{item.reason}</p>}</button>
+          <button
+            type="button"
+            title="Označit práci jako hotovou"
+            disabled={completingId === item.id}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (window.confirm(`Označit úkol „${item.title}“ jako hotový?`)) {
+                handleMarkDone(item.id);
+              }
+            }}
+            className="grid size-8 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-400 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 transition disabled:opacity-40"
+          >
+            <Check size={16} />
+          </button>
         </article>)}</div>
         <p className="border-t border-slate-100 p-3 text-[11px] leading-4 text-slate-400">Pro {date}, starší práce a terénní zadání bez termínu.</p>
       </section>}
@@ -178,7 +215,7 @@ export function DispatchBoard({
     {view !== 'week' && <details className="rounded-2xl border border-slate-200 bg-white p-4"><summary className="cursor-pointer text-sm font-bold"><Users className="mr-2 inline" size={17}/>Časová osa pracovníků <span className="ml-2 text-xs font-normal text-slate-400">{workers.size} pracovníků · schválené výjezdy</span></summary><p className="my-3 text-xs text-slate-500">Plánované časy z výjezdů. Osobní kalendář a celkovou dostupnost najdete v Planneru.</p><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{[...workers].map(([id, worker]) => <section key={id} aria-label={'Časová osa ' + worker.name}><h3 className="mb-2 text-sm font-bold">{worker.name}</h3><Timeline items={dayTimeline.filter(item => worker.routeKeys.has(item.id))} timezone={timezone} onEdit={noEdit}/></section>)}{!workers.size && <p className="text-sm text-slate-500">Pro tento den zatím nejsou schválené výjezdy s pracovníky.</p>}</div></details>}
     <footer className="flex flex-wrap items-center justify-between gap-3 px-1 text-xs text-slate-500"><span>Datum přehledu: {date}</span><div className="flex flex-wrap gap-4"><Link href="/work" className="hover:underline">Zakázky a dílna</Link><Link href="/my-route" className="hover:underline">Moje trasa</Link><Link href={'/work/dispatch?' + new URLSearchParams({ date, planner: 'work' }) + '#planner'} className="font-semibold text-sky-800 hover:underline">Rozšířené plánování →</Link></div></footer>
     {panel && <DispatchDrawer title={panel.type === 'create' ? 'Přidat práci' : 'Detail práce'} onClose={closePanel} busy={intakeBusy}>
-      {panel.type === 'create' ? <DispatchIntake embedded onClose={closePanel} onBusyChange={setIntakeBusy}/> : detail && <div className="space-y-6"><div><span className={'rounded-lg px-3 py-1 text-xs font-semibold ' + badge[detail.state]}>{labels[detail.state]}</span><h3 className="mt-4 break-words text-2xl font-bold">{detail.title}</h3><p className="mt-2 text-sm text-slate-500">{sourceLabels[detail.source]}</p></div><dl className="grid grid-cols-[90px_minmax(0,1fr)] gap-3 text-sm"><dt className="text-slate-500">Klient</dt><dd className="break-words">{detail.client || 'Neuveden'}</dd><dt className="text-slate-500">Místo</dt><dd className="break-words">{detail.address || 'Viz úplný detail práce'}</dd><dt className="text-slate-500">Množství</dt><dd>{detail.quantity} ks</dd></dl>{detail.reason && <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{detail.reason}</p>}<Link href={detail.detailUrl} className="flex min-h-11 items-center justify-between rounded-xl border border-slate-200 p-3 text-sm font-semibold">Úplný detail a podklady<ArrowRight size={16}/></Link>{detail.state === 'ready' && <button type="button" onClick={() => { setSelected(old => [...new Set([...old, detail.id])]); closePanel(); }} className="min-h-11 w-full rounded-xl bg-sky-800 px-4 text-sm font-bold text-white">Přidat do výběru pro plánování</button>}{detail.planId && <p className="text-xs text-slate-500">Práce je přiřazená výjezdu. Změny provádějte v jeho detailu.</p>}</div>}
+      {panel.type === 'create' ? <DispatchIntake embedded onClose={closePanel} onBusyChange={setIntakeBusy}/> : detail && <div className="space-y-6"><div><span className={'rounded-lg px-3 py-1 text-xs font-semibold ' + badge[detail.state]}>{labels[detail.state]}</span><h3 className="mt-4 break-words text-2xl font-bold">{detail.title}</h3><p className="mt-2 text-sm text-slate-500">{sourceLabels[detail.source]}</p></div><dl className="grid grid-cols-[90px_minmax(0,1fr)] gap-3 text-sm"><dt className="text-slate-500">Klient</dt><dd className="break-words">{detail.client || 'Neuveden'}</dd><dt className="text-slate-500">Místo</dt><dd className="break-words">{detail.address || 'Viz úplný detail práce'}</dd><dt className="text-slate-500">Množství</dt><dd>{detail.quantity} ks</dd></dl>{detail.reason && <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{detail.reason}</p>}<Link href={detail.detailUrl} className="flex min-h-11 items-center justify-between rounded-xl border border-slate-200 p-3 text-sm font-semibold">Úplný detail a podklady<ArrowRight size={16}/></Link><div className="pt-2 border-t border-slate-100 space-y-2"><button type="button" disabled={completingId === detail.id} onClick={() => { if (window.confirm(`Opravdu chcete označit práci „${detail.title}“ jako hotovou?`)) { handleMarkDone(detail.id); } }} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 text-sm font-bold text-white shadow-xs transition disabled:opacity-50"><CheckCircle2 size={17}/><span>{completingId === detail.id ? 'Označuji jako hotové…' : '✓ Označit práci jako hotovou'}</span></button>{detail.state === 'ready' && <button type="button" onClick={() => { setSelected(old => [...new Set([...old, detail.id])]); closePanel(); }} className="min-h-11 w-full rounded-xl bg-sky-800 hover:bg-sky-900 px-4 text-sm font-bold text-white transition">Přidat do výběru pro plánování</button>}</div>{detail.planId && <p className="text-xs text-slate-500">Práce je přiřazená výjezdu. Změny provádějte v jeho detailu.</p>}</div>}
     </DispatchDrawer>}
     {showSettings && (
       <PlanningProfileForm
