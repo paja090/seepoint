@@ -10,8 +10,9 @@ export default async function MobilePlanningPage() {
 
   const pointsRaw = await prisma.navigationPoint.findMany({
     where: {
+      organizationId: currentUser.organizationId!,
       navigationOrder: {
-        status: { in: ['SMLOUVA_OBJEDNAVKA', 'GRAFICKE_PODKLADY', 'SCHVALENI_GRAFIKY', 'TISK_VYROBA', 'PRIPRAVENO_K_INSTALACI', 'INSTALACE'] },
+        isNot: null,
       },
     },
     include: {
@@ -44,7 +45,7 @@ export default async function MobilePlanningPage() {
     id: p.id,
     orderId: p.navigationOrder?.id || '',
     orderNumber: p.navigationOrder?.crmOrder?.orderNumber || 'NAV-000',
-    clientName: p.navigationOrder?.crmOrder?.client.name || 'Klient',
+    clientName: p.navigationOrder?.crmOrder?.client?.name || 'Klient',
     targetName: p.navigationOrder?.targetName || 'Navigační cíl',
     targetAddress: p.navigationOrder?.targetAddress || null,
     label: p.label,
