@@ -52,3 +52,28 @@ export async function generateWebpThumbnail(
   setCachedThumbnail(cacheKey, resized);
   return resized;
 }
+
+/**
+ * Generates an optimized WebP preview for detail/lightbox views (max 1600x1200, quality 80)
+ * so massive 10-15MB phone camera uploads are downsized to ~150-250KB crisp WebP images.
+ */
+export async function generateWebpPreview(
+  cacheKey: string,
+  inputBuffer: Buffer
+): Promise<Buffer> {
+  const existing = getCachedThumbnail(cacheKey);
+  if (existing) return existing;
+
+  const resized = await sharp(inputBuffer)
+    .rotate()
+    .resize(1600, 1200, {
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+    .webp({ quality: 80, effort: 3 })
+    .toBuffer();
+
+  setCachedThumbnail(cacheKey, resized);
+  return resized;
+}
+

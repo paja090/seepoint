@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { enterTenantContext } from '@/lib/tenant-context';
 import { readStoredPhoto } from '@/lib/storage/photo-storage';
-import { generateWebpThumbnail, getCachedThumbnail } from '@/lib/storage/thumbnail-cache';
+import { generateWebpThumbnail, generateWebpPreview, getCachedThumbnail } from '@/lib/storage/thumbnail-cache';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -45,12 +45,16 @@ export async function GET(
     }
 
     const isThumbnail = urlObj.searchParams.get('thumbnail') === '1';
-    const cacheKey = `catalog-photo:${photoId}`;
+    const isRaw = urlObj.searchParams.get('raw') === '1';
+    const cacheKey = isThumbnail
+      ? `catalog-photo-thumb:${photoId}`
+      : `catalog-photo-preview:${photoId}`;
 
-    if (isThumbnail) {
-      const cachedThumb = getCachedThumbnail(cacheKey);
-      if (cachedThumb) {
-        return new Response(new Uint8Array(cachedThumb), {
+    // 1. Fast in-memory cache lookup for both thumbnails and optimized previews
+    if (!isRaw) {
+      const cached = getCachedThumbnail(cacheKey);
+      if (cached) {
+        return new Response(new Uint8Array(cached), {
           status: 200,
           headers: {
             'Content-Type': 'image/webp',
@@ -66,7 +70,8 @@ export async function GET(
       return NextResponse.json({ error: 'Soubor fotografie není dostupný.' }, { status: 404 });
     }
 
-    if (isThumbnail) {
+    // 2. Global web optimization: resize large originals into crisp WebP (thumbnail 360px or preview 1600px)
+    if (!isRaw) {
       let inputBuffer: Buffer | null = null;
       if (file.body) {
         if (Buffer.isBuffer(file.body)) {
@@ -92,8 +97,11 @@ export async function GET(
 
       if (inputBuffer) {
         try {
-          const resized = await generateWebpThumbnail(cacheKey, inputBuffer);
-          return new Response(new Uint8Array(resized), {
+          const processed = isThumbnail
+            ? await generateWebpThumbnail(cacheKey, inputBuffer)
+            : await generateWebpPreview(cacheKey, inputBuffer);
+
+          return new Response(new Uint8Array(processed), {
             status: 200,
             headers: {
               'Content-Type': 'image/webp',

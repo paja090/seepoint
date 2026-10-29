@@ -133,6 +133,8 @@ export function PublicInventoryCatalogView() {
   const [activePreset, setActivePreset] = useState<string | null>(null);
   // Share selection state
   const [copiedShare, setCopiedShare] = useState(false);
+  // Share catalog link state
+  const [copiedCatalogUrl, setCopiedCatalogUrl] = useState(false);
   // Impressions methodology tooltip
   const [showImpressionsInfo, setShowImpressionsInfo] = useState(false);
 
@@ -205,6 +207,21 @@ export function PublicInventoryCatalogView() {
       await navigator.clipboard.writeText(url.toString());
       setCopiedShare(true);
       setTimeout(() => setCopiedShare(false), 2500);
+    } catch {
+      // Fallback
+    }
+  };
+
+  const handleCopyCatalogUrl = async () => {
+    if (typeof window === 'undefined') return;
+    try {
+      const url = new URL(window.location.origin + window.location.pathname);
+      if (orgParam) url.searchParams.set('org', orgParam);
+      if (selectedCity) url.searchParams.set('city', selectedCity);
+      if (selectedMediaType) url.searchParams.set('mediaType', selectedMediaType);
+      await navigator.clipboard.writeText(url.toString());
+      setCopiedCatalogUrl(true);
+      setTimeout(() => setCopiedCatalogUrl(false), 2500);
     } catch {
       // Fallback
     }
@@ -505,35 +522,56 @@ export function PublicInventoryCatalogView() {
               </p>
             </div>
 
-            {organization && (organization.phone || organization.email) && (
-              <div className="flex flex-wrap items-center gap-3 text-xs bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-3">
-                <div className="space-y-0.5">
-                  <span className="text-[11px] font-bold text-slate-400 block">
-                    Potřebujete poradit s výběrem?
-                  </span>
-                  <div className="flex flex-wrap items-center gap-3 font-bold text-slate-200">
-                    {organization.phone && (
-                      <a
-                        href={`tel:${organization.phone}`}
-                        className="inline-flex items-center gap-1 text-emerald-400 hover:underline"
-                      >
-                        <Phone className="w-3.5 h-3.5" />
-                        <span>{organization.phone}</span>
-                      </a>
-                    )}
-                    {organization.email && (
-                      <a
-                        href={`mailto:${organization.email}`}
-                        className="inline-flex items-center gap-1 text-sky-400 hover:underline"
-                      >
-                        <Mail className="w-3.5 h-3.5" />
-                        <span>{organization.email}</span>
-                      </a>
-                    )}
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleCopyCatalogUrl}
+                className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-extrabold px-4 py-3 text-xs shadow-md transition cursor-pointer shrink-0 border border-sky-400/30"
+                title="Zkopírovat přímý odkaz na tento katalog pro odeslání klientovi"
+              >
+                {copiedCatalogUrl ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                    <span>Odkaz na katalog zkopírován!</span>
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="w-4 h-4 text-sky-200" />
+                    <span>Kopírovat odkaz na katalog</span>
+                  </>
+                )}
+              </button>
+
+              {organization && (organization.phone || organization.email) && (
+                <div className="flex flex-wrap items-center gap-3 text-xs bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-3">
+                  <div className="space-y-0.5">
+                    <span className="text-[11px] font-bold text-slate-400 block">
+                      Potřebujete poradit s výběrem?
+                    </span>
+                    <div className="flex flex-wrap items-center gap-3 font-bold text-slate-200">
+                      {organization.phone && (
+                        <a
+                          href={`tel:${organization.phone}`}
+                          className="inline-flex items-center gap-1 text-emerald-400 hover:underline"
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                          <span>{organization.phone}</span>
+                        </a>
+                      )}
+                      {organization.email && (
+                        <a
+                          href={`mailto:${organization.email}`}
+                          className="inline-flex items-center gap-1 text-sky-400 hover:underline"
+                        >
+                          <Mail className="w-3.5 h-3.5" />
+                          <span>{organization.email}</span>
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* CAMPAIGN DATES & FILTERS BAR */}
