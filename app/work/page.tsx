@@ -44,10 +44,14 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
     }
   }
 
-  // 2. Ensure active dispatch intake points are reflected in WorkOrders
-  await prisma.$transaction(async (tx) => {
-    await syncUnlinkedDispatchPointsInTransaction(tx, user.organizationId);
-  });
+  // 2. Ensure active dispatch intake points are reflected in WorkOrders (best-effort)
+  try {
+    await prisma.$transaction(async (tx) => {
+      await syncUnlinkedDispatchPointsInTransaction(tx, user.organizationId);
+    });
+  } catch (error) {
+    console.error('[work] dispatch work sync failed', error);
+  }
 
   const [orders, clients, carriers, employees, categories, plans, completedPoints, completedNavPoints] = await Promise.all([
     prisma.workOrder.findMany({

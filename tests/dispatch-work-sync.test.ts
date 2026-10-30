@@ -117,7 +117,8 @@ test('syncUnlinkedDispatchPointsInTransaction: creates a single consolidated Wor
       deleteMany: async () => ({ count: 0 }),
     },
     workTask: {
-      findMany: async () => [],
+      // Existing recorded work must survive automatic campaign consolidation.
+      findMany: async () => [{ id: 'logged-task', title: 'lepení bilboardu', assignedToEmployeeId: 'former-worker', workEntries: [{ id: 'entry-1' }] }],
       deleteMany: async () => ({ count: 0 }),
       create: async () => ({}),
       createMany: async () => ({ count: 1 }),

@@ -288,7 +288,7 @@ export async function syncUnlinkedDispatchPointsInTransaction(
         });
       }
 
-      await syncWorkOrderTasks(existing.id, tx);
+      await syncWorkOrderTasks(existing.id, tx, { preserveLoggedTasks: true });
       continue;
     }
 
@@ -348,7 +348,7 @@ export async function syncUnlinkedDispatchPointsInTransaction(
       });
     }
 
-    await syncWorkOrderTasks(workOrder.id, tx);
+    await syncWorkOrderTasks(workOrder.id, tx, { preserveLoggedTasks: true });
     campaignIdToWorkOrder.set(campaign.id, {
       id: workOrder.id,
       title: smartCampaignTitle,

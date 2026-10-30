@@ -14,11 +14,16 @@ export default async function MyTasksPage() {
   const user = await requirePageAccess('myTasks');
   if (!canAccess(user.role, 'myTasks')) return <AppShell><AccessDenied /></AppShell>;
 
-  // Ensure active dispatch intake points are reflected in WorkOrders
+  // Ensure active dispatch intake points are reflected in WorkOrders.
+  // Best-effort: a sync problem must never block the worker from seeing their tasks.
   if (user.organizationId) {
-    await prisma.$transaction(async (tx) => {
-      await syncUnlinkedDispatchPointsInTransaction(tx, user.organizationId);
-    });
+    try {
+      await prisma.$transaction(async (tx) => {
+        await syncUnlinkedDispatchPointsInTransaction(tx, user.organizationId);
+      });
+    } catch (error) {
+      console.error('[my-tasks] dispatch work sync failed', error);
+    }
   }
 
   const currentUserName = user.employee
