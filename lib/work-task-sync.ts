@@ -54,7 +54,21 @@ function taskNote(order: WorkOrderForSync, workerName?: string, employee?: Emplo
   return lines.join('\n');
 }
 
-export async function syncWorkOrderTasks(workOrderId: string, tx?: Prisma.TransactionClient) {
+export type SyncWorkOrderTasksOptions = {
+  /**
+   * When true, tasks that are no longer matched by an assignment but already have
+   * logged work entries are kept (history is preserved) instead of throwing.
+   * Use for automatic background syncs (e.g. on page load). Explicit user edits
+   * via the API keep the default strict behaviour and get a validation error.
+   */
+  preserveLoggedTasks?: boolean;
+};
+
+export async function syncWorkOrderTasks(
+  workOrderId: string,
+  tx?: Prisma.TransactionClient,
+  options: SyncWorkOrderTasksOptions = {}
+) {
   const client = tx || prisma;
   const order = await client.workOrder.findUnique({
     where: { id: workOrderId },
@@ -126,6 +140,10 @@ export async function syncWorkOrderTasks(workOrderId: string, tx?: Prisma.Transa
     const unmatchedTasks = existingTasks.filter(t => !matchedIds.has(t.id));
     for (const task of unmatchedTasks) {
       if (task.workEntries.length > 0) {
+        if (options.preserveLoggedTasks) {
+          // Keep the task with its logged work so the time/history is not lost.
+          continue;
+        }
         throw new Error(`NELZE_ODEBRAT_PRACOVNIKA: Pracovník přiřazený k úkolu "${task.title}" již vykázal práci. Odebrání pracovníka bylo zablokováno.`);
       } else {
         await transaction.workTask.delete({ where: { id: task.id } });
