@@ -9,6 +9,7 @@ import { CarrierDetail } from './CarrierDetail';
 import { CarrierForm } from './CarrierForm';
 import { CarrierMapCard } from './CarrierMapCard';
 import { OSTRAVA_RESTRICTED_ZONES_GEOJSON } from '@/lib/maps/ostrava-restricted-zones-data';
+import { OSTRAVA_HERITAGE_ZONES_GEOJSON } from '@/lib/maps/ostrava-heritage-zones-data';
 
 type LeafletModule = typeof import('leaflet');
 type StatusFilter = 'ALL' | CarrierStatus;
@@ -57,11 +58,13 @@ export function MapView({
   const [locationSaving, setLocationSaving] = useState(false);
   const [locationError, setLocationError] = useState('');
   const [showRestrictedZones, setShowRestrictedZones] = useState(false);
+  const [showHeritageZones, setShowHeritageZones] = useState(false);
   const hasOstravaCarriers = items.some(carrier => carrier.city?.trim().toLocaleLowerCase('cs') === 'ostrava');
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const markerLayerRef = useRef<LayerGroup | null>(null);
   const restrictedLayerRef = useRef<LayerGroup | null>(null);
+  const heritageLayerRef = useRef<LayerGroup | null>(null);
   const leafletRef = useRef<LeafletModule | null>(null);
   const locationEditIdRef = useRef<string | undefined>(undefined);
 
@@ -109,6 +112,7 @@ export function MapView({
       }).addTo(map);
 
       const restrictedLayer = L.layerGroup();
+      const heritageLayer = L.layerGroup();
       const markerLayer = L.layerGroup().addTo(map);
 
       // Render all 12 official Ostrava restricted advertising zones from GeoJSON
@@ -132,6 +136,27 @@ export function MapView({
         // Ignore if geometry fails
       }
 
+      // Render official Ostrava MPZ historical heritage zones from GeoJSON
+      try {
+        L.geoJSON(OSTRAVA_HERITAGE_ZONES_GEOJSON, {
+          style: {
+            color: '#d97706',
+            fillColor: '#f59e0b',
+            fillOpacity: 0.22,
+            weight: 2,
+          },
+          onEachFeature: (feature: { properties?: { NAZEV?: string; USKP?: string } }, layer: import('leaflet').Layer) => {
+            const name = feature.properties?.NAZEV || '';
+            const uskp = feature.properties?.USKP ? ` (ÚSKP ${feature.properties.USKP})` : '';
+            layer.bindTooltip(`🏛️ Městská památková zóna ${name}${uskp} – zákaz navigačních tabulí na sloupech VO`, {
+              sticky: true,
+            });
+          },
+        }).addTo(heritageLayer);
+      } catch {
+        // Ignore if geometry fails
+      }
+
       map.on('click', (event) => {
         if (locationEditIdRef.current) {
           setPendingLocation({ latitude: event.latlng.lat, longitude: event.latlng.lng });
@@ -144,6 +169,7 @@ export function MapView({
       mapRef.current = map;
       markerLayerRef.current = markerLayer;
       restrictedLayerRef.current = restrictedLayer;
+      heritageLayerRef.current = heritageLayer;
       setMapReady(true);
     }
     void initializeMap();
@@ -153,21 +179,34 @@ export function MapView({
       mapRef.current = null;
       markerLayerRef.current = null;
       restrictedLayerRef.current = null;
+      heritageLayerRef.current = null;
       leafletRef.current = null;
     };
   }, []);
 
-  // Handle toggling of restricted advertising zones
+  // Handle toggling of restricted advertising zones & historical heritage zones
   useEffect(() => {
     const map = mapRef.current;
     const restrictedLayer = restrictedLayerRef.current;
-    if (!map || !restrictedLayer) return;
-    if (showRestrictedZones && hasOstravaCarriers) {
-      if (!map.hasLayer(restrictedLayer)) map.addLayer(restrictedLayer);
-    } else {
-      if (map.hasLayer(restrictedLayer)) map.removeLayer(restrictedLayer);
+    const heritageLayer = heritageLayerRef.current;
+    if (!map) return;
+
+    if (restrictedLayer) {
+      if (showRestrictedZones && hasOstravaCarriers) {
+        if (!map.hasLayer(restrictedLayer)) map.addLayer(restrictedLayer);
+      } else {
+        if (map.hasLayer(restrictedLayer)) map.removeLayer(restrictedLayer);
+      }
     }
-  }, [showRestrictedZones, hasOstravaCarriers, mapReady]);
+
+    if (heritageLayer) {
+      if (showHeritageZones && hasOstravaCarriers) {
+        if (!map.hasLayer(heritageLayer)) map.addLayer(heritageLayer);
+      } else {
+        if (map.hasLayer(heritageLayer)) map.removeLayer(heritageLayer);
+      }
+    }
+  }, [showRestrictedZones, showHeritageZones, hasOstravaCarriers, mapReady]);
 
   useEffect(() => {
     const L = leafletRef.current;
@@ -259,20 +298,38 @@ export function MapView({
           <label><span className="sr-only">Filtrovat podle klienta</span><select className="input min-w-52" value={clientFilter} onChange={(event) => setClientFilter(event.target.value)}><option value={ALL_CLIENTS}>Všichni klienti</option><option value={WITHOUT_CLIENT}>Bez klienta</option>{clientNames.map((clientName) => <option key={clientName} value={clientName}>{clientName}</option>)}</select></label>
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-600">
-          {hasOstravaCarriers && <button
-            type="button"
-            onClick={() => setShowRestrictedZones((prev) => !prev)}
-            aria-pressed={showRestrictedZones}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-bold border transition cursor-pointer ${
-              showRestrictedZones
-                ? 'bg-red-50 text-red-700 border-red-200 shadow-xs'
-                : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'
-            }`}
-            title="Přepnout zobrazení 12 zón zákazu šíření reklamy (Ostrava)"
-          >
-            <span className={`h-2 w-2 rounded-full ${showRestrictedZones ? 'bg-red-500 animate-pulse' : 'bg-slate-400'}`} />
-            <span>Zákaz reklamy Ostrava (12 zón)</span>
-          </button>}
+          {hasOstravaCarriers && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowRestrictedZones((prev) => !prev)}
+                aria-pressed={showRestrictedZones}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-bold border transition cursor-pointer ${
+                  showRestrictedZones
+                    ? 'bg-red-50 text-red-700 border-red-200 shadow-xs'
+                    : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'
+                }`}
+                title="Přepnout zobrazení 12 zón zákazu šíření reklamy (Ostrava)"
+              >
+                <span className={`h-2 w-2 rounded-full ${showRestrictedZones ? 'bg-red-500 animate-pulse' : 'bg-slate-400'}`} />
+                <span>Zákaz reklamy Ostrava (12 zón)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowHeritageZones((prev) => !prev)}
+                aria-pressed={showHeritageZones}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl font-bold border transition cursor-pointer ${
+                  showHeritageZones
+                    ? 'bg-amber-50 text-amber-800 border-amber-300 shadow-xs'
+                    : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'
+                }`}
+                title="Přepnout zobrazení památkových zón MPZ (Ostrava)"
+              >
+                <span className={`h-2 w-2 rounded-full ${showHeritageZones ? 'bg-amber-500 animate-pulse' : 'bg-slate-400'}`} />
+                <span>🏛️ Památková zóna MPZ</span>
+              </button>
+            </>
+          )}
           {legend.map((item) => <span key={item.label} className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: item.color }} />{item.label}</span>)}
           <strong className="text-slate-900">{carrierCountLabel(filteredItems.length)}</strong>
           {missingGpsCount > 0 && <strong className="text-amber-700">{missingGpsCount} bez GPS</strong>}

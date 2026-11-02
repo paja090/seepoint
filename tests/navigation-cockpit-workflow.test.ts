@@ -16,6 +16,7 @@ import {
   isOstravaHistoricalHeritageZone,
   isOstravaRegulatedZone,
   evaluateNavigationZoning,
+  OSTRAVA_HERITAGE_ZONES_GEOJSON,
 } from '../lib/ai-offers/navigation-constraints.ts';
 import { TARGET_COLORS } from '../components/offers/navigation-cockpit/types.ts';
 import type { OfferView } from '../lib/offers/view-model.ts';
@@ -371,5 +372,24 @@ test('23. Dvouokruhový koncept (Vnitřní okruh do 750 m vs Vnější okruh nad
 
   assert.equal(innerCircuit, 'INNER');
   assert.equal(outerCircuit, 'OUTER');
+});
+
+test('24. Oficiální polygonová vrstva NPÚ pro Městské památkové zóny (MPZ) Ostravy', () => {
+  assert.ok(OSTRAVA_HERITAGE_ZONES_GEOJSON, 'GeoJSON památkových zón musí existovat');
+  assert.equal(OSTRAVA_HERITAGE_ZONES_GEOJSON.type, 'FeatureCollection');
+  assert.equal(OSTRAVA_HERITAGE_ZONES_GEOJSON.features.length, 15, 'Ostravské památkové zóny obsahují 15 oficiálních polygonů (Moravská Ostrava, Poruba, Přívoz, Vítkovice)');
+
+  // Ověření prostorového Point-in-Polygon testu pro klíčová památková centra:
+  // 1. Masarykovo náměstí (Moravská Ostrava)
+  assert.equal(isOstravaHistoricalHeritageZone(49.8355, 18.2925), true);
+  // 2. Alšovo náměstí / Hlavní třída (Poruba Sorela)
+  assert.equal(isOstravaHistoricalHeritageZone(49.8280, 18.1700), true);
+  // 3. Náměstí Svatopluka Čecha (Přívoz)
+  assert.equal(isOstravaHistoricalHeritageZone(49.8510, 18.2720), true);
+  // 4. Mírové náměstí / Štítová kolonie (Vítkovice)
+  assert.equal(isOstravaHistoricalHeritageZone(49.8140, 18.2650), true);
+
+  // Místo mimo památkovou zónu (Hrabůvka, Svinov, Výškovice)
+  assert.equal(isOstravaHistoricalHeritageZone(49.7800, 18.2000), false);
 });
 
