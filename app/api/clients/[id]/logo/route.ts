@@ -50,28 +50,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       logoUpdatedAt: now,
     };
 
-    // Ensure legacy unique B-tree index Client_logoDriveFileId_key is dropped if still present in the DB
-    // (Postgres B-tree index rejects entries > 8191 bytes with error 54000 when base64 fallback is used)
-    await prisma.$executeRawUnsafe('DROP INDEX IF EXISTS "Client_logoDriveFileId_key"').catch(() => undefined);
-
-    try {
-      await prisma.client.update({
-        where: { id },
-        data: updatePayload,
-      });
-    } catch (updateErr: unknown) {
-      const errStr = String(updateErr);
-      if (errStr.includes('54000') || errStr.includes('8191') || errStr.includes('Client_logoDriveFileId_key')) {
-        console.warn('[client-logo] Hit legacy index constraint during update; dropping Client_logoDriveFileId_key and retrying...', errStr);
-        await prisma.$executeRawUnsafe('DROP INDEX IF EXISTS "Client_logoDriveFileId_key"').catch(() => undefined);
-        await prisma.client.update({
-          where: { id },
-          data: updatePayload,
-        });
-      } else {
-        throw updateErr;
-      }
-    }
+    await prisma.client.update({
+      where: { id },
+      data: updatePayload,
+    });
 
     // Also synchronize logo onto any duplicate client records sharing companyId or normalizedName in the same org
     const siblingOr: Array<Record<string, unknown>> = [];
@@ -85,22 +67,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           OR: siblingOr,
         },
         data: updatePayload,
-      }).catch(async (syncErr: unknown) => {
-        const errStr = String(syncErr);
-        if (errStr.includes('54000') || errStr.includes('8191') || errStr.includes('Client_logoDriveFileId_key')) {
-          await prisma.$executeRawUnsafe('DROP INDEX IF EXISTS "Client_logoDriveFileId_key"').catch(() => undefined);
-          await prisma.client.updateMany({
-            where: {
-              organizationId: client.organizationId,
-              id: { not: id },
-              OR: siblingOr,
-            },
-            data: updatePayload,
-          }).catch((e) => console.warn('[client-logo] Sibling sync retry failed', e));
-        } else {
-          console.warn('[client-logo] Sibling sync failed', syncErr);
-        }
-      });
+      }).catch((syncErr) => console.warn('[client-logo] Sibling sync failed', syncErr));
     }
 
     if (client.logoDriveFileId && !client.logoDriveFileId.startsWith('data:') && client.logoDriveFileId !== storedId) {
@@ -111,7 +78,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (uploadedFileId) await deletePhotoFromGoogleDrive(uploadedFileId).catch(() => undefined);
     if (error instanceof PhotoValidationError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     console.error('Client logo upload failed', error);
-    const detail = error instanceof Error ? error.message : 'Logo se nepodařilo uložit.';
+    let detail = error instanceof Error ? error.message : 'Logo se nepodařilo uložit.';
+    if (detail.includes('54000') || detail.includes('8191')) {
+      detail = 'Databáze vyžaduje aplikaci migrace pro odstranění omezení velikosti loga (npx prisma migrate deploy).';
+    }
     return NextResponse.json({ error: `Logo se nepodařilo uložit: ${detail}` }, { status: 502 });
   }
 }
