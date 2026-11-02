@@ -99,13 +99,33 @@ export default async function PublicOfferPage({ params, searchParams }: { params
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <OfferBrandMark branding={offer.branding} />
               </div>
             </div>
           </header>
+
+          {/* 🌟 Prominent Client Approval & Actions – Immediately below the header so the client notices right away */}
+          <SpecializedOfferResponseActions
+            status={offer.status}
+            token={token}
+            isLocationSelection={isLocationSelection}
+            offerType={offer.offerType}
+            pointsCount={offer.navigation?.points?.length}
+            placement="top"
+          />
+
           <SpecializedOfferSummary offer={offer} proposalKey={token} />
-          <SpecializedOfferResponseActions status={offer.status} token={token} isLocationSelection={isLocationSelection} />
+
+          {/* Bottom Confirmation Actions – Conveniently accessible when scrolling to the end */}
+          <SpecializedOfferResponseActions
+            status={offer.status}
+            token={token}
+            isLocationSelection={isLocationSelection}
+            offerType={offer.offerType}
+            pointsCount={offer.navigation?.points?.length}
+            placement="bottom"
+            isFooter
+          />
         </div>
       </div>
     );

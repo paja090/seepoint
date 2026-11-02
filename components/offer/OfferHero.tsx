@@ -1,5 +1,4 @@
 import { CalendarDays, CheckCircle2, HelpCircle, Layers, MapPin, PencilLine, Timer } from 'lucide-react';
-import Image from 'next/image';
 import type { ProposalOffer } from '@/lib/offers/presentation';
 import { MEDIA_TYPE_META } from '@/lib/offers/presentation';
 import { LogoPlaceholder } from './LogoPlaceholder';
@@ -73,32 +72,39 @@ export function OfferHero({
             <MetaItem icon={<Layers size={18} />} label="Typy médií" value={mediaLabels} />
           </div>
 
-          {actionsEnabled && <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap print:hidden">
-            <button
-              className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:bg-emerald-700 sm:flex-none"
-              onClick={onApprove}
-              type="button"
-            >
-              <CheckCircle2 aria-hidden size={18} />
-              Mám zájem o nabídku
-            </button>
-            <button
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50"
-              onClick={onRevision}
-              type="button"
-            >
-              <PencilLine aria-hidden size={18} />
-              Požádat o úpravu
-            </button>
-            <button
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50"
-              onClick={onQuestion}
-              type="button"
-            >
-              <HelpCircle aria-hidden size={18} />
-              Prostor pro dotaz
-            </button>
-          </div>}
+          {actionsEnabled && (
+            <div className="space-y-3 pt-2 print:hidden">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <button
+                  className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:bg-emerald-700 sm:flex-none cursor-pointer"
+                  onClick={onApprove}
+                  type="button"
+                >
+                  <CheckCircle2 aria-hidden size={18} />
+                  Schválit nabídku
+                </button>
+                <button
+                  className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50 cursor-pointer"
+                  onClick={onRevision}
+                  type="button"
+                >
+                  <PencilLine aria-hidden size={18} />
+                  Požádat o úpravu
+                </button>
+                <button
+                  className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50 cursor-pointer"
+                  onClick={onQuestion}
+                  type="button"
+                >
+                  <HelpCircle aria-hidden size={18} />
+                  Mám dotaz
+                </button>
+              </div>
+              <p className="text-xs text-slate-500">
+                Nabídku můžete jedním kliknutím schválit nebo požádat o úpravu lokalit, termínu či rozsahu vybraných reklamních ploch.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="relative order-1 min-h-[260px] lg:order-2 lg:min-h-full">
