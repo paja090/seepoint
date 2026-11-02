@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { AppShell } from '@/components/AppShell';
 import { ClientLogoControl } from '@/components/ClientLogoControl';
 import { AddClientModalButton } from '@/components/crm/ClientListControl';
+import { ClientDuplicatesModalButton } from '@/components/crm/ClientDuplicatesModal';
 import { requirePageAccess } from '@/lib/page-auth';
 import { Button, EmptyState, FilterBar, PageHeader, Table, TableCell, TableHead, TableHeaderCell } from '@/components/ui';
 import { prisma } from '@/lib/db';
@@ -51,7 +52,12 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
       <PageHeader
         title="CRM Klienti"
         description="Centrální evidence obchodních partnerů, kontaktů, nabídek a zakázek."
-        actions={<AddClientModalButton />}
+        actions={
+          <div className="flex items-center gap-2">
+            <ClientDuplicatesModalButton />
+            <AddClientModalButton />
+          </div>
+        }
       />
 
       <FilterBar>

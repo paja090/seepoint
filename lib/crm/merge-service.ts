@@ -18,6 +18,29 @@ export async function mergeDuplicateClients(
     ]);
     if (!targetClient || !sourceClient) throw new Error('CLIENT_NOT_FOUND');
 
+    // Auto-enrich target client with missing fields from source client
+    const enrichData: Prisma.ClientUpdateInput = {};
+    if (!targetClient.companyId && sourceClient.companyId) enrichData.companyId = sourceClient.companyId;
+    if (!targetClient.dic && sourceClient.dic) enrichData.dic = sourceClient.dic;
+    if (!targetClient.email && sourceClient.email) enrichData.email = sourceClient.email;
+    if (!targetClient.phone && sourceClient.phone) enrichData.phone = sourceClient.phone;
+    if (!targetClient.billingStreet && sourceClient.billingStreet) enrichData.billingStreet = sourceClient.billingStreet;
+    if (!targetClient.billingCity && sourceClient.billingCity) enrichData.billingCity = sourceClient.billingCity;
+    if (!targetClient.billingZip && sourceClient.billingZip) enrichData.billingZip = sourceClient.billingZip;
+    if (!targetClient.shippingStreet && sourceClient.shippingStreet) enrichData.shippingStreet = sourceClient.shippingStreet;
+    if (!targetClient.shippingCity && sourceClient.shippingCity) enrichData.shippingCity = sourceClient.shippingCity;
+    if (!targetClient.shippingZip && sourceClient.shippingZip) enrichData.shippingZip = sourceClient.shippingZip;
+    if (!targetClient.contactPerson && sourceClient.contactPerson) enrichData.contactPerson = sourceClient.contactPerson;
+    if (!targetClient.website && sourceClient.website) enrichData.website = sourceClient.website;
+    if (!targetClient.tradingName && sourceClient.tradingName) enrichData.tradingName = sourceClient.tradingName;
+
+    if (Object.keys(enrichData).length > 0) {
+      await tx.client.update({
+        where: { id: targetClientId },
+        data: enrichData,
+      });
+    }
+
     const [targetPrimary, sourcePrimaryContacts] = await Promise.all([
       tx.clientContact.findFirst({ where: { clientId: targetClientId, active: true, isPrimary: true }, select: { id: true } }),
       tx.clientContact.findMany({ where: { clientId: sourceClientId, active: true, isPrimary: true }, orderBy: { createdAt: 'asc' }, select: { id: true } }),
@@ -30,96 +53,29 @@ export async function mergeDuplicateClients(
         data: { isPrimary: false },
       });
     }
-    // 1. Move ClientContact records
-    await tx.clientContact.updateMany({
-      where: { clientId: sourceClientId },
-      data: { clientId: targetClientId },
-    });
-
-    // 2. Move ClientBranch records
-    await tx.clientBranch.updateMany({
-      where: { clientId: sourceClientId },
-      data: { clientId: targetClientId },
-    });
-
-    // 3. Move Offers
-    await tx.offer.updateMany({
-      where: { clientId: sourceClientId },
-      data: { clientId: targetClientId },
-    });
-
-    // 4. Move CrmOrders
-    await tx.crmOrder.updateMany({
-      where: { clientId: sourceClientId },
-      data: { clientId: targetClientId },
-    });
-
-    // 5. Move Occupancy records
-    await tx.occupancy.updateMany({
-      where: { clientId: sourceClientId },
-      data: { clientId: targetClientId, clientName: targetClient.name },
-    });
-
-    // 6. Move AdvertisingSurface currentClientId
-    await tx.advertisingSurface.updateMany({
-      where: { currentClientId: sourceClientId },
-      data: { currentClientId: targetClientId },
-    });
-
-    // 7. Move WorkOrders
-    await tx.workOrder.updateMany({
-      where: { clientId: sourceClientId },
-      data: { clientId: targetClientId, clientName: targetClient.name },
-    });
-
-    // 8. Move WorkEntries
-    await tx.workEntry.updateMany({
-      where: { clientId: sourceClientId },
-      data: { clientId: targetClientId },
-    });
-
-    // 9. Move ClientContract records
-    await tx.clientContract.updateMany({
-      where: { clientId: sourceClientId },
-      data: { clientId: targetClientId },
-    });
-
-    // 10. Move ClientInvoice records
-    await tx.clientInvoice.updateMany({
-      where: { clientId: sourceClientId },
-      data: { clientId: targetClientId },
-    });
-
-    // 11. Move ClientCommunication records
-    await tx.clientCommunication.updateMany({
-      where: { clientId: sourceClientId },
-      data: { clientId: targetClientId },
-    });
-
-    // 12. Move CrmTask records
-    await tx.crmTask.updateMany({
-      where: { clientId: sourceClientId },
-      data: { clientId: targetClientId },
-    });
-
-    // 13. Move ClientDocument records
-    await tx.clientDocument.updateMany({
-      where: { clientId: sourceClientId },
-      data: { clientId: targetClientId },
-    });
-
-    // 14. Move NavigationDocumentationReport records
-    await tx.navigationDocumentationReport.updateMany({
-      where: { clientId: sourceClientId },
-      data: { clientId: targetClientId },
-    });
-
-    // 15. Move the remaining client-linked modules
+    // Move all client relations concurrently to keep transaction super fast and avoid timeouts
     await Promise.all([
+      tx.clientContact.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
+      tx.clientBranch.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
+      tx.offer.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
+      tx.crmOrder.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
+      tx.occupancy.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId, clientName: targetClient.name } }),
+      tx.advertisingSurface.updateMany({ where: { currentClientId: sourceClientId }, data: { currentClientId: targetClientId } }),
+      tx.workOrder.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId, clientName: targetClient.name } }),
+      tx.workEntry.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
+      tx.clientContract.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
+      tx.clientInvoice.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
+      tx.clientCommunication.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
+      tx.crmTask.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
+      tx.clientDocument.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
+      tx.navigationDocumentationReport.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
       tx.navigationContract.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
       tx.navigationContactPerson.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
       tx.salesOpportunity.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
       tx.carrierHistoryLog.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId, clientName: targetClient.name } }),
+      tx.printProductionJob.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
+      tx.aiInboxMessage.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
+      tx.occupancyInsight.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
     ]);
 
     // 16. Create ClientMergeLog
@@ -153,12 +109,17 @@ export async function mergeDuplicateClients(
       },
     });
 
-    // 18. Soft-deactivate/archive source client
+    // 18. Soft-deactivate/archive source client and make normalizedName unique to free unique index
+    const uniqueMergedName = sourceClient.normalizedName.startsWith('[merged-')
+      ? sourceClient.normalizedName
+      : `[merged-${sourceClientId.slice(-8)}]-${sourceClient.normalizedName}`.slice(0, 180);
+
     await tx.client.update({
-      where: { id: sourceClientId, active: true },
+      where: { id: sourceClientId },
       data: {
         active: false,
         status: 'INACTIVE',
+        normalizedName: uniqueMergedName,
         note: `[SLOUČENO DO KLIENTA ${targetClient.name} (${targetClient.id}) DNE ${new Date().toLocaleDateString('cs-CZ')}] ${sourceClient.note ?? ''}`,
       },
     });
@@ -169,5 +130,5 @@ export async function mergeDuplicateClients(
       sourceClientId,
       mergeLogId: mergeLog.id,
     };
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 30000, maxWait: 10000 });
 }

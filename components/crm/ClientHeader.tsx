@@ -63,6 +63,45 @@ export function ClientHeader({ client, canManageLifecycle }: { client: ClientPro
 
   // Merge form state
   const [sourceClientId, setSourceClientId] = useState('');
+  const [searchMergeQ, setSearchMergeQ] = useState('');
+  const [mergeCandidates, setMergeCandidates] = useState<Array<{
+    id: string;
+    name: string;
+    companyId: string | null;
+    email: string | null;
+    ordersCount: number;
+    offersCount: number;
+    occupanciesCount: number;
+    surfacesCount: number;
+  }>>([]);
+  const [searchingCandidates, setSearchingCandidates] = useState(false);
+  const [selectedCandidate, setSelectedCandidate] = useState<{
+    id: string;
+    name: string;
+    companyId: string | null;
+    ordersCount: number;
+    offersCount: number;
+  } | null>(null);
+
+  const handleSearchCandidates = async (query: string) => {
+    setSearchMergeQ(query);
+    if (!query.trim() || query.trim().length < 2) {
+      setMergeCandidates([]);
+      return;
+    }
+    setSearchingCandidates(true);
+    try {
+      const res = await fetch(`/api/crm/clients/duplicates?q=${encodeURIComponent(query.trim())}&excludeId=${client.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMergeCandidates(data.candidates || []);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setSearchingCandidates(false);
+    }
+  };
 
   const handleSaveClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -627,37 +666,151 @@ export function ClientHeader({ client, canManageLifecycle }: { client: ClientPro
 
       {/* Merge Client Modal */}
       {showMergeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 text-slate-900">
-          <div className="card max-w-md w-full bg-white space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b pb-2">
-              <h3 className="font-bold text-base text-slate-900">🔗 Sloučit jiného klienta do tohoto profilu</h3>
-              <button onClick={() => setShowMergeModal(false)} className="text-slate-400 hover:text-slate-700 text-sm font-bold">✕</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 text-slate-900">
+          <div className="card max-w-lg w-full bg-white space-y-4 shadow-2xl rounded-2xl overflow-hidden p-6">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
+                <span>🔗</span>
+                <span>Sloučit duplicitního klienta do tohoto profilu</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMergeModal(false);
+                  setSelectedCandidate(null);
+                  setSearchMergeQ('');
+                  setMergeCandidates([]);
+                }}
+                className="text-slate-400 hover:text-slate-700 text-sm font-bold"
+              >
+                ✕
+              </button>
             </div>
-            <form onSubmit={handleMergeClient} className="space-y-3">
-              <p className="text-xs text-slate-600">Všechny nabídky, zakázky, pobočky i kontakty zdrojového klienta budou sloučeny do profilu <strong>{client.name}</strong>.</p>
-              <div className="p-3 rounded-xl bg-purple-50 border border-purple-200 text-xs space-y-1.5">
-                <span className="text-purple-700 font-bold block text-[11px] uppercase tracking-wide">Cílový profil klienta (zůstane zachován):</span>
+            <form onSubmit={handleMergeClient} className="space-y-4">
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Všechny nabídky, zakázky, plochy, faktury i kontakty vybraného duplicitního klienta budou bezpečně převedeny sem do profilu <strong>{client.name}</strong> a duplikát bude archivován.
+              </p>
+
+              {/* Target client preview */}
+              <div className="p-3 rounded-xl bg-purple-50 border border-purple-200 text-xs space-y-1">
+                <span className="text-purple-800 font-bold block text-[11px] uppercase tracking-wide">
+                  🌟 Cílový profil (zůstane zachován):
+                </span>
                 <div className="flex items-center justify-between gap-2">
                   <strong className="text-purple-950 font-black text-sm truncate">{client.name}</strong>
-                  <span className="inline-flex items-center gap-1 font-mono text-[11px] text-purple-900 bg-white px-2 py-0.5 rounded border border-purple-300 shrink-0">
-                    ID: {client.id}
+                  <span className="font-mono text-[10px] text-purple-900 bg-white px-2 py-0.5 rounded border border-purple-300 shrink-0">
+                    IČO: {client.companyId || 'neuvedeno'}
                   </span>
                 </div>
               </div>
-              <label className="text-xs font-semibold block">
-                ID zdrojového klienta ke sloučení (bude sloučen sem a archivován) *
+
+              {/* Search duplicate client */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold block text-slate-700">
+                  Vyhledejte duplicitního klienta (podle názvu nebo IČO):
+                </label>
                 <input
                   type="text"
-                  value={sourceClientId}
-                  onChange={e => setSourceClientId(e.target.value)}
-                  required
-                  placeholder="Vložte ID zdrojového klienta (např. CUID)"
-                  className="input text-xs mt-1 font-mono w-full"
+                  value={searchMergeQ}
+                  onChange={(e) => handleSearchCandidates(e.target.value)}
+                  placeholder="Zadejte název duplicitní firmy nebo IČO..."
+                  className="input text-xs w-full"
                 />
-              </label>
+
+                {searchingCandidates && (
+                  <p className="text-[11px] text-slate-400 italic">Hledám v databázi...</p>
+                )}
+
+                {mergeCandidates.length > 0 && !selectedCandidate && (
+                  <div className="max-h-40 overflow-y-auto border rounded-xl divide-y bg-slate-50 text-xs">
+                    {mergeCandidates.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          setSourceClientId(c.id);
+                          setSelectedCandidate({
+                            id: c.id,
+                            name: c.name,
+                            companyId: c.companyId,
+                            ordersCount: c.ordersCount,
+                            offersCount: c.offersCount,
+                          });
+                          setMergeCandidates([]);
+                        }}
+                        className="w-full text-left p-2.5 hover:bg-purple-50 hover:text-purple-950 flex items-center justify-between gap-2 transition-colors"
+                      >
+                        <div>
+                          <div className="font-bold text-slate-900">{c.name}</div>
+                          <div className="text-[10px] text-slate-500">IČO: {c.companyId || '-'} • E-mail: {c.email || '-'}</div>
+                        </div>
+                        <span className="text-[10px] font-bold bg-white text-purple-700 border border-purple-200 px-2 py-0.5 rounded shrink-0">
+                          Vybrat ↗
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Selected candidate card */}
+              {selectedCandidate ? (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-amber-800 font-bold block text-[11px] uppercase tracking-wide">
+                      ⚠️ Vybraný duplikát k převedení:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCandidate(null);
+                        setSourceClientId('');
+                      }}
+                      className="text-[11px] text-amber-700 underline hover:text-amber-900"
+                    >
+                      Změnit
+                    </button>
+                  </div>
+                  <div className="font-extrabold text-sm text-amber-950">{selectedCandidate.name}</div>
+                  <div className="text-slate-600 text-[11px]">
+                    IČO: {selectedCandidate.companyId || 'neuvedeno'} • Zakázky: {selectedCandidate.ordersCount} • Nabídky: {selectedCandidate.offersCount}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <label className="text-[11px] text-slate-500 block">
+                    Nebo vložte ID přímo:
+                  </label>
+                  <input
+                    type="text"
+                    value={sourceClientId}
+                    onChange={(e) => setSourceClientId(e.target.value)}
+                    placeholder="ID zdrojového klienta (CUID)"
+                    className="input text-xs font-mono w-full"
+                  />
+                </div>
+              )}
+
               <div className="flex justify-end gap-2 border-t pt-3">
-                <Button type="button" variant="secondary" onClick={() => setShowMergeModal(false)}>Zrušit</Button>
-                <Button type="submit" disabled={saving || !sourceClientId.trim()} className="font-bold bg-purple-600 text-white hover:bg-purple-700">Sloučit klienta</Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowMergeModal(false);
+                    setSelectedCandidate(null);
+                    setSearchMergeQ('');
+                    setMergeCandidates([]);
+                  }}
+                >
+                  Zrušit
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={saving || !sourceClientId.trim()}
+                  className="font-bold bg-purple-600 text-white hover:bg-purple-700"
+                >
+                  {saving ? 'Slučuji...' : 'Sloučit klienta'}
+                </Button>
               </div>
             </form>
           </div>
