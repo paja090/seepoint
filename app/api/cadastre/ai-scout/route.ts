@@ -29,12 +29,17 @@ export async function POST(req: Request) {
     const { action } = body;
 
     if (action === 'scout') {
-      const { cityOrArea, preferredFocus } = body;
+      const { cityOrArea, preferredFocus, count, offset } = body;
       if (!cityOrArea || typeof cityOrArea !== 'string') {
         return NextResponse.json({ error: 'Zadejte město nebo oblast.' }, { status: 400 });
       }
 
-      const locations = await scoutAdvertisingLocationsAi(cityOrArea, preferredFocus);
+      const locations = await scoutAdvertisingLocationsAi(
+        cityOrArea,
+        preferredFocus,
+        Math.min(20, Math.max(1, Number(count) || 8)),
+        Math.max(0, Number(offset) || 0)
+      );
       return NextResponse.json({ success: true, locations });
     }
 

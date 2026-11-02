@@ -8,7 +8,7 @@ import {
 test('scoutAdvertisingLocationsAi returns strategic locations for regional query', async () => {
   const locations = await scoutAdvertisingLocationsAi('Ostrava');
   assert.ok(Array.isArray(locations));
-  assert.ok(locations.length > 0);
+  assert.ok(locations.length >= 8, `Expected at least 8 locations for Ostrava, got ${locations.length}`);
 
   const first = locations[0];
   assert.ok(first.title);
@@ -20,6 +20,14 @@ test('scoutAdvertisingLocationsAi returns strategic locations for regional query
   assert.ok(first.estimatedMonthlyRentCzk > 0);
   assert.ok(first.commercialRationale);
   assert.ok(first.acquisitionTip);
+
+  // Test pagination / count limit
+  const batchOf4 = await scoutAdvertisingLocationsAi('Ostrava', 'ALL', 4, 0);
+  assert.equal(batchOf4.length, 4);
+
+  const nextBatch = await scoutAdvertisingLocationsAi('Ostrava', 'ALL', 4, 4);
+  assert.equal(nextBatch.length, 4);
+  assert.notEqual(batchOf4[0].id, nextBatch[0].id);
 });
 
 test('analyzePlotAdvertisingPotentialAi calculates score and generates cold outreach pitch', async () => {
