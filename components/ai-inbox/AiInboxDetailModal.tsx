@@ -36,10 +36,12 @@ import {
   Phone,
   Mail,
   Eye,
+  MessageSquare,
 } from 'lucide-react';
 import { BrandedEmailComposerModal } from '@/components/email/BrandedEmailComposerModal';
+import { AiInboxTeamTimeline } from './AiInboxTeamTimeline';
 import { CLASSIFICATION_LABELS, getConfidenceBadge } from '@/lib/ai-inbox/classifier';
-import type { AiInboxActionStatus, AiInboxActionType, AiInboxAnalysisResult } from '@/lib/ai-inbox/types';
+import type { AiInboxActionStatus, AiInboxActionType, AiInboxAnalysisResult, UnifiedCommunicationItem } from '@/lib/ai-inbox/types';
 import type { CommercialRequest, DatesClarity } from '@/lib/ai-commercial/contracts/commercial-request';
 import type { CommercialNextBestAction } from '@/lib/ai-commercial/contracts/next-best-action';
 
@@ -63,6 +65,9 @@ export type AiInboxMessageDetailData = {
   suggestedReply: string | null;
   errorMessage: string | null;
   clientId: string | null;
+  crmOrderId?: string | null;
+  navigationOrderId?: string | null;
+  offerId?: string | null;
   integrationConnection?: { id: string; accountEmail: string | null; provider: string } | null;
   client?: { id: string; name: string; companyId: string | null; email: string | null; phone: string | null } | null;
   contact?: { id: string; firstName: string; lastName: string; email: string | null; phone: string | null } | null;
@@ -98,10 +103,11 @@ export type AiInboxMessageDetailData = {
     executedAt: string | null;
     executedBy?: { id: string; name: string } | null;
   }>;
+  conversationHistory?: UnifiedCommunicationItem[];
 };
 
 export function AiInboxDetailModal({
-  message,
+  message: initialMessage,
   onClose,
   onActionComplete,
 }: {
@@ -109,9 +115,53 @@ export function AiInboxDetailModal({
   onClose: () => void;
   onActionComplete: () => void;
 }) {
+  const [loadedMessage, setLoadedMessage] = useState<AiInboxMessageDetailData | null>(null);
+  const message = loadedMessage || initialMessage;
+
+  const [activeLeftTab, setActiveLeftTab] = useState<'CURRENT_MESSAGE' | 'TEAM_TIMELINE'>('CURRENT_MESSAGE');
+
+  useEffect(() => {
+    setLoadedMessage(null);
+  }, [initialMessage.id]);
+
   const [selectedActionIds, setSelectedActionIds] = useState<Set<string>>(
     () => new Set(message.actions.filter((a) => a.status === 'PROPOSED').map((a) => a.id))
   );
+
+  async function handleLoadSibling(siblingId: string) {
+    try {
+      const res = await fetch(`/api/ai-inbox/${siblingId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setLoadedMessage(data);
+        setReplyText(data.suggestedReply || '');
+        setReplySubject(`Re: ${data.subject}`);
+        setReplyRecipient(data.fromEmail);
+        setSelectedActionIds(
+          new Set(
+            (data.actions || [])
+              .filter((a: { id: string; status: string }) => a.status === 'PROPOSED')
+              .map((a: { id: string }) => a.id)
+          )
+        );
+      }
+    } catch (err) {
+      console.warn('Failed to load sibling message:', err);
+    }
+  }
+
+  async function reloadDetail() {
+    try {
+      const res = await fetch(`/api/ai-inbox/${message.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setLoadedMessage(data);
+      }
+    } catch (err) {
+      console.warn('Failed to reload detail:', err);
+    }
+  }
+
   const [isExecutingBatch, setIsExecutingBatch] = useState(false);
   const [isReprocessing, setIsReprocessing] = useState(false);
   const [isSendingReply, setIsSendingReply] = useState(false);
@@ -587,37 +637,96 @@ export function AiInboxDetailModal({
           </div>
         )}
 
-        {/* BODY: SPLIT VIEW (LEFT: EMAIL, RIGHT: AI & ACTIONS) */}
+        {/* BODY: SPLIT VIEW (LEFT: EMAIL & TEAM CONVERSATION, RIGHT: AI & ACTIONS) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 flex-1 overflow-y-auto divide-y lg:divide-y-0 lg:divide-x divide-slate-200">
-          {/* LEFT PANE (5 cols): ORIGINAL MESSAGE */}
+          {/* LEFT PANE (5 cols): ORIGINAL MESSAGE & TEAM TIMELINE */}
           <div className="lg:col-span-5 p-5 space-y-4 overflow-y-auto bg-slate-50/50">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Původní zpráva
-              </h3>
-              {message.htmlBody && (
-                <button
-                  type="button"
-                  onClick={() => setViewHtml(!viewHtml)}
-                  className="text-xs font-medium text-fuchsia-700 hover:underline"
-                >
-                  {viewHtml ? 'Zobrazit čistý text' : 'Zobrazit HTML formát'}
-                </button>
-              )}
+            {/* TABS: TATO ZPRÁVA vs KOMUNIKACE TÝMU A ZAKÁZKY */}
+            <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 pb-2">
+              <button
+                type="button"
+                onClick={() => setActiveLeftTab('CURRENT_MESSAGE')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition ${
+                  activeLeftTab === 'CURRENT_MESSAGE'
+                    ? 'bg-fuchsia-600 text-white shadow-xs'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <Mail size={13} />
+                <span>Tato zpráva</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveLeftTab('TEAM_TIMELINE')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl transition ${
+                  activeLeftTab === 'TEAM_TIMELINE'
+                    ? 'bg-fuchsia-600 text-white shadow-xs'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <MessageSquare size={13} />
+                <span>Komunikace týmu & zakázky</span>
+                {message.conversationHistory && message.conversationHistory.length > 0 && (
+                  <span
+                    className={`rounded-full px-1.5 py-0.2 text-[10px] font-black ${
+                      activeLeftTab === 'TEAM_TIMELINE'
+                        ? 'bg-fuchsia-950 text-white'
+                        : 'bg-slate-200 text-slate-800'
+                    }`}
+                  >
+                    {message.conversationHistory.length}
+                  </span>
+                )}
+              </button>
             </div>
 
-            <div className={`${viewHtml && message.htmlBody ? 'ai-original-email' : ''} rounded-xl border border-slate-200 bg-white p-4 shadow-sm text-sm text-slate-800 max-h-[420px] overflow-y-auto`}>
-              {viewHtml && message.htmlBody ? (
-                <div
-                  className="prose prose-sm max-w-none break-words"
-                  dangerouslySetInnerHTML={{ __html: message.htmlBody }}
-                />
-              ) : (
-                <p className="whitespace-pre-wrap leading-relaxed">
-                  {message.textBody || message.htmlBody || '(Zpráva nemá textové tělo)'}
-                </p>
-              )}
-            </div>
+            {activeLeftTab === 'TEAM_TIMELINE' ? (
+              <AiInboxTeamTimeline
+                messageId={message.id}
+                clientId={message.clientId}
+                crmOrderId={message.crmOrderId || message.crmOrder?.id}
+                orderNumber={message.crmOrder?.orderNumber}
+                orderTitle={message.crmOrder?.title}
+                clientName={message.client?.name}
+                conversationHistory={message.conversationHistory || []}
+                onSelectInboundMessage={handleLoadSibling}
+                onOpenReplyComposer={() => {
+                  setShowReplyComposer(true);
+                }}
+                onNoteAdded={reloadDetail}
+              />
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Původní zpráva
+                  </h3>
+                  {message.htmlBody && (
+                    <button
+                      type="button"
+                      onClick={() => setViewHtml(!viewHtml)}
+                      className="text-xs font-medium text-fuchsia-700 hover:underline"
+                    >
+                      {viewHtml ? 'Zobrazit čistý text' : 'Zobrazit HTML formát'}
+                    </button>
+                  )}
+                </div>
+
+                <div className={`${viewHtml && message.htmlBody ? 'ai-original-email' : ''} rounded-xl border border-slate-200 bg-white p-4 shadow-sm text-sm text-slate-800 max-h-[420px] overflow-y-auto`}>
+                  {viewHtml && message.htmlBody ? (
+                    <div
+                      className="prose prose-sm max-w-none break-words"
+                      dangerouslySetInnerHTML={{ __html: message.htmlBody }}
+                    />
+                  ) : (
+                    <p className="whitespace-pre-wrap leading-relaxed">
+                      {message.textBody || message.htmlBody || '(Zpráva nemá textové tělo)'}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* ATTACHMENTS */}
             {message.attachments.length > 0 && (
