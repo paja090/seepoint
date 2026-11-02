@@ -25,6 +25,10 @@ test('client logo route supports 10MB, SVG, base64 fallback and drops unique con
 
   // Verify migration exists to drop unique index
   assert.match(migration, /DROP INDEX IF EXISTS "Client_logoDriveFileId_key"/);
+
+  // Verify route proactively and reactively drops legacy index to prevent Postgres error 54000 (8191 limit)
+  assert.match(logoRoute, /DROP INDEX IF EXISTS "Client_logoDriveFileId_key"/);
+  assert.match(logoRoute, /54000/);
 });
 
 test('validatePhotoFile accepts SVG when allowSvg is true and rejects when false', async () => {

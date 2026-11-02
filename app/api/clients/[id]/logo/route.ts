@@ -43,11 +43,35 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     const now = new Date();
+    const updatePayload = {
+      logoDriveFileId: storedId,
+      logoFileName: storedName,
+      logoMimeType: storedMime,
+      logoUpdatedAt: now,
+    };
 
-    await prisma.client.update({
-      where: { id },
-      data: { logoDriveFileId: storedId, logoFileName: storedName, logoMimeType: storedMime, logoUpdatedAt: now },
-    });
+    // Ensure legacy unique B-tree index Client_logoDriveFileId_key is dropped if still present in the DB
+    // (Postgres B-tree index rejects entries > 8191 bytes with error 54000 when base64 fallback is used)
+    await prisma.$executeRawUnsafe('DROP INDEX IF EXISTS "Client_logoDriveFileId_key"').catch(() => undefined);
+
+    try {
+      await prisma.client.update({
+        where: { id },
+        data: updatePayload,
+      });
+    } catch (updateErr: unknown) {
+      const errStr = String(updateErr);
+      if (errStr.includes('54000') || errStr.includes('8191') || errStr.includes('Client_logoDriveFileId_key')) {
+        console.warn('[client-logo] Hit legacy index constraint during update; dropping Client_logoDriveFileId_key and retrying...', errStr);
+        await prisma.$executeRawUnsafe('DROP INDEX IF EXISTS "Client_logoDriveFileId_key"').catch(() => undefined);
+        await prisma.client.update({
+          where: { id },
+          data: updatePayload,
+        });
+      } else {
+        throw updateErr;
+      }
+    }
 
     // Also synchronize logo onto any duplicate client records sharing companyId or normalizedName in the same org
     const siblingOr: Array<Record<string, unknown>> = [];
@@ -60,8 +84,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           id: { not: id },
           OR: siblingOr,
         },
-        data: { logoDriveFileId: storedId, logoFileName: storedName, logoMimeType: storedMime, logoUpdatedAt: now },
-      }).catch((syncErr) => console.warn('[client-logo] Sibling sync failed', syncErr));
+        data: updatePayload,
+      }).catch(async (syncErr: unknown) => {
+        const errStr = String(syncErr);
+        if (errStr.includes('54000') || errStr.includes('8191') || errStr.includes('Client_logoDriveFileId_key')) {
+          await prisma.$executeRawUnsafe('DROP INDEX IF EXISTS "Client_logoDriveFileId_key"').catch(() => undefined);
+          await prisma.client.updateMany({
+            where: {
+              organizationId: client.organizationId,
+              id: { not: id },
+              OR: siblingOr,
+            },
+            data: updatePayload,
+          }).catch((e) => console.warn('[client-logo] Sibling sync retry failed', e));
+        } else {
+          console.warn('[client-logo] Sibling sync failed', syncErr);
+        }
+      });
     }
 
     if (client.logoDriveFileId && !client.logoDriveFileId.startsWith('data:') && client.logoDriveFileId !== storedId) {
