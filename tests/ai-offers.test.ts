@@ -231,3 +231,94 @@ test('NavigationOfferCockpit recalculates routes and arrow directions truthfully
   assert.match(cockpit, /recalculateAllRoutes/);
   assert.match(cockpit, /handlePointMove/);
 });
+
+test('offerReadinessChecks verifies AI routes and truthful arrow directions for navigation offers', async () => {
+  const { offerReadinessChecks } = await import('../lib/offers/workflow.ts');
+  type OfferView = Parameters<typeof offerReadinessChecks>[0];
+
+  // Case 1: Offer with verified routes and directions
+  const verifiedOffer = {
+    offerType: 'NAVIGATION',
+    client: { name: 'Supermarket Ostrava', contactEmail: 'info@supermarket.cz' },
+    validUntil: '2028-12-31',
+    totalWithTax: '50000',
+    navigation: {
+      targetName: 'Supermarket Ostrava',
+      targetLatitude: 49.8355,
+      targetLongitude: 18.2925,
+      proposalMode: 'PRICED_QUOTE',
+      points: [
+        {
+          id: 'p1',
+          label: 'P1 - Výstavní - 350m vpravo',
+          latitude: 49.8360,
+          longitude: 18.2910,
+          routePolyline: 'polyline_sample_1',
+          arrowDirectionEnum: 'RIGHT',
+          visualizedPhotoUrl: 'https://example.com/vis1.jpg',
+          sitePhotoId: 'photo_1',
+        },
+        {
+          id: 'p2',
+          label: 'P2 - Rudná - 750m rovně',
+          latitude: 49.8370,
+          longitude: 18.2900,
+          routePolyline: 'polyline_sample_2',
+          arrowDirectionEnum: 'STRAIGHT',
+          visualizedPhotoUrl: 'https://example.com/vis2.jpg',
+          sitePhotoId: 'photo_2',
+        },
+      ],
+    },
+  } as unknown as OfferView;
+
+  const checksVerified = offerReadinessChecks(verifiedOffer);
+  const aiRouteCheck = checksVerified.find((c) => c.id === 'navigationAiRoutes');
+  assert.ok(aiRouteCheck, 'navigationAiRoutes check must exist');
+  assert.equal(aiRouteCheck.status, 'ok');
+  assert.match(aiRouteCheck.detail, /Všechny navigační body mají spočítanou jízdní trasu a ověřený směr/);
+
+  // Case 2: Older offer or dragged points missing route / arrow direction
+  const unverifiedOffer = {
+    ...verifiedOffer,
+    navigation: {
+      ...verifiedOffer.navigation,
+      points: [
+        { ...verifiedOffer.navigation!.points[0], routePolyline: null, arrowDirectionEnum: null },
+        verifiedOffer.navigation!.points[1],
+      ],
+    },
+  } as unknown as OfferView;
+
+  const checksUnverified = offerReadinessChecks(unverifiedOffer);
+  const unverifiedAiCheck = checksUnverified.find((c) => c.id === 'navigationAiRoutes');
+  assert.ok(unverifiedAiCheck);
+  assert.equal(unverifiedAiCheck.status, 'warning');
+  assert.match(unverifiedAiCheck.detail, /U 1 bodů chybí ověřená jízdní trasa nebo směrová šipka/);
+});
+
+test('NavigationOfferPublicView contains AI check toolbar and triggers navigation-ai-check API', () => {
+  const publicView = readFileSync(new URL('../components/offers/NavigationOfferPublicView.tsx', import.meta.url), 'utf8');
+  assert.match(publicView, /handleRunAiCheck/);
+  assert.match(publicView, /navigation-ai-check/);
+  assert.match(publicView, /AI Kontrola tras a směrových rčení/);
+  assert.match(publicView, /pointsWithRoutes/);
+  assert.match(publicView, /allRoutesVerified/);
+});
+
+test('NavigationMapStep contains prominent AI check toolbar button', () => {
+  const mapStep = readFileSync(new URL('../components/offers/navigation-cockpit/NavigationMapStep.tsx', import.meta.url), 'utf8');
+  assert.match(mapStep, /AI Kontrola tras a směrových rčení/);
+  assert.match(mapStep, /onRecalculateRoutes/);
+});
+
+test('API route /api/offers/[id]/navigation-ai-check exists and performs truthful verification', () => {
+  const apiRoute = readFileSync(new URL('../app/api/offers/[id]/navigation-ai-check/route.ts', import.meta.url), 'utf8');
+  assert.match(apiRoute, /computeGoogleRoute/);
+  assert.match(apiRoute, /inferArrowDirectionFromRoute/);
+  assert.match(apiRoute, /evaluateNavigationZoning/);
+  assert.match(apiRoute, /formatNavigationPositionName/);
+  assert.match(apiRoute, /formatNavigationPointDetails/);
+  assert.match(apiRoute, /prisma\.navigationPoint\.update/);
+});
+
