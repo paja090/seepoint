@@ -88,6 +88,19 @@ export async function createClient(input: CreateClientInput, actorUserId: string
     throw new Error(`Klient se stejným názevem "${input.name}" již existuje.`);
   }
 
+  if (input.companyId?.trim()) {
+    const existingIco = await tx.client.findFirst({
+      where: {
+        organizationId: actorOrganizationId,
+        companyId: input.companyId.trim(),
+        active: true,
+      },
+    });
+    if (existingIco) {
+      throw new Error(`Klient s IČO "${input.companyId.trim()}" již v systému existuje (${existingIco.name}).`);
+    }
+  }
+
   const client = await tx.client.create({
     data: {
       name,
