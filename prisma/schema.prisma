@@ -1193,7 +1193,7 @@ model Client {
   rating          String?
   lastActivityAt  DateTime             @default(now())
   note            String?
-  logoDriveFileId String?              @unique
+  logoDriveFileId String?
   logoFileName    String?
   logoMimeType    String?
   logoUpdatedAt   DateTime?

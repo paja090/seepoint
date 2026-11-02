@@ -7,7 +7,7 @@ import { PhotoValidationError, safePhotoFileName, validatePhotoFile } from '@/li
 import { enforcePhotoUploadRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
-const MAX_LOGO_SIZE = 2 * 1024 * 1024;
+const MAX_LOGO_SIZE = 10 * 1024 * 1024;
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('clients'); if (isApiDenied(auth)) return auth;
@@ -22,13 +22,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
     if (!client) return NextResponse.json({ error: 'Klient nebyl nalezen.' }, { status: 404 });
     const form = await request.formData();
-    const validated = await validatePhotoFile(form.get('file'), { maxBytes: MAX_LOGO_SIZE });
+    const validated = await validatePhotoFile(form.get('file'), { maxBytes: MAX_LOGO_SIZE, allowSvg: true });
     const file = validated!.file;
     const safeName = safePhotoFileName(file.name, 'client-logo.png');
 
     let storedId: string;
     let storedName = safeName;
-    let storedMime = file.type || 'image/png';
+    let storedMime = validated!.mimeType || file.type || 'image/png';
 
     try {
       const stored = await uploadPhotoToGoogleDrive(file, `client-logo-${id}-${Date.now()}-${safeName}`, `client-logo-${randomUUID()}`);
@@ -36,12 +36,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       storedId = stored.id;
       storedName = stored.name;
       storedMime = stored.mimeType;
-    } catch {
+    } catch (gdriveErr) {
+      console.warn(`[client-logo] Google Drive upload failed; falling back to direct base64 data URI storage for client=${id}`, gdriveErr);
       const bytes = Buffer.from(await file.arrayBuffer());
       storedId = `data:${storedMime};base64,${bytes.toString('base64')}`;
     }
 
     const now = new Date();
+
     await prisma.client.update({
       where: { id },
       data: { logoDriveFileId: storedId, logoFileName: storedName, logoMimeType: storedMime, logoUpdatedAt: now },
@@ -59,7 +61,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           OR: siblingOr,
         },
         data: { logoDriveFileId: storedId, logoFileName: storedName, logoMimeType: storedMime, logoUpdatedAt: now },
-      }).catch(() => undefined);
+      }).catch((syncErr) => console.warn('[client-logo] Sibling sync failed', syncErr));
     }
 
     if (client.logoDriveFileId && !client.logoDriveFileId.startsWith('data:') && client.logoDriveFileId !== storedId) {
@@ -70,7 +72,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (uploadedFileId) await deletePhotoFromGoogleDrive(uploadedFileId).catch(() => undefined);
     if (error instanceof PhotoValidationError) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     console.error('Client logo upload failed', error);
-    return NextResponse.json({ error: 'Logo se nepodařilo uložit.' }, { status: 502 });
+    const detail = error instanceof Error ? error.message : 'Logo se nepodařilo uložit.';
+    return NextResponse.json({ error: `Logo se nepodařilo uložit: ${detail}` }, { status: 502 });
   }
 }
 

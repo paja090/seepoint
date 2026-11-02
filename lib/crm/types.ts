@@ -205,6 +205,7 @@ export type ClientProfileData = {
   tradingName?: string | null;
   companyId?: string | null;
   dic?: string | null;
+  contactPerson?: string | null;
   email?: string | null;
   phone?: string | null;
   website?: string | null;

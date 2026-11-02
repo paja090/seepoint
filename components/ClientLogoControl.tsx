@@ -79,7 +79,7 @@ export function ClientLogoControl({
       <div className="space-y-1">
         <input
           ref={input}
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/jpeg,image/png,image/webp,image/svg+xml"
           aria-label={`Nahrát logo klienta ${clientName}`}
           className="block max-w-36 text-[11px]"
           disabled={busy}
@@ -92,7 +92,7 @@ export function ClientLogoControl({
               Odstranit
             </button>
           )}
-          <span className="text-[11px] text-slate-400">max. 2 MB</span>
+          <span className="text-[11px] text-slate-400">max. 10 MB</span>
         </div>
         {message && (
           <p className="max-w-48 text-[11px] text-red-600" role="alert">
