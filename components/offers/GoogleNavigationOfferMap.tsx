@@ -5,6 +5,7 @@ import { Search, MapPin, AlertCircle, RefreshCw, Layers } from 'lucide-react';
 import { NavigationPointMap, type NavigationMapPoint } from './NavigationPointMap';
 import { OSTRAVA_RESTRICTED_ZONES_GEOJSON } from '@/lib/maps/ostrava-restricted-zones-data';
 import { getPointPinColor, getPointPinVisual } from '@/lib/offers/navigation-carrier-types';
+import { evaluateNavigationZoning } from '@/lib/ai-offers/navigation-constraints';
 
 declare global {
   interface Window {
@@ -63,6 +64,8 @@ export type SuggestedNavigationPoint = {
   routeDurationSeconds?: number;
   routePolyline?: string;
   arrowDirection?: 'LEFT' | 'RIGHT' | 'STRAIGHT';
+  circuit?: 'INNER' | 'OUTER';
+  circuitLabel?: string;
 };
 
 type SearchResultItem = {
@@ -322,36 +325,68 @@ export function GoogleNavigationOfferMap({
         const latitude = step.start_location.lat();
         const longitude = step.start_location.lng();
         const distanceMeters = distanceBetween({ latitude, longitude }, target);
-        if (distanceMeters < 250 || distanceMeters > radiusMeters * 1.15) return [];
+        if (distanceMeters < 120 || distanceMeters > radiusMeters * 1.15) return [];
         const instruction = plainText(step.instructions);
-        const normInstr = instruction.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-        // Exclude restricted highways & Ostrava Historic Heritage Zone (Nařízení č. 2/2020)
-        const isHighwayOrHeritage = /rudna|mistecka|bohuminska|marianskohorska|dalnic|d1|d56|i\/11|i\/56|masarykovo namesti|jiraskovo namesti|pamatkova/i.test(normInstr)
-          || (latitude >= 49.8310 && latitude <= 49.8420 && longitude >= 18.2810 && longitude <= 18.2980);
+        // Zoning evaluation respecting city context (Ostrava vs other regional agencies)
+        const zoning = evaluateNavigationZoning({
+          latitude,
+          longitude,
+          addressText: instruction,
+          city: target.address,
+        });
 
-        if (isHighwayOrHeritage) return [];
+        // Exclude restricted highways & historical heritage zones (MPZ)
+        if (!zoning.isAllowed) return [];
 
         const isTurn = /odboč|turn|exit|výjezd|kruhov|roundabout|merge|sjezd|držte|keep/i.test(`${instruction} ${step.maneuver ?? ''}`);
         const isMainRoad = /tříd|avenue|ulice|náměstí|nároží/i.test(instruction);
-        const usefulDistance = distanceMeters >= 300 && distanceMeters <= 3_500;
+        const usefulDistance = distanceMeters >= 150 && distanceMeters <= 3_500;
         const score = Math.min(98, 58 + (isTurn ? 22 : 0) + (isMainRoad ? 10 : 0) + (usefulDistance ? 8 : 0));
-        return [{ routeIndex, stepIndex, direction: origin.direction, latitude, longitude, distanceMeters, instruction, score, maneuver: step.maneuver }];
+        return [{
+          routeIndex, stepIndex, direction: origin.direction, latitude, longitude, distanceMeters, instruction, score,
+          maneuver: step.maneuver, zoningReason: zoning.reason, isRegulatedZone: zoning.isRegulatedZone, badge: zoning.badge,
+        }];
       });
     })).then(async (groups) => {
       if (cancelled) return;
       const candidates = groups.flat().sort((a, b) => b.score - a.score || b.distanceMeters - a.distanceMeters);
+
+      // Two-tier circuit partitioning:
+      // Inner circuit: 120m - 750m (final approach and turns to venue)
+      // Outer circuit: 750m - maxRadiusKm (major feeder intersections on main avenues)
+      const innerPool = candidates.filter((c) => c.distanceMeters >= 120 && c.distanceMeters <= 750);
+      const outerPool = candidates.filter((c) => c.distanceMeters > 750 && c.distanceMeters <= radiusMeters);
+
+      const targetInner = Math.max(1, Math.floor(suggestionCount / 2));
+      const targetOuter = suggestionCount - targetInner;
+
       const selected: typeof candidates = [];
-      for (const candidate of candidates) {
+
+      // 1. Pick inner circuit candidates
+      for (const candidate of innerPool) {
+        if (selected.filter((s) => s.distanceMeters <= 750).length >= targetInner) break;
+        if (selected.some((existing) => distanceBetween(existing, candidate) < 140)) continue;
+        if (selected.some((existing) => existing.routeIndex === candidate.routeIndex) && selected.length < routeCount) continue;
+        selected.push(candidate);
+      }
+
+      // 2. Pick outer circuit candidates
+      for (const candidate of outerPool) {
+        if (selected.filter((s) => s.distanceMeters > 750).length >= targetOuter) break;
         if (selected.some((existing) => distanceBetween(existing, candidate) < 220)) continue;
         if (selected.some((existing) => existing.routeIndex === candidate.routeIndex) && selected.length < routeCount) continue;
         selected.push(candidate);
-        if (selected.length >= suggestionCount) break;
       }
+
+      // 3. Complete quota from any pool if one tier had insufficient candidates
       for (const candidate of candidates) {
         if (selected.length >= suggestionCount) break;
-        if (!selected.includes(candidate) && !selected.some((existing) => distanceBetween(existing, candidate) < 220)) selected.push(candidate);
+        if (!selected.includes(candidate) && !selected.some((existing) => distanceBetween(existing, candidate) < 180)) {
+          selected.push(candidate);
+        }
       }
+
       const suggestions = await Promise.all(selected.map(async (candidate, index) => {
         const route = await requestRoute(candidate);
         const rawPolyline = route?.overview_polyline;
@@ -359,23 +394,33 @@ export function GoogleNavigationOfferMap({
         const instruction = candidate.instruction || `rozhodovací místo při příjezdu od ${candidate.direction}`;
         const rawDist = route?.legs[0]?.distance?.value ?? candidate.distanceMeters;
         const roundedDist = Math.max(50, Math.round(rawDist / 50) * 50);
+
+        const isInner = candidate.distanceMeters <= 750;
+        const circuit: 'INNER' | 'OUTER' = isInner ? 'INNER' : 'OUTER';
+        const circuitLabel = isInner ? 'Vnitřní okruh (dojezd k prodejně)' : 'Vnější okruh (hlavní křižovatka / tah)';
+        const title = isInner
+          ? `[Vnitřní okruh] Odbočení k cíli: ${instruction.slice(0, 75)}`
+          : `[Vnější okruh] Hlavní křižovatka: ${instruction.slice(0, 75)}`;
+
         return {
           id: `route-point-${candidate.routeIndex + 1}-${candidate.stepIndex + 1}`,
-          title: `Rozhodovací bod: ${instruction.slice(0, 90)}`,
+          title,
           latitude: candidate.latitude,
           longitude: candidate.longitude,
           score: candidate.score,
           reasons: [
-            `Pokrývá příjezd od ${candidate.direction}.`,
-            /odboč|turn|exit|výjezd|kruhov|roundabout|merge|sjezd/i.test(`${instruction} ${candidate.maneuver ?? ''}`)
-              ? 'Řidič zde mění směr nebo volí další část trasy.'
-              : 'Bod leží na důležitém úseku příjezdové trasy.',
-            `${roundedDist} m před cílem.`,
+            isInner
+              ? '🔵 Vnitřní okruh: Klíčový bod pro bezpečné finální odbočení řidičů přímo k cíli.'
+              : '🟣 Vnější okruh: Bod zachycuje průjezd na hlavní městské třídě a navádí do lokality.',
+            candidate.zoningReason || `Pokrývá příjezd od ${candidate.direction}.`,
+            `${roundedDist} m před cílem (od ${candidate.direction}).`,
           ],
           distanceMeters: roundedDist,
           routeDurationSeconds: route?.legs[0]?.duration?.value,
           routePolyline,
           arrowDirection: arrowFor(candidate.maneuver),
+          circuit,
+          circuitLabel,
           index,
         } satisfies SuggestedNavigationPoint & { index: number };
       }));

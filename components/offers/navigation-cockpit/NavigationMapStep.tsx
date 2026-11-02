@@ -30,6 +30,7 @@ interface NavigationMapStepProps {
   proposalMode: 'LOCATION_SELECTION' | 'PRICED_QUOTE';
   onOpenVisualizer?: (pointId: string) => void;
   onUploadSitePhoto?: (pointId: string, file: File) => void;
+  onApplyCatalogRatesToPoint?: (pointId: string) => void;
 }
 
 export function NavigationMapStep({
@@ -47,6 +48,7 @@ export function NavigationMapStep({
   proposalMode,
   onOpenVisualizer,
   onUploadSitePhoto,
+  onApplyCatalogRatesToPoint,
 }: NavigationMapStepProps) {
   const [selectedPointId, setSelectedPointId] = useState<string | null>(points[0]?.id || null);
   const [editingPoint, setEditingPoint] = useState<DraftPoint | null>(null);
@@ -242,22 +244,26 @@ export function NavigationMapStep({
       </div>
 
       {/* Slide-over Side Drawer for Point Details */}
-      {editingPoint && (
-        <NavigationPointDrawer
-          point={editingPoint}
-          onClose={handleCloseDetail}
-          onUpdatePoint={handleUpdatePoint}
-          targets={targets}
-          proposalMode={proposalMode}
-          onOpenVisualizer={onOpenVisualizer}
-          onUploadSitePhoto={onUploadSitePhoto}
-          onRecalculateRoute={async (ptId) => {
-            await onRecalculateRoutes();
-            const fresh = points.find((p) => p.id === ptId);
-            if (fresh) setEditingPoint(fresh);
-          }}
-        />
-      )}
+      {editingPoint && (() => {
+        const activePoint = points.find((p) => p.id === editingPoint.id) || editingPoint;
+        return (
+          <NavigationPointDrawer
+            point={activePoint}
+            onClose={handleCloseDetail}
+            onUpdatePoint={handleUpdatePoint}
+            targets={targets}
+            proposalMode={proposalMode}
+            onOpenVisualizer={onOpenVisualizer}
+            onUploadSitePhoto={onUploadSitePhoto}
+            onApplyCatalogRatesToPoint={(ptId) => {
+              onApplyCatalogRatesToPoint?.(ptId);
+            }}
+            onRecalculateRoute={async (_ptId) => {
+              await onRecalculateRoutes();
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }

@@ -39,6 +39,8 @@ export type AiNavigationPointInput = {
   routeDurationSeconds?: number;
   routePolyline?: string;
   arrowDirection?: 'LEFT' | 'RIGHT' | 'STRAIGHT';
+  circuit?: 'INNER' | 'OUTER';
+  circuitLabel?: string;
 };
 
 export type AiResolvedClient = {
@@ -92,6 +94,8 @@ export type AiOfferItemPreview = {
   routePolyline?: string;
   routeDurationSeconds?: number;
   arrowDirection?: 'LEFT' | 'RIGHT' | 'STRAIGHT';
+  circuit?: 'INNER' | 'OUTER';
+  circuitLabel?: string;
   componentPrices?: Partial<Record<OfferPriceCategory, AiPriceSnapshot | null>>;
 };
 

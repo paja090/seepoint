@@ -26,6 +26,10 @@ import {
   type RentalDurationMonths,
   inferDurationMonthsFromDates,
   addMonthsToDate,
+  DEFAULT_NAVIGATION_RATES,
+  detectPointMountingType,
+  resolveNavigationCatalogRates,
+  type NavigationPriceRuleLike,
 } from '@/lib/offers/navigation-pricing';
 import { NavigationOfferStepHeader } from './NavigationOfferStepHeader';
 import { NavigationOfferBasicsStep } from './NavigationOfferBasicsStep';
@@ -208,64 +212,106 @@ export function NavigationOfferCockpit({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [activeVisualizerPointId, setActiveVisualizerPointId] = useState<string | null>(null);
 
-  // Catalog default rates
-  const [catalogDefaults, setCatalogDefaults] = useState<CatalogRates>({
-    rentalPrice: '',
-    framePrice: '',
-    productionPrice: '',
-    installationPrice: '',
-    removalPrice: '',
-  });
+  // Catalog rules and resolved rates
+  const [catalogRules, setCatalogRules] = useState<NavigationPriceRuleLike[]>([]);
+  const [catalogDefaults, setCatalogDefaults] = useState<CatalogRates>(DEFAULT_NAVIGATION_RATES);
+
+  const selectedClient = clients.find((c) => c.id === clientId);
 
   // Load catalog price rules
   useEffect(() => {
     async function loadCatalog() {
       try {
         const resRules = await fetch('/api/offer-price-rules');
-        let rental = '', frame = '', prod = '', inst = '', rem = '';
         if (resRules.ok) {
-          const rules = await resRules.json() as Record<string, unknown>;
-          if (rules.navigationAnnualRental != null) rental = String(rules.navigationAnnualRental);
-          if (rules.navigationFrameProduction != null) frame = String(rules.navigationFrameProduction);
-          if (rules.navigationSignProduction != null) prod = String(rules.navigationSignProduction);
-          if (rules.navigationInstallation != null) inst = String(rules.navigationInstallation);
-          if (rules.navigationRemoval != null) rem = String(rules.navigationRemoval);
+          const rules = await resRules.json();
+          const rulesArray = Array.isArray(rules) ? (rules as NavigationPriceRuleLike[]) : [];
+          setCatalogRules(rulesArray);
+          const resolved = resolveNavigationCatalogRates(rulesArray, {
+            clientSegment: selectedClient?.pricingSegment,
+            city: city || initialOffer?.navigation?.city,
+          });
+          setCatalogDefaults(resolved);
+        } else {
+          setCatalogDefaults(DEFAULT_NAVIGATION_RATES);
         }
-        setCatalogDefaults({
-          rentalPrice: rental || '8000',
-          framePrice: frame || '3500',
-          productionPrice: prod || '2200',
-          installationPrice: inst || '1500',
-          removalPrice: rem || '800',
-        });
       } catch {
-        setCatalogDefaults({
-          rentalPrice: '8000',
-          framePrice: '3500',
-          productionPrice: '2200',
-          installationPrice: '1500',
-          removalPrice: '800',
-        });
+        setCatalogDefaults(DEFAULT_NAVIGATION_RATES);
       }
     }
     void loadCatalog();
   }, []);
 
-  const selectedClient = clients.find((c) => c.id === clientId);
+  // Update catalog defaults when selected client or city changes
+  useEffect(() => {
+    if (catalogRules.length === 0) return;
+    const resolved = resolveNavigationCatalogRates(catalogRules, {
+      clientSegment: selectedClient?.pricingSegment,
+      city: city || initialOffer?.navigation?.city,
+    });
+    setCatalogDefaults(resolved);
+  }, [catalogRules, selectedClient?.pricingSegment, city, initialOffer?.navigation?.city]);
 
   // Apply catalog rates to all points
   function applyCatalogRatesToAllPoints() {
+    const segment = selectedClient?.pricingSegment || 'COMMERCIAL';
+    const effectiveCity = city || initialOffer?.navigation?.city || 'Ostrava';
+
     setPoints((curr) =>
-      curr.map((p) => ({
-        ...p,
-        unitPrice: catalogDefaults.rentalPrice,
-        framePrice: catalogDefaults.framePrice,
-        productionPrice: catalogDefaults.productionPrice,
-        installationPrice: catalogDefaults.installationPrice,
-        removalPrice: catalogDefaults.removalPrice,
-      }))
+      curr.map((p) => {
+        const mountingType = detectPointMountingType(p);
+        const rates = resolveNavigationCatalogRates(catalogRules, {
+          clientSegment: segment,
+          city: effectiveCity,
+          mountingType,
+        });
+        return {
+          ...p,
+          unitPrice: rates.rentalPrice,
+          framePrice: rates.framePrice,
+          productionPrice: rates.productionPrice,
+          installationPrice: rates.installationPrice,
+          removalPrice: rates.removalPrice,
+        };
+      })
     );
-    setMessage('✓ Ceníkové sazby byly načteny pro všechny navigační body.');
+
+    const sampleRates = resolveNavigationCatalogRates(catalogRules, {
+      clientSegment: segment,
+      city: effectiveCity,
+    });
+    const clientDesc = selectedClient ? `${selectedClient.name} (${segment})` : `Segment ${segment}`;
+    setMessage(
+      `✓ Ceníkové sazby načteny pro ${points.length} bodů dle ceníku klienta [${clientDesc}] (roční nájem: ${sampleRates.rentalPrice} Kč/rok, rám: ${sampleRates.framePrice} Kč, tisk: ${sampleRates.productionPrice} Kč, montáž: ${sampleRates.installationPrice} Kč, demontáž: ${sampleRates.removalPrice} Kč).`
+    );
+    setHasUnsavedChanges(true);
+  }
+
+  // Apply catalog rates to single point
+  function applyCatalogRatesToPoint(pointId: string) {
+    const segment = selectedClient?.pricingSegment || 'COMMERCIAL';
+    const effectiveCity = city || initialOffer?.navigation?.city || 'Ostrava';
+
+    setPoints((curr) =>
+      curr.map((p) => {
+        if (p.id !== pointId) return p;
+        const mountingType = detectPointMountingType(p);
+        const rates = resolveNavigationCatalogRates(catalogRules, {
+          clientSegment: segment,
+          city: effectiveCity,
+          mountingType,
+        });
+        return {
+          ...p,
+          unitPrice: rates.rentalPrice,
+          framePrice: rates.framePrice,
+          productionPrice: rates.productionPrice,
+          installationPrice: rates.installationPrice,
+          removalPrice: rates.removalPrice,
+        };
+      })
+    );
+    setMessage(`✓ Ceníkové sazby načteny pro vybraný bod dle ceníku klienta.`);
     setHasUnsavedChanges(true);
   }
 
@@ -781,6 +827,7 @@ export function NavigationOfferCockpit({
           proposalMode={proposalMode}
           onOpenVisualizer={(ptId) => setActiveVisualizerPointId(ptId)}
           onUploadSitePhoto={handleUploadSitePhoto}
+          onApplyCatalogRatesToPoint={applyCatalogRatesToPoint}
         />
       )}
 
@@ -795,9 +842,13 @@ export function NavigationOfferCockpit({
                 setHasUnsavedChanges(true);
               }}
               onApplyCatalogRates={applyCatalogRatesToAllPoints}
+              onApplyCatalogRatesToPoint={applyCatalogRatesToPoint}
               hasSelectionSubmitted={initialOffer?.navigation?.selectionSubmitted === true}
               rentalDuration={rentalDuration}
               onRentalDurationChange={handleRentalDurationChange}
+              catalogDefaults={catalogDefaults}
+              selectedClientName={selectedClient?.name}
+              selectedClientSegment={selectedClient?.pricingSegment ?? undefined}
             />
           ) : (
             <NavigationOfferReviewStep

@@ -2,6 +2,225 @@ import { Prisma } from '@prisma/client';
 
 export type RentalDurationMonths = 1 | 3 | 6 | 12 | 24 | 36;
 
+export const DEFAULT_NAVIGATION_RATES = {
+  rentalPrice: '12000',
+  framePrice: '1960',
+  productionPrice: '600',
+  installationPrice: '800',
+  removalPrice: '600',
+} as const;
+
+export type NavigationCatalogRates = {
+  rentalPrice: string;
+  framePrice: string;
+  productionPrice: string;
+  installationPrice: string;
+  removalPrice: string;
+};
+
+export type NavigationPriceRuleLike = {
+  id?: string;
+  code?: string;
+  category?: string;
+  label?: string;
+  description?: string | null;
+  mediaType?: string | null;
+  mountingType?: string | null;
+  pricingSegment?: string | null;
+  city?: string | null;
+  unitPrice: string | number | { toString(): string };
+  unit?: string;
+  active?: boolean;
+};
+
+export type ResolveNavigationCatalogOptions = {
+  clientSegment?: string | null;
+  city?: string | null;
+  mountingType?: 'LIGHT_POLE' | 'COLUMN' | 'TRACTION' | string | null;
+};
+
+export function detectPointMountingType(point?: {
+  pillarType?: string | null;
+  navigationType?: string | null;
+  variant?: string | null;
+  label?: string | null;
+} | null): 'LIGHT_POLE' | 'COLUMN' | 'TRACTION' {
+  if (!point) return 'LIGHT_POLE';
+  const text = `${point.pillarType || ''} ${point.navigationType || ''} ${point.variant || ''} ${point.label || ''}`.toLowerCase();
+  if (text.includes('trakc') || text.includes('traction') || text.includes('trakční')) {
+    return 'TRACTION';
+  }
+  if (text.includes('sloupek') || text.includes('column') || text.includes('samostatn')) {
+    return 'COLUMN';
+  }
+  return 'LIGHT_POLE';
+}
+
+export function resolveNavigationCatalogRates(
+  rules: NavigationPriceRuleLike[] | null | undefined,
+  options?: ResolveNavigationCatalogOptions
+): NavigationCatalogRates {
+  const result: NavigationCatalogRates = { ...DEFAULT_NAVIGATION_RATES };
+  if (!Array.isArray(rules) || rules.length === 0) {
+    return result;
+  }
+
+  const activeRules = rules.filter((r) => r.active !== false);
+  const targetSegment = (options?.clientSegment || 'COMMERCIAL').toUpperCase();
+  const targetCity = options?.city ? options.city.trim().toLowerCase() : '';
+  const targetMounting = (options?.mountingType || 'LIGHT_POLE').toUpperCase();
+
+  const scoreRule = (rule: NavigationPriceRuleLike, categoryTarget: string, expectMounting = false) => {
+    let score = 0;
+    const ruleCode = (rule.code || '').toUpperCase();
+    const ruleCat = (rule.category || '').toUpperCase();
+
+    if (ruleCat === categoryTarget) {
+      score += 10;
+    }
+
+    if (ruleCode.startsWith('NAV_')) {
+      score += 20;
+    }
+
+    const ruleSeg = (rule.pricingSegment || 'COMMERCIAL').toUpperCase();
+    if (ruleSeg === targetSegment) {
+      score += 15;
+    } else if (ruleSeg === 'COMMERCIAL') {
+      score += 3;
+    }
+
+    if (rule.city && targetCity) {
+      const c = rule.city.trim().toLowerCase();
+      if (c === targetCity || targetCity.includes(c) || c.includes(targetCity)) {
+        score += 10;
+      }
+    } else if (!rule.city) {
+      score += 2;
+    }
+
+    if (expectMounting) {
+      const ruleMounting = (rule.mountingType || '').toUpperCase();
+      if (ruleMounting === targetMounting) {
+        score += 25;
+      } else if (!ruleMounting) {
+        score += 2;
+      }
+    }
+
+    return score;
+  };
+
+  const toPriceString = (val: unknown): string => {
+    if (val == null) return '';
+    const num = Number(typeof val === 'object' && val !== null && 'toString' in val ? (val as { toString(): string }).toString() : val);
+    if (!Number.isFinite(num)) return '';
+    return Number.isInteger(num) ? String(num) : num.toFixed(2);
+  };
+
+  // 1. RENTAL
+  const rentalCandidates = activeRules.filter(
+    (r) =>
+      r.category === 'RENTAL' ||
+      (r.code && r.code.toUpperCase().includes('RENTAL'))
+  );
+  if (rentalCandidates.length > 0) {
+    let best = rentalCandidates[0];
+    let bestScore = -1;
+    for (const cand of rentalCandidates) {
+      const score = scoreRule(cand, 'RENTAL', true);
+      if (score > bestScore) {
+        bestScore = score;
+        best = cand;
+      }
+    }
+    const price = toPriceString(best.unitPrice);
+    if (price) result.rentalPrice = price;
+  }
+
+  // 2. FRAME (Production of frame, e.g. D-FLEX)
+  const frameCandidates = activeRules.filter((r) => {
+    const code = (r.code || '').toUpperCase();
+    const label = (r.label || '').toLowerCase();
+    return (
+      code === 'NAV_OSR_FRAME_DFLEX' ||
+      code.includes('FRAME') ||
+      code.includes('DFLEX') ||
+      (r.category === 'PRODUCTION' && (label.includes('rám') || label.includes('frame') || label.includes('d-flex')))
+    );
+  });
+  if (frameCandidates.length > 0) {
+    let best = frameCandidates[0];
+    let bestScore = -1;
+    for (const cand of frameCandidates) {
+      const score = scoreRule(cand, 'PRODUCTION', false);
+      if (score > bestScore) {
+        bestScore = score;
+        best = cand;
+      }
+    }
+    const price = toPriceString(best.unitPrice);
+    if (price) result.framePrice = price;
+  }
+
+  // 3. PRINT (Sign printing / UV dibond production)
+  const printCandidates = activeRules.filter((r) => {
+    const code = (r.code || '').toUpperCase();
+    const label = (r.label || '').toLowerCase();
+    return (
+      code === 'NAV_OSR_PRINT_UV_DIBOND' ||
+      (r.category === 'PRINT' && (code.startsWith('NAV_') || label.includes('dibond') || label.includes('navig')))
+    );
+  });
+  if (printCandidates.length > 0) {
+    let best = printCandidates[0];
+    let bestScore = -1;
+    for (const cand of printCandidates) {
+      const score = scoreRule(cand, 'PRINT', false);
+      if (score > bestScore) {
+        bestScore = score;
+        best = cand;
+      }
+    }
+    const price = toPriceString(best.unitPrice);
+    if (price) result.productionPrice = price;
+  }
+
+  // 4. INSTALLATION
+  const installCandidates = activeRules.filter((r) => r.category === 'INSTALLATION');
+  if (installCandidates.length > 0) {
+    let best = installCandidates[0];
+    let bestScore = -1;
+    for (const cand of installCandidates) {
+      const score = scoreRule(cand, 'INSTALLATION', false);
+      if (score > bestScore) {
+        bestScore = score;
+        best = cand;
+      }
+    }
+    const price = toPriceString(best.unitPrice);
+    if (price) result.installationPrice = price;
+  }
+
+  // 5. REMOVAL
+  const removalCandidates = activeRules.filter((r) => r.category === 'REMOVAL');
+  if (removalCandidates.length > 0) {
+    let best = removalCandidates[0];
+    let bestScore = -1;
+    for (const cand of removalCandidates) {
+      const score = scoreRule(cand, 'REMOVAL', false);
+      if (score > bestScore) {
+        bestScore = score;
+        best = cand;
+      }
+    }
+    const price = toPriceString(best.unitPrice);
+    if (price) result.removalPrice = price;
+  }
+
+  return result;
+}
+
 export interface RentalDurationOption {
   months: RentalDurationMonths;
   label: string;
