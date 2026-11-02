@@ -244,27 +244,26 @@ export function NavigationMapStep({
       </div>
 
       {/* Slide-over Side Drawer for Point Details */}
-      {editingPoint && (
-        <NavigationPointDrawer
-          point={editingPoint}
-          onClose={handleCloseDetail}
-          onUpdatePoint={handleUpdatePoint}
-          targets={targets}
-          proposalMode={proposalMode}
-          onOpenVisualizer={onOpenVisualizer}
-          onUploadSitePhoto={onUploadSitePhoto}
-          onApplyCatalogRatesToPoint={(ptId) => {
-            onApplyCatalogRatesToPoint?.(ptId);
-            const fresh = points.find((p) => p.id === ptId);
-            if (fresh) setEditingPoint(fresh);
-          }}
-          onRecalculateRoute={async (ptId) => {
-            await onRecalculateRoutes();
-            const fresh = points.find((p) => p.id === ptId);
-            if (fresh) setEditingPoint(fresh);
-          }}
-        />
-      )}
+      {editingPoint && (() => {
+        const activePoint = points.find((p) => p.id === editingPoint.id) || editingPoint;
+        return (
+          <NavigationPointDrawer
+            point={activePoint}
+            onClose={handleCloseDetail}
+            onUpdatePoint={handleUpdatePoint}
+            targets={targets}
+            proposalMode={proposalMode}
+            onOpenVisualizer={onOpenVisualizer}
+            onUploadSitePhoto={onUploadSitePhoto}
+            onApplyCatalogRatesToPoint={(ptId) => {
+              onApplyCatalogRatesToPoint?.(ptId);
+            }}
+            onRecalculateRoute={async (_ptId) => {
+              await onRecalculateRoutes();
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }

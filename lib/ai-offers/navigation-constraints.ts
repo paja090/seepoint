@@ -31,7 +31,7 @@ export function isRestrictedHighwayOr1stClassRoad(text: string, city?: string): 
   if (!text) return false;
   const normalized = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-  // National motorways and trunk roads (prohibited for VO navigation signs nationwide without special transit permit)
+  // National motorways and numbered 1st class roads (prohibited for VO navigation signs nationwide without special transit permit)
   const nationalForbidden = [
     'dalnice', 'dalnici', 'dalnic', 'd0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'd10', 'd11',
     'd35', 'd46', 'd48', 'd52', 'd55', 'd56',
@@ -42,7 +42,7 @@ export function isRestrictedHighwayOr1stClassRoad(text: string, city?: string): 
     keyword.length <= 3
       ? new RegExp(`\\b${keyword}\\b`, 'i').test(normalized)
       : normalized.includes(keyword)
-  );
+  ) || /\bi\/\d+\b/i.test(normalized);
   if (hasNational) return true;
 
   // Ostrava-specific primary expressways where light-pole navigation is prohibited by municipal administration / ŘSD
@@ -51,7 +51,7 @@ export function isRestrictedHighwayOr1stClassRoad(text: string, city?: string): 
     const ostravaForbidden = [
       'rudna', 'rudne', 'mistecka', 'mistecke', 'bohuminska', 'bohuminske',
       'marianskohorska', 'marianskohorske', 'plzenska', 'plzenske', 'opavska',
-      'opavske', 'slovenska', 'i/11', 'i/56', 'i/59', 'i/48', 'i/58',
+      'opavske', 'slovenska',
     ];
     return ostravaForbidden.some((keyword) =>
       keyword.length <= 4
