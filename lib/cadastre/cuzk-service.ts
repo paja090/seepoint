@@ -201,8 +201,8 @@ export async function findCadastralParcelByCoords(
       landTypeName,
       landUseCode,
       landUseName,
-      cuzkViewUrl: `https://nahlizenidokn.cuzk.cz/ZobrazObjekt.aspx?typ=par&id=${parcelId}`,
-      cuzkMapUrl: `https://nahlizenidokn.cuzk.cz/Mapa.aspx?typ=par&id=${parcelId}`,
+      cuzkViewUrl: `https://vdp.cuzk.cz/vdp/ruian/parcely/${parcelId}`,
+      cuzkMapUrl: `https://mapy.cz/zakladni?q=${latitude},${longitude}&z=18&base=katastr`,
     };
   } catch (error) {
     console.error('[CUZK] Error fetching parcel info:', error);

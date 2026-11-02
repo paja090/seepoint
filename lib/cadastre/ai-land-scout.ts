@@ -11,7 +11,13 @@ export interface AiScoutedLocation {
   city: string;
   latitude: number;
   longitude: number;
-  propertyType: 'PRIVATE_COMMERCIAL' | 'RETAIL_PARK' | 'LOGISTICS_INDUSTRIAL' | 'GAS_STATION_SERVICES' | 'PRIVATE_INDIVIDUAL';
+  propertyType:
+    | 'FIRST_CLASS_ROAD_CORRIDOR'
+    | 'PRIVATE_COMMERCIAL'
+    | 'RETAIL_PARK'
+    | 'LOGISTICS_INDUSTRIAL'
+    | 'GAS_STATION_SERVICES'
+    | 'PRIVATE_INDIVIDUAL';
   propertyTypeLabel: string;
   trafficEstimate: string;
   visibilityScore: number; // 1 to 10
@@ -56,6 +62,86 @@ function getAiKeys() {
  */
 const REGIONAL_PRESETS: Record<string, AiScoutedLocation[]> = {
   ostrava: [
+    {
+      id: 'ova-i11-1',
+      title: 'Rudná (silnice I/11) – křížení Frýdecká / Vratimov (soukromý areál)',
+      addressOrJunction: 'Rudná (I/11) u sjezdu Frýdecká, Ostrava - Kunčice',
+      city: 'Ostrava',
+      latitude: 49.808142,
+      longitude: 18.283120,
+      propertyType: 'FIRST_CLASS_ROAD_CORRIDOR',
+      propertyTypeLabel: '🛣️ Koridor I. třídy (I/11 Rudná) – soukromý pozemek',
+      trafficEstimate: '42 000+ vozidel/den',
+      visibilityScore: 9.8,
+      recommendedCarrierType: 'Samostatný navigační sloupek (COLUMN) nebo pylon na soukromé parcele',
+      estimatedMonthlyRentCzk: 4000,
+      commercialRationale: 'Silnice I. třídy I/11 – reklama na sloupech VO je zákonem 13/1997 Sb. zakázána. Umístění samostatného navigačního sloupku na přilehlém soukromém pozemku u vjezdu do areálu je legální a nabízí mimořádný dosah pro navigaci zákazníků.',
+      acquisitionTip: 'Oslovit majitele přilehlého komerčního areálu – zábor je jen 0,5 m² na patku sloupku, nabídnout pasivní příjem 4 000 Kč/měsíc.',
+    },
+    {
+      id: 'ova-i56-1',
+      title: 'Místecká (silnice I/56) – sjezd Hrabůvka / Ostrava-Jih (čerpací stanice OMV)',
+      addressOrJunction: 'Místecká (I/56) u sjezdu Dr. Martínka / Aviatiků, Ostrava - Hrabůvka',
+      city: 'Ostrava',
+      latitude: 49.789500,
+      longitude: 18.261200,
+      propertyType: 'FIRST_CLASS_ROAD_CORRIDOR',
+      propertyTypeLabel: '🛣️ Koridor I. třídy (I/56 Místecká) – soukromý pozemek',
+      trafficEstimate: '48 000+ vozidel/den',
+      visibilityScore: 9.7,
+      recommendedCarrierType: 'Navigační sloupek SeePOINT (mimo VO)',
+      estimatedMonthlyRentCzk: 4500,
+      commercialRationale: 'Páteřní rychlostní tah I/56 z Frýdku-Místku do centra. Komerční vjezd na soukromý pozemek přímo u sjezdové rampy zajišťuje vysoký čtecí čas.',
+      acquisitionTip: 'Zdůraznit, že na silnici I. třídy nikdo jiný na sloupech VO reklamu mít nemůže, takže sloupek na soukromém pozemku je vysoce exkluzivní.',
+    },
+    {
+      id: 'ova-i11-2',
+      title: 'Rudná (silnice I/11) – křižovatka Závodní / Vítkovice (pneuservis)',
+      addressOrJunction: 'Rudná (I/11) / Závodní, Ostrava - Vítkovice',
+      city: 'Ostrava',
+      latitude: 49.805500,
+      longitude: 18.259800,
+      propertyType: 'FIRST_CLASS_ROAD_CORRIDOR',
+      propertyTypeLabel: '🛣️ Koridor I. třídy (I/11 Rudná) – soukromý pozemek',
+      trafficEstimate: '36 000+ vozidel/den',
+      visibilityScore: 9.6,
+      recommendedCarrierType: 'Navigační sloupek (COLUMN) pro navádění do zóny',
+      estimatedMonthlyRentCzk: 3500,
+      commercialRationale: 'Nájezdový roh na frekventovanou I/11, zpomalení dopravy před odbočením do Vítkovic a Zábřehu.',
+      acquisitionTip: 'Nabídnout majiteli pneuservisu reciproční směrovou šipku na navigačním sloupku zdarma jako součást smlouvy.',
+    },
+    {
+      id: 'ova-i56-2',
+      title: 'Mariánskohorská (I/56) – sjezd Cihelní / Hornopolní (areál autosalonu)',
+      addressOrJunction: 'Mariánskohorská (I/56) u sjezdu Cihelní, Moravská Ostrava',
+      city: 'Ostrava',
+      latitude: 49.839200,
+      longitude: 18.272100,
+      propertyType: 'FIRST_CLASS_ROAD_CORRIDOR',
+      propertyTypeLabel: '🛣️ Koridor I. třídy (I/56 Mariánskohorská) – soukromý pozemek',
+      trafficEstimate: '39 000+ vozidel/den',
+      visibilityScore: 9.5,
+      recommendedCarrierType: 'Navigační sloupek / pylon na soukromém vjezdu',
+      estimatedMonthlyRentCzk: 4200,
+      commercialRationale: 'Čtyřproudý průtah s vysokou hustotou. Soukromý pozemek navazuje přímo na zpevněnou plochu mimo těleso vozovky.',
+      acquisitionTip: 'Umístění do rohu oploceného areálu bez jakéhokoliv omezení manipulační plochy nebo vjezdu.',
+    },
+    {
+      id: 'ova-i11-3',
+      title: 'I/11 Rudná / Opavská (Poruba – nájezd Svinov / Globus)',
+      addressOrJunction: 'Opavská / Rudná (I/11), Ostrava - Poruba / Svinov',
+      city: 'Ostrava',
+      latitude: 49.827800,
+      longitude: 18.192500,
+      propertyType: 'FIRST_CLASS_ROAD_CORRIDOR',
+      propertyTypeLabel: '🛣️ Koridor I. třídy (I/11 Opavská/Rudná) – soukromý pozemek',
+      trafficEstimate: '44 000+ vozidel/den',
+      visibilityScore: 9.6,
+      recommendedCarrierType: 'Navigační sloupek mimo těleso silnice',
+      estimatedMonthlyRentCzk: 4000,
+      commercialRationale: 'Masivní dopravní uzel spojující Opavu, dálnici D1 a Ostravu. Ideální pro směrovou navigaci do areálů.',
+      acquisitionTip: 'Dlouhodobá smlouva na 5 let s garancí pasivního výnosu a nulové administrativy.',
+    },
     {
       id: 'ova-1',
       title: 'Komerční zóna Rudná – křížení s ul. Frýdecká',
@@ -319,11 +405,24 @@ const REGIONAL_PRESETS: Record<string, AiScoutedLocation[]> = {
   ],
 };
 
-function generateExtendedPresetFallback(cityOrArea: string, count = 8): AiScoutedLocation[] {
+function generateExtendedPresetFallback(cityOrArea: string, count = 8, preferredFocus = 'ALL'): AiScoutedLocation[] {
   const norm = cityOrArea.trim().toLowerCase();
   for (const [key, list] of Object.entries(REGIONAL_PRESETS)) {
     if (norm.includes(key)) {
-      return list.slice(0, count);
+      let filtered = [...list];
+      if (preferredFocus === 'FIRST_CLASS_ROAD' || preferredFocus === 'FIRST_CLASS_ROAD_CORRIDOR') {
+        filtered.sort((a, b) => {
+          const aMatch = a.propertyType === 'FIRST_CLASS_ROAD_CORRIDOR' ? 1 : 0;
+          const bMatch = b.propertyType === 'FIRST_CLASS_ROAD_CORRIDOR' ? 1 : 0;
+          return bMatch - aMatch;
+        });
+      } else if (preferredFocus !== 'ALL') {
+        const matching = filtered.filter((item) => item.propertyType === preferredFocus);
+        if (matching.length > 0) {
+          filtered = [...matching, ...filtered.filter((item) => item.propertyType !== preferredFocus)];
+        }
+      }
+      return filtered.slice(0, count);
     }
   }
 
@@ -331,6 +430,22 @@ function generateExtendedPresetFallback(cityOrArea: string, count = 8): AiScoute
   const genericList: AiScoutedLocation[] = [
     {
       id: `gen-${Date.now()}-1`,
+      title: `Silnice I. třídy – soukromý vjezd do areálu (${cityOrArea})`,
+      addressOrJunction: `Koridor silnice I. třídy u vjezdu do komerční zóny, ${cityOrArea}`,
+      city: cityOrArea,
+      latitude: 49.820000,
+      longitude: 18.260000,
+      propertyType: 'FIRST_CLASS_ROAD_CORRIDOR',
+      propertyTypeLabel: '🛣️ Koridor I. třídy – soukromý pozemek',
+      trafficEstimate: '38 000+ vozidel/den',
+      visibilityScore: 9.7,
+      recommendedCarrierType: 'Samostatný navigační sloupek (COLUMN) mimo VO',
+      estimatedMonthlyRentCzk: 4500,
+      commercialRationale: 'Podél silnice I. třídy je reklama na sloupech VO zákonem zakázána. Umístění navigačního sloupku na přilehlém soukromém pozemku u sjezdu/vjezdu je plně legální a zajišťuje vysokou viditelnost.',
+      acquisitionTip: 'Oslovit majitele komerčního areálu – zábor patky je minimální (cca 0,5 m²), pasivní příjem 4 500 Kč/měs.',
+    },
+    {
+      id: `gen-${Date.now()}-2`,
       title: `Hlavní vjezdový koridor a obchvat (${cityOrArea})`,
       addressOrJunction: `Výpadová silnice I. třídy u vjezdu do města, ${cityOrArea}`,
       city: cityOrArea,
@@ -346,7 +461,7 @@ function generateExtendedPresetFallback(cityOrArea: string, count = 8): AiScoute
       acquisitionTip: 'Oslovit majitele soukromého areálu na parcele – snadné schválení bez průtahů na zastupitelstvu obce.',
     },
     {
-      id: `gen-${Date.now()}-2`,
+      id: `gen-${Date.now()}-3`,
       title: `Světelná křižovatka u retail zóny (${cityOrArea})`,
       addressOrJunction: `Křížení obchodní zóny a průtahu městem, ${cityOrArea}`,
       city: cityOrArea,
@@ -362,7 +477,7 @@ function generateExtendedPresetFallback(cityOrArea: string, count = 8): AiScoute
       acquisitionTip: 'Navrhnout majiteli dlouhodobou nájemní smlouvu s pravidelnou čtvrtletní platbou předem.',
     },
     {
-      id: `gen-${Date.now()}-3`,
+      id: `gen-${Date.now()}-4`,
       title: `Průmyslová zóna – plot logistického areálu (${cityOrArea})`,
       addressOrJunction: `Příjezdová komunikace k logistickému parku, ${cityOrArea}`,
       city: cityOrArea,
@@ -378,7 +493,7 @@ function generateExtendedPresetFallback(cityOrArea: string, count = 8): AiScoute
       acquisitionTip: 'Garantovat převzetí veškerého servisu a pojištění, nulové starosti pro správce areálu.',
     },
     {
-      id: `gen-${Date.now()}-4`,
+      id: `gen-${Date.now()}-5`,
       title: `Areál čerpací stanice / pneuservisu (${cityOrArea})`,
       addressOrJunction: `Čerpací stanice u frekventovaného tahu, ${cityOrArea}`,
       city: cityOrArea,
@@ -394,7 +509,7 @@ function generateExtendedPresetFallback(cityOrArea: string, count = 8): AiScoute
       acquisitionTip: 'Možnost bezplatného umístění navigační směrovky pro majitele servisu na nosiči.',
     },
     {
-      id: `gen-${Date.now()}-5`,
+      id: `gen-${Date.now()}-6`,
       title: `Kruhový objezd na obchvatu (${cityOrArea})`,
       addressOrJunction: `Okružní křižovatka na silnici I. třídy, ${cityOrArea}`,
       city: cityOrArea,
@@ -410,7 +525,7 @@ function generateExtendedPresetFallback(cityOrArea: string, count = 8): AiScoute
       acquisitionTip: 'Jednání přímo s majitelem přilehlé zahrady či dvora u obchvatu.',
     },
     {
-      id: `gen-${Date.now()}-6`,
+      id: `gen-${Date.now()}-7`,
       title: `Centrální městský koridor (${cityOrArea})`,
       addressOrJunction: `Páteřní městská třída, ${cityOrArea}`,
       city: cityOrArea,
@@ -426,7 +541,17 @@ function generateExtendedPresetFallback(cityOrArea: string, count = 8): AiScoute
       acquisitionTip: 'Nabídnout majiteli moderní osvětlený nosič, který zlepší vzhled zanedbaného plotu.',
     },
   ];
-  return genericList.slice(0, count);
+
+  let list = genericList;
+  if (preferredFocus === 'FIRST_CLASS_ROAD' || preferredFocus === 'FIRST_CLASS_ROAD_CORRIDOR') {
+    list = [...genericList].sort((a, b) => {
+      const aMatch = a.propertyType === 'FIRST_CLASS_ROAD_CORRIDOR' ? 1 : 0;
+      const bMatch = b.propertyType === 'FIRST_CLASS_ROAD_CORRIDOR' ? 1 : 0;
+      return bMatch - aMatch;
+    });
+  }
+
+  return list.slice(0, count);
 }
 
 /**
@@ -439,26 +564,26 @@ export async function scoutAdvertisingLocationsAi(
   count = 8,
   offset = 0
 ): Promise<AiScoutedLocation[]> {
-  const normalizedQuery = cityOrArea.trim().toLowerCase();
   const { geminiKey, openAiKey } = getAiKeys();
 
   // If no AI key configured, return our extended presets
   if (!geminiKey && !openAiKey) {
-    const list = generateExtendedPresetFallback(cityOrArea, count + offset);
+    const list = generateExtendedPresetFallback(cityOrArea, count + offset, preferredFocus);
     return list.slice(offset, offset + count);
   }
 
-  const promptText = `Jsi špičkový expert na venkovní reklamu (OOH - Out-of-Home, billboardy, bigboardy, LED totemy) a akvizici pozemků v České republice pro SeePOINT.
+  const promptText = `Jsi špičkový expert na venkovní reklamu (OOH - Out-of-Home, billboardy, bigboardy, LED totemy, navigační sloupky) a akvizici pozemků v České republice pro SeePOINT.
 Tvým úkolem je navrhnout PŘESNĚ ${count} konkrétních, vysoce lukrativních LOKALIT / SOUKROMÝCH POZEMKŮ pro umístění nových reklamních nosičů ve městě/lokalitě: "${cityOrArea}".
 Zaměření vyhledávání: "${preferredFocus}".
 Číslo stránky / posun (offset): ${offset}. Navrhni jiné různorodé tahy a křižovatky v různých čtvrtích města.
 
 DŮLEŽITÁ PRAVIDLA PRO REKLAMNÍ POZEMKY:
 1. Zaměř se prioritně na SOUKROMÉ POZEMKY (areály firem, autoservisy, stavebniny, logistické parky, čerpací stanice, soukromé oplocené dvory u frekventovaných silnic I. a II. třídy, křižovatek či obchvatů).
-2. Soukromé pozemky jsou pro SeePOINT mnohem lepší než městské, protože dohoda o nájmu je rychlá a přímá (nemusí se čekat na schválení rady obce a záměr §39).
-3. U každé lokality uveď reálné přibližné GPS souřadnice odpovídající danému městu/lokalitě v ČR (WGS-84).
-4. Odhadni férový měsíční nájem v CZK, který vyjednavač nabídne majiteli pozemku (obvykle 3 000 až 12 000 Kč/měsíc dle atraktivity).
-5. Vrať celkem ${count} různých položek.
+2. Pokud je zaměření "FIRST_CLASS_ROAD" (silnice I. třídy a rychlostní tahy jako např. I/11 Rudná, I/56 Místecká, I/58 Plzeňská): soustřeď se na SOUKROMÉ POZEMKY (areály firem, autoservisy, parkoviště, čerpací stanice, komerční vjezdy) bezprostředně sousedící se silnicemi I. třídy, kde zákon 13/1997 Sb. zakazuje reklamu na sloupech veřejného osvětlení (VO), ale na přilehlém soukromém pozemku lze legálně umístit SAMOSTATNÝ NAVIGAČNÍ SLOUPEK (COLUMN / orientační pylon) mimo těleso vozovky. U těchto položek nastav propertyType: "FIRST_CLASS_ROAD_CORRIDOR".
+3. Soukromé pozemky jsou pro SeePOINT mnohem lepší než městské, protože dohoda o nájmu je rychlá a přímá (nemusí se čekat na schválení rady obce a záměr §39).
+4. U každé lokality uveď reálné přibližné GPS souřadnice odpovídající danému městu/lokalitě v ČR (WGS-84).
+5. Odhadni férový měsíční nájem v CZK, který vyjednavač nabídne majiteli pozemku (obvykle 3 000 až 12 000 Kč/měsíc dle atraktivity).
+6. Vrať celkem ${count} různých položek.
 
 Odpověz VÝHRADNĚ jako validní JSON bez markdownu kolem (žádné \`\`\`json):
 [
@@ -469,13 +594,13 @@ Odpověz VÝHRADNĚ jako validní JSON bez markdownu kolem (žádné \`\`\`json)
     "city": "${cityOrArea}",
     "latitude": 49.123456,
     "longitude": 16.123456,
-    "propertyType": "PRIVATE_COMMERCIAL | RETAIL_PARK | LOGISTICS_INDUSTRIAL | GAS_STATION_SERVICES | PRIVATE_INDIVIDUAL",
-    "propertyTypeLabel": "Popisek typu (např. Soukromý autoservis / stavebniny)",
+    "propertyType": "FIRST_CLASS_ROAD_CORRIDOR | PRIVATE_COMMERCIAL | RETAIL_PARK | LOGISTICS_INDUSTRIAL | GAS_STATION_SERVICES | PRIVATE_INDIVIDUAL",
+    "propertyTypeLabel": "Popisek typu (např. 🛣️ Koridor I. třídy (I/11 Rudná) – soukromý pozemek)",
     "trafficEstimate": "odhad průjezdu např. 28 000 vozidel/den",
     "visibilityScore": 9.4,
-    "recommendedCarrierType": "Billboard 5,1 × 2,4 m | Bigboard 9,6 × 3,6 m | LED obrazovka | CLV",
+    "recommendedCarrierType": "Navigační sloupek (COLUMN) | Billboard 5,1 × 2,4 m | Bigboard 9,6 × 3,6 m | LED obrazovka",
     "estimatedMonthlyRentCzk": 5000,
-    "commercialRationale": "Proč je to pro inzerenty extrémně lákavé (viditelnost, kolony, nákupní spád)",
+    "commercialRationale": "Proč je to pro inzerenty extrémně lákavé (viditelnost, kolony, nákupní spád, zákaz reklamy na VO)",
     "acquisitionTip": "Konkrétní tip pro obchodníka, jak oslovit majitele a co mu nabídnout"
   }
 ]`;

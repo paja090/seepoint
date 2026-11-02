@@ -1019,12 +1019,13 @@ export function CampaignPointsView({
                               )}
                               {pt.parcelId && (
                                 <a
-                                  href={`https://nahlizenidokn.cuzk.cz/ZobrazObjekt.aspx?typ=par&id=${pt.parcelId}`}
+                                  href={`https://vdp.cuzk.cz/vdp/ruian/parcely/${pt.parcelId}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-[10px] text-sky-600 hover:underline inline-flex items-center gap-0.5 font-semibold"
+                                  title="Otevřít oficiální detail parcely v RÚIAN (ČÚZK)"
                                 >
-                                  <span>Katastr ČÚZK</span>
+                                  <span>ČÚZK (RÚIAN)</span>
                                   <ExternalLink className="w-2.5 h-2.5" />
                                 </a>
                               )}

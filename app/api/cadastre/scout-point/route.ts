@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { runWithTenantContext } from '@/lib/tenant-context';
+import { findCadastralParcelByCoords } from '@/lib/cadastre/cuzk-service';
 
 export async function POST(req: Request) {
   const user = await requireApiAccess('carriers');
@@ -14,6 +15,7 @@ export async function POST(req: Request) {
       latitude,
       longitude,
       parcelNumber,
+      parcelId,
       cadastralArea,
       cadastralAreaCode,
       landArea,
@@ -34,6 +36,32 @@ export async function POST(req: Request) {
     }
 
     const orgId = user.organizationId!;
+
+    // Auto-enrich parcel info from ČÚZK if parcelNumber or parcelId is not provided
+    let finalParcelNumber = parcelNumber || null;
+    let finalParcelId = parcelId || null;
+    let finalCadastralArea = cadastralArea || null;
+    let finalCadastralAreaCode = cadastralAreaCode ? Number(cadastralAreaCode) : null;
+    let finalLandArea = landArea ? Number(landArea) : null;
+    let finalLandType = landType || null;
+
+    if (!finalParcelNumber || !finalParcelId) {
+      try {
+        const cuzkInfo = await findCadastralParcelByCoords(Number(latitude), Number(longitude));
+        if (cuzkInfo) {
+          finalParcelNumber = finalParcelNumber || cuzkInfo.parcelNumber;
+          finalParcelId = finalParcelId || cuzkInfo.parcelId;
+          finalCadastralArea = finalCadastralArea || cuzkInfo.cadastralAreaName;
+          finalCadastralAreaCode = finalCadastralAreaCode || cuzkInfo.cadastralAreaCode;
+          finalLandArea = finalLandArea || cuzkInfo.areaSqm;
+          finalLandType =
+            finalLandType ||
+            `${cuzkInfo.landTypeName}${cuzkInfo.landUseName ? ` · ${cuzkInfo.landUseName}` : ''}`;
+        }
+      } catch (cuzkErr) {
+        console.warn('[scout-point] Auto ČÚZK lookup failed, continuing with provided data:', cuzkErr);
+      }
+    }
 
     const result = await runWithTenantContext(
       { organizationId: orgId, userId: user.id, source: 'session' },
@@ -61,7 +89,7 @@ export async function POST(req: Request) {
           data: {
             organizationId: orgId,
             campaignId: campaign.id,
-            label: label || `Pozemek ${parcelNumber || ''} (${cadastralArea || 'ČÚZK'})`.trim(),
+            label: label || `Pozemek ${finalParcelNumber || ''} (${finalCadastralArea || 'ČÚZK'})`.trim(),
             latitude: Number(latitude),
             longitude: Number(longitude),
             status: 'PENDING',
@@ -69,11 +97,12 @@ export async function POST(req: Request) {
             mediaType: 'OTHER',
             quantity: 1,
             // Cadastre fields
-            parcelNumber: parcelNumber || null,
-            cadastralArea: cadastralArea || null,
-            cadastralAreaCode: cadastralAreaCode ? Number(cadastralAreaCode) : null,
-            landArea: landArea ? Number(landArea) : null,
-            landType: landType || null,
+            parcelNumber: finalParcelNumber,
+            parcelId: finalParcelId,
+            cadastralArea: finalCadastralArea,
+            cadastralAreaCode: finalCadastralAreaCode,
+            landArea: finalLandArea,
+            landType: finalLandType,
             landOwnership: landOwnership || 'UNKNOWN',
             landownerName: landownerName || null,
             landownerIco: landownerIco || null,
