@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Paperclip, Sparkles, AlertCircle, CheckCircle2, Clock, Building2, FolderKanban, Compass, FileText, Trash2 } from 'lucide-react';
+import { Paperclip, Sparkles, AlertCircle, CheckCircle2, Clock, Building2, FolderKanban, Compass, FileText, Trash2, MessageSquare } from 'lucide-react';
 import { CLASSIFICATION_LABELS, getConfidenceBadge } from '@/lib/ai-inbox/classifier';
 import type { AiInboxClassification, AiInboxStatus } from '@/lib/ai-inbox/types';
 
@@ -16,6 +16,7 @@ export type AiInboxListItem = {
   confidence: number;
   requiresReview: boolean;
   aiSummary: string | null;
+  providerThreadId?: string | null;
   integrationConnection?: { accountEmail: string | null; provider: string } | null;
   client?: { id: string; name: string; companyId: string | null } | null;
   crmOrder?: { id: string; orderNumber: string; title: string; status: string } | null;
@@ -188,6 +189,17 @@ export function AiInboxMessageCard({
             <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
               <Paperclip size={11} />
               <span>{attachmentCount}</span>
+            </span>
+          )}
+
+          {/* Thread indicator */}
+          {item.providerThreadId && (
+            <span
+              title="Zpráva je součástí e-mailového vlákna"
+              className="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 border border-purple-200"
+            >
+              <MessageSquare size={11} />
+              <span>Vlákno</span>
             </span>
           )}
         </div>
