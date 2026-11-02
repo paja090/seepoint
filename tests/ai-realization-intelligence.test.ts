@@ -1050,13 +1050,15 @@ describe('AI Realization Intelligence (AI Commercial Engine Phase)', () => {
     // 1. Navigation adapter with undefined points does not crash
     const emptyNavOrder = {
       id: 'nav-empty',
-      points: undefined as unknown as any[],
-    } as any;
+      points: undefined as unknown as NavigationOrderWithPoints['points'],
+    } as unknown as NavigationOrderWithPoints;
     const navItems = adaptNavigationPointsToRealizationItems(emptyNavOrder);
     assert.deepEqual(navItems, [], 'Undefined navigation points must return empty array without crashing');
 
     // 2. Standard media adapter with undefined realizations does not crash
-    const mediaItems = adaptStandardMediaRealizationItems(undefined as unknown as any[]);
+    const mediaItems = adaptStandardMediaRealizationItems(
+      undefined as unknown as CrmRealizationWithRelations[]
+    );
     assert.deepEqual(mediaItems, [], 'Undefined realizations must return empty array without crashing');
 
     // 3. Evaluation on minimal context does not crash

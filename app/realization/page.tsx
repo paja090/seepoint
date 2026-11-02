@@ -14,8 +14,6 @@ import {
   Layers,
   ChevronRight,
   ShieldAlert,
-  ArrowUpRight,
-  RotateCcw,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
