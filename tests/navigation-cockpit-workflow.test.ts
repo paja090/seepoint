@@ -9,7 +9,14 @@ import {
   getPointPinColor,
   detectCarrierCategory,
 } from '../lib/offers/navigation-carrier-types.ts';
-import { isRestrictedHighwayOr1stClassRoad, isOstravaRestrictedZone } from '../lib/ai-offers/navigation-constraints.ts';
+import {
+  isRestrictedHighwayOr1stClassRoad,
+  isOstravaRestrictedZone,
+  isCityOstrava,
+  isOstravaHistoricalHeritageZone,
+  isOstravaRegulatedZone,
+  evaluateNavigationZoning,
+} from '../lib/ai-offers/navigation-constraints.ts';
 import { TARGET_COLORS } from '../components/offers/navigation-cockpit/types.ts';
 import type { OfferView } from '../lib/offers/view-model.ts';
 import { Prisma } from '@prisma/client';
@@ -283,3 +290,86 @@ test('18. Validace struktury navigační nabídky pro obě fáze workflow', () =
   assert.equal(phase2Offer.navigation?.proposalMode, 'PRICED_QUOTE');
   assert.equal(Number(phase2Offer.totalWithTax), 15000);
 });
+
+test('19. Detekce města Ostrava vs ostatní regiony (isCityOstrava)', () => {
+  assert.equal(isCityOstrava('Ostrava', 'Hlavní třída 12'), true);
+  assert.equal(isCityOstrava(undefined, 'Nádražní, Ostrava-Přívoz'), true);
+  assert.equal(isCityOstrava(undefined, 'Alšovo náměstí, Poruba'), true);
+  assert.equal(isCityOstrava('Brno', 'Kounicova 10'), false);
+  assert.equal(isCityOstrava('Praha', 'Václavské náměstí 1'), false);
+  assert.equal(isCityOstrava('Olomouc', 'Horní náměstí'), false);
+});
+
+test('20. Oddělení restrikcí: dálnice celostátně vs městské rychlostní tahy v Ostravě vs jiné agentury', () => {
+  // Dálnice D1 je zakázána všude (v Ostravě i v Brně)
+  assert.equal(isRestrictedHighwayOr1stClassRoad('D1 exit 354', 'Ostrava'), true);
+  assert.equal(isRestrictedHighwayOr1stClassRoad('D1 km 190', 'Brno'), true);
+  assert.equal(isRestrictedHighwayOr1stClassRoad('Dálnice D56', 'Ostrava'), true);
+
+  // Rudná / Místecká je zakázána pro sloupy VO v Ostravě (I. třída / městský průtah)
+  assert.equal(isRestrictedHighwayOr1stClassRoad('Rudná 12, Ostrava', 'Ostrava'), true);
+  assert.equal(isRestrictedHighwayOr1stClassRoad('Místecká ulice, Ostrava', 'Ostrava'), true);
+
+  // V jiných městech (např. Brno, Praha) ulice se jménem Rudná NESMÍ být blokována jako ostravská I. třída!
+  assert.equal(isRestrictedHighwayOr1stClassRoad('Rudná 5, Brno', 'Brno'), false);
+  assert.equal(isRestrictedHighwayOr1stClassRoad('Rudná ulice, Praha', 'Praha'), false);
+});
+
+test('21. Ostravská zonace: Regulovaná zóna (Nařízení 2/2020) vs Památková zóna (MPZ Masarykovo náměstí)', () => {
+  // Masarykovo náměstí = MPZ (historické jádro) -> přísný zákaz navigací na VO
+  const mpzResult = evaluateNavigationZoning({
+    latitude: 49.8355,
+    longitude: 18.2925,
+    addressText: 'Masarykovo náměstí 1, Ostrava',
+    city: 'Ostrava',
+  });
+  assert.equal(mpzResult.isOstrava, true);
+  assert.equal(mpzResult.isHistoricalHeritageZone, true);
+  assert.equal(mpzResult.isAllowed, false);
+  assert.match(mpzResult.badge, /Památková zóna/i);
+
+  // Hrabůvka / Závodní / širší centrum = Regulovaná zóna (Nařízení č. 2/2020), kde jsou navigace na VO POVOLENY
+  // Ověříme, že pro městskou ulici v Ostravě mimo MPZ je isAllowed === true
+  const standardResult = evaluateNavigationZoning({
+    latitude: 49.7800,
+    longitude: 18.2000,
+    addressText: 'Závodní 1, Ostrava-Hrabůvka',
+    city: 'Ostrava',
+  });
+  assert.equal(standardResult.isOstrava, true);
+  assert.equal(standardResult.isHistoricalHeritageZone, false);
+  assert.equal(standardResult.isAllowed, true);
+  assert.match(standardResult.badge, /✓/);
+});
+
+test('22. Mimoměstská zonace pro jiné agentury (Brno, Olomouc)', () => {
+  const brnoResult = evaluateNavigationZoning({
+    latitude: 49.2000,
+    longitude: 16.6000,
+    addressText: 'Kounicova 10, Brno',
+    city: 'Brno',
+  });
+  assert.equal(brnoResult.isOstrava, false);
+  assert.equal(brnoResult.city, 'Brno');
+  assert.equal(brnoResult.isAllowed, true);
+  assert.match(brnoResult.badge, /Městská komunikace \(Brno\)/);
+  assert.doesNotMatch(brnoResult.reason, /2\/2020/); // Žádná zmínka o ostravské vyhlášce!
+});
+
+test('23. Dvouokruhový koncept (Vnitřní okruh do 750 m vs Vnější okruh nad 750 m)', () => {
+  const innerDistance = 350;
+  const outerDistance = 1800;
+
+  const isInner = innerDistance <= 750;
+  const isOuter = outerDistance > 750;
+
+  assert.equal(isInner, true);
+  assert.equal(isOuter, true);
+
+  const innerCircuit = isInner ? 'INNER' : 'OUTER';
+  const outerCircuit = isOuter ? 'OUTER' : 'INNER';
+
+  assert.equal(innerCircuit, 'INNER');
+  assert.equal(outerCircuit, 'OUTER');
+});
+

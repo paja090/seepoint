@@ -32,6 +32,7 @@ interface NavigationPointDrawerProps {
   onOpenVisualizer?: (pointId: string) => void;
   onUploadSitePhoto?: (pointId: string, file: File) => void;
   onRecalculateRoute?: (pointId: string) => Promise<void>;
+  onApplyCatalogRatesToPoint?: (pointId: string) => void;
 }
 
 export function NavigationPointDrawer({
@@ -43,6 +44,7 @@ export function NavigationPointDrawer({
   onOpenVisualizer,
   onUploadSitePhoto,
   onRecalculateRoute,
+  onApplyCatalogRatesToPoint,
 }: NavigationPointDrawerProps) {
   if (!point) return null;
 
@@ -542,10 +544,23 @@ export function NavigationPointDrawer({
         {/* Sekce 5: Ceny (POUZE v režimu PRICED_QUOTE) */}
         {isPricedMode && (
           <div className="space-y-3 pt-3 border-t bg-purple-50/40 p-4 rounded-xl border-purple-200">
-            <h3 className="font-black uppercase tracking-wider text-purple-900 text-[11px] flex items-center gap-1.5">
-              <DollarSign size={13} className="text-purple-600" />
-              <span>5. Individuální ceny bodu (Kč bez DPH)</span>
-            </h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-black uppercase tracking-wider text-purple-900 text-[11px] flex items-center gap-1.5">
+                <DollarSign size={13} className="text-purple-600" />
+                <span>5. Individuální ceny bodu (Kč bez DPH)</span>
+              </h3>
+              {onApplyCatalogRatesToPoint && (
+                <button
+                  type="button"
+                  onClick={() => onApplyCatalogRatesToPoint(point.id)}
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-white border border-purple-200 hover:border-purple-300 px-2 py-0.5 rounded-lg shadow-2xs transition cursor-pointer"
+                  title="Načíst sazby z ceníku pro tento bod"
+                >
+                  <Zap size={11} className="text-amber-500 fill-amber-400" />
+                  <span>Načíst z ceníku</span>
+                </button>
+              )}
+            </div>
 
             <div className="grid gap-2 sm:grid-cols-2">
               <div>

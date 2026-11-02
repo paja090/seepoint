@@ -10,6 +10,9 @@ import {
   calculateNavigationTotalsForDuration,
   calculateNavigationPointSubtotal,
   calculateNavigationOfferTotals,
+  DEFAULT_NAVIGATION_RATES,
+  detectPointMountingType,
+  resolveNavigationCatalogRates,
 } from '../lib/offers/navigation-pricing';
 
 test('RENTAL_DURATION_OPTIONS contains expected periods and factors', () => {
@@ -191,3 +194,83 @@ test('calculateNavigationPointSubtotal and calculateNavigationOfferTotals (Prism
   assert.equal(offerTotals.taxAmount.toNumber(), 2205);
   assert.equal(offerTotals.totalWithTax.toNumber(), 12705);
 });
+
+test('DEFAULT_NAVIGATION_RATES has 12 000 CZK rental and correct component defaults', () => {
+  assert.equal(DEFAULT_NAVIGATION_RATES.rentalPrice, '12000');
+  assert.equal(DEFAULT_NAVIGATION_RATES.framePrice, '1960');
+  assert.equal(DEFAULT_NAVIGATION_RATES.productionPrice, '600');
+  assert.equal(DEFAULT_NAVIGATION_RATES.installationPrice, '800');
+  assert.equal(DEFAULT_NAVIGATION_RATES.removalPrice, '600');
+});
+
+test('detectPointMountingType accurately identifies LIGHT_POLE, COLUMN, and TRACTION', () => {
+  assert.equal(detectPointMountingType(null), 'LIGHT_POLE');
+  assert.equal(detectPointMountingType({}), 'LIGHT_POLE');
+  assert.equal(detectPointMountingType({ pillarType: 'Sloup veřejného osvětlení' }), 'LIGHT_POLE');
+  assert.equal(detectPointMountingType({ pillarType: 'VO #456' }), 'LIGHT_POLE');
+  assert.equal(detectPointMountingType({ pillarType: 'Trakční stožár DPO' }), 'TRACTION');
+  assert.equal(detectPointMountingType({ variant: 'Traction 67x90' }), 'TRACTION');
+  assert.equal(detectPointMountingType({ pillarType: 'Samostatný sloupek v zeleni' }), 'COLUMN');
+  assert.equal(detectPointMountingType({ label: 'Bod 3 - sloupek' }), 'COLUMN');
+});
+
+test('resolveNavigationCatalogRates returns default rates for empty or null rules', () => {
+  const resEmpty = resolveNavigationCatalogRates([]);
+  assert.deepEqual(resEmpty, DEFAULT_NAVIGATION_RATES);
+
+  const resNull = resolveNavigationCatalogRates(null);
+  assert.deepEqual(resNull, DEFAULT_NAVIGATION_RATES);
+});
+
+test('resolveNavigationCatalogRates resolves accurate rates from system rules catalog', () => {
+  const systemRules = [
+    { code: 'NAV_OSR_RENTAL_LIGHT_POLE_12M', category: 'RENTAL', mountingType: 'LIGHT_POLE', pricingSegment: 'COMMERCIAL', city: 'Ostrava', unitPrice: '12000.00', active: true },
+    { code: 'NAV_OSR_RENTAL_TRACTION_12M', category: 'RENTAL', mountingType: 'TRACTION', pricingSegment: 'COMMERCIAL', city: 'Ostrava', unitPrice: '12000.00', active: true },
+    { code: 'NAV_OSR_RENTAL_COLUMN_12M', category: 'RENTAL', mountingType: 'COLUMN', pricingSegment: 'COMMERCIAL', city: 'Ostrava', unitPrice: '12000.00', active: true },
+    { code: 'NAV_OSR_FRAME_DFLEX', category: 'PRODUCTION', label: 'Rám D-FLEX 67 × 90', unitPrice: '1960.00', active: true },
+    { code: 'NAV_OSR_PRINT_UV_DIBOND', category: 'PRINT', label: 'UV tisk na dibond 67 × 90', unitPrice: '600.00', active: true },
+    { code: 'NAV_OSR_INSTALLATION', category: 'INSTALLATION', label: 'Instalace navigace', unitPrice: '800.00', active: true },
+    { code: 'NAV_OSR_REMOVAL', category: 'REMOVAL', label: 'Deinstalace navigace', unitPrice: '600.00', active: true },
+  ];
+
+  const resolvedStandard = resolveNavigationCatalogRates(systemRules, {
+    clientSegment: 'COMMERCIAL',
+    city: 'Ostrava',
+    mountingType: 'LIGHT_POLE',
+  });
+
+  assert.equal(resolvedStandard.rentalPrice, '12000');
+  assert.equal(resolvedStandard.framePrice, '1960');
+  assert.equal(resolvedStandard.productionPrice, '600');
+  assert.equal(resolvedStandard.installationPrice, '800');
+  assert.equal(resolvedStandard.removalPrice, '600');
+});
+
+test('resolveNavigationCatalogRates prioritizes segment and mountingType properly', () => {
+  const rules = [
+    { code: 'NAV_COMMERCIAL_VO', category: 'RENTAL', mountingType: 'LIGHT_POLE', pricingSegment: 'COMMERCIAL', city: 'Ostrava', unitPrice: '12000.00', active: true },
+    { code: 'NAV_NONPROFIT_VO', category: 'RENTAL', mountingType: 'LIGHT_POLE', pricingSegment: 'PUBLIC_NONPROFIT', city: 'Ostrava', unitPrice: '6000.00', active: true },
+    { code: 'NAV_COMMERCIAL_TRACTION', category: 'RENTAL', mountingType: 'TRACTION', pricingSegment: 'COMMERCIAL', city: 'Ostrava', unitPrice: '14000.00', active: true },
+    { code: 'NAV_FRAME_DEFAULT', category: 'PRODUCTION', label: 'Rám D-FLEX', unitPrice: '1960.00', active: true },
+    { code: 'NAV_PRINT_DEFAULT', category: 'PRINT', label: 'UV dibond', unitPrice: '600.00', active: true },
+    { code: 'NAV_INSTALL_DEFAULT', category: 'INSTALLATION', unitPrice: '800.00', active: true },
+    { code: 'NAV_REMOVAL_DEFAULT', category: 'REMOVAL', unitPrice: '600.00', active: true },
+  ];
+
+  // Non-profit client gets 6 000 Kč
+  const nonProfitRates = resolveNavigationCatalogRates(rules, {
+    clientSegment: 'PUBLIC_NONPROFIT',
+    city: 'Ostrava',
+    mountingType: 'LIGHT_POLE',
+  });
+  assert.equal(nonProfitRates.rentalPrice, '6000');
+
+  // Traction gets 14 000 Kč
+  const tractionRates = resolveNavigationCatalogRates(rules, {
+    clientSegment: 'COMMERCIAL',
+    city: 'Ostrava',
+    mountingType: 'TRACTION',
+  });
+  assert.equal(tractionRates.rentalPrice, '14000');
+});
+

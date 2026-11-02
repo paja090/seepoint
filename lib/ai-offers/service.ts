@@ -43,6 +43,8 @@ function parseRequest(raw: unknown): AiOfferRequest {
           routeDurationSeconds: Number.isFinite(Number(point.routeDurationSeconds)) ? Number(point.routeDurationSeconds) : undefined,
           routePolyline: typeof point.routePolyline === 'string' ? point.routePolyline : undefined,
           arrowDirection: ['LEFT', 'RIGHT', 'STRAIGHT'].includes(String(point.arrowDirection)) ? point.arrowDirection as AiNavigationPointInput['arrowDirection'] : undefined,
+          circuit: ['INNER', 'OUTER'].includes(String(point.circuit)) ? point.circuit as 'INNER' | 'OUTER' : undefined,
+          circuitLabel: typeof point.circuitLabel === 'string' ? point.circuitLabel : undefined,
         }];
       }).slice(0, 20)
     : undefined;
@@ -210,7 +212,7 @@ async function confirmNavigation(user: CurrentUser, request: AiOfferRequest, cli
       installationPrice: item.componentPrices?.INSTALLATION?.unitPrice ?? 0, removalPrice: item.componentPrices?.REMOVAL?.unitPrice ?? 0,
       productionPrice: (item.componentPrices?.PRODUCTION?.unitPrice ?? 0) + (item.componentPrices?.PRINT?.unitPrice ?? 0), calculatedDistanceMeters: item.distanceMeters,
       routeDistanceMeters: item.distanceMeters, routeDurationSeconds: item.routeDurationSeconds, routePolyline: item.routePolyline,
-      arrowDirectionEnum: item.arrowDirection, pillarType: item.mountingType ?? '', clientNote: item.reasons.join(' '),
+      arrowDirectionEnum: item.arrowDirection, pillarType: item.mountingType ?? '', clientNote: [item.circuitLabel ? `[${item.circuitLabel}]` : '', item.reasons.join(' ')].filter(Boolean).join(' '),
       internalNote: item.finalPrice === null ? 'AI návrhový bod bez potvrzené ceny. Vyžaduje fotografii a terénní ověření konstrukce.' : 'AI návrhový bod. Typ konstrukce a cenu potvrďte podle fotografie z terénu.',
     })),
   });

@@ -30,6 +30,7 @@ interface NavigationMapStepProps {
   proposalMode: 'LOCATION_SELECTION' | 'PRICED_QUOTE';
   onOpenVisualizer?: (pointId: string) => void;
   onUploadSitePhoto?: (pointId: string, file: File) => void;
+  onApplyCatalogRatesToPoint?: (pointId: string) => void;
 }
 
 export function NavigationMapStep({
@@ -47,6 +48,7 @@ export function NavigationMapStep({
   proposalMode,
   onOpenVisualizer,
   onUploadSitePhoto,
+  onApplyCatalogRatesToPoint,
 }: NavigationMapStepProps) {
   const [selectedPointId, setSelectedPointId] = useState<string | null>(points[0]?.id || null);
   const [editingPoint, setEditingPoint] = useState<DraftPoint | null>(null);
@@ -251,6 +253,11 @@ export function NavigationMapStep({
           proposalMode={proposalMode}
           onOpenVisualizer={onOpenVisualizer}
           onUploadSitePhoto={onUploadSitePhoto}
+          onApplyCatalogRatesToPoint={(ptId) => {
+            onApplyCatalogRatesToPoint?.(ptId);
+            const fresh = points.find((p) => p.id === ptId);
+            if (fresh) setEditingPoint(fresh);
+          }}
           onRecalculateRoute={async (ptId) => {
             await onRecalculateRoutes();
             const fresh = points.find((p) => p.id === ptId);

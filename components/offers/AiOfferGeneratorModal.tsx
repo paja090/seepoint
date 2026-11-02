@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import { ChevronDown, Compass, Image, MapPin, Sparkles, X } from 'lucide-react';
 import type { SuggestedNavigationPoint } from './GoogleNavigationOfferMap';
 import { reverseGeocode } from '@/lib/google-maps';
-import { isRestrictedHighwayOr1stClassRoad, isOstravaRestrictedZone } from '@/lib/ai-offers/navigation-constraints';
+import { isRestrictedHighwayOr1stClassRoad, isOstravaRestrictedZone, evaluateNavigationZoning } from '@/lib/ai-offers/navigation-constraints';
 import { haversineMeters } from '@/lib/ai-offers/scoring';
 
 const GoogleNavigationOfferMap = dynamic(() => import('./GoogleNavigationOfferMap').then((module) => module.GoogleNavigationOfferMap), { ssr: false });
@@ -22,6 +22,7 @@ type PreviewItem = {
   pricingOptions?: Array<{ mountingType: MountingType; label: string; rentalTotal: number | null; total: number | null; componentPrices: Record<string, unknown> }>;
   componentPrices?: Record<string, unknown>; score: number; reasons: string[]; distanceMeters?: number;
   routePolyline?: string; routeDurationSeconds?: number; arrowDirection?: 'LEFT' | 'RIGHT' | 'STRAIGHT';
+  circuit?: 'INNER' | 'OUTER'; circuitLabel?: string;
 };
 type Preview = {
   offerType: OfferType; recommendedOfferType: OfferType; client: { name: string; pricingSegment: PricingSegment; segmentLocked: boolean };
@@ -148,6 +149,8 @@ export function AiOfferGeneratorModal({
       routeDurationSeconds: item.routeDurationSeconds,
       routePolyline: item.routePolyline,
       arrowDirection: item.arrowDirection,
+      circuit: item.circuit,
+      circuitLabel: item.circuitLabel,
     }]) : undefined,
   });
 
@@ -200,14 +203,18 @@ export function AiOfferGeneratorModal({
           routeDurationSeconds: suggestion.routeDurationSeconds,
           routePolyline: suggestion.routePolyline,
           arrowDirection: suggestion.arrowDirection,
+          circuit: suggestion.circuit,
+          circuitLabel: suggestion.circuitLabel,
         };
       });
+      const innerCount = items.filter((item) => item.circuit === 'INNER' || (item.distanceMeters && item.distanceMeters <= 750)).length;
+      const outerCount = items.length - innerCount;
       return {
         ...current,
         items,
         candidateCount: suggestions.length,
         warnings: current.warnings.filter((warning) => !/Mapa ještě hledá|Google Routes|radiální/i.test(warning)),
-        explanation: `AI vybrala ${suggestions.length} rozhodovacích míst na reálných příjezdových trasách. Upřednostnila křižovatky, odbočení a hlavní tahy v účinné vzdálenosti před cílem.`,
+        explanation: `Dvouokruhový navigační koncept: ${innerCount}× vnitřní okruh (dojezd k prodejně) a ${outerCount}× vnější okruh (hlavní křižovatky). Body respektují regulaci i památkovou ochranu.`,
       };
     });
     setRouteAnalysis('done');
@@ -390,37 +397,41 @@ export function AiOfferGeneratorModal({
 
                 setPreview((prev) => {
                   if (!prev) return prev;
+                  const targetCity = prev.city || prev.target?.address || '';
                   return {
                     ...prev,
                     items: prev.items.map((item) => {
                       if (item.selectionId !== pointId) return item;
-                      const isHighway = isRestrictedHighwayOr1stClassRoad(freshAddress || '');
-                      const isHeritage = isOstravaRestrictedZone(latitude, longitude, freshAddress || '');
+                      const zoning = evaluateNavigationZoning({
+                        latitude,
+                        longitude,
+                        addressText: freshAddress || '',
+                        city: targetCity,
+                      });
                       const targetLat = prev.target?.latitude ?? latitude;
                       const targetLng = prev.target?.longitude ?? longitude;
                       const newDist = haversineMeters({ latitude, longitude }, { latitude: targetLat, longitude: targetLng });
                       const distKm = (newDist / 1000).toFixed(1);
+                      const isInner = newDist <= 750;
+                      const circuit: 'INNER' | 'OUTER' = isInner ? 'INNER' : 'OUTER';
+                      const circuitLabel = isInner ? 'Vnitřní okruh (dojezd k prodejně)' : 'Vnější okruh (hlavní křižovatka / tah)';
 
                       let newTitle = item.title;
                       let newReasons = [...item.reasons];
 
-                      if (isHeritage) {
-                        newTitle = `⚠️ Bod v Památkové zóně (${streetPart || 'centrum'})`;
+                      if (!zoning.isAllowed) {
+                        newTitle = `${zoning.badge} (${streetPart || 'centrum'})`;
                         newReasons = [
-                          `🏛️ Upozornění: Bod leží v Městské památkové zóně (Nařízení č. 2/2020). Navigační desky VO podléhají schválení památkového odboru.`,
-                          `Vzdálenost cca ${distKm} km od prodejny.`,
-                        ];
-                      } else if (isHighway) {
-                        newTitle = `⚠️ Bod na I. třídě (${streetPart || 'hlavní tah'})`;
-                        newReasons = [
-                          `🛡️ Upozornění: Bod leží na rychlostní komunikaci (${streetPart}). Vyžaduje zvláštní povolení správce komunikace.`,
-                          `Vzdálenost cca ${distKm} km od prodejny.`,
+                          `⚠️ ${zoning.reason}`,
+                          zoning.warning || `Vzdálenost cca ${distKm} km od cíle.`,
                         ];
                       } else if (streetPart && !/č\.p\.|ostrava|česko/i.test(streetPart)) {
-                        newTitle = `Příjezdový bod na ${streetPart}`;
+                        newTitle = `[${isInner ? 'Vnitřní okruh' : 'Vnější okruh'}] Příjezdový bod na ${streetPart}`;
                         newReasons = [
-                          `Navigační bod přesunut na městskou třídu ${streetPart}.`,
-                          `Vzdálenost cca ${distKm} km od prodejny.`,
+                          isInner
+                            ? `🔵 Vnitřní okruh: Bod pro finální navedení k provozovně (${Math.round(newDist)} m).`
+                            : `🟣 Vnější okruh: Bod na příjezdové třídě (${distKm} km).`,
+                          zoning.reason,
                         ];
                       }
 
@@ -431,6 +442,8 @@ export function AiOfferGeneratorModal({
                         title: newTitle,
                         reasons: newReasons,
                         distanceMeters: newDist,
+                        circuit,
+                        circuitLabel,
                       };
                     }),
                   };
@@ -440,12 +453,39 @@ export function AiOfferGeneratorModal({
             />
           </div>}
 
-          <div className="space-y-2">{preview.items.map((item, index) => <article className="rounded-xl border border-slate-800 p-3" key={item.selectionId}>
-            <div className="flex items-start justify-between gap-3"><div><strong className="text-sm">{index + 1}. {item.title}</strong><p className="mt-1 text-xs text-slate-400">{item.distanceMeters ? `${Math.round(item.distanceMeters)} m před cílem · ` : ''}dopad {item.score}/100</p></div><span className="shrink-0 text-xs font-bold">{item.finalPrice == null ? 'cena po ověření' : `${item.finalPrice.toLocaleString('cs-CZ')} Kč`}</span></div>
-            <p className="mt-2 text-xs text-slate-300">{item.reasons.slice(0, 2).join(' ')}</p>
-            {preview.offerType === 'NAVIGATION' && <details className="mt-2"><summary className="cursor-pointer text-xs font-bold text-sky-300">Konstrukce a cena</summary><label className="mt-2 block text-xs font-bold text-slate-300">Předpokládaný typ<select className="input mt-1" value={item.mountingType ?? ''} onChange={(event) => updateMountingType(item.selectionId, event.target.value as MountingType | '')}><option value="">Určí obchodník podle fotografie</option>{item.pricingOptions?.map((option) => <option key={option.mountingType} value={option.mountingType}>{option.label} · {option.total === null ? 'cena není nastavena' : `${option.total.toLocaleString('cs-CZ')} Kč`}</option>)}</select></label></details>}
-            <button className="mt-2 text-xs font-bold text-rose-300" onClick={() => setPreview((current) => current ? { ...current, items: current.items.filter((candidate) => candidate.selectionId !== item.selectionId) } : current)} type="button">Odebrat bod</button>
-          </article>)}</div>
+          <div className="space-y-2">{preview.items.map((item, index) => {
+            const isInner = item.circuit === 'INNER' || (item.distanceMeters != null && item.distanceMeters <= 750);
+            return <article className="rounded-xl border border-slate-800 p-3" key={item.selectionId}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {preview.offerType === 'NAVIGATION' && (
+                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                        isInner
+                          ? 'bg-blue-900/60 text-blue-200 border border-blue-600/50'
+                          : 'bg-purple-900/60 text-purple-200 border border-purple-600/50'
+                      }`}>
+                        {isInner ? '🔵 Vnitřní okruh' : '🟣 Vnější okruh'}
+                      </span>
+                    )}
+                    {item.arrowDirection && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                        {item.arrowDirection === 'LEFT' ? '⬅️ Vlevo' : item.arrowDirection === 'RIGHT' ? '➡️ Vpravo' : '⬆️ Rovně'}
+                      </span>
+                    )}
+                    <strong className="text-sm">{index + 1}. {item.title}</strong>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {item.distanceMeters ? `${Math.round(item.distanceMeters)} m před cílem · ` : ''}dopad {item.score}/100
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs font-bold">{item.finalPrice == null ? 'cena po ověření' : `${item.finalPrice.toLocaleString('cs-CZ')} Kč`}</span>
+              </div>
+              <p className="mt-2 text-xs text-slate-300">{item.reasons.slice(0, 2).join(' ')}</p>
+              {preview.offerType === 'NAVIGATION' && <details className="mt-2"><summary className="cursor-pointer text-xs font-bold text-sky-300">Konstrukce a cena</summary><label className="mt-2 block text-xs font-bold text-slate-300">Předpokládaný typ<select className="input mt-1" value={item.mountingType ?? ''} onChange={(event) => updateMountingType(item.selectionId, event.target.value as MountingType | '')}><option value="">Určí obchodník podle fotografie</option>{item.pricingOptions?.map((option) => <option key={option.mountingType} value={option.mountingType}>{option.label} · {option.total === null ? 'cena není nastavena' : `${option.total.toLocaleString('cs-CZ')} Kč`}</option>)}</select></label></details>}
+              <button className="mt-2 text-xs font-bold text-rose-300" onClick={() => setPreview((current) => current ? { ...current, items: current.items.filter((candidate) => candidate.selectionId !== item.selectionId) } : current)} type="button">Odebrat bod</button>
+            </article>;
+          })}</div>
 
           <div className="rounded-xl border border-sky-800 bg-sky-950/60 p-3">
             <label className="block text-xs font-bold text-sky-200">

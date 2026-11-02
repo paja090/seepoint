@@ -19,6 +19,7 @@ export type ClientOption = {
   contactPerson?: string | null;
   email?: string | null;
   phone?: string | null;
+  pricingSegment?: string | null;
   branches?: ClientBranchOption[];
 };
 

@@ -645,6 +645,7 @@ export async function getSpecializedOfferOptions() {
         contactPerson: true,
         email: true,
         phone: true,
+        pricingSegment: true,
         branches: {
           where: { active: true },
           select: { id: true, name: true, street: true, city: true, zip: true },

@@ -3,9 +3,19 @@ import { OfferValidationError } from '@/lib/offers/domain';
 import { resolveCatalogPrice } from './price-resolver';
 import { haversineMeters } from './scoring';
 import type { AiNavigationPointInput, AiOfferPreview, AiOfferRequest, AiResolvedClient } from './types';
-import { isOstravaRestrictedZone, isRestrictedHighwayOr1stClassRoad } from './navigation-constraints';
+import {
+  evaluateNavigationZoning,
+  isCityOstrava,
+  isOstravaRestrictedZone,
+  isRestrictedHighwayOr1stClassRoad,
+} from './navigation-constraints';
 
-export { isOstravaRestrictedZone, isRestrictedHighwayOr1stClassRoad } from './navigation-constraints';
+export {
+  evaluateNavigationZoning,
+  isCityOstrava,
+  isOstravaRestrictedZone,
+  isRestrictedHighwayOr1stClassRoad,
+} from './navigation-constraints';
 
 const pricedMountingTypes = ['LIGHT_POLE', 'TRACTION', 'COLUMN'] as const;
 const mountingLabels: Record<(typeof pricedMountingTypes)[number], string> = {
@@ -118,6 +128,13 @@ export async function generateNavigationPreview(input: {
   dateFrom: Date; dateTo: Date; durationMonths: number; quantity: number;
 }): Promise<AiOfferPreview> {
   const target = await resolveTarget(input.request);
+  const pricingCity = input.request.city?.trim() || (/ostrava/i.test(target.address) ? 'Ostrava' : '');
+  const inOstrava = isCityOstrava(pricingCity, target.address);
+
+  // Two-tier circuit quota: inner circuit (dojezd do 750m) vs outer circuit (křižovatky nad 1000m)
+  const innerQuota = Math.max(1, Math.floor(input.quantity / 2));
+  const outerQuota = input.quantity - innerQuota;
+
   // Search origins in urban radius of 2.0 - 4.5 km to capture high-traffic intersections further out
   const radius = Math.min(4500, Math.max(2000, (input.request.maxRadiusKm ?? 4) * 1000));
   const origins = approachOrigins(target, radius, Math.max(input.quantity, 4));
@@ -126,65 +143,96 @@ export async function generateNavigationPreview(input: {
   const proposed: Array<AiNavigationPointInput | ApproachOrigin> = refinedPoints.length
     ? refinedPoints
     : requestedIds.size ? origins.filter((origin) => requestedIds.has(origin.id)) : origins.slice(0, input.quantity);
-  const pricingCity = input.request.city?.trim() || (/ostrava/i.test(target.address) ? 'Ostrava' : '');
   const pricingOptions = await resolvePricingOptions({ pricingSegment: input.client.pricingSegment, city: pricingCity, effectiveDate: input.dateFrom, durationMonths: input.durationMonths });
 
   const items = await Promise.all(proposed.map(async (origin, index) => {
     const isRefined = isRefinedPoint(origin);
     const route = isRefined ? null : await computeGoogleRoute(origin, target);
     const direction = 'direction' in origin ? origin.direction : '';
-    let selectedPoint = isRefined ? { latitude: origin.latitude, longitude: origin.longitude } : { latitude: origin.latitude, longitude: origin.longitude };
-    let pointTitle = isRefined ? origin.title : `Městská příjezdová trasa od ${direction}`;
+    let selectedPoint = { latitude: origin.latitude, longitude: origin.longitude };
+
+    // Determine target circuit role for this item slot
+    const isInnerSlot = index < innerQuota;
+    let targetCircuit: 'INNER' | 'OUTER' = isInnerSlot ? 'INNER' : 'OUTER';
+    let targetCircuitLabel = isInnerSlot ? 'Vnitřní okruh (dojezd k prodejně)' : 'Vnější okruh (hlavní křižovatka / tah)';
+
+    if (isRefined) {
+      const refinedDist = origin.distanceMeters ?? haversineMeters(selectedPoint, target);
+      targetCircuit = origin.circuit ?? (refinedDist <= 750 ? 'INNER' : 'OUTER');
+      targetCircuitLabel = origin.circuitLabel ?? (targetCircuit === 'INNER' ? 'Vnitřní okruh (dojezd k prodejně)' : 'Vnější okruh (hlavní křižovatka / tah)');
+    }
+
+    let pointTitle = isRefined ? origin.title : `[${targetCircuit === 'INNER' ? 'Vnitřní okruh' : 'Vnější okruh'}] Městská příjezdová trasa od ${direction}`;
     let pointReasons: string[] = isRefined ? origin.reasons : [
-      `Klíčový rozhodovací bod na městské třídě pro příjezd od ${direction}.`,
+      targetCircuit === 'INNER'
+        ? `🔵 Vnitřní okruh: Klíčové místo pro finální odbočení řidičů k cíli při příjezdu od ${direction}.`
+        : `🟣 Vnější okruh: Bod zachycuje průjezd na hlavní městské třídě a navádí řidiče od ${direction}.`,
     ];
 
     if (!isRefined && route?.status === 'OK' && route.polyline) {
       const decodedPoints = decodePolylinePoints(route.polyline);
-      // Filter points along polyline that are between 300m and 3500m (up to 3.5 km) from target store
-      const decisionZoneCandidates = decodedPoints.filter((pt) => {
+
+      // Filter candidates according to two-tier circuit distances
+      // Inner circuit: 150m - 750m (final turn approach directly to store)
+      // Outer circuit: 950m - 3500m (major feeder intersections)
+      const primaryRange = isInnerSlot
+        ? { min: 150, max: 750 }
+        : { min: 950, max: Math.min(3500, radius) };
+      const fallbackRange = isInnerSlot
+        ? { min: 100, max: 950 }
+        : { min: 750, max: Math.min(4000, radius) };
+
+      let decisionZoneCandidates = decodedPoints.filter((pt) => {
         const dist = haversineMeters(pt, target);
-        return dist >= 300 && dist <= 3500;
+        return dist >= primaryRange.min && dist <= primaryRange.max;
       });
 
-      // Find candidate point along polyline that is NOT on a restricted highway or Heritage Zone (Nařízení č. 2/2020)
+      if (!decisionZoneCandidates.length) {
+        decisionZoneCandidates = decodedPoints.filter((pt) => {
+          const dist = haversineMeters(pt, target);
+          return dist >= fallbackRange.min && dist <= fallbackRange.max;
+        });
+      }
+
+      // Find candidate point along polyline that complies with zoning
       let foundValidPoint = false;
       for (const candidate of decisionZoneCandidates) {
         const revGeo = await reverseGeocode(candidate.latitude, candidate.longitude);
         const addressText = revGeo?.formattedAddress || '';
-        const isHighway = isRestrictedHighwayOr1stClassRoad(addressText);
-        const isHeritageZone = isOstravaRestrictedZone(candidate.latitude, candidate.longitude, addressText);
+        const zoning = evaluateNavigationZoning({
+          latitude: candidate.latitude,
+          longitude: candidate.longitude,
+          addressText,
+          city: pricingCity,
+        });
 
-        if (addressText && !isHighway) {
+        if (addressText && zoning.isAllowed) {
           selectedPoint = candidate;
           foundValidPoint = true;
           const distMeters = haversineMeters(candidate, target);
           const distKm = (distMeters / 1000).toFixed(1);
           const streetPart = addressText.split(',')[0]?.trim() || '';
 
-          const isFarIntersection = distMeters > 1000;
-
           if (streetPart && !/č\.p\.|ostrava|česko/i.test(streetPart)) {
-            pointTitle = isHeritageZone
-              ? `Navigační bod na ${streetPart} (${distKm} km, od ${direction})`
-              : (isFarIntersection
-                ? `Vytížená křižovatka na ${streetPart} (${distKm} km, od ${direction})`
-                : `Příjezdový bod na ${streetPart} (od ${direction})`);
-            
+            pointTitle = isInnerSlot
+              ? `[Vnitřní okruh] Příjezd k provozovně – ${streetPart} (${Math.round(distMeters)} m)`
+              : `[Vnější okruh] Hlavní křižovatka – ${streetPart} (${distKm} km, od ${direction})`;
+
             pointReasons = [
-              isFarIntersection
-                ? `🚦 Frekventovaná křižovatka: Bod zachycuje vysoký průjezd aut na městské třídě ${streetPart} ve vzdálenosti cca ${distKm} km od cíle.`
-                : `Navigační bod na městské třídě ${streetPart} s přímou viditelností pro přijíždějící řidiče.`,
-              isHeritageZone
-                ? `🏛️ Upozornění: Bod leží v regulované zóně města Ostrava (Nařízení č. 2/2020 a č. 11/2019) – při realizaci ověřte soulad se schválením.`
-                : `Strategický bod pro včasné nasměrování řidičů přijíždějících od ${direction}.`,
+              isInnerSlot
+                ? `🔵 Vnitřní okruh (dojezd): Klíčové místo pro finální odbočení řidiče k cíli bez bloudění.`
+                : `🟣 Vnější okruh (tranzit): Bod zachycuje vysoký průjezd aut na městské třídě ${streetPart} ve vzdálenosti cca ${distKm} km od cíle.`,
+              zoning.reason,
+              isInnerSlot
+                ? `Vzdálenost ${Math.round(distMeters)} m před cílem.`
+                : `Vzdálenost cca ${distKm} km před cílem (příjezd od ${direction}).`,
             ];
           }
           break;
         }
       }
 
-      // If all polyline points were on restricted highway, step 300m perpendicular towards target store
+      // If all polyline points were in restricted zone or highway, step towards target local street
       if (!foundValidPoint) {
         const shiftLat = (target.latitude - selectedPoint.latitude) * 0.35;
         const shiftLon = (target.longitude - selectedPoint.longitude) * 0.35;
@@ -195,10 +243,21 @@ export async function generateNavigationPreview(input: {
         const revGeo = await reverseGeocode(candidatePoint.latitude, candidatePoint.longitude);
         const addressText = revGeo?.formattedAddress || '';
         const streetPart = addressText.split(',')[0]?.trim() || 'městská třída';
+        const zoning = evaluateNavigationZoning({
+          latitude: candidatePoint.latitude,
+          longitude: candidatePoint.longitude,
+          addressText,
+          city: pricingCity,
+        });
+
         selectedPoint = candidatePoint;
-        pointTitle = `Odbočovací navigační bod na ${streetPart}`;
+        pointTitle = `[${targetCircuit === 'INNER' ? 'Vnitřní okruh' : 'Vnější okruh'}] Odbočovací navigační bod na ${streetPart}`;
         pointReasons = [
-          `🛡️ Bezpečnostní filtr sítě: Bod byl automaticky přesunut z dálnice/I. třídy na městskou obslužnou komunikaci (${streetPart}).`,
+          targetCircuit === 'INNER'
+            ? '🔵 Vnitřní okruh (dojezd k prodejně).'
+            : '🟣 Vnější okruh (hlavní křižovatka a přivaděč).',
+          `🛡️ Bezpečnostní filtr sítě: Bod byl automaticky situován na městskou obslužnou komunikaci (${streetPart}) mimo dálnice a památkovou zónu.`,
+          zoning.reason,
         ];
       }
     }
@@ -219,20 +278,29 @@ export async function generateNavigationPreview(input: {
       routePolyline: isRefined ? origin.routePolyline : route?.polyline || undefined,
       routeDurationSeconds: isRefined ? origin.routeDurationSeconds : route?.durationSeconds || undefined,
       arrowDirection: isRefined ? origin.arrowDirection ?? 'STRAIGHT' as const : 'STRAIGHT' as const,
+      circuit: targetCircuit,
+      circuitLabel: targetCircuitLabel,
       reasons: pointReasons,
     };
   }));
 
   const pricedItems = items.filter((item) => item.finalPrice !== null);
   const catalogTotal = pricedItems.length === items.length ? pricedItems.reduce((sum, item) => sum + item.finalPrice!, 0) : null;
+
+  const innerCount = items.filter((item) => item.circuit === 'INNER' || (item.distanceMeters && item.distanceMeters <= 750)).length;
+  const outerCount = items.length - innerCount;
+
   const warnings = [
     'Před realizací obchodník ověří sloup VO v terénu, nahraje fotografii a případně bod posune.',
-    '🛡️ Pravidlo sítě: Navigační desky na sloupech VO nelze z legislativních a bezpečnostních důvodů umísťovat přímo na dálnicích a silnicích I. třídy (Rudná, Místecká, D1, D56). AI navrhuje body výhradně na městských třídách a odbočovacích křižovatkách.',
+    inOstrava
+      ? '🛡️ Pravidla Ostrava: Navigační desky na sloupech VO jsou povoleny v regulované zóně města (Nařízení č. 2/2020), ale je zakázáno je umísťovat v historické památkové zóně (MPZ) a na dálnicích či rychlostních tazích (Rudná, Místecká, D1, D56). Body byly navrženy na schválených městských třídách.'
+      : `🛡️ Pravidlo sítě: Navigační desky na sloupech VO nelze umísťovat přímo na dálnicích a silnicích I. třídy bez zvláštního povolení. Body byly situovány na městských obslužných komunikacích v lokalitě ${pricingCity || 'cíle'}.`,
   ];
 
   if (items.length < input.quantity) warnings.push(`AI připravila ${items.length} různých příjezdových směrů z požadovaných ${input.quantity} bodů. Další body doplní obchodník v mapě.`);
   if (!refinedPoints.length && items.some((item) => !item.routePolyline)) warnings.push('Mapa vyhledala silné rozhodovací body na městských odbočovacích trasách k prodejně.');
   if (pricingOptions.every((option) => option.total === null)) warnings.push('Pro tuto lokalitu, délku nebo segment není kompletní navigační ceník. Koncept lze vytvořit bez ceny.');
+
   return {
     mode: 'preview', offerType: 'NAVIGATION', recommendedOfferType: input.recommendedOfferType, client: input.client,
     city: pricingCity, dateFrom: input.dateFrom.toISOString().slice(0, 10), dateTo: input.dateTo.toISOString().slice(0, 10),
@@ -240,7 +308,7 @@ export async function generateNavigationPreview(input: {
     budgetDifference: catalogTotal !== null && input.request.budget ? catalogTotal - input.request.budget : null,
     warnings, candidateCount: origins.length,
     explanation: refinedPoints.length
-      ? `Vybráno ${items.length} rozhodovacích míst na městských odbočovacích trasách přímo k prodejně (mimo dálnice a I. třídy).`
-      : `Připraveny strategické navigační body na městských třídách a křižovatkách v okruhu 300m–1400m pro orientaci zákazníků.`,
+      ? `Dvouokruhový koncept: ${innerCount}× vnitřní okruh (dojezd k prodejně) a ${outerCount}× vnější okruh (příjezdové křižovatky) z mapy.`
+      : `Dvouokruhový navigační koncept (${innerCount}× vnitřní okruh do 750 m pro dojezd přímo k prodejně + ${outerCount}× vnější okruh na hlavních křižovatkách pro záchyt tranzitní dopravy).`,
   };
 }

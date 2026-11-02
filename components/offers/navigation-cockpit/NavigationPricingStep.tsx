@@ -23,18 +23,32 @@ interface NavigationPricingStepProps {
   points: DraftPoint[];
   onPointsChange: (points: DraftPoint[]) => void;
   onApplyCatalogRates: () => void;
+  onApplyCatalogRatesToPoint?: (pointId: string) => void;
   hasSelectionSubmitted?: boolean;
   rentalDuration?: RentalDurationMonths;
   onRentalDurationChange?: (months: RentalDurationMonths) => void;
+  catalogDefaults?: {
+    rentalPrice: string;
+    framePrice: string;
+    productionPrice: string;
+    installationPrice: string;
+    removalPrice: string;
+  };
+  selectedClientName?: string;
+  selectedClientSegment?: string;
 }
 
 export function NavigationPricingStep({
   points,
   onPointsChange,
   onApplyCatalogRates,
+  onApplyCatalogRatesToPoint,
   hasSelectionSubmitted,
   rentalDuration,
   onRentalDurationChange,
+  catalogDefaults,
+  selectedClientName,
+  selectedClientSegment,
 }: NavigationPricingStepProps) {
   const [internalDuration, setInternalDuration] = useState<RentalDurationMonths>(12);
   const activeDuration = rentalDuration ?? internalDuration;
@@ -83,6 +97,35 @@ export function NavigationPricingStep({
             <p className="text-xs text-slate-500 mt-0.5">
               Naceňte jednotlivé položky (nájem, rámy, tisk, montáž, demontáž) pro vybrané body trasy.
             </p>
+            {catalogDefaults && (
+              <div className="mt-2.5 inline-flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 border border-slate-200 px-3 py-1.5 text-xs text-slate-700 font-medium">
+                <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Aktivní ceník:
+                </span>
+                <span>
+                  Nájem: <strong className="font-mono text-slate-900">{Number(catalogDefaults.rentalPrice || 12000).toLocaleString('cs-CZ')} Kč/rok</strong>
+                </span>
+                <span className="text-slate-300">·</span>
+                <span>Rám: <strong className="font-mono text-slate-900">{Number(catalogDefaults.framePrice || 1960).toLocaleString('cs-CZ')} Kč</strong></span>
+                <span className="text-slate-300">·</span>
+                <span>Tisk: <strong className="font-mono text-slate-900">{Number(catalogDefaults.productionPrice || 600).toLocaleString('cs-CZ')} Kč</strong></span>
+                <span className="text-slate-300">·</span>
+                <span>Montáž: <strong className="font-mono text-slate-900">{Number(catalogDefaults.installationPrice || 800).toLocaleString('cs-CZ')} Kč</strong></span>
+                <span className="text-slate-300">·</span>
+                <span>Demontáž: <strong className="font-mono text-slate-900">{Number(catalogDefaults.removalPrice || 600).toLocaleString('cs-CZ')} Kč</strong></span>
+                {selectedClientSegment && (
+                  <span className="ml-1 rounded-md bg-purple-100 text-purple-900 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider">
+                    {selectedClientSegment}
+                  </span>
+                )}
+                {selectedClientName && (
+                  <span className="text-slate-500 text-[11px] font-normal truncate max-w-xs">
+                    ({selectedClientName})
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           <button
@@ -162,6 +205,7 @@ export function NavigationPricingStep({
                 <th className="px-3 py-3 w-24 text-right">Montáž</th>
                 <th className="px-3 py-3 w-24 text-right">Demontáž</th>
                 <th className="px-3.5 py-3 w-28 text-right font-black">Mezisoučet</th>
+                <th className="px-2 py-3 w-12 text-center" title="Načíst sazby z ceníku pro bod">Ceník</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -246,6 +290,18 @@ export function NavigationPricingStep({
                     </td>
                     <td className="px-3.5 py-2.5 text-right font-mono font-black text-slate-900">
                       {formatPrice(calc.subtotal)}
+                    </td>
+                    <td className="px-2 py-2.5 text-center">
+                      {onApplyCatalogRatesToPoint && (
+                        <button
+                          type="button"
+                          onClick={() => onApplyCatalogRatesToPoint(pt.id)}
+                          title="Načíst ceníkové sazby pro tento bod"
+                          className="inline-flex items-center justify-center p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-amber-800 hover:bg-amber-50 hover:border-amber-300 transition cursor-pointer shadow-2xs"
+                        >
+                          <Zap size={13} className="text-amber-600 fill-amber-400" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
