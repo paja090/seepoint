@@ -14,7 +14,7 @@ const FREEMAIL_DOMAINS = new Set([
   'volny.cz',
   'tiscali.cz',
   'outlook.com',
-  ' outlook.cz',
+  'outlook.cz',
   'hotmail.com',
   'live.com',
   'msn.com',
@@ -23,6 +23,18 @@ const FREEMAIL_DOMAINS = new Set([
   'yahoo.com',
   'proton.me',
   'protonmail.com',
+  'google.com',
+  'google.cz',
+  'news.google.com',
+  'bing.com',
+  'duckduckgo.com',
+  'facebook.com',
+  'instagram.com',
+  'linkedin.com',
+  'twitter.com',
+  'x.com',
+  'youtube.com',
+  'wikipedia.org',
 ]);
 
 export type ClientLogoRecord = {
@@ -49,7 +61,13 @@ export function extractClientWebsiteDomain(website?: string | null, email?: stri
       .split('?')[0]
       .split('#')[0]
       .trim();
-    if (clean && clean.includes('.') && !FREEMAIL_DOMAINS.has(clean)) {
+    if (
+      clean &&
+      clean.includes('.') &&
+      !FREEMAIL_DOMAINS.has(clean) &&
+      !clean.endsWith('.google.com') &&
+      !clean.endsWith('.google.cz')
+    ) {
       return clean;
     }
   }

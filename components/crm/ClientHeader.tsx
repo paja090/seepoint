@@ -313,14 +313,15 @@ export function ClientHeader({ client, canManageLifecycle }: { client: ClientPro
             <ClientLogoControl
               clientId={client.id}
               clientName={client.name}
+              hasCustomLogo={Boolean(client.logoDriveFileId)}
               logoUrl={
                 client.logoDriveFileId
                   ? `/api/clients/${client.id}/logo/file`
-                  : client.website && client.website.trim()
-                  ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
-                      client.website.trim().toLowerCase().replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0]
-                    )}&sz=256`
-                  : undefined
+                  : (() => {
+                      const web = client.website && client.website.trim() ? client.website.trim().toLowerCase().replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('?')[0] : '';
+                      if (!web || web.includes('google.') || web.includes('seznam.cz') || web.includes('bing.com')) return undefined;
+                      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(web)}&sz=256`;
+                    })()
               }
             />
           </div>
