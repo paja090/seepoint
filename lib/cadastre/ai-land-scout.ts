@@ -25,6 +25,9 @@ export interface AiScoutedLocation {
   estimatedMonthlyRentCzk: number;
   commercialRationale: string;
   acquisitionTip: string;
+  roadProximityMeters?: string;
+  visualAngle?: string;
+  isExtremeProximity?: boolean;
 }
 
 export interface AiPlotAnalysis {
@@ -77,6 +80,9 @@ const REGIONAL_PRESETS: Record<string, AiScoutedLocation[]> = {
       estimatedMonthlyRentCzk: 4000,
       commercialRationale: 'Silnice I. třídy I/11 – reklama na sloupech VO je zákonem 13/1997 Sb. zakázána. Umístění samostatného navigačního sloupku na přilehlém soukromém pozemku u vjezdu do areálu je legální a nabízí mimořádný dosah pro navigaci zákazníků.',
       acquisitionTip: 'Oslovit majitele přilehlého komerčního areálu – zábor je jen 0,5 m² na patku sloupku, nabídnout pasivní příjem 4 000 Kč/měsíc.',
+      roadProximityMeters: '4–7 m od krajnice I/11 (čelní plot u vjezdu)',
+      visualAngle: 'Čelní nájezdový úhel, přímá linie pohledu 180 m bez clonění',
+      isExtremeProximity: true,
     },
     {
       id: 'ova-i56-1',
@@ -93,6 +99,9 @@ const REGIONAL_PRESETS: Record<string, AiScoutedLocation[]> = {
       estimatedMonthlyRentCzk: 4500,
       commercialRationale: 'Páteřní rychlostní tah I/56 z Frýdku-Místku do centra. Komerční vjezd na soukromý pozemek přímo u sjezdové rampy zajišťuje vysoký čtecí čas.',
       acquisitionTip: 'Zdůraznit, že na silnici I. třídy nikdo jiný na sloupech VO reklamu mít nemůže, takže sloupek na soukromém pozemku je vysoce exkluzivní.',
+      roadProximityMeters: '3–6 m od odbočovacího pruhu (čelo vjezdu stanice OMV)',
+      visualAngle: 'Přední linie chodníku a vjezdu, perfektní viditelnost z aut sjíždějících z I/56',
+      isExtremeProximity: true,
     },
     {
       id: 'ova-i11-2',
@@ -109,6 +118,9 @@ const REGIONAL_PRESETS: Record<string, AiScoutedLocation[]> = {
       estimatedMonthlyRentCzk: 3500,
       commercialRationale: 'Nájezdový roh na frekventovanou I/11, zpomalení dopravy před odbočením do Vítkovic a Zábřehu.',
       acquisitionTip: 'Nabídnout majiteli pneuservisu reciproční směrovou šipku na navigačním sloupku zdarma jako součást smlouvy.',
+      roadProximityMeters: '4–8 m od krajnice I/11 (nájezdový roh pneuservisu)',
+      visualAngle: 'Přímo v zorném poli řidičů brzdících před křižovatkou Závodní',
+      isExtremeProximity: true,
     },
     {
       id: 'ova-i56-2',
@@ -125,6 +137,9 @@ const REGIONAL_PRESETS: Record<string, AiScoutedLocation[]> = {
       estimatedMonthlyRentCzk: 4200,
       commercialRationale: 'Čtyřproudý průtah s vysokou hustotou. Soukromý pozemek navazuje přímo na zpevněnou plochu mimo těleso vozovky.',
       acquisitionTip: 'Umístění do rohu oploceného areálu bez jakéhokoliv omezení manipulační plochy nebo vjezdu.',
+      roadProximityMeters: '3–5 m od obrubníku (přední plot autosalonu u sjezdu)',
+      visualAngle: 'Dlouhá pohledová rovina přes 200 m po Mariánskohorské',
+      isExtremeProximity: true,
     },
     {
       id: 'ova-i11-3',
@@ -141,6 +156,9 @@ const REGIONAL_PRESETS: Record<string, AiScoutedLocation[]> = {
       estimatedMonthlyRentCzk: 4000,
       commercialRationale: 'Masivní dopravní uzel spojující Opavu, dálnici D1 a Ostravu. Ideální pro směrovou navigaci do areálů.',
       acquisitionTip: 'Dlouhodobá smlouva na 5 let s garancí pasivního výnosu a nulové administrativy.',
+      roadProximityMeters: '5–8 m od tělesa křižovatky (roh vjezdu do nákupního areálu)',
+      visualAngle: 'Čelní pohled pro oba směry Opava <-> Ostrava bez překážek',
+      isExtremeProximity: true,
     },
     {
       id: 'ova-1',
@@ -443,6 +461,9 @@ function generateExtendedPresetFallback(cityOrArea: string, count = 8, preferred
       estimatedMonthlyRentCzk: 4500,
       commercialRationale: 'Podél silnice I. třídy je reklama na sloupech VO zákonem zakázána. Umístění navigačního sloupku na přilehlém soukromém pozemku u sjezdu/vjezdu je plně legální a zajišťuje vysokou viditelnost.',
       acquisitionTip: 'Oslovit majitele komerčního areálu – zábor patky je minimální (cca 0,5 m²), pasivní příjem 4 500 Kč/měs.',
+      roadProximityMeters: '3–6 m od krajnice I. třídy (čelní roh plotu u vjezdu)',
+      visualAngle: 'Přímý čelní pohled 180 m bez clonění pro projíždějící vozy',
+      isExtremeProximity: true,
     },
     {
       id: `gen-${Date.now()}-2`,
@@ -459,6 +480,8 @@ function generateExtendedPresetFallback(cityOrArea: string, count = 8, preferred
       estimatedMonthlyRentCzk: 5500,
       commercialRationale: 'Vysoká čelní viditelnost před vjezdem do města, dlouhý nájezdový úhel pro řidiče.',
       acquisitionTip: 'Oslovit majitele soukromého areálu na parcele – snadné schválení bez průtahů na zastupitelstvu obce.',
+      roadProximityMeters: '6–10 m od krajnice',
+      visualAngle: 'Čelní nájezdový úhel',
     },
     {
       id: `gen-${Date.now()}-3`,
@@ -475,6 +498,8 @@ function generateExtendedPresetFallback(cityOrArea: string, count = 8, preferred
       estimatedMonthlyRentCzk: 6000,
       commercialRationale: 'Zpomalení a stání vozidel na světlech zaručuje detailní zhlédnutí reklamního sdělení.',
       acquisitionTip: 'Navrhnout majiteli dlouhodobou nájemní smlouvu s pravidelnou čtvrtletní platbou předem.',
+      roadProximityMeters: '5–8 m od obrubníku',
+      visualAngle: 'Pohled přímo z čekající kolony na semaforech',
     },
     {
       id: `gen-${Date.now()}-4`,
@@ -523,6 +548,7 @@ function generateExtendedPresetFallback(cityOrArea: string, count = 8, preferred
       estimatedMonthlyRentCzk: 4800,
       commercialRationale: 'Zpomalení vozidel před kruhovým objezdem zaručuje prodloužený kontakt s reklamou.',
       acquisitionTip: 'Jednání přímo s majitelem přilehlé zahrady či dvora u obchvatu.',
+      roadProximityMeters: '4–7 m od vnější hrany okruhu',
     },
     {
       id: `gen-${Date.now()}-7`,
@@ -579,7 +605,15 @@ Zaměření vyhledávání: "${preferredFocus}".
 
 DŮLEŽITÁ PRAVIDLA PRO REKLAMNÍ POZEMKY:
 1. Zaměř se prioritně na SOUKROMÉ POZEMKY (areály firem, autoservisy, stavebniny, logistické parky, čerpací stanice, soukromé oplocené dvory u frekventovaných silnic I. a II. třídy, křižovatek či obchvatů).
-2. Pokud je zaměření "FIRST_CLASS_ROAD" (silnice I. třídy a rychlostní tahy jako např. I/11 Rudná, I/56 Místecká, I/58 Plzeňská): soustřeď se na SOUKROMÉ POZEMKY (areály firem, autoservisy, parkoviště, čerpací stanice, komerční vjezdy) bezprostředně sousedící se silnicemi I. třídy, kde zákon 13/1997 Sb. zakazuje reklamu na sloupech veřejného osvětlení (VO), ale na přilehlém soukromém pozemku lze legálně umístit SAMOSTATNÝ NAVIGAČNÍ SLOUPEK (COLUMN / orientační pylon) mimo těleso vozovky. U těchto položek nastav propertyType: "FIRST_CLASS_ROAD_CORRIDOR".
+2. KRITICKÉ PRAVIDLO PRO SILNICE I. TŘÍDY ("FIRST_CLASS_ROAD"):
+   U koridorů silnic I. třídy (např. I/11 Rudná, I/56 Místecká, I/58 Plzeňská) musí být pozemek v EXTRÉMNÍ BLÍZKOSTI k vozovce – odstup pouhých 3 až 10 metrů od krajnice (čelní plotová linie, roh komerčního vjezdu, začátek odbočovacího pruhu, okraj parkoviště sousedící s chodníkem/krajnicí).
+   DŮVOD: Řidiči jedou 50–90 km/h a navigační sloupek (COLUMN) má menší formát písma než velkoplošný bigboard – řidič musí šipku i název firmy bezpečně přečíst během jízdy! Pozemky posunuté více než 12 metrů hluboko do areálu nebo kryté stromy/valy jsou pro navigace ZCELA NEPOUŽITELNÉ.
+   U těchto položek nastav:
+   - propertyType: "FIRST_CLASS_ROAD_CORRIDOR"
+   - isExtremeProximity: true
+   - roadProximityMeters: "např. 3–7 m od krajnice I/11 (čelní plot u vjezdu)"
+   - visualAngle: "např. Přímý čelní pohled 180 m bez clonění z pravého pruhu"
+   - recommendedCarrierType: "Navigační sloupek (COLUMN) – oboustranný"
 3. Soukromé pozemky jsou pro SeePOINT mnohem lepší než městské, protože dohoda o nájmu je rychlá a přímá (nemusí se čekat na schválení rady obce a záměr §39).
 4. U každé lokality uveď reálné přibližné GPS souřadnice odpovídající danému městu/lokalitě v ČR (WGS-84).
 5. Odhadni férový měsíční nájem v CZK, který vyjednavač nabídne majiteli pozemku (obvykle 3 000 až 12 000 Kč/měsíc dle atraktivity).
@@ -601,7 +635,10 @@ Odpověz VÝHRADNĚ jako validní JSON bez markdownu kolem (žádné \`\`\`json)
     "recommendedCarrierType": "Navigační sloupek (COLUMN) | Billboard 5,1 × 2,4 m | Bigboard 9,6 × 3,6 m | LED obrazovka",
     "estimatedMonthlyRentCzk": 5000,
     "commercialRationale": "Proč je to pro inzerenty extrémně lákavé (viditelnost, kolony, nákupní spád, zákaz reklamy na VO)",
-    "acquisitionTip": "Konkrétní tip pro obchodníka, jak oslovit majitele a co mu nabídnout"
+    "acquisitionTip": "Konkrétní tip pro obchodníka, jak oslovit majitele a co mu nabídnout",
+    "roadProximityMeters": "3–7 m od krajnice vozovky (čelní plot u vjezdu)",
+    "visualAngle": "Přímý čelní pohled 180 m bez clonění pro projíždějící vozy",
+    "isExtremeProximity": true
   }
 ]`;
 

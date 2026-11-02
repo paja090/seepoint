@@ -571,14 +571,28 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
                       <div>
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-indigo-50 text-indigo-800 border border-indigo-200 mb-1">
-                              {s.propertyTypeLabel || 'Soukromý pozemek'}
-                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                              <span className="inline-block px-2 py-0.5 rounded text-[10px] font-extrabold bg-indigo-50 text-indigo-800 border border-indigo-200">
+                                {s.propertyTypeLabel || 'Soukromý pozemek'}
+                              </span>
+                              {(s.isExtremeProximity || s.roadProximityMeters || s.propertyType === 'FIRST_CLASS_ROAD_CORRIDOR') && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black bg-rose-50 text-rose-900 border border-rose-300 shadow-2xs">
+                                  <span>⚡ Extrémní blízkost:</span>
+                                  <span className="underline">{s.roadProximityMeters || '3–8 m od krajnice'}</span>
+                                </span>
+                              )}
+                            </div>
                             <h4 className="font-bold text-slate-900 text-sm leading-snug">{s.title}</h4>
                             <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
                               <MapPin size={12} className="text-slate-400" />
                               <span>{s.addressOrJunction}</span>
                             </p>
+                            {s.visualAngle && (
+                              <p className="text-[11px] text-slate-600 mt-1.5 flex items-center gap-1 font-medium bg-amber-50/70 border border-amber-200/80 px-2 py-1 rounded-lg">
+                                <span className="font-bold text-amber-900">👁️ Pohled řidiče:</span>
+                                <span>{s.visualAngle}</span>
+                              </p>
+                            )}
                           </div>
                           <div className="text-right">
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-black bg-amber-50 text-amber-800 border border-amber-200">
@@ -596,6 +610,14 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
                             <span className="text-[10px] text-slate-400 block uppercase font-bold">Férový nájem majiteli</span>
                             <span className="font-semibold text-emerald-800">💰 {s.estimatedMonthlyRentCzk?.toLocaleString('cs-CZ')} Kč/měs.</span>
                           </div>
+                          {s.roadProximityMeters && (
+                            <div className="col-span-2 pt-1 border-t border-slate-200/50 flex items-center justify-between">
+                              <span className="text-[10px] text-slate-500 font-bold uppercase">Odstup od vozovky</span>
+                              <span className="font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                📏 {s.roadProximityMeters}
+                              </span>
+                            </div>
+                          )}
                           <div className="col-span-2 pt-1 border-t border-slate-200/50">
                             <span className="text-[10px] text-slate-400 block uppercase font-bold">Doporučený nosič</span>
                             <span className="font-semibold text-indigo-900">📐 {s.recommendedCarrierType}</span>
