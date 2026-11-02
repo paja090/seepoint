@@ -661,6 +661,59 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
         </div>
       </div>
 
+      {/* 🧭 Client Point Selection & Interactive Guide */}
+      <div className="rounded-3xl border-2 border-emerald-300 bg-gradient-to-r from-emerald-50/95 via-white to-sky-50/90 p-5 sm:p-6 shadow-sm space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm font-black text-lg">
+              ✓
+            </span>
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-base font-black text-slate-950">
+                  Vyberte si navigační body do nabídky podle svých představ
+                </h3>
+                <span className={`rounded-full font-black text-xs px-2.5 py-0.5 border ${
+                  selectedPointIds.length === navigation.points.length
+                    ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                    : 'bg-amber-100 text-amber-900 border-amber-300'
+                }`}>
+                  Vybráno: {selectedPointIds.length} z {navigation.points.length} bodů
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-700 leading-relaxed max-w-3xl">
+                Nemusíte realizovat celou navrženou síť. Níže na mapě a v seznamu můžete u každého navigačního bodu kliknout na tlačítko <strong>„+ Vybrat do nabídky“</strong> nebo <strong>„✓ Vybráno v nabídce“</strong> a zvolit si pouze ty pozice, které vám vyhovují. Rozpočet a celková cena se automaticky přizpůsobí vašemu výběru.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              disabled={selectionSubmitted}
+              onClick={() => setSelectedPointIds(navigation.points.map((p) => p.id))}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3.5 py-2 text-xs font-bold text-emerald-900 hover:bg-emerald-100/70 transition shadow-2xs cursor-pointer disabled:opacity-50"
+            >
+              ✓ Označit všech {navigation.points.length} bodů
+            </button>
+            <button
+              type="button"
+              disabled={selectionSubmitted}
+              onClick={() => setSelectedPointIds([])}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs cursor-pointer disabled:opacity-50"
+            >
+              Zrušit výběr
+            </button>
+            <a
+              href="#nav-points-section"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white hover:bg-sky-700 transition shadow-xs cursor-pointer"
+            >
+              <Compass size={14} /> Přejít na výběr bodů
+            </a>
+          </div>
+        </div>
+      </div>
+
       {/* Branch Filter Tabs if multiple targets */}
       {targets.length > 1 && (
         <div className="flex items-center gap-2 flex-wrap bg-slate-100/90 border border-slate-200 p-2.5 rounded-2xl shadow-2xs">
@@ -708,7 +761,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
       )}
 
       {/* Main Interactive Google Map & Detail Panel */}
-      <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
+      <div id="nav-points-section" className="scroll-mt-6 grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
         {/* Interactive Map */}
         <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2 px-2 pt-1">
@@ -836,11 +889,13 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             <h3 className="text-base font-bold text-slate-900">
               Navigační body {targets.length > 1 && activeBranchFilter !== 'ALL' ? `pro pobočku (${displayedPoints.length})` : `v nabídce (${navigation.points.length})`}
             </h3>
-            {isLocationSelectionPhase && (
-              <span className="text-xs font-bold text-amber-700 bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg">
-                Vybráno: {selectedPointIds.length} / {navigation.points.length}
-              </span>
-            )}
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${
+              selectedPointIds.length === navigation.points.length
+                ? 'text-emerald-800 bg-emerald-100 border-emerald-300'
+                : 'text-amber-800 bg-amber-100 border-amber-300'
+            }`}>
+              Vybráno: {selectedPointIds.length} / {navigation.points.length} bodů
+            </span>
           </div>
 
           <div className="space-y-3 max-h-[620px] overflow-y-auto pr-1">

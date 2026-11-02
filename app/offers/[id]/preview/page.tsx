@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { OfferProposal } from '@/components/offer/OfferProposal';
 import { OfferProcessStepper } from '@/components/offers/OfferProcessStepper';
 import { SpecializedOfferSummary } from '@/components/offers/SpecializedOfferSummary';
+import { SpecializedOfferResponseActions } from '@/components/offers/SpecializedOfferResponseActions';
 import { OfferValidationError } from '@/lib/offers/domain';
 import { toProposalOffer } from '@/lib/offers/presentation';
 import { getOffer } from '@/lib/offers/service';
@@ -19,6 +20,10 @@ export default async function OfferPreviewPage({ params }: { params: Promise<{ i
   const user = await requirePageAccess('offers');
   try {
     const offer = await getOffer(user, (await params).id) as OfferView;
+    const navigationMode = (offer.navigation as unknown as { proposalMode?: string } | undefined)?.proposalMode;
+    const isLocationSelection = offer.offerType === 'NAVIGATION' && navigationMode !== 'PRICED_QUOTE';
+    const pointsCount = offer.navigation?.points?.length;
+
     return (
       <AppShell>
         <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -30,7 +35,26 @@ export default async function OfferPreviewPage({ params }: { params: Promise<{ i
         {(offer as unknown as { isNoPriceConcept?: boolean }).isNoPriceConcept ? (
           <CampaignConceptPublicView offer={offer} />
         ) : offer.offerType === 'NAVIGATION' || offer.offerType === 'CITY_GALLERY' ? (
-          <SpecializedOfferSummary offer={offer} />
+          <div className="space-y-6">
+            <SpecializedOfferResponseActions
+              status={offer.status}
+              token={offer.portalToken ?? offer.id!}
+              isLocationSelection={isLocationSelection}
+              offerType={offer.offerType}
+              pointsCount={pointsCount}
+              placement="top"
+            />
+            <SpecializedOfferSummary offer={offer} proposalKey={offer.portalToken ?? offer.id} />
+            <SpecializedOfferResponseActions
+              status={offer.status}
+              token={offer.portalToken ?? offer.id!}
+              isLocationSelection={isLocationSelection}
+              offerType={offer.offerType}
+              pointsCount={pointsCount}
+              placement="bottom"
+              isFooter
+            />
+          </div>
         ) : (
           <OfferProposal branding={offer.branding} offer={toProposalOffer(offer)} variant="internal" />
         )}
