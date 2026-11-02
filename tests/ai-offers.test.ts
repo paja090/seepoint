@@ -108,3 +108,126 @@ test('AI navigation points are new proposals requiring a real pole photo', () =>
   assert.match(service, /requiresSitePhoto: true/);
   assert.match(workflow, /navigationSitePhotos/);
 });
+
+test('calculateBearing and calculateTurnAngle determine truthful turn directions', async () => {
+  const { calculateBearing, calculateTurnAngle } = await import('../lib/ai-offers/route-direction-helper.ts');
+
+  // North (from 49.0, 18.0 to 49.1, 18.0)
+  const bearingNorth = calculateBearing({ latitude: 49.0, longitude: 18.0 }, { latitude: 49.1, longitude: 18.0 });
+  assert.ok(Math.abs(bearingNorth - 0) < 0.5 || Math.abs(bearingNorth - 360) < 0.5);
+
+  // East (from 49.0, 18.0 to 49.0, 18.1)
+  const bearingEast = calculateBearing({ latitude: 49.0, longitude: 18.0 }, { latitude: 49.0, longitude: 18.1 });
+  assert.ok(Math.abs(bearingEast - 90) < 1.0);
+
+  // Turn North to East -> Right turn (+90 deg)
+  const turnRight = calculateTurnAngle(bearingNorth, bearingEast);
+  assert.ok(turnRight > 80 && turnRight < 100);
+
+  // Turn North to West -> Left turn (-90 deg)
+  const bearingWest = calculateBearing({ latitude: 49.0, longitude: 18.0 }, { latitude: 49.0, longitude: 17.9 });
+  const turnLeft = calculateTurnAngle(bearingNorth, bearingWest);
+  assert.ok(turnLeft < -80 && turnLeft > -100);
+});
+
+test('inferArrowDirectionFromRoute determines LEFT, RIGHT and STRAIGHT accurately', async () => {
+  const { inferArrowDirectionFromRoute, encodePolylinePoints } = await import('../lib/ai-offers/route-direction-helper.ts');
+
+  const origin = { latitude: 49.8355, longitude: 18.2925 };
+  const targetEast = { latitude: 49.8365, longitude: 18.3100 };
+  const targetWest = { latitude: 49.8365, longitude: 18.2750 };
+  const targetNorth = { latitude: 49.8500, longitude: 18.2925 };
+
+  // Polyline 1: starts North, then turns East (Right)
+  const rightPolyline = encodePolylinePoints([
+    origin,
+    { latitude: 49.8360, longitude: 18.2925 },
+    { latitude: 49.8360, longitude: 18.2950 },
+    targetEast,
+  ]);
+  const rightTurn = inferArrowDirectionFromRoute(origin, targetEast, rightPolyline);
+  assert.equal(rightTurn.arrowDirection, 'RIGHT');
+  assert.equal(rightTurn.turnText, 'vpravo');
+
+  // Polyline 2: starts North, then turns West (Left)
+  const leftPolyline = encodePolylinePoints([
+    origin,
+    { latitude: 49.8360, longitude: 18.2925 },
+    { latitude: 49.8360, longitude: 18.2900 },
+    targetWest,
+  ]);
+  const leftTurn = inferArrowDirectionFromRoute(origin, targetWest, leftPolyline);
+  assert.equal(leftTurn.arrowDirection, 'LEFT');
+  assert.equal(leftTurn.turnText, 'vlevo');
+
+  // Polyline 3: continues straight North
+  const straightPolyline = encodePolylinePoints([
+    origin,
+    { latitude: 49.8370, longitude: 18.2925 },
+    { latitude: 49.8400, longitude: 18.2925 },
+    targetNorth,
+  ]);
+  const straight = inferArrowDirectionFromRoute(origin, targetNorth, straightPolyline);
+  assert.equal(straight.arrowDirection, 'STRAIGHT');
+  assert.equal(straight.turnText, 'rovně');
+});
+
+test('formatNavigationPointDetails produces truthful title and descriptions', async () => {
+  const { formatNavigationPointDetails } = await import('../lib/ai-offers/route-direction-helper.ts');
+
+  // Inner circuit right turn
+  const innerResult = formatNavigationPointDetails({
+    circuit: 'INNER',
+    streetPart: 'Výstavní',
+    arrowDirection: 'RIGHT',
+    turnText: 'vpravo',
+    turnVerb: 'Odbočení vpravo',
+    distanceMeters: 450,
+    zoning: { isAllowed: true, reason: 'Povoleno', isRegulatedZone: true },
+  });
+  assert.match(innerResult.title, /\[Vnitřní okruh\] Odbočení vpravo na Výstavní \(450 m\)/);
+  assert.ok(innerResult.reasons.some((r) => r.includes('Vnitřní okruh (dojezd)')));
+  assert.ok(innerResult.reasons.some((r) => r.includes('Směrové rčení: Odbočení vpravo (vpravo) na Výstavní')));
+
+  // Outer circuit left turn
+  const outerResult = formatNavigationPointDetails({
+    circuit: 'OUTER',
+    streetPart: 'Opavská',
+    arrowDirection: 'LEFT',
+    turnText: 'vlevo',
+    turnVerb: 'Odbočení vlevo',
+    distanceMeters: 1400,
+    zoning: { isAllowed: true, reason: 'Povoleno', isRegulatedZone: false },
+  });
+  assert.match(outerResult.title, /\[Vnější okruh\] Odbočení vlevo na Opavská \(1,4 km\)/);
+  assert.ok(outerResult.reasons.some((r) => r.includes('Vnější okruh (hlavní tah)')));
+
+  // Prohibited zone
+  const prohibitedResult = formatNavigationPointDetails({
+    circuit: 'INNER',
+    streetPart: 'Masarykovo náměstí',
+    arrowDirection: 'STRAIGHT',
+    turnText: 'rovně',
+    turnVerb: 'Pokračovat rovně',
+    distanceMeters: 300,
+    zoning: { isAllowed: false, reason: 'Památková zóna MPZ', isRegulatedZone: true, badge: '🏛️ Památková zóna (MPZ)' },
+  });
+  assert.match(prohibitedResult.title, /🏛️ Památková zóna \(MPZ\)/);
+  assert.ok(prohibitedResult.reasons.some((r) => r.includes('Památková zóna MPZ')));
+});
+
+test('AiOfferGeneratorModal contains dedicated AI re-analysis button and live route recalculation', () => {
+  const modal = readFileSync(new URL('../components/offers/AiOfferGeneratorModal.tsx', import.meta.url), 'utf8');
+  assert.match(modal, /handleReanalyzeWithAi/);
+  assert.match(modal, /✨ Znovu AI: Zkontrolovat a přepočítat trasy & směry/);
+  assert.match(modal, /fetchRouteForPoint/);
+  assert.match(modal, /inferArrowDirectionFromRoute/);
+  assert.match(modal, /formatNavigationPointDetails/);
+});
+
+test('NavigationOfferCockpit recalculates routes and arrow directions truthfully', () => {
+  const cockpit = readFileSync(new URL('../components/offers/navigation-cockpit/NavigationOfferCockpit.tsx', import.meta.url), 'utf8');
+  assert.match(cockpit, /inferArrowDirectionFromRoute/);
+  assert.match(cockpit, /recalculateAllRoutes/);
+  assert.match(cockpit, /handlePointMove/);
+});

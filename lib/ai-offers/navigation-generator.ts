@@ -3,12 +3,12 @@ import { OfferValidationError } from '@/lib/offers/domain';
 import { resolveCatalogPrice } from './price-resolver';
 import { haversineMeters } from './scoring';
 import type { AiNavigationPointInput, AiOfferPreview, AiOfferRequest, AiResolvedClient } from './types';
+import { evaluateNavigationZoning, isCityOstrava } from './navigation-constraints';
 import {
-  evaluateNavigationZoning,
-  isCityOstrava,
-  isOstravaRestrictedZone,
-  isRestrictedHighwayOr1stClassRoad,
-} from './navigation-constraints';
+  decodePolylinePoints,
+  inferArrowDirectionFromRoute,
+  formatNavigationPointDetails,
+} from './route-direction-helper';
 
 export {
   evaluateNavigationZoning,
@@ -16,6 +16,12 @@ export {
   isOstravaRestrictedZone,
   isRestrictedHighwayOr1stClassRoad,
 } from './navigation-constraints';
+export {
+  decodePolylinePoints,
+  inferArrowDirectionFromRoute,
+  formatNavigationDistance,
+  formatNavigationPointDetails,
+} from './route-direction-helper';
 
 const pricedMountingTypes = ['LIGHT_POLE', 'TRACTION', 'COLUMN'] as const;
 const mountingLabels: Record<(typeof pricedMountingTypes)[number], string> = {
@@ -66,41 +72,6 @@ function isRefinedPoint(point: AiNavigationPointInput | ApproachOrigin): point i
   return 'title' in point && typeof point.title === 'string' && point.title.length > 0;
 }
 
-function decodePolylinePoints(encoded: string): Array<{ latitude: number; longitude: number }> {
-  if (!encoded) return [];
-  let index = 0;
-  let lat = 0;
-  let lng = 0;
-  const coordinates: Array<{ latitude: number; longitude: number }> = [];
-
-  while (index < encoded.length) {
-    let result = 0;
-    let shift = 0;
-    let b: number;
-    do {
-      b = encoded.charCodeAt(index++) - 63;
-      result |= (b & 0x1f) << shift;
-      shift += 5;
-    } while (b >= 0x20 && index < encoded.length);
-    const dlat = (result & 1) ? ~(result >> 1) : (result >> 1);
-    lat += dlat;
-
-    result = 0;
-    shift = 0;
-    do {
-      b = encoded.charCodeAt(index++) - 63;
-      result |= (b & 0x1f) << shift;
-      shift += 5;
-    } while (b >= 0x20 && index < encoded.length);
-    const dlng = (result & 1) ? ~(result >> 1) : (result >> 1);
-    lng += dlng;
-
-    coordinates.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
-  }
-
-  return coordinates;
-}
-
 async function resolvePricingOptions(input: {
   pricingSegment: AiResolvedClient['pricingSegment']; city: string; effectiveDate: Date; durationMonths: number;
 }) {
@@ -133,7 +104,6 @@ export async function generateNavigationPreview(input: {
 
   // Two-tier circuit quota: inner circuit (dojezd do 750m) vs outer circuit (křižovatky nad 1000m)
   const innerQuota = Math.max(1, Math.floor(input.quantity / 2));
-  const outerQuota = input.quantity - innerQuota;
 
   // Search origins in urban radius of 2.0 - 4.5 km to capture high-traffic intersections further out
   const radius = Math.min(4500, Math.max(2000, (input.request.maxRadiusKm ?? 4) * 1000));
@@ -147,9 +117,19 @@ export async function generateNavigationPreview(input: {
 
   const items = await Promise.all(proposed.map(async (origin, index) => {
     const isRefined = isRefinedPoint(origin);
-    const route = isRefined ? null : await computeGoogleRoute(origin, target);
-    const direction = 'direction' in origin ? origin.direction : '';
     let selectedPoint = { latitude: origin.latitude, longitude: origin.longitude };
+
+    // Compute route to target for refined/moved points if polyline is missing, or compute route from scratch
+    const route = isRefined && origin.routePolyline
+      ? {
+          status: 'OK' as const,
+          distanceMeters: origin.distanceMeters ?? haversineMeters(selectedPoint, target),
+          durationSeconds: origin.routeDurationSeconds ?? 0,
+          polyline: origin.routePolyline,
+        }
+      : await computeGoogleRoute(selectedPoint, target);
+
+    const direction = 'direction' in origin ? origin.direction : '';
 
     // Determine target circuit role for this item slot
     const isInnerSlot = index < innerQuota;
@@ -157,10 +137,14 @@ export async function generateNavigationPreview(input: {
     let targetCircuitLabel = isInnerSlot ? 'Vnitřní okruh (dojezd k prodejně)' : 'Vnější okruh (hlavní křižovatka / tah)';
 
     if (isRefined) {
-      const refinedDist = origin.distanceMeters ?? haversineMeters(selectedPoint, target);
+      const refinedDist = origin.distanceMeters ?? (route?.distanceMeters || haversineMeters(selectedPoint, target));
       targetCircuit = origin.circuit ?? (refinedDist <= 750 ? 'INNER' : 'OUTER');
       targetCircuitLabel = origin.circuitLabel ?? (targetCircuit === 'INNER' ? 'Vnitřní okruh (dojezd k prodejně)' : 'Vnější okruh (hlavní křižovatka / tah)');
     }
+
+    const routePoly = route?.polyline || (isRefined ? origin.routePolyline : undefined);
+    const inferred = inferArrowDirectionFromRoute(selectedPoint, target, routePoly);
+    let resolvedArrow = isRefined && origin.arrowDirection ? origin.arrowDirection : inferred.arrowDirection;
 
     let pointTitle = isRefined ? origin.title : `[${targetCircuit === 'INNER' ? 'Vnitřní okruh' : 'Vnější okruh'}] Městská příjezdová trasa od ${direction}`;
     let pointReasons: string[] = isRefined ? origin.reasons : [
@@ -210,24 +194,24 @@ export async function generateNavigationPreview(input: {
           selectedPoint = candidate;
           foundValidPoint = true;
           const distMeters = haversineMeters(candidate, target);
-          const distKm = (distMeters / 1000).toFixed(1);
           const streetPart = addressText.split(',')[0]?.trim() || '';
 
-          if (streetPart && !/č\.p\.|ostrava|česko/i.test(streetPart)) {
-            pointTitle = isInnerSlot
-              ? `[Vnitřní okruh] Příjezd k provozovně – ${streetPart} (${Math.round(distMeters)} m)`
-              : `[Vnější okruh] Hlavní křižovatka – ${streetPart} (${distKm} km, od ${direction})`;
+          const candidateInferred = inferArrowDirectionFromRoute(candidate, target, route.polyline);
+          resolvedArrow = candidateInferred.arrowDirection;
 
-            pointReasons = [
-              isInnerSlot
-                ? `🔵 Vnitřní okruh (dojezd): Klíčové místo pro finální odbočení řidiče k cíli bez bloudění.`
-                : `🟣 Vnější okruh (tranzit): Bod zachycuje vysoký průjezd aut na městské třídě ${streetPart} ve vzdálenosti cca ${distKm} km od cíle.`,
-              zoning.reason,
-              isInnerSlot
-                ? `Vzdálenost ${Math.round(distMeters)} m před cílem.`
-                : `Vzdálenost cca ${distKm} km před cílem (příjezd od ${direction}).`,
-            ];
-          }
+          const formatted = formatNavigationPointDetails({
+            circuit: isInnerSlot ? 'INNER' : 'OUTER',
+            streetPart,
+            arrowDirection: resolvedArrow,
+            turnText: candidateInferred.turnText,
+            turnVerb: candidateInferred.turnVerb,
+            distanceMeters: distMeters,
+            zoning,
+            index: index + 1,
+          });
+
+          pointTitle = formatted.title;
+          pointReasons = formatted.reasons;
           break;
         }
       }
@@ -251,20 +235,32 @@ export async function generateNavigationPreview(input: {
         });
 
         selectedPoint = candidatePoint;
-        pointTitle = `[${targetCircuit === 'INNER' ? 'Vnitřní okruh' : 'Vnější okruh'}] Odbočovací navigační bod na ${streetPart}`;
+        const distMeters = haversineMeters(candidatePoint, target);
+        const formatted = formatNavigationPointDetails({
+          circuit: targetCircuit,
+          streetPart,
+          arrowDirection: resolvedArrow,
+          turnText: inferred.turnText,
+          turnVerb: inferred.turnVerb,
+          distanceMeters: distMeters,
+          zoning,
+          index: index + 1,
+        });
+        pointTitle = formatted.title;
         pointReasons = [
-          targetCircuit === 'INNER'
-            ? '🔵 Vnitřní okruh (dojezd k prodejně).'
-            : '🟣 Vnější okruh (hlavní křižovatka a přivaděč).',
+          ...formatted.reasons,
           `🛡️ Bezpečnostní filtr sítě: Bod byl automaticky situován na městskou obslužnou komunikaci (${streetPart}) mimo dálnice a památkovou zónu.`,
-          zoning.reason,
         ];
       }
     }
 
     const mountingType = input.request.candidateMountingTypes?.[origin.id];
     const selectedPricing = pricingOptions.find((option) => option.mountingType === mountingType);
-    const distance = isRefined ? origin.distanceMeters ?? haversineMeters(selectedPoint, target) : haversineMeters(selectedPoint, target);
+    const distance = route?.distanceMeters && route.distanceMeters > 0
+      ? route.distanceMeters
+      : isRefined && origin.distanceMeters
+      ? origin.distanceMeters
+      : haversineMeters(selectedPoint, target);
 
     return {
       selectionId: origin.id, surfaceId: null, carrierId: '', carrierCode: `NAV-${index + 1}`,
@@ -275,9 +271,9 @@ export async function generateNavigationPreview(input: {
       price: selectedPricing?.componentPrices.RENTAL ?? null, componentPrices: selectedPricing?.componentPrices,
       mountingType: mountingType ?? null, pricingOptions,
       score: isRefined ? origin.score : 92, distanceMeters: distance,
-      routePolyline: isRefined ? origin.routePolyline : route?.polyline || undefined,
-      routeDurationSeconds: isRefined ? origin.routeDurationSeconds : route?.durationSeconds || undefined,
-      arrowDirection: isRefined ? origin.arrowDirection ?? 'STRAIGHT' as const : 'STRAIGHT' as const,
+      routePolyline: routePoly,
+      routeDurationSeconds: route?.durationSeconds || (isRefined ? origin.routeDurationSeconds : undefined),
+      arrowDirection: resolvedArrow,
       circuit: targetCircuit,
       circuitLabel: targetCircuitLabel,
       reasons: pointReasons,
