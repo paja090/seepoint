@@ -52,3 +52,19 @@ test('3. AI Land Scout general locations also include private commercial corrido
   assert.ok(generalLocations.every((l) => l.visibilityScore >= 8));
   assert.ok(generalLocations.every((l) => l.estimatedMonthlyRentCzk > 0));
 });
+
+test('4. 1st-class road locations must be in extreme proximity (3-10m) to roadway edge for navigation visibility', async () => {
+  const locations = await scoutAdvertisingLocationsAi('Ostrava', 'FIRST_CLASS_ROAD', 6);
+  const firstClass = locations.filter((loc) => loc.propertyType === 'FIRST_CLASS_ROAD_CORRIDOR');
+  assert.ok(firstClass.length > 0, 'Should find 1st class road locations');
+
+  for (const loc of firstClass) {
+    assert.equal(loc.isExtremeProximity, true, 'Location must be marked with isExtremeProximity');
+    assert.ok(loc.roadProximityMeters, 'Location must specify road proximity in meters');
+    assert.ok(
+      loc.roadProximityMeters.includes('m od') || loc.roadProximityMeters.includes('krajnice') || loc.roadProximityMeters.includes('obrubníku'),
+      'Must describe distance from curb or roadway edge'
+    );
+    assert.ok(loc.visualAngle, 'Location must specify visual angle/line of sight for moving traffic');
+  }
+});

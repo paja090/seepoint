@@ -393,3 +393,71 @@ test('24. Oficiální polygonová vrstva NPÚ pro Městské památkové zóny (M
   assert.equal(isOstravaHistoricalHeritageZone(49.7800, 18.2000), false);
 });
 
+test('25. Plánování montáže: Výchozí filtr "active" zobrazuje pouze body bez nahrané fotodokumentace', () => {
+  type MockPoint = {
+    id: string;
+    orderId: string;
+    hasPhoto: boolean;
+    isOrderComplete: boolean;
+    plannedInstallationAt: string | null;
+    installerId: string | null;
+  };
+
+  const points: MockPoint[] = [
+    // Zakázka 1 (stará, kompletně hotová s fotkami)
+    { id: 'p1', orderId: 'ord-old-1', hasPhoto: true, isOrderComplete: true, plannedInstallationAt: '2025-01-10', installerId: 'inst-1' },
+    { id: 'p2', orderId: 'ord-old-1', hasPhoto: true, isOrderComplete: true, plannedInstallationAt: '2025-01-10', installerId: 'inst-1' },
+    // Zakázka 2 (aktivní, částečně namontovaná: 1 bod má fotku, 1 bod ještě nemá fotku)
+    { id: 'p3', orderId: 'ord-active-2', hasPhoto: true, isOrderComplete: false, plannedInstallationAt: '2026-11-01', installerId: 'inst-2' },
+    { id: 'p4', orderId: 'ord-active-2', hasPhoto: false, isOrderComplete: false, plannedInstallationAt: '2026-11-03', installerId: 'inst-2' },
+    // Zakázka 3 (zbrusu nová, nenaplánovaná, žádná fotka)
+    { id: 'p5', orderId: 'ord-new-3', hasPhoto: false, isOrderComplete: false, plannedInstallationAt: null, installerId: null },
+  ];
+
+  // Filtrovací logika odpovídající InstallationPlanningView.tsx (statusFilter === 'active')
+  const activePoints = points.filter((p) => !p.hasPhoto);
+
+  assert.equal(activePoints.length, 2, 'Ve výchozím zobrazení mají zůstat pouze 2 body čekající na fotodokumentaci');
+  assert.deepEqual(activePoints.map((p) => p.id), ['p4', 'p5']);
+  assert.ok(!activePoints.some((p) => p.orderId === 'ord-old-1'), 'Hotová zakázka ord-old-1 nesmí být ve výchozím plánování');
+});
+
+test('26. Plánování montáže: Filtry pro "Nenaplánované", "V terénu" a "Hotové (s fotodokumentací)"', () => {
+  const points = [
+    { id: 'p1', hasPhoto: true, plannedInstallationAt: '2025-01-10', installerId: 'inst-1' },
+    { id: 'p2', hasPhoto: false, plannedInstallationAt: '2026-11-03', installerId: 'inst-2' },
+    { id: 'p3', hasPhoto: false, plannedInstallationAt: null, installerId: null },
+  ];
+
+  const unplannedPoints = points.filter((p) => !p.hasPhoto && (!p.plannedInstallationAt || !p.installerId));
+  const plannedPoints = points.filter((p) => !p.hasPhoto && Boolean(p.plannedInstallationAt));
+  const completedPoints = points.filter((p) => p.hasPhoto);
+
+  assert.equal(unplannedPoints.length, 1);
+  assert.equal(unplannedPoints[0].id, 'p3');
+
+  assert.equal(plannedPoints.length, 1);
+  assert.equal(plannedPoints[0].id, 'p2');
+
+  assert.equal(completedPoints.length, 1);
+  assert.equal(completedPoints[0].id, 'p1');
+});
+
+test('27. Hromadná akce "⚡ Celá zakázka" vybere pouze body zakázky bez nahrané fotky', () => {
+  const orderPoints = [
+    { id: 'p1', orderId: 'ord-100', hasPhoto: true },
+    { id: 'p2', orderId: 'ord-100', hasPhoto: false },
+    { id: 'p3', orderId: 'ord-100', hasPhoto: false },
+  ];
+
+  const targetOrderId = 'ord-100';
+  const selectedForOrder = orderPoints
+    .filter((p) => p.orderId === targetOrderId && !p.hasPhoto)
+    .map((p) => p.id);
+
+  assert.equal(selectedForOrder.length, 2);
+  assert.deepEqual(selectedForOrder, ['p2', 'p3']);
+  assert.ok(!selectedForOrder.includes('p1'), 'Již namontovaný bod s fotkou p1 nesmí být vybrán pro přeplánování');
+});
+
+
