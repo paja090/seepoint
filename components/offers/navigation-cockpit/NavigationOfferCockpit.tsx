@@ -5,9 +5,16 @@ import { useRouter } from 'next/navigation';
 import type { OfferView } from '@/lib/offers/view-model';
 import { NavigationSignVisualizer } from '@/components/navigation-documentation/NavigationSignVisualizer';
 import { compressImageFile } from '@/lib/image-compress';
-import { isRestrictedHighwayOr1stClassRoad, isOstravaRestrictedZone } from '@/lib/ai-offers/navigation-constraints';
+import {
+  isRestrictedHighwayOr1stClassRoad,
+  isOstravaRestrictedZone,
+  evaluateNavigationZoning,
+} from '@/lib/ai-offers/navigation-constraints';
 import { formatNavigationPositionName } from '@/lib/navigation/navigation-naming';
-import { inferArrowDirectionFromRoute } from '@/lib/ai-offers/route-direction-helper';
+import {
+  inferArrowDirectionFromRoute,
+  formatNavigationPointDetails,
+} from '@/lib/ai-offers/route-direction-helper';
 import {
   CARRIER_PIN_COLORS,
   detectCarrierCategory,
@@ -430,17 +437,24 @@ export function NavigationOfferCockpit({
     return {};
   }
 
-  // Recalculate routes for all points
+  // Recalculate routes, directions, zoning, and naming for all points (AI Kontrola)
   async function recalculateAllRoutes(targetList = targets) {
     setRecalculatingRoutes(true);
-    setMessage('Přepočítávám trasy ze všech bodů k cílovým prodejnám...');
+    setMessage('✨ AI kontrola: Přepočítávám reálné trasy, směrové šipky a ověřuji zóny...');
     try {
+      let zoningAlertCount = 0;
       const updated = await Promise.all(
-        points.map(async (p) => {
+        points.map(async (p, idx) => {
           const ptTarget = targetList.find((t) => t.id === p.targetId) || targetList[0];
           if (!ptTarget?.latitude || !ptTarget?.longitude) return p;
+
+          // 1. Driving route calculation
           const info = await fetchRouteInfo(p.latitude, p.longitude, ptTarget.latitude, ptTarget.longitude);
+
+          // 2. Truthful arrow direction from geometry
           let arrowDir = p.arrowDirectionEnum;
+          let turnText: 'vpravo' | 'vlevo' | 'rovně' = 'rovně';
+          let turnVerb = 'Pokračovat rovně';
           if (info.routePolyline) {
             const inferred = inferArrowDirectionFromRoute(
               { latitude: p.latitude, longitude: p.longitude },
@@ -448,15 +462,89 @@ export function NavigationOfferCockpit({
               info.routePolyline
             );
             arrowDir = inferred.arrowDirection;
+            turnText = inferred.turnText;
+            turnVerb = inferred.turnVerb;
           }
-          return { ...p, ...info, ...(arrowDir ? { arrowDirectionEnum: arrowDir } : {}) };
+
+          // 3. Address resolution
+          let addr = p.address;
+          if (!addr) {
+            addr = await reverseGeocodeLocation(p.latitude, p.longitude);
+          }
+          const streetPart = addr ? addr.split(',')[0]?.trim() : (city || 'město');
+
+          // 4. Municipal zoning evaluation
+          const zoning = evaluateNavigationZoning({
+            latitude: p.latitude,
+            longitude: p.longitude,
+            addressText: addr || streetPart,
+            city,
+          });
+          if (!zoning.isAllowed) {
+            zoningAlertCount++;
+          }
+
+          // 5. Real road distance & canonical label
+          const distMeters = info.calculatedDistanceMeters ?? p.calculatedDistanceMeters;
+          const canonicalLabel = formatNavigationPositionName({
+            positionNumber: idx + 1,
+            street: streetPart,
+            city,
+            distanceMeters: distMeters,
+            direction: turnText,
+          });
+
+          // 6. Circuit tagging and truthful rationale
+          const simpleArrow: 'LEFT' | 'RIGHT' | 'STRAIGHT' =
+            arrowDir === 'LEFT' || arrowDir === 'SLANTED_LEFT'
+              ? 'LEFT'
+              : arrowDir === 'RIGHT' || arrowDir === 'SLANTED_RIGHT'
+              ? 'RIGHT'
+              : 'STRAIGHT';
+
+          const circuit = (distMeters || 1000) <= 750 ? 'INNER' : 'OUTER';
+          const details = formatNavigationPointDetails({
+            circuit,
+            streetPart,
+            arrowDirection: simpleArrow,
+            turnText,
+            turnVerb,
+            distanceMeters: distMeters || 0,
+            zoning,
+            index: idx + 1,
+          });
+
+          const circuitBadge = circuit === 'INNER' ? '🔵 Vnitřní okruh (dojezd)' : '🟣 Vnější okruh (hlavní tah)';
+          const updatedClientNote = p.clientNote && !p.clientNote.includes('okruh')
+            ? `${circuitBadge}: ${p.clientNote} · ${details.reasons[1]}`
+            : details.reasons.join(' · ');
+
+          return {
+            ...p,
+            ...info,
+            address: addr || p.address,
+            label: canonicalLabel,
+            clientNote: updatedClientNote,
+            ...(arrowDir ? { arrowDirectionEnum: arrowDir } : {}),
+            targetId: ptTarget.id,
+            targetLatitude: ptTarget.latitude,
+            targetLongitude: ptTarget.longitude,
+          };
         })
       );
       setPoints(updated);
-      setMessage('✓ Všechny trasy, vzdálenosti a směry byly úspěšně přepočítány.');
       setHasUnsavedChanges(true);
+      if (zoningAlertCount > 0) {
+        setMessage(
+          `⚠️ AI zkontrolovala všech ${updated.length} bodů: trasy, směrové šipky a vzdálenosti byly aktualizovány. Pozor: ${zoningAlertCount} bodů leží v regulované/historické zóně města!`
+        );
+      } else {
+        setMessage(
+          `✓ AI zkontrolovala všech ${updated.length} bodů: trasy, směrové šipky (vpravo/vlevo/rovně), vzdálenosti i směrová rčení byla úspěšně aktualizována podle pravdy.`
+        );
+      }
     } catch {
-      setMessage('Chyba při přepočtu tras.');
+      setMessage('Chyba při AI kontrole tras a směrových rčení.');
     } finally {
       setRecalculatingRoutes(false);
     }
