@@ -8,11 +8,13 @@ export function ClientLogoControl({
   clientId,
   clientName,
   logoUrl,
+  hasCustomLogo,
   compact = false,
 }: {
   clientId: string;
   clientName: string;
   logoUrl?: string;
+  hasCustomLogo?: boolean;
   compact?: boolean;
 }) {
   const router = useRouter();
@@ -86,12 +88,14 @@ export function ClientLogoControl({
           onChange={() => void upload()}
           type="file"
         />
-        <div className="flex gap-2">
-          {logoUrl && (
-            <button className="text-[11px] font-semibold text-red-600" disabled={busy} onClick={() => void remove()} type="button">
+        <div className="flex items-center gap-2">
+          {hasCustomLogo ? (
+            <button className="text-[11px] font-semibold text-red-600 hover:text-red-500 cursor-pointer" disabled={busy} onClick={() => void remove()} type="button">
               Odstranit
             </button>
-          )}
+          ) : logoUrl ? (
+            <span className="text-[10px] text-slate-400">Ikona z webu</span>
+          ) : null}
           <span className="text-[11px] text-slate-400">max. 10 MB</span>
         </div>
         {message && (

@@ -80,9 +80,28 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('clients'); if (isApiDenied(auth)) return auth;
   const id = (await params).id;
-  const client = await prisma.client.findUnique({ where: { id }, select: { logoDriveFileId: true } });
+  const client = await prisma.client.findUnique({
+    where: { id },
+    select: { id: true, organizationId: true, companyId: true, normalizedName: true, logoDriveFileId: true },
+  });
   if (!client) return NextResponse.json({ error: 'Klient nebyl nalezen.' }, { status: 404 });
   await prisma.client.update({ where: { id }, data: { logoDriveFileId: null, logoFileName: null, logoMimeType: null, logoUpdatedAt: null } });
+
+  // Also synchronize logo removal onto any duplicate client records in the same org
+  const siblingOr: Array<Record<string, unknown>> = [];
+  if (client.companyId) siblingOr.push({ companyId: client.companyId });
+  if (client.normalizedName) siblingOr.push({ normalizedName: client.normalizedName });
+  if (siblingOr.length > 0) {
+    await prisma.client.updateMany({
+      where: {
+        organizationId: client.organizationId,
+        id: { not: id },
+        OR: siblingOr,
+      },
+      data: { logoDriveFileId: null, logoFileName: null, logoMimeType: null, logoUpdatedAt: null },
+    }).catch((syncErr) => console.warn('[client-logo] Sibling delete sync failed', syncErr));
+  }
+
   if (client.logoDriveFileId && !client.logoDriveFileId.startsWith('data:')) {
     await deletePhotoFromGoogleDrive(client.logoDriveFileId).catch(() => undefined);
   }
