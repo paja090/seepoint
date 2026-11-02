@@ -46,18 +46,62 @@ type AresData = {
   address?: string;
 };
 
+function formatAiEnrichmentNote(data: AiEnrichmentData, existingNote?: string | null): string {
+  const parts: string[] = [];
+  const dateStr = new Date().toLocaleDateString('cs-CZ');
+  parts.push(`🤖 AI PROFIL & STRATEGIE SEEPOINT (${dateStr}):`);
+  if (data.businessField) parts.push(`• Obor činnosti: ${data.businessField}`);
+  if (data.companySummary) parts.push(`• Profil firmy: ${data.companySummary}`);
+  if (data.executives) parts.push(`• Vedení / Jednatelé: ${data.executives}`);
+
+  if (data.msRegionBranches && data.msRegionBranches.length > 0) {
+    parts.push(`\n🏬 POBOČKY A PRODEJNY V MS KRAJI:`);
+    data.msRegionBranches.forEach((b) => {
+      const addr = [b.street, b.city].filter(Boolean).join(', ');
+      parts.push(`  - ${b.name}${addr ? ` (${addr})` : ''}`);
+    });
+  }
+
+  if (data.salesAdvice && data.salesAdvice.length > 0) {
+    parts.push(`\n💡 TIPY PRO OBCHODNÍKA (MS KRAJ):`);
+    data.salesAdvice.forEach((tip) => parts.push(`  - ${tip}`));
+  }
+
+  if (data.recommendedCarriers && data.recommendedCarriers.length > 0) {
+    parts.push(`\n🎯 DOPORUČENÁ REKLAMNÍ STRATEGIE SEEPOINT (OSTRAVA & MS KRAJ):`);
+    data.recommendedCarriers.forEach((rec) => parts.push(`  - [${rec.type}]: ${rec.reason}`));
+  }
+
+  const newAiSection = parts.join('\n');
+
+  if (!existingNote || !existingNote.trim()) {
+    return newAiSection;
+  }
+
+  // Remove previous AI section if present to avoid piling up duplicate old AI notes
+  const manualNote = existingNote
+    .replace(/🤖\s*AI PROFIL[\s\S]*?(?=(\n\n[^\n•\s\d💡🎯🏬-]|\n\nPoznámka|$))/gi, '')
+    .trim();
+
+  return manualNote ? `${manualNote}\n\n${newAiSection}` : newAiSection;
+}
+
 export function ClientAiEnrichCard({
   clientId,
   clientName,
   companyId,
   dic,
   website,
+  initialNote,
+  initialContactPerson,
 }: {
   clientId: string;
   clientName: string;
   companyId?: string | null;
   dic?: string | null;
   website?: string | null;
+  initialNote?: string | null;
+  initialContactPerson?: string | null;
 }) {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -124,6 +168,14 @@ export function ClientAiEnrichCard({
         normWeb = 'https://' + normWeb;
       }
 
+      const fullFormattedNote = enrichData
+        ? formatAiEnrichmentNote(enrichData, initialNote)
+        : undefined;
+
+      const primaryContactPerson = enrichData?.contactPersons?.[0]
+        ? `${enrichData.contactPersons[0].firstName} ${enrichData.contactPersons[0].lastName}${enrichData.contactPersons[0].title ? ` (${enrichData.contactPersons[0].title})` : ''}`
+        : undefined;
+
       const res = await fetch(`/api/crm/clients/${clientId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -138,19 +190,73 @@ export function ClientAiEnrichCard({
           website: normWeb,
           email: enrichData?.foundEmail || undefined,
           phone: enrichData?.foundPhone || undefined,
-          note: enrichData?.companySummary ? enrichData.companySummary : undefined,
+          contactPerson: initialContactPerson || primaryContactPerson || undefined,
+          note: fullFormattedNote || (enrichData?.companySummary ? enrichData.companySummary : undefined),
         }),
       });
 
       const resData = await res.json();
       if (!res.ok) {
         alert(resData.error || 'Chyba při ukládání do profilu klienta.');
-      } else {
-        setSavedProfileMsg('✅ Údaje byly úspěšně uloženy do profilu klienta v CRM.');
-        setTimeout(() => {
-          window.location.reload();
-        }, 1200);
+        return;
       }
+
+      // Also automatically save all branches into CRM
+      let savedBranchesCount = 0;
+      if (enrichData?.msRegionBranches?.length) {
+        for (let i = 0; i < enrichData.msRegionBranches.length; i++) {
+          if (savedBranchIndices.includes(i)) continue;
+          const b = enrichData.msRegionBranches[i];
+          const bRes = await fetch(`/api/crm/clients/${clientId}/branches`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: b.name,
+              street: b.street || undefined,
+              city: b.city || undefined,
+              zip: b.zip || undefined,
+              country: 'CZ',
+              note: b.note || 'Dohledáno AI v MS kraji',
+            }),
+          }).catch(() => null);
+          if (bRes && bRes.ok) {
+            savedBranchesCount++;
+            setSavedBranchIndices((prev) => [...prev, i]);
+          }
+        }
+      }
+
+      // Also automatically save all contacts into CRM
+      let savedContactsCount = 0;
+      if (enrichData?.contactPersons?.length) {
+        for (let i = 0; i < enrichData.contactPersons.length; i++) {
+          if (savedContactIndices.includes(i)) continue;
+          const c = enrichData.contactPersons[i];
+          const cRes = await fetch(`/api/crm/clients/${clientId}/contacts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              firstName: c.firstName || 'Kontakt',
+              lastName: c.lastName || 'Klienta',
+              title: c.title || undefined,
+              email: c.email || undefined,
+              phone: c.phone || undefined,
+              isCommercial: true,
+            }),
+          }).catch(() => null);
+          if (cRes && cRes.ok) {
+            savedContactsCount++;
+            setSavedContactIndices((prev) => [...prev, i]);
+          }
+        }
+      }
+
+      const branchNotice = savedBranchesCount > 0 ? `, ${savedBranchesCount} poboček` : '';
+      const contactNotice = savedContactsCount > 0 ? `, ${savedContactsCount} kontaktů` : '';
+      setSavedProfileMsg(`✅ Všechny údaje byly úspěšně uloženy do CRM (profil, kompletní strategie${branchNotice}${contactNotice}).`);
+      setTimeout(() => {
+        window.location.reload();
+      }, 1400);
     } catch {
       alert('Chyba při komunikaci se serverem.');
     } finally {
@@ -346,7 +452,7 @@ export function ClientAiEnrichCard({
           <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-white rounded-2xl border border-emerald-200 shadow-sm">
             <div className="text-xs text-slate-700">
               <span className="font-bold text-slate-900">Chcete tyto ověřené údaje zapsat do klienta?</span>
-              <p className="text-[11px] text-slate-500">Uloží se název, IČO, DIČ, sídlo, web, e-mail, telefon a profil do CRM.</p>
+              <p className="text-[11px] text-slate-500">Uloží se název, IČO, DIČ, sídlo, web, e-mail, telefon, kompletní AI strategie, pobočky i kontakty do CRM.</p>
             </div>
             <button
               onClick={handleSaveToProfile}
@@ -354,7 +460,7 @@ export function ClientAiEnrichCard({
               className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 active:scale-95 transition shadow-sm disabled:opacity-50 cursor-pointer"
             >
               <Save size={15} />
-              <span>{savingProfile ? 'Ukládám do profilu...' : '💾 Uložit ověřené údaje do profilu'}</span>
+              <span>{savingProfile ? 'Ukládám do profilu...' : '💾 Uložit všechny vygenerované údaje do profilu'}</span>
             </button>
           </div>
 

@@ -85,6 +85,8 @@ export default async function ClientProfilePage({
           companyId={client.companyId}
           dic={client.dic}
           website={client.website}
+          initialNote={client.note}
+          initialContactPerson={client.contactPerson}
         />
 
         {/* Enterprise Tab Bar */}
