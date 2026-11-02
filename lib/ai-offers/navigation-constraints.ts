@@ -1,4 +1,7 @@
 import { OSTRAVA_RESTRICTED_ZONES_GEOJSON } from '@/lib/maps/ostrava-restricted-zones-data';
+import { OSTRAVA_HERITAGE_ZONES_GEOJSON } from '@/lib/maps/ostrava-heritage-zones-data';
+
+export { OSTRAVA_RESTRICTED_ZONES_GEOJSON, OSTRAVA_HERITAGE_ZONES_GEOJSON };
 
 function isPointInPolygon(point: [number, number], vs: number[][]) {
   const x = point[0], y = point[1];
@@ -69,16 +72,31 @@ export function isRestrictedHighwayOr1stClassRoad(text: string, city?: string): 
  * navigation signs on light poles are STRICTLY PROHIBITED by heritage protection authorities.
  */
 export function isOstravaHistoricalHeritageZone(lat: number, lng: number, addressText = ''): boolean {
-  // 1. Moravská Ostrava historical core (Masarykovo náměstí, Kostelní, 28. října center, Kuří rynek, Smetanovo nám.)
+  // 1. Exact GIS Point-in-Polygon check against official MPZ polygons from NPÚ
+  try {
+    const features = (OSTRAVA_HERITAGE_ZONES_GEOJSON?.features ?? []) as Array<{
+      geometry?: { coordinates?: number[][][] };
+    }>;
+    for (const feature of features) {
+      const coords = feature.geometry?.coordinates?.[0];
+      if (Array.isArray(coords) && isPointInPolygon([lng, lat], coords)) {
+        return true;
+      }
+    }
+  } catch {
+    // Fallback to bounding box & keyword checks
+  }
+
+  // 2. Moravská Ostrava historical core (Masarykovo náměstí, Kostelní, 28. října center, Kuří rynek, Smetanovo nám.)
   if (lat >= 49.8310 && lat <= 49.8420 && lng >= 18.2810 && lng <= 18.2980) return true;
 
-  // 2. Poruba 1. stavební obvod / Sorela (Oblouk, Alšovo náměstí, Porubská)
+  // 3. Poruba 1. stavební obvod / Sorela (Oblouk, Alšovo náměstí, Porubská)
   if (lat >= 49.8235 && lat <= 49.8355 && lng >= 18.1600 && lng <= 18.1760) return true;
 
-  // 3. Vítkovice historické centrum (Mírové náměstí a Štítová kolonie)
+  // 4. Vítkovice historické centrum (Mírové náměstí a Štítová kolonie)
   if (lat >= 49.8105 && lat <= 49.8185 && lng >= 18.2640 && lng <= 18.2760) return true;
 
-  // 4. Přívoz historické centrum (Náměstí Svatopluka Čecha a okolí kostela)
+  // 5. Přívoz historické centrum (Náměstí Svatopluka Čecha a okolí kostela)
   if (lat >= 49.8500 && lat <= 49.8545 && lng >= 18.2665 && lng <= 18.2740) return true;
 
   const normalized = addressText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');

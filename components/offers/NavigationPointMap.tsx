@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LayerGroup, Map as LeafletMap } from 'leaflet';
 import { OSTRAVA_RESTRICTED_ZONES_GEOJSON } from '@/lib/maps/ostrava-restricted-zones-data';
+import { OSTRAVA_HERITAGE_ZONES_GEOJSON } from '@/lib/maps/ostrava-heritage-zones-data';
 import { getPointPinColor, getPointPinVisual } from '@/lib/offers/navigation-carrier-types';
 
 export type NavigationMapPoint = {
@@ -65,7 +66,7 @@ export function NavigationPointMap({
       map.on('click', (event) => { if (!readOnlyRef.current) clickRef.current(event.latlng.lat, event.latlng.lng); });
       mapRef.current = map;
 
-      // Public regional reference layer, available only on explicit selection.
+      // Public regional reference layers (Ostrava regulated advertising zone & MPZ historical heritage zone)
       try {
         const restrictedZones = L.geoJSON(OSTRAVA_RESTRICTED_ZONES_GEOJSON, {
           style: {
@@ -82,8 +83,28 @@ export function NavigationPointMap({
             });
           },
         });
+
+        const heritageZones = L.geoJSON(OSTRAVA_HERITAGE_ZONES_GEOJSON, {
+          style: {
+            color: '#d97706',
+            fillColor: '#f59e0b',
+            fillOpacity: 0.22,
+            weight: 2,
+          },
+          onEachFeature: (feature: { properties?: { NAZEV?: string; USKP?: string } }, polyLayer: import('leaflet').Layer) => {
+            const name = feature.properties?.NAZEV || '';
+            const uskp = feature.properties?.USKP ? ` (ÚSKP ${feature.properties.USKP})` : '';
+            polyLayer.bindTooltip(`🏛️ Městská památková zóna ${name}${uskp} – zákaz navigačních tabulí na sloupech VO`, {
+              sticky: true,
+            });
+          },
+        });
+
         if (!readOnlyRef.current) {
-          L.control.layers({}, { 'Ostrava – zóny omezení reklamy': restrictedZones }).addTo(map);
+          L.control.layers({}, {
+            '🚫 Ostrava – zóna omezení reklamy': restrictedZones,
+            '🏛️ Ostrava – památková zóna (MPZ)': heritageZones,
+          }).addTo(map);
         }
       } catch {
         // Ignore if geometry fails

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, MapPin, AlertCircle, RefreshCw, Layers } from 'lucide-react';
 import { NavigationPointMap, type NavigationMapPoint } from './NavigationPointMap';
 import { OSTRAVA_RESTRICTED_ZONES_GEOJSON } from '@/lib/maps/ostrava-restricted-zones-data';
+import { OSTRAVA_HERITAGE_ZONES_GEOJSON } from '@/lib/maps/ostrava-heritage-zones-data';
 import { getPointPinColor, getPointPinVisual } from '@/lib/offers/navigation-carrier-types';
 import { evaluateNavigationZoning } from '@/lib/ai-offers/navigation-constraints';
 
@@ -133,6 +134,7 @@ export function GoogleNavigationOfferMap({
   const [mapsLoaded, setMapsLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [showRestrictedZones, setShowRestrictedZones] = useState(false);
+  const [showHeritageZones, setShowHeritageZones] = useState(true);
   const [mapType, setMapType] = useState<'roadmap' | 'hybrid' | 'terrain'>('roadmap');
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -550,7 +552,7 @@ export function GoogleNavigationOfferMap({
       markersRef.current.push(targetMarker);
     });
 
-    // Render Ostrava Municipal Heritage & Restricted Advertising Zones (Nařízení č. 2/2020 a č. 11/2019)
+    // Render Ostrava Municipal Restricted Advertising Zones (Nařízení č. 2/2020 a č. 11/2019)
     if (!readOnly && showRestrictedZones && googleMaps.Polygon) {
       try {
         const features = (OSTRAVA_RESTRICTED_ZONES_GEOJSON?.features ?? []) as Array<{
@@ -571,6 +573,37 @@ export function GoogleNavigationOfferMap({
               strokeWeight: 2,
               fillColor: '#f87171',
               fillOpacity: 0.16,
+              map,
+            });
+            polylinesRef.current.push(poly as unknown as { setMap: (map: unknown) => void });
+          }
+        });
+      } catch {
+        // Ignore if geometry fails
+      }
+    }
+
+    // Render Ostrava Historical Heritage Zones (Městská památková zóna – MPZ: Moravská Ostrava, Poruba, Přívoz, Vítkovice)
+    if (!readOnly && showHeritageZones && googleMaps.Polygon) {
+      try {
+        const features = (OSTRAVA_HERITAGE_ZONES_GEOJSON?.features ?? []) as Array<{
+          geometry?: { coordinates?: number[][][] };
+          properties?: { NAZEV?: string; USKP?: string };
+        }>;
+        features.forEach((feature) => {
+          const rawCoords = feature.geometry?.coordinates?.[0];
+          if (Array.isArray(rawCoords) && rawCoords.length > 0) {
+            const path = rawCoords.map((coord) => ({
+              lat: coord[1],
+              lng: coord[0],
+            }));
+            const poly = new googleMaps.Polygon!({
+              paths: path,
+              strokeColor: '#d97706',
+              strokeOpacity: 0.9,
+              strokeWeight: 2,
+              fillColor: '#f59e0b',
+              fillOpacity: 0.22,
               map,
             });
             polylinesRef.current.push(poly as unknown as { setMap: (map: unknown) => void });
@@ -692,7 +725,7 @@ export function GoogleNavigationOfferMap({
     if (!selectedPointId && (points.length > 0 || target || userLocation) && (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds) {
       (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
     }
-  }, [mapsLoaded, target, targets, points, userLocation, onMapClick, onPointMove, onTargetSelect, readOnly, selectedPointId, onPointClick, showRestrictedZones]);
+  }, [mapsLoaded, target, targets, points, userLocation, onMapClick, onPointMove, onTargetSelect, readOnly, selectedPointId, onPointClick, showRestrictedZones, showHeritageZones]);
 
   // Center/Pan smoothly to selected point when it changes
   useEffect(() => {
@@ -781,12 +814,30 @@ export function GoogleNavigationOfferMap({
       </div>}
 
       {/* Interactive Google Map Container & Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
         {!readOnly && (
-          <label className="flex items-center gap-2 text-xs text-slate-600">
-            <input type="checkbox" checked={showRestrictedZones} onChange={(event) => setShowRestrictedZones(event.target.checked)} />
-            <span>Ostrava – zóny omezení reklamy</span>
-          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showRestrictedZones}
+                onChange={(event) => setShowRestrictedZones(event.target.checked)}
+                className="rounded text-rose-600 focus:ring-rose-500"
+              />
+              <span className="inline-block w-3 h-3 rounded-xs border border-rose-500 bg-rose-400/40" />
+              <span>Ostrava – omezení reklamy (Nařízení 2/2020)</span>
+            </label>
+            <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showHeritageZones}
+                onChange={(event) => setShowHeritageZones(event.target.checked)}
+                className="rounded text-amber-600 focus:ring-amber-500"
+              />
+              <span className="inline-block w-3 h-3 rounded-xs border border-amber-600 bg-amber-400/40" />
+              <span>🏛️ Ostrava – památková zóna (MPZ)</span>
+            </label>
+          </div>
         )}
         <div className="flex items-center rounded-xl border border-slate-200 bg-white p-0.5 shadow-2xs ml-auto">
           <button
