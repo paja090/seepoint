@@ -1,4 +1,4 @@
-import { CalendarDays, CheckCircle2, HelpCircle, Layers, MapPin, PencilLine, Timer } from 'lucide-react';
+import { CalendarDays, CheckCircle2, HelpCircle, Layers, MapPin, PencilLine, Sparkles, Timer } from 'lucide-react';
 import type { ProposalOffer } from '@/lib/offers/presentation';
 import { MEDIA_TYPE_META } from '@/lib/offers/presentation';
 import { LogoPlaceholder } from './LogoPlaceholder';
@@ -30,6 +30,7 @@ export function OfferHero({
   onQuestion: () => void;
 }) {
   const mediaLabels = offer.mediaMix.map((media) => MEDIA_TYPE_META[media.key].label).join(', ');
+  const isNoPrice = offer.isNoPriceConcept;
 
   return (
     <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -50,7 +51,15 @@ export function OfferHero({
                 <p className="text-base font-semibold text-slate-900">{offer.client.name}</p>
               </div>
             </div>
-            <OfferStatusBadge status={offer.status} />
+            <div className="flex items-center gap-2">
+              {isNoPrice && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700 ring-1 ring-purple-200">
+                  <Sparkles size={13} className="text-purple-600" />
+                  Nezávazný koncept
+                </span>
+              )}
+              <OfferStatusBadge status={offer.status} />
+            </div>
           </div>
 
           <div>
@@ -75,14 +84,25 @@ export function OfferHero({
           {actionsEnabled && (
             <div className="space-y-3 pt-2 print:hidden">
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <button
-                  className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:bg-emerald-700 sm:flex-none cursor-pointer"
-                  onClick={onApprove}
-                  type="button"
-                >
-                  <CheckCircle2 aria-hidden size={18} />
-                  Schválit nabídku
-                </button>
+                {isNoPrice ? (
+                  <button
+                    className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-purple-600 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:bg-purple-700 sm:flex-none cursor-pointer"
+                    onClick={onApprove}
+                    type="button"
+                  >
+                    <Sparkles aria-hidden size={18} />
+                    Požádat o cenovou kalkulaci
+                  </button>
+                ) : (
+                  <button
+                    className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:bg-emerald-700 sm:flex-none cursor-pointer"
+                    onClick={onApprove}
+                    type="button"
+                  >
+                    <CheckCircle2 aria-hidden size={18} />
+                    Schválit nabídku
+                  </button>
+                )}
                 <button
                   className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:border-sky-300 hover:bg-sky-50/50 cursor-pointer"
                   onClick={onRevision}
@@ -101,7 +121,9 @@ export function OfferHero({
                 </button>
               </div>
               <p className="text-xs text-slate-500">
-                Nabídku můžete jedním kliknutím schválit nebo požádat o úpravu lokalit, termínu či rozsahu vybraných reklamních ploch.
+                {isNoPrice
+                  ? 'Tento návrh je nezávazný. Po potvrzení vašeho výběru vám obchodník připraví přesnou kalkulaci a zarezervuje volné kapacity.'
+                  : 'Nabídku můžete jedním kliknutím schválit nebo požádat o úpravu lokalit, termínu či rozsahu vybraných reklamních ploch.'}
               </p>
             </div>
           )}

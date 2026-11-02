@@ -1302,6 +1302,42 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
       };
     }
 
+    // Special handling for Standard Media No-Price Concept:
+    // Client is confirming interest in this concept and requesting a price quote, NOT placing a binding production order!
+    if (target === 'ACCEPTED' && row.isNoPriceConcept) {
+      if (['REJECTED', 'EXPIRED'].includes(row.status)) throw new OfferValidationError('Nabídka již byla uzavřena.');
+
+      const effectiveStatus = row.status === 'DRAFT' ? 'SENT' : row.status;
+      if (row.status === 'DRAFT') {
+        await tx.offer.update({
+          where: { id: row.id },
+          data: { status: 'SENT', sentAt: new Date() },
+        });
+      }
+
+      await tx.offerEvent.create({
+        data: {
+          offerId: row.id,
+          organizationId: row.organizationId,
+          type: 'UPDATED',
+          actorName,
+          actorEmail,
+          message: `${actorName} požádal/a o zpracování cenové kalkulace pro tento koncept kampaně.${message ? ` Poznámka: ${message}` : ''}`,
+          metadata: {
+            channel: 'public-token',
+            action: 'request-pricing',
+            consent: true,
+          },
+        },
+      });
+
+      return {
+        row,
+        status: effectiveStatus,
+        message: 'Děkujeme! Váš požadavek na zpracování cenové nabídky byl odeslán obchodníkovi. Brzy se vám ozve.',
+      };
+    }
+
     // Check availability conflicts for standard media offers before accepting
     if (target === 'ACCEPTED' && row.offerType === 'STANDARD_MEDIA') {
       const conflicts = await findConflicts(tx, row.items, row.id);
@@ -1376,8 +1412,11 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
     const recipientEmail = row.createdByUser?.email || organization?.email;
     if (!recipientEmail) throw new Error('Organizace nemá kontaktní e-mail pro oznámení.');
     const isNavPhase1 = row.offerType === 'NAVIGATION' && row.navigationOffer?.proposalMode === 'LOCATION_SELECTION';
+    const isNoPriceConcept = Boolean(row.isNoPriceConcept);
     const actionLabel = isNavPhase1 && action === 'accept'
       ? 'SCHVÁLEN NÁVRH LOKALIT (FÁZE 1 – K NACENĚNÍ)'
+      : isNoPriceConcept && action === 'accept'
+      ? 'POŽADAVEK NA ZPRACOVÁNÍ CENOVÉ NABÍDKY'
       : action === 'accept'
       ? 'PŘIJATA'
       : action === 'reject'
@@ -1388,6 +1427,8 @@ export async function respondToPublicOffer(token: string, raw: unknown) {
 
     const emailSubject = isNavPhase1 && action === 'accept'
       ? `📍 Klient ${actorName} schválil návrh navigace k nacenění (${row.campaignName})`
+      : isNoPriceConcept && action === 'accept'
+      ? `🎯 Klient ${actorName} žádá o cenovou nabídku konceptu (${row.campaignName})`
       : action === 'accept'
       ? `🎉 Nabídka ${row.campaignName} byla PŘIJATA klientem ${actorName}`
       : action === 'reject'

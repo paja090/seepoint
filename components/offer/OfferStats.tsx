@@ -1,4 +1,4 @@
-import { CalendarRange, Camera, Layers, MapPin, PanelsTopLeft, ReceiptText } from 'lucide-react';
+import { CalendarRange, Camera, Layers, MapPin, PanelsTopLeft, ReceiptText, Users } from 'lucide-react';
 import type { ProposalOffer } from '@/lib/offers/presentation';
 import { formatNumber } from '@/lib/offers/presentation';
 
@@ -6,12 +6,17 @@ export function OfferStats({ offer }: { offer: ProposalOffer }) {
   const photoStatValue = offer.stats.photos > 0 ? `${formatNumber(offer.stats.photos)} fotek` : 'Po výlepu';
   const photoStatLabel = offer.stats.photos > 0 ? 'Fotografií ploch' : 'Fotodokumentace';
 
+  const isNoPrice = offer.isNoPriceConcept;
+  const estimatedReach = Math.max(1, offer.stats.carriers) * 18000;
+
   const stats = [
     { icon: PanelsTopLeft, value: formatNumber(offer.stats.carriers), label: 'Vybrané nosiče' },
-    { icon: Layers, value: formatNumber(offer.stats.mediaTypes), label: 'Typy médií' },
-    { icon: MapPin, value: formatNumber(offer.stats.locations), label: 'Lokalit' },
+    { icon: Layers, value: formatNumber(offer.stats.mediaTypes), label: 'Kategorie médií' },
+    { icon: MapPin, value: formatNumber(offer.stats.locations), label: 'Lokalit v návrhu' },
     { icon: Camera, value: photoStatValue, label: photoStatLabel },
-    { icon: ReceiptText, value: `${formatNumber(Math.round(offer.stats.total))} Kč`, label: 'Celkem s DPH' },
+    isNoPrice
+      ? { icon: Users, value: `~${formatNumber(estimatedReach)}+`, label: 'Měsíční zásah (est.)' }
+      : { icon: ReceiptText, value: `${formatNumber(Math.round(offer.stats.total))} Kč`, label: 'Celkem s DPH' },
     { icon: CalendarRange, value: `${offer.stats.days} dní`, label: 'Délka kampaně' },
   ];
 

@@ -64,11 +64,11 @@ export default async function PublicOfferPage({ params, searchParams }: { params
     );
   }
 
-  if ((offer as unknown as { isNoPriceConcept?: boolean }).isNoPriceConcept) {
+  const search = await searchParams;
+  if ((offer as unknown as { isNoPriceConcept?: boolean }).isNoPriceConcept && search.view === 'dark') {
     return <CampaignConceptPublicView offer={offer} publicToken={token} />;
   }
 
-  const search = await searchParams;
   if (['ACCEPTED', 'CONVERTED'].includes(offer.status) && search.view !== 'proposal') {
     return <CampaignLivePortalView offer={offer} publicToken={token} />;
   }

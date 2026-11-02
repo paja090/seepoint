@@ -2,15 +2,20 @@ import { Check } from 'lucide-react';
 import type { ProposalOffer } from '@/lib/offers/presentation';
 
 export function ConditionsSection({ offer }: { offer: ProposalOffer }) {
+  const isNoPrice = offer.isNoPriceConcept;
   return (
     <section
       aria-labelledby="conditions-heading"
       className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:p-8"
     >
       <h2 className="text-xl font-semibold tracking-tight text-slate-950" id="conditions-heading">
-        Podmínky kampaně
+        {isNoPrice ? 'Postup a princip konceptu' : 'Podmínky kampaně'}
       </h2>
-      <p className="mt-1 text-sm text-slate-500">Shrnutí klíčových podmínek této nabídky.</p>
+      <p className="mt-1 text-sm text-slate-500">
+        {isNoPrice
+          ? 'Jak probíhá cesta od nezávazného konceptu k aktivní kampani v terénu.'
+          : 'Shrnutí klíčových podmínek této nabídky.'}
+      </p>
       <ul className="mt-5 grid gap-3 sm:grid-cols-2">
         {offer.conditions.map((condition) => (
           <li key={condition.id} className="flex items-start gap-3">

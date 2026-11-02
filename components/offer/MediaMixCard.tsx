@@ -2,7 +2,7 @@ import { Eye, LayoutGrid } from 'lucide-react';
 import type { ProposalMediaType } from '@/lib/offers/presentation';
 import { TONE_CLASSES, formatCzk } from '@/lib/offers/presentation';
 
-export function MediaMixCard({ media, sharePercent }: { media: ProposalMediaType; sharePercent: number }) {
+export function MediaMixCard({ media, sharePercent, isNoPrice }: { media: ProposalMediaType; sharePercent: number; isNoPrice?: boolean }) {
   const tone = TONE_CLASSES[media.tone];
   return (
     <article className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
@@ -46,8 +46,14 @@ export function MediaMixCard({ media, sharePercent }: { media: ProposalMediaType
         </div>
 
         <div className="flex items-center justify-between border-t border-slate-100 pt-4">
-          <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Mezisoučet</span>
-          <span className="text-lg font-semibold text-slate-950">{formatCzk(media.subtotal)}</span>
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            {isNoPrice ? 'Zastoupení' : 'Mezisoučet'}
+          </span>
+          <span className="text-lg font-semibold text-slate-950">
+            {isNoPrice
+              ? `${media.surfaceCount} ${media.surfaceCount === 1 ? 'plocha' : media.surfaceCount < 5 ? 'plochy' : 'ploch'}`
+              : formatCzk(media.subtotal)}
+          </span>
         </div>
       </div>
     </article>
