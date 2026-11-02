@@ -38,7 +38,7 @@ test('validatePhotoFile accepts SVG when allowSvg is true and rejects when false
   // Without allowSvg
   await assert.rejects(
     () => validatePhotoFile(svgFile, { allowSvg: false }),
-    (err: any) => err.code === 'INVALID_IMAGE'
+    (err: unknown) => (err as { code?: string }).code === 'INVALID_IMAGE'
   );
 });
 
