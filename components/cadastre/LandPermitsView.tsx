@@ -53,6 +53,7 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
   const [aiScouting, setAiScouting] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<AiScoutedLocation[]>([]);
+  const [savingAiId, setSavingAiId] = useState<string | null>(null);
 
   // AI Plot Analysis Modal State
   const [analyzingPlot, setAnalyzingPlot] = useState<ElectionRemovalPoint | null>(null);
@@ -144,6 +145,45 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
     setPlotLabel(s.title);
     setScoutMode('MANUAL_GPS');
     handleIdentify(s.latitude, s.longitude);
+  };
+
+  // Direct 1-click save of an AI scouted location into database with ČÚZK enrichment
+  const handleDirectSaveAiSuggestion = async (s: AiScoutedLocation) => {
+    setSavingAiId(s.id);
+    try {
+      const res = await fetch('/api/cadastre/scout-point', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label: s.title,
+          latitude: s.latitude,
+          longitude: s.longitude,
+          monthlyRent: s.estimatedMonthlyRentCzk || null,
+          permitNote: s.commercialRationale || null,
+          landownerNote: s.acquisitionTip || null,
+          landOwnership:
+            s.propertyType === 'FIRST_CLASS_ROAD_CORRIDOR' ||
+            s.propertyType === 'RETAIL_PARK' ||
+            s.propertyType === 'PRIVATE_COMMERCIAL'
+              ? 'PRIVATE_COMPANY'
+              : 'UNKNOWN',
+          permitStatus: 'SCOUTING',
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Uložení pozemku selhalo.');
+
+      setPoints((prev) => [data.point, ...prev]);
+      setMsg({
+        text: `Pozemek "${s.title}" byl úspěšně zaevidován včetně ověření v katastru ČÚZK!`,
+        type: 'success',
+      });
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Chyba při ukládání pozemku.');
+    } finally {
+      setSavingAiId(null);
+    }
   };
 
   // Open AI Analysis Modal for an existing point
@@ -259,6 +299,7 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
           latitude: parseFloat(latInput),
           longitude: parseFloat(lngInput),
           parcelNumber: identifiedData?.parcelNumber || null,
+          parcelId: identifiedData?.parcelId || null,
           cadastralArea: identifiedData?.cadastralAreaName || null,
           cadastralAreaCode: identifiedData?.cadastralAreaCode || null,
           landArea: identifiedData?.areaSqm || null,
@@ -434,6 +475,22 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
                   {city}
                 </button>
               ))}
+              <span className="text-slate-300 mx-1">|</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setAiFocus('FIRST_CLASS_ROAD');
+                  handleRunAiScout(aiCity, 'FIRST_CLASS_ROAD');
+                }}
+                className={`text-xs px-2.5 py-1 rounded-lg border font-bold transition flex items-center gap-1 ${
+                  aiFocus === 'FIRST_CLASS_ROAD'
+                    ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                    : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                }`}
+                title="Hledat soukromé pozemky podél silnic I. třídy (Rudná, Místecká...) vhodné pro navigační sloupky mimo VO"
+              >
+                <span>🛣️ Koridory I. třídy (pro navigační sloupky)</span>
+              </button>
             </div>
 
             {/* AI Search Controls */}
@@ -456,6 +513,7 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
                   className="w-full text-sm rounded-xl border border-slate-300 p-2.5 focus:border-indigo-500 focus:outline-none bg-white"
                 >
                   <option value="ALL">Všechny lukrativní pozemky</option>
+                  <option value="FIRST_CLASS_ROAD">🛣️ Koridory silnic I. třídy (pro navigační sloupky mimo VO)</option>
                   <option value="COMMERCIAL_ZONES">Komerční a retail parky</option>
                   <option value="CROSSROADS">Křižovatky a kruhové objezdy</option>
                   <option value="SERVICES_GAS">Autoservisy a čerpací stanice</option>
@@ -552,18 +610,70 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
                         </p>
                       </div>
 
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                        <span className="text-[11px] font-mono text-slate-400">
-                          GPS: {s.latitude.toFixed(4)}, {s.longitude.toFixed(4)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleSelectAiSuggestion(s)}
-                          className="btn bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-1.5 px-3 rounded-xl flex items-center gap-1.5 shadow-xs"
-                        >
-                          <Search size={13} />
-                          <span>🎯 Ověřit parcelu v ČÚZK & Převzít</span>
-                        </button>
+                      <div className="pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-mono text-slate-400">
+                            GPS: {s.latitude.toFixed(4)}, {s.longitude.toFixed(4)}
+                          </span>
+                          <a
+                            href={`https://mapy.cz/zakladni?q=${s.latitude},${s.longitude}&z=18&base=katastr`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-emerald-600 hover:text-emerald-800 hover:underline"
+                            title="Zobrazit parcelu na Mapy.cz s katastrální vrstvou"
+                          >
+                            <span>Katastr mapa</span>
+                            <ExternalLink size={10} />
+                          </a>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleSelectAiSuggestion(s)}
+                            className="btn btn-outline border-slate-300 hover:border-slate-400 text-slate-700 font-semibold text-xs py-1.5 px-2.5 rounded-xl flex items-center gap-1 cursor-pointer"
+                            title="Přepnout do formuláře a prověřit detail parcely v katastru"
+                          >
+                            <Search size={12} />
+                            <span>Prověřit</span>
+                          </button>
+                          {(() => {
+                            const isSaved = points.some(
+                              (p) =>
+                                (Math.abs(p.latitude - s.latitude) < 0.0003 &&
+                                  Math.abs(p.longitude - s.longitude) < 0.0003) ||
+                                p.label.toLowerCase() === s.title.toLowerCase()
+                            );
+                            return (
+                              <button
+                                type="button"
+                                disabled={savingAiId === s.id || isSaved}
+                                onClick={() => handleDirectSaveAiSuggestion(s)}
+                                className={`btn text-xs font-bold py-1.5 px-3 rounded-xl flex items-center gap-1.5 shadow-xs transition cursor-pointer ${
+                                  isSaved
+                                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 cursor-default opacity-90'
+                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                                }`}
+                              >
+                                {savingAiId === s.id ? (
+                                  <>
+                                    <Loader2 size={13} className="animate-spin" />
+                                    <span>Ukládám z ČÚZK...</span>
+                                  </>
+                                ) : isSaved ? (
+                                  <>
+                                    <Check size={13} className="text-emerald-600" />
+                                    <span>Zaevidováno</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus size={13} />
+                                    <span>Zaevidovat pozemek</span>
+                                  </>
+                                )}
+                              </button>
+                            );
+                          })()}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -802,24 +912,48 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
                       <div>{p.label}</div>
                       <div className="text-[10px] text-slate-400 font-normal">GPS: {p.latitude.toFixed(4)}, {p.longitude.toFixed(4)}</div>
                     </td>
-                    <td className="p-3 font-mono font-medium text-slate-800">
+                    <td className="p-3 font-medium text-slate-800">
                       {p.parcelNumber ? (
-                        <div className="flex items-center gap-1.5">
-                          <span>{p.parcelNumber}</span>
-                          {p.cadastralAreaCode && (
+                        <div>
+                          <div className="font-mono font-bold text-slate-900">{p.parcelNumber}</div>
+                          <div className="flex items-center gap-2 mt-0.5 text-[11px]">
+                            {p.parcelId ? (
+                              <a
+                                href={`https://vdp.cuzk.cz/vdp/ruian/parcely/${p.parcelId}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                title="Otevřít oficiální detail parcely v RÚIAN (ČÚZK)"
+                                className="inline-flex items-center gap-0.5 text-sky-600 hover:text-sky-800 font-semibold hover:underline"
+                              >
+                                <span>ČÚZK</span>
+                                <ExternalLink size={10} />
+                              </a>
+                            ) : null}
                             <a
-                              href={`https://nahlizenidokn.cuzk.gov.cz/ZobrazObjekt.aspx?typ=KU&id=${p.cadastralAreaCode}`}
+                              href={`https://mapy.cz/zakladni?q=${p.latitude},${p.longitude}&z=18&base=katastr`}
                               target="_blank"
                               rel="noreferrer"
-                              title="Otevřít v Katastru"
-                              className="text-sky-600 hover:text-sky-800"
+                              title="Zobrazit katastrální hranice na Mapy.cz"
+                              className="inline-flex items-center gap-0.5 text-emerald-600 hover:text-emerald-800 font-semibold hover:underline"
                             >
-                              <ExternalLink size={12} />
+                              <span>Katastr</span>
+                              <ExternalLink size={10} />
                             </a>
-                          )}
+                          </div>
                         </div>
                       ) : (
-                        <span className="text-slate-400 italic">nezjištěna</span>
+                        <div>
+                          <span className="text-slate-400 italic block">nezjištěna</span>
+                          <a
+                            href={`https://mapy.cz/zakladni?q=${p.latitude},${p.longitude}&z=18&base=katastr`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-0.5 text-[11px] text-emerald-600 hover:underline"
+                          >
+                            <span>Mapa</span>
+                            <ExternalLink size={10} />
+                          </a>
+                        </div>
                       )}
                     </td>
                     <td className="p-3">

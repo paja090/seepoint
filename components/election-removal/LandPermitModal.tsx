@@ -238,7 +238,7 @@ export function LandPermitModal({ point, onClose, onUpdated }: LandPermitModalPr
   };
 
   const cuzkViewUrl = parcelId
-    ? `https://nahlizenidokn.cuzk.cz/ZobrazObjekt.aspx?typ=par&id=${parcelId}`
+    ? `https://vdp.cuzk.cz/vdp/ruian/parcely/${parcelId}`
     : null;
 
   return (
@@ -351,11 +351,23 @@ export function LandPermitModal({ point, onClose, onUpdated }: LandPermitModalPr
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-3 py-1.5 text-xs border border-slate-700 transition"
+                    title="Otevřít oficiální detail v RÚIAN (ČÚZK)"
                   >
-                    <span>Otevřít v KN (ČÚZK)</span>
+                    <span>ČÚZK (RÚIAN)</span>
                     <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 )}
+
+                <a
+                  href={`https://mapy.cz/zakladni?q=${point.latitude},${point.longitude}&z=18&base=katastr`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 font-bold px-3 py-1.5 text-xs border border-emerald-800/80 transition"
+                  title="Otevřít parcelu s katastrální vrstvou na Mapy.cz"
+                >
+                  <span>Katastrální mapa</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
               </div>
             </div>
 
