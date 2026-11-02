@@ -17,9 +17,11 @@ import {
   Settings,
 } from 'lucide-react';
 import { AiInboxMessageCard, type AiInboxListItem } from './AiInboxMessageCard';
+import { AiInboxOrderGroupCard } from './AiInboxOrderGroupCard';
 import { AiInboxDetailModal, type AiInboxMessageDetailData } from './AiInboxDetailModal';
 import { MailboxSettingsModal, type MailboxSettingsData } from './MailboxSettingsModal';
 import { CLASSIFICATION_LABELS } from '@/lib/ai-inbox/classifier';
+import { groupAiInboxMessagesByOrder } from '@/lib/ai-inbox/grouping';
 
 export type MailboxItem = {
   id: string;
@@ -39,6 +41,7 @@ export function AiInboxView({
   const [editingMailbox, setEditingMailbox] = useState<MailboxItem | null>(null);
   const [items, setItems] = useState<AiInboxListItem[]>(initialItems);
   const [activeTab, setActiveTab] = useState<'ATTENTION' | 'NEW' | 'PROCESSED' | 'SPAM' | 'ALL'>('ATTENTION');
+  const [viewMode, setViewMode] = useState<'BY_ORDER' | 'INDIVIDUAL'>('BY_ORDER');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMailboxId, setSelectedMailboxId] = useState<string>('ALL');
   const [selectedClassification, setSelectedClassification] = useState<string>('ALL');
@@ -207,6 +210,9 @@ export function AiInboxView({
 
     return true;
   });
+
+  // Grouped order conversations
+  const orderGroups = React.useMemo(() => groupAiInboxMessagesByOrder(filteredItems), [filteredItems]);
 
   return (
     <div className="space-y-6">
@@ -452,6 +458,43 @@ export function AiInboxView({
         </div>
       </div>
 
+      {/* VIEW MODE TOGGLE BAR */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+        <div className="inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+          <button
+            type="button"
+            onClick={() => setViewMode('BY_ORDER')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              viewMode === 'BY_ORDER'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <FolderKanban size={13} className={viewMode === 'BY_ORDER' ? 'text-blue-600' : 'text-slate-400'} />
+            <span>Sjednotit dle zakázek & vláken ({orderGroups.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode('INDIVIDUAL')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              viewMode === 'INDIVIDUAL'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Mail size={13} className={viewMode === 'INDIVIDUAL' ? 'text-fuchsia-600' : 'text-slate-400'} />
+            <span>Jednotlivé zprávy ({filteredItems.length})</span>
+          </button>
+        </div>
+
+        <div className="text-xs text-slate-400 hidden sm:block">
+          {viewMode === 'BY_ORDER'
+            ? 'E-maily k jedné zakázce jsou sjednoceny do uceleného konverzačního vlákna'
+            : 'Klasické zobrazení každého příchozího e-mailu samostatně'}
+        </div>
+      </div>
+
       {/* MESSAGES LIST */}
       {filteredItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white py-16 px-4 text-center">
@@ -477,6 +520,18 @@ export function AiInboxView({
               <span>Připojit první firemní schránku</span>
             </a>
           )}
+        </div>
+      ) : viewMode === 'BY_ORDER' ? (
+        <div className="space-y-3.5">
+          {orderGroups.map((group) => (
+            <AiInboxOrderGroupCard
+              key={group.key}
+              group={group}
+              onSelectMessage={handleOpenDetail}
+              onDeleteMessage={handleDeleteSingle}
+              selectedMessageId={selectedMessage?.id}
+            />
+          ))}
         </div>
       ) : (
         <div className="space-y-3">

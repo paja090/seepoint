@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import type { Prisma, AiInboxStatus } from '@prisma/client';
-import type { MailboxSyncSettings, RawInboundMessage } from './types';
+import type { MailboxSyncSettings, RawInboundMessage, UnifiedCommunicationItem } from './types';
 import {
   getGmailAccessToken,
   getGmailMessage,
@@ -477,11 +477,150 @@ export async function getAiInboxMessageDetail(organizationId: string, messageId:
     }));
   }
 
+  // Sjednocená historie komunikace týmu a zakázky (příchozí i odeslané e-maily a interní poznámky)
+  const conversationHistory: UnifiedCommunicationItem[] = [];
+
+  const orFilters: Prisma.AiInboxMessageWhereInput[] = [];
+  if (message.crmOrderId) orFilters.push({ crmOrderId: message.crmOrderId });
+  if (message.navigationOrderId) orFilters.push({ navigationOrderId: message.navigationOrderId });
+  if (message.providerThreadId) orFilters.push({ providerThreadId: message.providerThreadId });
+
+  let siblingMessages: Array<{
+    id: string;
+    fromEmail: string;
+    fromName: string | null;
+    toEmails: string[];
+    subject: string;
+    textBody: string | null;
+    htmlBody: string | null;
+    receivedAt: Date;
+    aiSummary: string | null;
+    classification: string;
+    processingStatus: string;
+    requiresReview: boolean;
+    _count: { attachments: number };
+  }> = [];
+
+  if (orFilters.length > 0) {
+    siblingMessages = await prisma.aiInboxMessage.findMany({
+      where: {
+        organizationId,
+        OR: orFilters,
+      },
+      select: {
+        id: true,
+        fromEmail: true,
+        fromName: true,
+        toEmails: true,
+        subject: true,
+        textBody: true,
+        htmlBody: true,
+        receivedAt: true,
+        aiSummary: true,
+        classification: true,
+        processingStatus: true,
+        requiresReview: true,
+        _count: { select: { attachments: true } },
+      },
+      orderBy: { receivedAt: 'asc' },
+    });
+  } else {
+    siblingMessages = [{
+      id: message.id,
+      fromEmail: message.fromEmail,
+      fromName: message.fromName,
+      toEmails: message.toEmails,
+      subject: message.subject,
+      textBody: message.textBody,
+      htmlBody: message.htmlBody,
+      receivedAt: message.receivedAt,
+      aiSummary: message.aiSummary,
+      classification: message.classification,
+      processingStatus: message.processingStatus,
+      requiresReview: message.requiresReview,
+      _count: { attachments: message.attachments.length },
+    }];
+  }
+
+  for (const sib of siblingMessages) {
+    const isCurrent = sib.id === message.id;
+    const isNew = (sib.processingStatus === 'INGESTED' || sib.processingStatus === 'READY') && !isCurrent;
+    conversationHistory.push({
+      id: sib.id,
+      source: 'AI_INBOX_INBOUND',
+      type: 'INBOUND_EMAIL',
+      senderName: sib.fromName || sib.fromEmail,
+      senderEmail: sib.fromEmail,
+      recipient: Array.isArray(sib.toEmails) && sib.toEmails.length > 0 ? sib.toEmails.join(', ') : undefined,
+      date: sib.receivedAt,
+      subject: sib.subject,
+      content: sib.textBody || sib.htmlBody || '',
+      aiSummary: sib.aiSummary,
+      isInternal: false,
+      isCurrentMessage: isCurrent,
+      isNewIncoming: isNew,
+      classification: sib.classification,
+      attachmentsCount: sib._count?.attachments || 0,
+    });
+  }
+
+  // Týmová komunikace a odeslané odpovědi z CRM/AI schránky
+  if (message.crmOrderId || message.clientId) {
+    const commWhere: Prisma.ClientCommunicationWhereInput = { organizationId };
+    if (message.crmOrderId) {
+      commWhere.crmOrderId = message.crmOrderId;
+    } else if (message.clientId) {
+      commWhere.clientId = message.clientId;
+    }
+
+    const teamComms = await prisma.clientCommunication.findMany({
+      where: commWhere,
+      select: {
+        id: true,
+        type: true,
+        subject: true,
+        content: true,
+        result: true,
+        isInternal: true,
+        createdAt: true,
+        author: { select: { id: true, name: true, email: true } },
+        contact: { select: { firstName: true, lastName: true, email: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 50,
+    });
+
+    for (const comm of teamComms) {
+      const isReply = comm.type === 'EMAIL' && !comm.isInternal;
+      conversationHistory.push({
+        id: `comm-${comm.id}`,
+        source: isReply ? 'TEAM_REPLY' : 'TEAM_COMMUNICATION',
+        type: comm.type,
+        senderName: comm.author?.name || 'Tým SeePOINT',
+        senderEmail: comm.author?.email,
+        recipient: comm.contact ? `${comm.contact.firstName} ${comm.contact.lastName} <${comm.contact.email || ''}>` : undefined,
+        date: comm.createdAt,
+        subject: comm.subject,
+        content: comm.content + (comm.result ? `\n\n[Výsledek: ${comm.result}]` : ''),
+        isInternal: comm.isInternal,
+        authorName: comm.author?.name || 'Tým SeePOINT',
+      });
+    }
+  }
+
+  // Seřazení časově od nejstarší po nejnovější (jako v moderním komunikačním vlákně)
+  conversationHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
   return {
     ...message,
     activeClientOrders,
+    conversationHistory,
   };
 }
+
+export { groupAiInboxMessagesByOrder } from './grouping';
+
+
 
 export async function processAiInboxMessage(organizationId: string, messageId: string) {
   const msg = await prisma.aiInboxMessage.findFirst({

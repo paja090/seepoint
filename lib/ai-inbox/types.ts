@@ -164,3 +164,59 @@ export type MailboxSyncSettings = {
   lastHistoryId?: string | null;
   syncError?: string | null;
 };
+
+export type UnifiedCommunicationItem = {
+  id: string;
+  source: 'AI_INBOX_INBOUND' | 'TEAM_REPLY' | 'TEAM_COMMUNICATION';
+  type: string;
+  senderName: string;
+  senderEmail?: string | null;
+  recipient?: string | null;
+  date: string | Date;
+  subject: string;
+  content: string;
+  aiSummary?: string | null;
+  isInternal: boolean;
+  isCurrentMessage?: boolean;
+  isNewIncoming?: boolean;
+  authorName?: string | null;
+  classification?: string | null;
+  attachmentsCount?: number;
+};
+
+export type OrderConversationGroup = {
+  key: string;
+  type: 'CRM_ORDER' | 'NAVIGATION_ORDER' | 'OFFER' | 'THREAD' | 'CLIENT' | 'UNASSIGNED';
+  title: string;
+  orderNumber?: string | null;
+  status?: string | null;
+  projectType?: string | null;
+  client?: { id: string; name: string; companyId?: string | null } | null;
+  items: Array<{
+    id: string;
+    fromEmail: string;
+    fromName: string | null;
+    subject: string;
+    receivedAt: string | Date;
+    processingStatus: AiInboxStatus;
+    classification: AiInboxClassification;
+    confidence: number;
+    requiresReview: boolean;
+    aiSummary: string | null;
+    providerThreadId?: string | null;
+    integrationConnection?: { accountEmail: string | null; provider: string } | null;
+    client?: { id: string; name: string; companyId: string | null } | null;
+    crmOrder?: { id: string; orderNumber: string; title: string; status: string } | null;
+    offer?: { id: string; title: string; status: string } | null;
+    navigationOrder?: { id: string; orderNumber: string; status: string } | null;
+    _count?: { attachments: number; actions: number };
+  }>;
+  messageCount: number;
+  attentionCount: number;
+  newCount: number;
+  hasNewIncoming: boolean;
+  latestReceivedAt: string | Date;
+  latestAiSummary?: string | null;
+  participants: Array<{ name: string; email?: string | null; isTeam?: boolean }>;
+};
+
