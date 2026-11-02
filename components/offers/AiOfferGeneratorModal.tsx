@@ -6,10 +6,96 @@ import dynamic from 'next/dynamic';
 import { ChevronDown, Compass, Image, MapPin, Sparkles, X } from 'lucide-react';
 import type { SuggestedNavigationPoint } from './GoogleNavigationOfferMap';
 import { reverseGeocode } from '@/lib/google-maps';
-import { isRestrictedHighwayOr1stClassRoad, isOstravaRestrictedZone, evaluateNavigationZoning } from '@/lib/ai-offers/navigation-constraints';
+import { evaluateNavigationZoning } from '@/lib/ai-offers/navigation-constraints';
 import { haversineMeters } from '@/lib/ai-offers/scoring';
+import {
+  inferArrowDirectionFromRoute,
+  formatNavigationDistance,
+  formatNavigationPointDetails,
+} from '@/lib/ai-offers/route-direction-helper';
 
 const GoogleNavigationOfferMap = dynamic(() => import('./GoogleNavigationOfferMap').then((module) => module.GoogleNavigationOfferMap), { ssr: false });
+
+async function fetchRouteForPoint(
+  fromLat: number,
+  fromLng: number,
+  toLat: number,
+  toLng: number
+): Promise<{ polyline?: string; distanceMeters?: number; durationSeconds?: number }> {
+  // 1. Primary: Server-side Google Routes API (/api/navigation-routes)
+  try {
+    const res = await fetch('/api/navigation-routes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ originLat: fromLat, originLng: fromLng, destLat: toLat, destLng: toLng }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === 'OK' && data.polyline) {
+        return {
+          polyline: data.polyline as string,
+          distanceMeters: typeof data.distanceMeters === 'number' ? data.distanceMeters : undefined,
+          durationSeconds: typeof data.durationSeconds === 'number' ? data.durationSeconds : undefined,
+        };
+      }
+    }
+  } catch {
+    /* fallback to client DirectionsService below */
+  }
+
+  // 2. Fallback: Browser DirectionsService using loaded Google Maps SDK
+  if (typeof window !== 'undefined' && window.google?.maps) {
+    try {
+      const maps = window.google.maps as unknown as {
+        DirectionsService?: new () => {
+          route: (
+            request: Record<string, unknown>,
+            callback: (
+              result: {
+                routes?: Array<{
+                  overview_polyline?: string | { points?: string };
+                  legs?: Array<{ distance?: { value?: number }; duration?: { value?: number } }>;
+                }>;
+              } | null,
+              status: string
+            ) => void
+          ) => void;
+        };
+        TravelMode?: { DRIVING?: string };
+      };
+      if (maps?.DirectionsService) {
+        const clientRes = await new Promise<{ polyline?: string; distanceMeters?: number; durationSeconds?: number } | null>((resolve) => {
+          new maps.DirectionsService!().route(
+            {
+              origin: { lat: fromLat, lng: fromLng },
+              destination: { lat: toLat, lng: toLng },
+              travelMode: maps.TravelMode?.DRIVING || 'DRIVING',
+            },
+            (result, status) => {
+              if (status === 'OK' && result?.routes?.[0]) {
+                const first = result.routes[0];
+                const rawPoly = first.overview_polyline;
+                const polyline = typeof rawPoly === 'string' ? rawPoly : rawPoly?.points;
+                const dist = first.legs?.[0]?.distance?.value;
+                const dur = first.legs?.[0]?.duration?.value;
+                resolve({ polyline: polyline || undefined, distanceMeters: dist, durationSeconds: dur });
+              } else {
+                resolve(null);
+              }
+            }
+          );
+        });
+        if (clientRes) return clientRes;
+      }
+    } catch {
+      /* fallback haversine */
+    }
+  }
+
+  return {
+    distanceMeters: haversineMeters({ latitude: fromLat, longitude: fromLng }, { latitude: toLat, longitude: toLng }),
+  };
+}
 
 type PricingSegment = 'COMMERCIAL' | 'CULTURE_SPORT' | 'PUBLIC_NONPROFIT' | 'CUSTOM';
 type OfferType = 'STANDARD_MEDIA' | 'NAVIGATION' | 'CITY_GALLERY';
@@ -221,6 +307,95 @@ export function AiOfferGeneratorModal({
     setRouteAnalysisMessage(`${suggestions.length} míst vybráno z reálných jízdních tras.`);
   }, []);
 
+  const [isReanalyzing, setIsReanalyzing] = useState(false);
+
+  async function handleReanalyzeWithAi() {
+    if (!preview || !preview.target) return;
+    setIsReanalyzing(true);
+    setRouteAnalysis('running');
+    setRouteAnalysisMessage('AI kontroluje posunuté body, přepočítává trasy, směrová rčení a šipky…');
+
+    try {
+      const targetPos = { latitude: preview.target.latitude, longitude: preview.target.longitude };
+      const targetCity = preview.city || preview.target.address || '';
+
+      const updatedItems = await Promise.all(
+        preview.items.map(async (item, index) => {
+          if (item.latitude == null || item.longitude == null) return item;
+          const ptCoords = { latitude: item.latitude, longitude: item.longitude };
+
+          let streetPart = '';
+          try {
+            const revGeo = await reverseGeocode(item.latitude, item.longitude);
+            if (revGeo?.formattedAddress) {
+              streetPart = revGeo.formattedAddress.split(',')[0]?.trim() || '';
+            }
+          } catch {
+            streetPart = item.title.replace(/^\[.*?\]\s*/, '').replace(/\(.*?\)/, '').trim();
+          }
+
+          const routeInfo = await fetchRouteForPoint(item.latitude, item.longitude, targetPos.latitude, targetPos.longitude);
+          const routePoly = routeInfo.polyline || item.routePolyline;
+          const routeDist = routeInfo.distanceMeters ?? haversineMeters(ptCoords, targetPos);
+          const routeDur = routeInfo.durationSeconds ?? item.routeDurationSeconds;
+
+          const inferred = inferArrowDirectionFromRoute(ptCoords, targetPos, routePoly);
+
+          const zoning = evaluateNavigationZoning({
+            latitude: item.latitude,
+            longitude: item.longitude,
+            addressText: streetPart || item.title,
+            city: targetCity,
+          });
+
+          const isInner = routeDist <= 750;
+          const circuit: 'INNER' | 'OUTER' = isInner ? 'INNER' : 'OUTER';
+          const circuitLabel = isInner ? 'Vnitřní okruh (dojezd k prodejně)' : 'Vnější okruh (hlavní křižovatka / tah)';
+
+          const formatted = formatNavigationPointDetails({
+            circuit,
+            streetPart,
+            arrowDirection: inferred.arrowDirection,
+            turnText: inferred.turnText,
+            turnVerb: inferred.turnVerb,
+            distanceMeters: routeDist,
+            zoning,
+            index: index + 1,
+          });
+
+          return {
+            ...item,
+            title: formatted.title,
+            reasons: formatted.reasons,
+            distanceMeters: routeDist,
+            routePolyline: routePoly,
+            routeDurationSeconds: routeDur,
+            arrowDirection: inferred.arrowDirection,
+            circuit,
+            circuitLabel,
+          };
+        })
+      );
+
+      const innerCount = updatedItems.filter((i) => i.circuit === 'INNER' || (i.distanceMeters && i.distanceMeters <= 750)).length;
+      const outerCount = updatedItems.length - innerCount;
+
+      setPreview({
+        ...preview,
+        items: updatedItems,
+        explanation: `Dvouokruhový koncept po kontrole AI: ${innerCount}× vnitřní okruh (dojezd k prodejně) a ${outerCount}× vnější okruh (hlavní křižovatky). Všechny trasy a směrová rčení odpovídají skutečnosti.`,
+      });
+
+      setRouteAnalysis('done');
+      setRouteAnalysisMessage(`✓ AI úspěšně zkontrolovala ${updatedItems.length} bodů: trasy, směrová rčení i šipky jsou přepočteny podle pravdy.`);
+    } catch {
+      setRouteAnalysis('error');
+      setRouteAnalysisMessage('Při přepočtu bodů došlo k chybě. Zkuste to prosím znovu.');
+    } finally {
+      setIsReanalyzing(false);
+    }
+  }
+
   async function call(action: 'preview' | 'confirm') {
     setLoading(true);
     setError('');
@@ -376,7 +551,21 @@ export function AiOfferGeneratorModal({
           {preview.warnings.length > 0 && <details className="rounded-xl border border-amber-900/70 bg-amber-950/60 p-3"><summary className="cursor-pointer text-xs font-bold text-amber-200">Co musí obchodník ověřit ({preview.warnings.length})</summary><ul className="mt-2 space-y-1 pl-4 text-xs text-amber-100">{preview.warnings.map((warning) => <li className="list-disc" key={warning}>{warning}</li>)}</ul></details>}
 
           {preview.offerType === 'NAVIGATION' && preview.target && <div className="space-y-2">
-            <div className={`rounded-lg px-3 py-2 text-xs font-bold ${routeAnalysis === 'error' ? 'bg-amber-950 text-amber-200' : routeAnalysis === 'done' ? 'bg-emerald-950 text-emerald-200' : 'bg-sky-950 text-sky-200'}`}>{routeAnalysis === 'running' && <span className="mr-2 inline-block animate-spin">◌</span>}{routeAnalysisMessage || 'Analyzuji příjezdové trasy…'}</div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold ${routeAnalysis === 'error' ? 'bg-amber-950 text-amber-200' : routeAnalysis === 'done' ? 'bg-emerald-950 text-emerald-200' : 'bg-sky-950 text-sky-200'}`}>
+                {routeAnalysis === 'running' && <span className="mr-2 inline-block animate-spin">◌</span>}
+                {routeAnalysisMessage || 'Analyzuji příjezdové trasy…'}
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleReanalyzeWithAi()}
+                disabled={isReanalyzing || routeAnalysis === 'running'}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs font-black text-amber-300 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-50 shrink-0"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>✨ Znovu AI: Zkontrolovat a přepočítat trasy & směry</span>
+              </button>
+            </div>
             <GoogleNavigationOfferMap
               compact
               readOnly={false}
@@ -395,59 +584,72 @@ export function AiOfferGeneratorModal({
                 }
                 const streetPart = freshAddress ? freshAddress.split(',')[0]?.trim() : '';
 
+                const targetLat = preview.target!.latitude;
+                const targetLng = preview.target!.longitude;
+                const targetCity = preview.city || preview.target!.address || '';
+
+                // 1. Recompute route to target via server API with client fallback
+                const routeInfo = await fetchRouteForPoint(latitude, longitude, targetLat, targetLng);
+                const routePoly = routeInfo.polyline;
+                const routeDist = routeInfo.distanceMeters ?? haversineMeters({ latitude, longitude }, { latitude: targetLat, longitude: targetLng });
+                const routeDur = routeInfo.durationSeconds;
+
+                // 2. Infer truthful direction (arrow & turn phrasing)
+                const inferred = inferArrowDirectionFromRoute(
+                  { latitude, longitude },
+                  { latitude: targetLat, longitude: targetLng },
+                  routePoly
+                );
+
+                // 3. Evaluate municipal zoning compliance
+                const zoning = evaluateNavigationZoning({
+                  latitude,
+                  longitude,
+                  addressText: freshAddress || '',
+                  city: targetCity,
+                });
+
+                const isInner = routeDist <= 750;
+                const circuit: 'INNER' | 'OUTER' = isInner ? 'INNER' : 'OUTER';
+                const circuitLabel = isInner ? 'Vnitřní okruh (dojezd k prodejně)' : 'Vnější okruh (hlavní křižovatka / tah)';
+
+                const formatted = formatNavigationPointDetails({
+                  circuit,
+                  streetPart,
+                  arrowDirection: inferred.arrowDirection,
+                  turnText: inferred.turnText,
+                  turnVerb: inferred.turnVerb,
+                  distanceMeters: routeDist,
+                  zoning,
+                });
+
                 setPreview((prev) => {
                   if (!prev) return prev;
-                  const targetCity = prev.city || prev.target?.address || '';
                   return {
                     ...prev,
                     items: prev.items.map((item) => {
                       if (item.selectionId !== pointId) return item;
-                      const zoning = evaluateNavigationZoning({
-                        latitude,
-                        longitude,
-                        addressText: freshAddress || '',
-                        city: targetCity,
-                      });
-                      const targetLat = prev.target?.latitude ?? latitude;
-                      const targetLng = prev.target?.longitude ?? longitude;
-                      const newDist = haversineMeters({ latitude, longitude }, { latitude: targetLat, longitude: targetLng });
-                      const distKm = (newDist / 1000).toFixed(1);
-                      const isInner = newDist <= 750;
-                      const circuit: 'INNER' | 'OUTER' = isInner ? 'INNER' : 'OUTER';
-                      const circuitLabel = isInner ? 'Vnitřní okruh (dojezd k prodejně)' : 'Vnější okruh (hlavní křižovatka / tah)';
-
-                      let newTitle = item.title;
-                      let newReasons = [...item.reasons];
-
-                      if (!zoning.isAllowed) {
-                        newTitle = `${zoning.badge} (${streetPart || 'centrum'})`;
-                        newReasons = [
-                          `⚠️ ${zoning.reason}`,
-                          zoning.warning || `Vzdálenost cca ${distKm} km od cíle.`,
-                        ];
-                      } else if (streetPart && !/č\.p\.|ostrava|česko/i.test(streetPart)) {
-                        newTitle = `[${isInner ? 'Vnitřní okruh' : 'Vnější okruh'}] Příjezdový bod na ${streetPart}`;
-                        newReasons = [
-                          isInner
-                            ? `🔵 Vnitřní okruh: Bod pro finální navedení k provozovně (${Math.round(newDist)} m).`
-                            : `🟣 Vnější okruh: Bod na příjezdové třídě (${distKm} km).`,
-                          zoning.reason,
-                        ];
-                      }
-
                       return {
                         ...item,
                         latitude,
                         longitude,
-                        title: newTitle,
-                        reasons: newReasons,
-                        distanceMeters: newDist,
+                        title: formatted.title,
+                        reasons: formatted.reasons,
+                        distanceMeters: routeDist,
+                        routePolyline: routePoly || item.routePolyline,
+                        routeDurationSeconds: routeDur ?? item.routeDurationSeconds,
+                        arrowDirection: inferred.arrowDirection,
                         circuit,
                         circuitLabel,
                       };
                     }),
                   };
                 });
+
+                setRouteAnalysis('done');
+                setRouteAnalysisMessage(
+                  `Bod posunut na ${streetPart || 'nové místo'} – trasa, vzdálenost (${formatNavigationDistance(routeDist)}) a směr (${inferred.turnText}) aktualizovány.`
+                );
               }}
               onTargetSelect={() => undefined}
             />

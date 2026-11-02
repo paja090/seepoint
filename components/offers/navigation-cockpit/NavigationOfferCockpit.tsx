@@ -7,6 +7,7 @@ import { NavigationSignVisualizer } from '@/components/navigation-documentation/
 import { compressImageFile } from '@/lib/image-compress';
 import { isRestrictedHighwayOr1stClassRoad, isOstravaRestrictedZone } from '@/lib/ai-offers/navigation-constraints';
 import { formatNavigationPositionName } from '@/lib/navigation/navigation-naming';
+import { inferArrowDirectionFromRoute } from '@/lib/ai-offers/route-direction-helper';
 import {
   CARRIER_PIN_COLORS,
   detectCarrierCategory,
@@ -439,11 +440,20 @@ export function NavigationOfferCockpit({
           const ptTarget = targetList.find((t) => t.id === p.targetId) || targetList[0];
           if (!ptTarget?.latitude || !ptTarget?.longitude) return p;
           const info = await fetchRouteInfo(p.latitude, p.longitude, ptTarget.latitude, ptTarget.longitude);
-          return { ...p, ...info };
+          let arrowDir = p.arrowDirectionEnum;
+          if (info.routePolyline) {
+            const inferred = inferArrowDirectionFromRoute(
+              { latitude: p.latitude, longitude: p.longitude },
+              { latitude: ptTarget.latitude, longitude: ptTarget.longitude },
+              info.routePolyline
+            );
+            arrowDir = inferred.arrowDirection;
+          }
+          return { ...p, ...info, ...(arrowDir ? { arrowDirectionEnum: arrowDir } : {}) };
         })
       );
       setPoints(updated);
-      setMessage('✓ Všechny trasy a vzdálenosti byly úspěšně přepočítány.');
+      setMessage('✓ Všechny trasy, vzdálenosti a směry byly úspěšně přepočítány.');
       setHasUnsavedChanges(true);
     } catch {
       setMessage('Chyba při přepočtu tras.');
@@ -475,8 +485,17 @@ export function NavigationOfferCockpit({
     const ptTarget = targets[0];
 
     let routeInfo: { calculatedDistanceMeters?: number; routePolyline?: string; routeDistanceMeters?: number } = {};
+    let arrowDir: 'LEFT' | 'RIGHT' | 'STRAIGHT' = 'STRAIGHT';
     if (ptTarget?.latitude && ptTarget?.longitude) {
       routeInfo = await fetchRouteInfo(lat, lng, ptTarget.latitude, ptTarget.longitude);
+      if (routeInfo.routePolyline) {
+        const inferred = inferArrowDirectionFromRoute(
+          { latitude: lat, longitude: lng },
+          { latitude: ptTarget.latitude, longitude: ptTarget.longitude },
+          routeInfo.routePolyline
+        );
+        arrowDir = inferred.arrowDirection;
+      }
     }
 
     const autoLabel = formatNavigationPositionName({
@@ -484,7 +503,7 @@ export function NavigationOfferCockpit({
       street: streetPart || addr || city,
       city,
       distanceMeters: routeInfo.calculatedDistanceMeters,
-      direction: 'rovně',
+      direction: arrowDir === 'LEFT' ? 'vlevo' : arrowDir === 'RIGHT' ? 'vpravo' : 'rovně',
     });
 
     const newPoint: DraftPoint = {
@@ -504,7 +523,7 @@ export function NavigationOfferCockpit({
       targetId: ptTarget?.id,
       targetLatitude: ptTarget?.latitude,
       targetLongitude: ptTarget?.longitude,
-      arrowDirectionEnum: 'STRAIGHT',
+      arrowDirectionEnum: arrowDir,
       isSelectedByClient: true,
       ...routeInfo,
     };
@@ -535,9 +554,18 @@ export function NavigationOfferCockpit({
     const currentPoint = points.find((p) => p.id === id);
     const ptTarget = targets.find((t) => t.id === currentPoint?.targetId) || targets[0];
 
-    let routeInfo = {};
+    let routeInfo: { calculatedDistanceMeters?: number; routePolyline?: string; routeDistanceMeters?: number } = {};
+    let arrowDir: 'LEFT' | 'RIGHT' | 'STRAIGHT' | undefined = undefined;
     if (ptTarget?.latitude && ptTarget?.longitude) {
       routeInfo = await fetchRouteInfo(lat, lng, ptTarget.latitude, ptTarget.longitude);
+      if (routeInfo.routePolyline) {
+        const inferred = inferArrowDirectionFromRoute(
+          { latitude: lat, longitude: lng },
+          { latitude: ptTarget.latitude, longitude: ptTarget.longitude },
+          routeInfo.routePolyline
+        );
+        arrowDir = inferred.arrowDirection;
+      }
     }
 
     setPoints((curr) =>
@@ -549,6 +577,7 @@ export function NavigationOfferCockpit({
               longitude: lng,
               ...(freshAddress ? { address: freshAddress } : {}),
               ...routeInfo,
+              ...(arrowDir ? { arrowDirectionEnum: arrowDir } : {}),
             }
           : p
       )
