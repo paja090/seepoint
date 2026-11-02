@@ -4,6 +4,7 @@ import { requirePageAccess } from '@/lib/page-auth';
 import { prisma } from '@/lib/db';
 import { getOrganizationRealizationProfile } from '@/lib/ai-realization/profile';
 import { buildRealizationContext } from '@/lib/ai-realization/realization-engine';
+import { RealizationRefreshButton } from '@/components/ai-realization/RealizationRefreshButton';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -36,7 +37,14 @@ export default async function RealizationDashboardPage() {
 
   const contexts = (
     await Promise.all(
-      orders.map((o) => buildRealizationContext(o.id, user, profile))
+      orders.map(async (o) => {
+        try {
+          return await buildRealizationContext(o.id, user, profile);
+        } catch (err) {
+          console.error(`[RealizationDashboard] Error building context for order ${o.id}:`, err);
+          return null;
+        }
+      })
     )
   ).filter(Boolean);
 
@@ -47,12 +55,13 @@ export default async function RealizationDashboardPage() {
   let readyForBillingCount = 0;
 
   for (const ctx of contexts) {
-    const isCompleted = ctx!.status === 'COMPLETED' || ctx!.overallPhase === 'COMPLETED';
+    if (!ctx) continue;
+    const isCompleted = ctx.status === 'COMPLETED' || ctx.overallPhase === 'COMPLETED';
     if (!isCompleted) totalActive++;
-    if (ctx!.deadlineRisk.isAtRisk) atRiskCount++;
-    if (ctx!.blockers.some((b) => b.severity === 'BLOCKING')) blockedCount++;
-    if (ctx!.items.some((i) => !i.isPhotographed && i.isInstalled)) missingPhotosCount++;
-    if (ctx!.billingReadiness.isReady) readyForBillingCount++;
+    if (ctx.deadlineRisk?.isAtRisk) atRiskCount++;
+    if (ctx.blockers?.some((b) => b.severity === 'BLOCKING')) blockedCount++;
+    if (ctx.items?.some((i) => !i.isPhotographed && i.isInstalled)) missingPhotosCount++;
+    if (ctx.billingReadiness?.isReady) readyForBillingCount++;
   }
 
   const phaseColors: Record<string, string> = {
@@ -91,13 +100,7 @@ export default async function RealizationDashboardPage() {
             </p>
           </div>
           <div>
-            <Link
-              href="/realization"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50"
-            >
-              <RotateCcw className="h-3.5 w-3.5 text-slate-500" />
-              Obnovit přehled
-            </Link>
+            <RealizationRefreshButton />
           </div>
         </div>
 

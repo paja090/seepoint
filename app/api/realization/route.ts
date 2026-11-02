@@ -27,7 +27,14 @@ export async function GET() {
 
     const contexts = (
       await Promise.all(
-        orders.map((o) => buildRealizationContext(o.id, auth, profile))
+        orders.map(async (o) => {
+          try {
+            return await buildRealizationContext(o.id, auth, profile);
+          } catch (err) {
+            console.error(`[Realization API] Error building context for order ${o.id}:`, err);
+            return null;
+          }
+        })
       )
     ).filter(Boolean);
 

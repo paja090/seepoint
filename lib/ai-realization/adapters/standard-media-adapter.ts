@@ -17,7 +17,7 @@ export function adaptStandardMediaRealizationItems(
 ): RealizationItemContext[] {
   const referenceDate = campaignDateFrom || orderCreatedAt || new Date(0);
 
-  return realizations.map((r) => {
+  return (realizations || []).map((r) => {
     const rawPhotos = r.photos || [];
     const photos: RealizationPhotoContext[] = rawPhotos.map((p) => {
       // Historical photo check (Clarification #14 & Scenario N):
