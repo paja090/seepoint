@@ -4,6 +4,7 @@ import { MediaMixCard } from './MediaMixCard';
 import { SectionHeading } from './SectionHeading';
 
 export function MediaMix({ offer }: { offer: ProposalOffer }) {
+  const isNoPrice = offer.isNoPriceConcept;
   const totalMedia = offer.mediaMix.reduce((sum, media) => sum + media.subtotal, 0);
   const totalSurfaces = offer.mediaMix.reduce((sum, media) => sum + media.surfaceCount, 0);
 
@@ -16,17 +17,30 @@ export function MediaMix({ offer }: { offer: ProposalOffer }) {
         description="Vybraná média se vzájemně doplňují a zajišťují pokrytí pěší i automobilové dopravy."
       />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {offer.mediaMix.map((media) => (
-          <MediaMixCard
-            key={media.key}
-            media={media}
-            sharePercent={Math.round((media.subtotal / totalMedia) * 100)}
-          />
-        ))}
+        {offer.mediaMix.map((media) => {
+          const sharePercent = isNoPrice || totalMedia === 0
+            ? (totalSurfaces > 0 ? Math.round((media.surfaceCount / totalSurfaces) * 100) : 0)
+            : Math.round((media.subtotal / totalMedia) * 100);
+
+          return (
+            <MediaMixCard
+              key={media.key}
+              media={media}
+              sharePercent={sharePercent}
+              isNoPrice={isNoPrice}
+            />
+          );
+        })}
         <div className="flex flex-col justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6">
-          <p className="text-sm font-medium text-slate-500">Celkem media mix</p>
-          <p className="text-3xl font-semibold tracking-tight text-slate-950">{formatCzk(totalMedia)}</p>
-          <p className="text-sm text-slate-500">{totalSurfaces} reklamních ploch napříč {offer.mediaMix.length} typy médií.</p>
+          <p className="text-sm font-medium text-slate-500">
+            {isNoPrice ? 'Struktura kampaně' : 'Celkem media mix'}
+          </p>
+          <p className="text-3xl font-semibold tracking-tight text-slate-950">
+            {isNoPrice ? `${totalSurfaces} nosičů` : formatCzk(totalMedia)}
+          </p>
+          <p className="text-sm text-slate-500">
+            {totalSurfaces} reklamních ploch napříč {offer.mediaMix.length} typy médií pro maximální vizuální zásah.
+          </p>
         </div>
       </div>
     </section>

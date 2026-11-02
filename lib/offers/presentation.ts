@@ -91,6 +91,7 @@ export type ProposalOffer = {
   conditions: Array<{ id: string; text: string }>;
   navigationTarget?: { name: string; latitude: number; longitude: number } | null;
   offerType?: string;
+  isNoPriceConcept?: boolean;
   rawOffer?: OfferView;
   campaignPhases?: ProposalCampaignPhase[] | null;
   campaignStrategy?: ProposalCampaignStrategy | null;
@@ -314,9 +315,11 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
   }
 
   const rentalTotal = offer.offerType === 'NAVIGATION' ? number(offer.subtotal) : offer.items.reduce((sum, item) => sum + number(item.subtotal), 0);
+  const isNoPriceConcept = Boolean((offer as unknown as { isNoPriceConcept?: boolean }).isNoPriceConcept);
 
   return {
     id: offer.id ?? 'public-offer',
+    isNoPriceConcept,
     status: (['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED'].includes(offer.status) ? offer.status : 'DRAFT') as ProposalStatus,
     title: offer.campaignName || offer.title,
     subtitle: offer.title,
@@ -528,7 +531,12 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
       ]
     ) : [],
     caseStudies: [],
-    conditions: [
+    conditions: isNoPriceConcept ? [
+      { id: 'validity', text: 'Tento návrh je nezávazný a slouží k projednání výběru optimálních lokalit a reklamních formátů.' },
+      { id: 'availability', text: 'Dostupnost ploch a termíny budou závazně prověřeny a zarezervovány po odsouhlasení konceptu.' },
+      { id: 'pricing', text: 'Konečná cenová kalkulace bude zpracována na míru podle vámi schváleného výběru nosičů a délky kampaně.' },
+      { id: 'turnkey', text: 'Zajistíme kompletní realizaci na klíč: kontrolu tiskových dat, velkoformátový UV tisk, instalaci a 100% fotodokumentaci.' },
+    ] : [
       { id: 'validity', text: `Nabídka je platná do ${asDate(offer.validUntil)}.` },
       { id: 'availability', text: 'Realizace podléhá finálnímu technickému a místnímu schválení dotčených úřadů/vlastníků.' },
       { id: 'dates', text: `Navržený termín kampaně: ${asDate(from)} – ${asDate(to)}.` },

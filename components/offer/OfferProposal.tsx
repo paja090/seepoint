@@ -121,7 +121,7 @@ export function OfferProposal({
         </div>
 
         {/* 5. Pricing & Financial Breakdown */}
-        <PricingSummary offer={offer} />
+        <PricingSummary offer={offer} onRequestPricing={() => setAction('approve')} />
 
         {/* 6. Media Mix Overview */}
         <MediaMix offer={offer} />
@@ -155,13 +155,21 @@ export function OfferProposal({
             onApprove={() => setAction('approve')}
             onRevision={() => setAction('revision')}
             onQuestion={() => setAction('question')}
+            isNoPrice={offer.isNoPriceConcept}
           />
         )}
       </main>
 
       {variant === 'public' && <PublicOfferFooter branding={branding} />}
 
-      <OfferActionDialog action={action} offerStatus={offer.status} onClose={() => setAction(null)} onReject={() => setAction('reject')} token={token} />
+      <OfferActionDialog
+        action={action}
+        offerStatus={offer.status}
+        onClose={() => setAction(null)}
+        onReject={() => setAction('reject')}
+        token={token}
+        isNoPriceConcept={offer.isNoPriceConcept}
+      />
 
       {/* Lightbox Photo Preview Modal */}
       {lightboxPhoto && (

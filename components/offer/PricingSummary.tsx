@@ -4,7 +4,131 @@ import { Receipt, ShieldCheck, Calendar, CreditCard, Sparkles } from 'lucide-rea
 import type { ProposalOffer } from '@/lib/offers/presentation';
 import { formatCzk, formatCzkDecimal } from '@/lib/offers/presentation';
 
-export function PricingSummary({ offer }: { offer: ProposalOffer }) {
+export function PricingSummary({ offer, onRequestPricing }: { offer: ProposalOffer; onRequestPricing?: () => void }) {
+  if (offer.isNoPriceConcept) {
+    return (
+      <section aria-labelledby="concept-pricing-heading" className="rounded-3xl border border-purple-200/80 bg-gradient-to-br from-white via-purple-50/20 to-sky-50/30 p-6 shadow-sm lg:p-8">
+        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-purple-100 pb-5">
+          <div className="flex items-center gap-3">
+            <div className="inline-flex size-11 items-center justify-center rounded-2xl bg-purple-100 text-purple-700 ring-1 ring-purple-200">
+              <Sparkles aria-hidden size={22} />
+            </div>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-950" id="concept-pricing-heading">
+                Strategický balíček kampaně na klíč
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500">
+                Připraveno pro společnost {offer.client.name} — nezávazný koncept k výběru lokalit a stanovení rozpočtu.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-100/80 px-3.5 py-1 text-xs font-bold text-purple-900 ring-1 ring-purple-300">
+              <ShieldCheck size={14} className="text-purple-700" /> Nezávazný koncept k projednání
+            </span>
+          </div>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
+          {/* Left: 4 pillars included */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+              Co všechno tento balíček zahrnuje
+            </h3>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-sm text-slate-900">
+                  <span className="text-base">🎯</span>
+                  <span>Výběr & rezervace ploch</span>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Prověření volných kapacit v požadovaném termínu a přednostní opce na schválené lokality.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-sm text-slate-900">
+                  <span className="text-base">🖨️</span>
+                  <span>UV tisk & tisková data</span>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Kontrola grafiky, předtisková příprava a velkoformátový tisk odolnými pigmentovými barvami.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-sm text-slate-900">
+                  <span className="text-base">🛠️</span>
+                  <span>Profesionální montáž</span>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Instalace našimi certifikovanými výlepovými týmy v přesně odsouhlasený den startu.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-sm text-slate-900">
+                  <span className="text-base">📸</span>
+                  <span>100% fotodokumentace</span>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Protokolární fotoreport každé plochy po instalaci přímo v klientském portálu.
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed pt-1">
+              * Po výběru finálních lokalit připravíme položkovou kalkulaci s garantovanou fixní cenou bez skrytých poplatků.
+            </p>
+          </div>
+
+          {/* Right: CTA box */}
+          <div className="flex flex-col gap-4 rounded-3xl border border-purple-900/60 bg-gradient-to-br from-slate-950 via-slate-900 to-purple-950 p-6 sm:p-7 text-white shadow-xl">
+            <div className="space-y-1">
+              <span className="text-[11px] font-black uppercase tracking-widest text-purple-300">
+                Cenová kalkulace na míru
+              </span>
+              <div className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                Rozpočet na vyžádání
+              </div>
+              <p className="text-xs text-slate-300 pt-1 leading-relaxed">
+                Pošlete nám svůj zájem. Obchodník obratem ověří termíny a spočítá přesnou částku pro {offer.carriers.length} vybraných nosičů.
+              </p>
+            </div>
+
+            {onRequestPricing && (
+              <button
+                type="button"
+                onClick={onRequestPricing}
+                className="mt-2 inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm shadow-lg transition active:scale-95 cursor-pointer"
+              >
+                <Sparkles size={16} />
+                Požádat o cenovou kalkulaci
+              </button>
+            )}
+
+            <div className="border-t border-white/10 pt-3 space-y-1.5 text-xs text-slate-400">
+              <div className="flex justify-between">
+                <span>Doporučený počet nosičů:</span>
+                <span className="font-bold text-white">{offer.carriers.length} ks</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Kategorie médií:</span>
+                <span className="font-bold text-white">{offer.mediaMix.length} typy</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Platnost konceptu:</span>
+                <span className="font-bold text-white">{offer.validUntil}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   const regularRows = offer.pricing.filter((r) => r.emphasis !== 'total');
   const totalRow = offer.pricing.find((r) => r.emphasis === 'total');
 
