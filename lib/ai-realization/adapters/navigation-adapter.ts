@@ -48,7 +48,7 @@ export function adaptNavigationPointsToRealizationItems(
   navOrder: NavigationOrderWithPoints,
   fallbackAssignedUserId?: string | null
 ): RealizationItemContext[] {
-  return navOrder.points.map((p) => {
+  return (navOrder?.points || []).map((p) => {
     const photos: RealizationPhotoContext[] = [];
 
     if (p.installedPhoto) {

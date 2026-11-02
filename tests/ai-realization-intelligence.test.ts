@@ -1042,4 +1042,47 @@ describe('AI Realization Intelligence (AI Commercial Engine Phase)', () => {
     assert.ok(actions[0]?.title.includes('Schválit fotodokumentaci'));
     assert.equal(actions[0]?.targetUrl, '/navigation/orders/nav-ord-ff');
   });
+
+  /**
+   * SCENARIO S: Defensive handling of missing or undefined points/realizations/clients
+   */
+  it('Scenario S: Defensive handling of empty or undefined points and realizations', () => {
+    // 1. Navigation adapter with undefined points does not crash
+    const emptyNavOrder = {
+      id: 'nav-empty',
+      points: undefined as unknown as NavigationOrderWithPoints['points'],
+    } as unknown as NavigationOrderWithPoints;
+    const navItems = adaptNavigationPointsToRealizationItems(emptyNavOrder);
+    assert.deepEqual(navItems, [], 'Undefined navigation points must return empty array without crashing');
+
+    // 2. Standard media adapter with undefined realizations does not crash
+    const mediaItems = adaptStandardMediaRealizationItems(
+      undefined as unknown as CrmRealizationWithRelations[]
+    );
+    assert.deepEqual(mediaItems, [], 'Undefined realizations must return empty array without crashing');
+
+    // 3. Evaluation on minimal context does not crash
+    const minimalContext = {
+      organizationId: TENANT_A,
+      orderId: 'crm-minimal',
+      orderNumber: 'MIN-001',
+      clientId: 'cli-min',
+      clientName: 'Klient bez názvu',
+      projectType: 'STANDARD_MEDIA',
+      status: 'DRAFT',
+      campaign: {},
+      items: [],
+      tasks: [],
+      printJobs: [],
+      photos: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const evaluation = evaluateRealization(minimalContext);
+    assert.ok(evaluation);
+    assert.equal(evaluation.billingReadiness.isReady, false);
+    assert.equal(evaluation.overallPhase, 'PREPARATION');
+  });
 });
+
