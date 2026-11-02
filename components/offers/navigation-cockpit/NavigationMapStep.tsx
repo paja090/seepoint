@@ -4,11 +4,7 @@ import { useState } from 'react';
 import {
   Plus,
   Crosshair,
-  RefreshCw,
-  MapPin,
-  Compass,
-  AlertCircle,
-  HelpCircle,
+  Sparkles,
 } from 'lucide-react';
 import type { DraftPoint, DraftTarget } from './types';
 import { GoogleNavigationOfferMap } from '../GoogleNavigationOfferMap';
@@ -149,11 +145,11 @@ export function NavigationMapStep({
               type="button"
               disabled={recalculatingRoutes}
               onClick={() => void onRecalculateRoutes()}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              title="Přepočítat reálné jízdní trasy přes Google Routes API"
+              className="rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 via-sky-50 to-blue-50 px-3.5 py-2 text-xs font-black text-indigo-950 hover:border-indigo-300 hover:from-indigo-100 hover:to-blue-100 shadow-2xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="Spustit AI kontrolu: vypočte reálné trasy, směry šipek (vpravo/vlevo/rovně), vzdálenosti, zóny a pravdivá směrová rčení"
             >
-              <RefreshCw size={14} className={recalculatingRoutes ? 'animate-spin text-sky-600' : ''} />
-              <span>{recalculatingRoutes ? 'Přepočítávám trasy...' : 'Přepočítat trasy'}</span>
+              <Sparkles size={14} className={`text-indigo-600 ${recalculatingRoutes ? 'animate-spin' : ''}`} />
+              <span>{recalculatingRoutes ? 'AI kontroluje trasy a směry...' : '✨ AI Kontrola tras a směrových rčení'}</span>
             </button>
           )}
         </div>

@@ -30,7 +30,17 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
   }
 
   const domainChecks = offer.offerType === 'NAVIGATION'
-    ? [{ label: 'Cíl a GPS navigace', complete: Boolean(offer.navigation?.targetName) }, { label: 'Naplánované navigační body', complete: Boolean(offer.navigation?.points.length) }]
+    ? [
+        { label: 'Cíl a GPS navigace', complete: Boolean(offer.navigation?.targetName) },
+        { label: 'Naplánované navigační body', complete: Boolean(offer.navigation?.points.length) },
+        {
+          label: 'AI kontrola tras a směrových šipek',
+          complete: Boolean(
+            offer.navigation?.points.length &&
+            offer.navigation.points.every((p) => p.routePolyline && p.arrowDirectionEnum)
+          ),
+        },
+      ]
     : offer.offerType === 'CITY_GALLERY'
       ? [{ label: 'Koncept projektu', complete: Boolean(offer.cityGallery?.concept) }, { label: 'Lokalita nebo zadání prostoru', complete: Boolean(offer.cityGallery?.locationBrief) }]
       : [{ label: 'Vybrané reklamní plochy', complete: offer.items.length > 0 }, { label: 'Termíny kampaně', complete: offer.items.length > 0 && offer.items.every((item) => item.dateFrom && item.dateTo) }];

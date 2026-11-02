@@ -42,6 +42,11 @@ export function offerReadinessChecks(offer: OfferView, conflicts: OfferConflictV
   if (type === 'NAVIGATION') {
     const targetReady = Boolean(offer.navigation?.targetName && Number.isFinite(offer.navigation.targetLatitude) && Number.isFinite(offer.navigation.targetLongitude));
     const pointsReady = Boolean(offer.navigation?.points.length && offer.navigation.points.every((point) => point.label && Number.isFinite(point.latitude) && Number.isFinite(point.longitude)));
+    const routesReady = Boolean(
+      offer.navigation?.points.length &&
+      offer.navigation.points.every((point) => Boolean(point.routePolyline && point.arrowDirectionEnum))
+    );
+    const missingRoutesCount = offer.navigation?.points.filter((point) => !point.routePolyline || !point.arrowDirectionEnum).length ?? 0;
     const visualsReady = Boolean(offer.navigation?.points.length && offer.navigation.points.every((point) => Boolean((point as unknown as Record<string, unknown>).visualizedPhotoUrl)));
     const missingVisuals = offer.navigation?.points.filter((point) => !((point as unknown as Record<string, unknown>).visualizedPhotoUrl)).length ?? 0;
     const sitePhotosReady = Boolean(offer.navigation?.points.length && offer.navigation.points.every((point) => Boolean(point.sitePhotoId)));
@@ -50,6 +55,14 @@ export function offerReadinessChecks(offer: OfferView, conflicts: OfferConflictV
       ...common,
       { id: 'target', label: 'Cíl navigace', detail: targetReady ? 'Cíl má název a GPS pozici.' : 'Doplňte cíl a jeho GPS pozici.', status: targetReady ? 'ok' : 'error' },
       { id: 'points', label: 'Navigační body', detail: pointsReady ? `${offer.navigation?.points.length ?? 0} bodů má název a GPS pozici.` : 'Přidejte alespoň jeden kompletní navigační bod.', status: pointsReady ? 'ok' : 'error' },
+      {
+        id: 'navigationAiRoutes',
+        label: 'AI kontrola tras a směrových šipek',
+        detail: routesReady
+          ? 'Všechny navigační body mají spočítanou jízdní trasu a ověřený směr šipky podle pravdy.'
+          : `U ${missingRoutesCount} bodů chybí ověřená jízdní trasa nebo směrová šipka (spusťte AI kontrolu).`,
+        status: routesReady ? 'ok' : 'warning',
+      },
       { id: 'navigationSitePhotos', label: 'Terénní fotografie sloupů', detail: sitePhotosReady ? 'Každý návrhový bod má fotografii reálného sloupu.' : `Nahrajte fotografii reálného sloupu u ${missingSitePhotos} navigačních bodů a podle ní ověřte polohu.`, status: sitePhotosReady ? 'ok' : 'error' },
       { id: 'navigationVisuals', label: 'Fotografie a vizualizace bodů', detail: visualsReady ? 'Každý navigační bod má klientský vizuál umístění.' : `Doplňte fotografii nebo vizualizaci u ${missingVisuals} navigačních bodů.`, status: visualsReady ? 'ok' : 'error' },
     ];

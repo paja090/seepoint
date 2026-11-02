@@ -3,6 +3,7 @@
 import { hasSeePointPortfolio, navigationPresentation, offerBrandName } from '@/lib/offers/branding';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Store,
   Compass,
@@ -42,6 +43,14 @@ const money = (val: string | number | null | undefined) =>
   new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 }).format(
     Number(val || 0),
   );
+
+function useSafeRouter() {
+  try {
+    return useRouter();
+  } catch {
+    return null;
+  }
+}
 
 export function ArrowBadge({ arrowEnum }: { arrowEnum?: string | null }) {
   switch (arrowEnum) {
@@ -296,6 +305,51 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
       ((offer.campaignStrategy as Record<string, unknown> | null)?.dateTo as string | undefined) || offer.items[0]?.dateTo
     );
   });
+
+  const router = useSafeRouter();
+  const [runningAiCheck, setRunningAiCheck] = useState(false);
+  const [aiCheckMessage, setAiCheckMessage] = useState<string | null>(null);
+  const [aiCheckSeverity, setAiCheckSeverity] = useState<'success' | 'warning' | 'error' | null>(null);
+
+  async function handleRunAiCheck() {
+    if (!offer.id) return;
+    setRunningAiCheck(true);
+    setAiCheckMessage('AI provádí kontrolu tras, směrových šipek a zón...');
+    setAiCheckSeverity(null);
+    try {
+      const res = await fetch(`/api/offers/${encodeURIComponent(offer.id)}/navigation-ai-check`, {
+        method: 'POST',
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        message?: string;
+        error?: string;
+        zoningWarnings?: Array<{ label: string; reason: string }>;
+      };
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || 'Kontrola selhala');
+      }
+      if (data.zoningWarnings && data.zoningWarnings.length > 0) {
+        setAiCheckSeverity('warning');
+        setAiCheckMessage(
+          data.message ||
+            `AI zkontrolovala trasy. Pozor: ${data.zoningWarnings.length} bodů leží v regulované nebo památkové zóně.`
+        );
+      } else {
+        setAiCheckSeverity('success');
+        setAiCheckMessage(
+          data.message ||
+            '✓ Všechny trasy a směrové šipky byly úspěšně zkontrolovány a aktualizovány podle pravdy.'
+        );
+      }
+      router?.refresh();
+    } catch (err) {
+      setAiCheckSeverity('error');
+      setAiCheckMessage(err instanceof Error ? err.message : 'Chyba při spuštění AI kontroly.');
+    } finally {
+      setRunningAiCheck(false);
+    }
+  }
 
   async function handleArtworkFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -657,7 +711,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
       <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
         {/* Interactive Map */}
         <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-          <div className="flex items-center justify-between px-2 pt-1">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-2 pt-1">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <Compass size={18} className="text-sky-600" /> Interaktivní mapa navigační trasy
             </h3>
@@ -665,6 +719,71 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
               {displayedPoints.length} bodů v zobrazení
             </span>
           </div>
+
+          {/* AI Route & Direction Verification Toolbar for Internal Staff */}
+          {isInternalOfferPage && (
+            <div className="rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-50/80 via-sky-50/60 to-blue-50/80 p-3 space-y-2">
+              {(() => {
+                const pointsWithRoutes = displayedPoints.filter((p) => {
+                  const pObj = p as unknown as Record<string, unknown>;
+                  return Boolean(pObj.routePolyline && pObj.arrowDirectionEnum);
+                }).length;
+                const allRoutesVerified = pointsWithRoutes === displayedPoints.length && displayedPoints.length > 0;
+                return (
+                  <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2 text-indigo-950">
+                      <Sparkles size={16} className="text-indigo-600 shrink-0" />
+                      <div>
+                        <span className="font-bold">AI Kontrola tras a směrových rčení:</span>{' '}
+                        {allRoutesVerified ? (
+                          <span className="text-emerald-800 font-semibold">
+                            ✓ Všech {pointsWithRoutes} bodů má ověřenou jízdní trasu a šipku podle pravdy.
+                          </span>
+                        ) : (
+                          <span className="text-amber-800 font-semibold">
+                            {pointsWithRoutes} z {displayedPoints.length} bodů má vypočtenou trasu. Spusťte AI kontrolu pro ověření zbývajících tras a směrů.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        disabled={runningAiCheck}
+                        onClick={() => void handleRunAiCheck()}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-900 shadow-2xs hover:bg-indigo-50 transition cursor-pointer disabled:opacity-50"
+                        title="AI přepočte reálné trasy a směrové šipky (vpravo/vlevo/rovně) podle skutečné jízdy k prodejně"
+                      >
+                        <RefreshCw size={13} className={runningAiCheck ? 'animate-spin text-indigo-600' : ''} />
+                        <span>{runningAiCheck ? 'AI kontroluje trasy...' : allRoutesVerified ? 'Znovu prověřit AI trasy' : '✨ Spustit AI kontrolu tras'}</span>
+                      </button>
+                      <a
+                        href={`/offers/${offer.id}/navigation/edit`}
+                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                      >
+                        Upravit v editoru
+                      </a>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {aiCheckMessage && (
+                <div
+                  className={`rounded-xl px-3 py-2 text-xs font-medium border ${
+                    aiCheckSeverity === 'success'
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                      : aiCheckSeverity === 'warning'
+                      ? 'border-amber-200 bg-amber-50 text-amber-900'
+                      : 'border-rose-200 bg-rose-50 text-rose-900'
+                  }`}
+                >
+                  {aiCheckMessage}
+                </div>
+              )}
+            </div>
+          )}
 
           <GoogleNavigationOfferMap
             readOnly
