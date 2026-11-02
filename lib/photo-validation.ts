@@ -5,6 +5,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   jpeg: 'image/jpeg',
   png: 'image/png',
   webp: 'image/webp',
+  svg: 'image/svg+xml',
 };
 
 export class PhotoValidationError extends Error {
@@ -18,7 +19,7 @@ export class PhotoValidationError extends Error {
   }
 }
 
-function detectedMimeType(header: Uint8Array) {
+function detectedMimeType(header: Uint8Array, allowSvg = false) {
   if (header.length >= 3 && header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff) return 'image/jpeg';
   if (
     header.length >= 8
@@ -30,12 +31,18 @@ function detectedMimeType(header: Uint8Array) {
     && String.fromCharCode(...header.slice(0, 4)) === 'RIFF'
     && String.fromCharCode(...header.slice(8, 12)) === 'WEBP'
   ) return 'image/webp';
+  if (allowSvg && header.length >= 4) {
+    const head = String.fromCharCode(...header).trimStart().toLowerCase();
+    if (head.startsWith('<svg') || head.startsWith('<?xml') || head.includes('<svg')) {
+      return 'image/svg+xml';
+    }
+  }
   return null;
 }
 
 export async function validatePhotoFile(
   value: FormDataEntryValue | null,
-  options: { required?: boolean; maxBytes?: number } = {},
+  options: { required?: boolean; maxBytes?: number; allowSvg?: boolean } = {},
 ) {
   const required = options.required ?? true;
   if (!(value instanceof File)) {
@@ -53,15 +60,27 @@ export async function validatePhotoFile(
     );
   }
 
-  const header = new Uint8Array(await value.slice(0, 12).arrayBuffer());
-  const detected = detectedMimeType(header);
+  const sliceSize = options.allowSvg ? Math.min(256, value.size) : 12;
+  const header = new Uint8Array(await value.slice(0, sliceSize).arrayBuffer());
+  const detected = detectedMimeType(header, options.allowSvg);
   const extension = value.name.split('.').pop()?.toLowerCase() || '';
   const declared = value.type.trim().toLowerCase();
+  const normalizedDeclared = declared === 'image/x-png'
+    ? 'image/png'
+    : declared === 'image/pjpeg'
+      ? 'image/jpeg'
+      : declared;
   const extensionMime = MIME_BY_EXTENSION[extension] || null;
 
-  if (!detected || (declared && declared !== detected) || (extensionMime && extensionMime !== detected)) {
+  if (
+    !detected ||
+    (normalizedDeclared && normalizedDeclared !== detected && (!options.allowSvg || !declared.includes('svg'))) ||
+    (extensionMime && extensionMime !== detected)
+  ) {
     throw new PhotoValidationError(
-      'Povolené formáty fotografií jsou JPEG, PNG a WebP.',
+      options.allowSvg
+        ? 'Povolené formáty fotografií a log jsou JPEG, PNG, WebP a SVG.'
+        : 'Povolené formáty fotografií jsou JPEG, PNG a WebP.',
       'INVALID_IMAGE',
       415,
     );
