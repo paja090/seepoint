@@ -1,6 +1,6 @@
 'use client';
 
-import { LogOut, MessageSquare, PhoneCall, Sparkles } from 'lucide-react';
+import { Camera, LogOut, MessageSquare, PhoneCall, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { AppRole } from '@/lib/rbac';
@@ -22,6 +22,7 @@ const pageTitles: Array<[string, string]> = [
   ['/carriers', 'Evidence nosičů'],
   ['/land-permits', 'Pozemky & Katastr (ČÚZK)'],
   ['/field-survey', 'Terénní průzkum ploch'],
+  ['/mobile-photos', 'Foťák zakázek'],
   ['/occupancy', 'Obsazenost ploch'],
   ['/clients', 'Klienti'],
   ['/offers', 'Nabídky'],
@@ -94,6 +95,17 @@ export function AppTopbar({
 
       {/* Right: Unified Single-Row Toolbar */}
       <div className="app-topbar-actions flex items-center gap-1.5 xl:gap-2 shrink-0">
+        {['ADMIN', 'MANAGER', 'SALES', 'TECHNICIAN', 'WORKER'].includes(user.role) && (
+          <Link
+            href="/mobile-photos"
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-2.5 xl:px-3 text-xs font-bold text-white shadow-xs hover:bg-emerald-500 transition"
+            title="📸 Foťák zakázek — rychlé focení aktivních kampaní celým týmem"
+          >
+            <Camera size={14} />
+            <span className="hidden xl:inline">Foťák</span>
+          </Link>
+        )}
+
         {onAiQuickTask && (
           <button
             type="button"

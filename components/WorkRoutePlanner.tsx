@@ -4,7 +4,7 @@ import { planningDayOffset, planningStopHref } from '@/lib/field-planning/presen
 import { PostponeRouteButton } from '@/components/election-removal/PostponeRouteButton';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CrewInput, PlanningInput, PlanningProfile, PlanView } from '@/lib/field-planning/contracts';
+import type { CrewInput, PlanningInput, PlanningProfile, PlanView, ScheduledRouteDay } from '@/lib/field-planning/contracts';
 import { RouteMap } from './field-planning/RouteMap';
 import { PlanningProfileForm } from './field-planning/PlanningProfileForm';
 import { FieldTelemetryCard } from './field-planning/FieldTelemetryCard';
@@ -28,7 +28,19 @@ import {
   X,
 } from 'lucide-react';
 
-type Loaded = { profile: PlanningProfile | null; data: PlanningInput | null; plans: PlanView[] };
+type Loaded = {
+  profile: PlanningProfile | null;
+  data: PlanningInput | null;
+  plans: PlanView[];
+  scheduledDays?: ScheduledRouteDay[];
+};
+
+function formatDayChip(dateStr: string) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return dateStr;
+  const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  return dt.toLocaleDateString('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric', timeZone: 'UTC' });
+}
 
 function getPlanSummaryDetails(p: PlanView) {
   const allStops = p.result.crews.flatMap((c) => c.stops);
@@ -138,9 +150,21 @@ export function WorkRoutePlanner({
     crewName: string;
     currentWorkerNames: string[];
     currentEmployeeIds: string[];
+    currentVehicleId: string | null;
   } | null>(null);
   const [transferTargetId, setTransferTargetId] = useState('');
+  const [transferVehicleId, setTransferVehicleId] = useState('');
   const [transferMode, setTransferMode] = useState<'replace_first' | 'replace_all'>('replace_first');
+
+  const [rescheduleModal, setRescheduleModal] = useState<{
+    open: boolean;
+    crewId?: string;
+    crewName?: string;
+  } | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleStartTime, setRescheduleStartTime] = useState('');
+  const [rescheduleScope, setRescheduleScope] = useState<'plan' | 'crew'>('plan');
+
   const [toast, setToast] = useState<string | null>(null);
 
   const requestKey = useRef<string | null>(null);
@@ -181,6 +205,7 @@ export function WorkRoutePlanner({
     const { crewId, crewName } = transferModal;
     const targetEmp = loaded?.data?.employees.find((e) => e.id === transferTargetId);
     const targetName = targetEmp?.name || 'vybraného montážníka';
+    const nextVehicleId = transferVehicleId || null;
 
     setTransferModal(null);
 
@@ -189,11 +214,12 @@ export function WorkRoutePlanner({
         prev.map((c) => {
           if (c.id !== crewId) return c;
           if (transferMode === 'replace_all' || c.employeeIds.length <= 1) {
-            return { ...c, employeeIds: [transferTargetId] };
+            return { ...c, employeeIds: [transferTargetId], vehicleId: nextVehicleId };
           }
           return {
             ...c,
             employeeIds: [transferTargetId, ...c.employeeIds.slice(1).filter((id) => id !== transferTargetId)],
+            vehicleId: nextVehicleId,
           };
         })
       );
@@ -215,6 +241,7 @@ export function WorkRoutePlanner({
           crewId,
           targetEmployeeId: transferTargetId,
           mode: transferMode,
+          vehicleId: nextVehicleId,
         }),
       });
       const data = await res.json();
@@ -225,7 +252,9 @@ export function WorkRoutePlanner({
         prev.map((c) => {
           if (c.id !== crewId) return c;
           const updated = data.result.crews.find((rc: { id: string }) => rc.id === crewId);
-          return updated ? { ...c, employeeIds: updated.employeeIds, name: updated.name } : c;
+          return updated
+            ? { ...c, employeeIds: updated.employeeIds, vehicleId: updated.vehicleId ?? null, name: updated.name }
+            : c;
         })
       );
       setToast(`Trasa ${crewName} byla úspěšně předána na pracovníka: ${targetName}.`);
@@ -237,23 +266,97 @@ export function WorkRoutePlanner({
     }
   }
 
+  function openReschedule(crewId?: string, crewName?: string) {
+    const defaultTarget = planningDayOffset(
+      new Date(`${date}T12:00:00Z`),
+      loaded?.profile?.timezone ?? 'Europe/Prague',
+      1
+    );
+    setRescheduleDate(defaultTarget);
+    setRescheduleStartTime('');
+    setRescheduleScope(crewId && (plan?.result.crews.length ?? 0) > 1 ? 'crew' : 'plan');
+    setRescheduleModal({ open: true, crewId, crewName });
+  }
+
+  async function handleRescheduleSubmit() {
+    if (!plan?.id || !rescheduleDate) return;
+    const target = rescheduleDate;
+    const scope = rescheduleScope;
+    const crewId = scope === 'crew' ? rescheduleModal?.crewId : undefined;
+    setRescheduleModal(null);
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/work/route', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'reschedulePlan',
+          id: plan.id,
+          targetDate: target,
+          ...(crewId ? { crewId } : {}),
+          ...(rescheduleStartTime ? { startTime: rescheduleStartTime } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Přesun trasy selhal.');
+      setToast(`Trasa byla úspěšně přesunuta na ${formatDayChip(target)} (${target}).`);
+      setTimeout(() => setToast(null), 4500);
+      if (target !== date) {
+        setDate(target);
+      } else {
+        await load();
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Přesun trasy na jiný den selhal.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleStartAdditionalRoute() {
+    const busyEmpIds = new Set(plan?.result.crews.flatMap((c) => c.employeeIds) ?? []);
+    const busyVehIds = new Set(plan?.result.crews.map((c) => c.vehicleId).filter(Boolean) ?? []);
+    const nextEmp = loaded?.data?.employees.find((e) => e.isActive && e.available && !busyEmpIds.has(e.id));
+    const nextVeh = loaded?.data?.vehicles.find((v) => v.status === 'AVAILABLE' && !v.reserved && !busyVehIds.has(v.id));
+    const freeJobIds =
+      loaded?.data?.jobs
+        .filter((j) => !j.blockedReason && !['DONE', 'CANCELLED'].includes(j.status))
+        .map((j) => j.id) ?? [];
+
+    setPlan(null);
+    setCrews([
+      {
+        id: crypto.randomUUID(),
+        name: `Další trasa ${(loaded?.plans.length ?? 1) + 1}`,
+        employeeIds: nextEmp ? [nextEmp.id] : [],
+        vehicleId: nextVeh ? nextVeh.id : null,
+      },
+    ]);
+    setSelectedJobs(freeJobIds);
+    setInputsChanged(false);
+    setActiveTab('crews');
+    setToast('Připraven čistý návrh pro další samostatnou trasu v tento den.');
+    setTimeout(() => setToast(null), 4000);
+  }
+
   const load = useCallback(async () => {
     const ticket = ++loadCounter.current;
     setError('');
     try {
-      const response = await fetch(`/api/work/route?date=${date}${unified ? '&source=dispatch'+(initialJobIds?.length?'&jobs='+encodeURIComponent(initialJobIds.join(',')):'') : standardOnly ? '&source=work' : ''}`);
+      const response = await fetch(`/api/work/route?date=${date}${unified ? '&source=dispatch' : standardOnly ? '&source=work' : ''}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       if (ticket !== loadCounter.current) return;
 
       setInputsChanged(false);
 
-
-      if(initialPlanId && !(data.plans as PlanView[]).some(p=>p.id===initialPlanId)){
-        const selected=await fetch('/api/work/route?id='+encodeURIComponent(initialPlanId));
-        const value=await selected.json();if(!selected.ok)throw new Error(value.error || 'Výjezd není dostupný.');
-        if(ticket!==loadCounter.current)return;
-        data.plans=[value,...data.plans];
+      if (initialPlanId && !(data.plans as PlanView[]).some((p) => p.id === initialPlanId)) {
+        const selected = await fetch('/api/work/route?id=' + encodeURIComponent(initialPlanId));
+        const value = await selected.json();
+        if (!selected.ok) throw new Error(value.error || 'Výjezd není dostupný.');
+        if (ticket !== loadCounter.current) return;
+        data.plans = [value, ...data.plans];
       }
       setLoaded(data);
       const activePlan = initialPlanId
@@ -301,15 +404,19 @@ export function WorkRoutePlanner({
         if (validInitial.length > 0) {
           setInputsChanged(true);
           setActiveTab('jobs');
-          setToast(`Z plánu práce bylo vybráno ${validInitial.length} zakázek k naplánování.`);
-          setTimeout(() => setToast(null), 4000);
+          setToast(
+            activePlan
+              ? `Do trasy bylo předvybráno ${validInitial.length} zakázek — klikněte na „Aktualizovat tuto trasu“.`
+              : `Z plánu práce bylo vybráno ${validInitial.length} zakázek k naplánování.`
+          );
+          setTimeout(() => setToast(null), 5000);
         }
       } else if (activePlanJobIds.length > 0) {
         jobsToSelect = [...new Set(activePlanJobIds)];
       } else {
         jobsToSelect =
           data.data?.jobs
-            ?.filter((j: { status: string }) => !['DONE', 'CANCELLED'].includes(j.status))
+            ?.filter((j: { status: string; blockedReason?: string }) => !['DONE', 'CANCELLED'].includes(j.status) && !j.blockedReason)
             ?.map((j: { id: string }) => j.id) ?? [];
       }
       setSelectedJobs(jobsToSelect);
@@ -379,7 +486,7 @@ export function WorkRoutePlanner({
                 requestKey: requestKey.current,
                 crews: crews.filter((c) => c.employeeIds.length > 0),
                 jobIds: selectedJobs,
-                ...(kind === 'replan' ? { parentPlanId: plan?.id } : {}),
+                ...(kind === 'replan' && plan?.id ? { parentPlanId: plan.id } : {}),
               }
             : { action: kind, id: plan?.id, acceptEstimated }
         ),
@@ -422,10 +529,12 @@ export function WorkRoutePlanner({
 
   const visibleJobs =
     loaded?.data?.jobs.filter((j) => {
+      const isFieldJob = Boolean(j.electionRemovalPointId || j.fieldWorkStepId);
       const matchesSource =
         sourceFilter === 'all' ||
         (sourceFilter === 'navigation' && Boolean(j.navigationPointId)) ||
-        (sourceFilter === 'work' && !j.navigationPointId);
+        (sourceFilter === 'field' && isFieldJob) ||
+        (sourceFilter === 'work' && !j.navigationPointId && !isFieldJob);
       const isCurrentPlanJob = currentPlanJobIds.has(j.id);
       const isBlockedByOther = Boolean(j.blockedReason && (!isCurrentPlanJob || j.blockedReason !== 'Zastávka již patří jinému schválenému plánu.'));
       const matchesReady = !readyOnly || !isBlockedByOther;
@@ -620,6 +729,32 @@ export function WorkRoutePlanner({
             </button>
           )}
 
+          {plan && ['DRAFT', 'APPROVED', 'ACTIVE'].includes(plan.status) && (
+            <button
+              type="button"
+              onClick={() => openReschedule()}
+              disabled={busy}
+              className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-xs font-bold text-amber-900 hover:bg-amber-100 disabled:opacity-40 transition shadow-2xs"
+              title="Přesunout tuto trasu na libovolný jiný den v kalendáři"
+            >
+              <Calendar size={14} />
+              <span>Přesunout na jiný den</span>
+            </button>
+          )}
+
+          {plan && ['APPROVED', 'ACTIVE'].includes(plan.status) && (
+            <button
+              type="button"
+              onClick={handleStartAdditionalRoute}
+              disabled={busy}
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition shadow-2xs"
+              title="Založit další samostatnou trasu v tento den pro zbývající práci"
+            >
+              <Plus size={14} />
+              <span>Další trasa</span>
+            </button>
+          )}
+
           {plan?.status === 'DRAFT' && (
             <button
               onClick={() => void handleAction('approve')}
@@ -690,15 +825,74 @@ export function WorkRoutePlanner({
         </div>
       </section>
 
+      {/* Scheduled Days Overview Strip */}
+      {loaded?.scheduledDays && loaded.scheduledDays.length > 0 && (
+        <section className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <Calendar size={13} className="text-sky-600" />
+              <span>Dny s naplánovanými výjezdy ({loaded.scheduledDays.length})</span>
+            </span>
+            <span className="text-[11px] text-slate-400 hidden sm:inline">
+              Kliknutím přepnete kalendář přímo na den s výjezdem
+            </span>
+          </div>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {loaded.scheduledDays.map((d) => {
+              const isSelected = d.date === date;
+              const hasActive = d.hasActive || d.hasApproved;
+              return (
+                <button
+                  key={d.date}
+                  type="button"
+                  onClick={() => setDate(d.date)}
+                  title={[
+                    d.crewNames.length ? `Posádky: ${d.crewNames.join(', ')}` : null,
+                    d.clientNames.length ? `Klienti: ${d.clientNames.join(', ')}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                  className={`shrink-0 flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                    isSelected
+                      ? 'border-sky-600 bg-sky-700 text-white shadow-sm'
+                      : hasActive
+                        ? 'border-emerald-200 bg-emerald-50/70 text-emerald-950 hover:bg-emerald-100/80'
+                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>{formatDayChip(d.date)}</span>
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-extrabold ${
+                      isSelected
+                        ? 'bg-sky-900/70 text-sky-100'
+                        : hasActive
+                          ? 'bg-emerald-200/80 text-emerald-900'
+                          : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {d.crewCount} {d.crewCount === 1 ? 'jízda' : d.crewCount < 5 ? 'jízdy' : 'jízd'} · {d.stopCount} zast.
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* Warning banner when inputs changed */}
       {inputsChanged && (
-        <div className="flex items-center justify-between rounded-2xl bg-amber-50 p-4 border border-amber-200 text-xs font-semibold text-amber-900">
-          <span>⚠️ Změnil se výběr zakázek nebo složení posádek. Pro aktualizaci klikněte na „Naplánovat trasy“.</span>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 p-4 border border-amber-200 text-xs font-semibold text-amber-900">
+          <span>
+            {plan && ['APPROVED', 'ACTIVE'].includes(plan.status)
+              ? '⚠️ Upravili jste zakázky nebo posádku u již schválené trasy. Klikněte na „Aktualizovat tuto trasu“ — vytvoří se upravený návrh ke schválení bez kolize se stávající trasou.'
+              : '⚠️ Změnil se výběr zakázek nebo složení posádek. Pro přepočet klikněte na „Aktualizovat návrh“.'}
+          </span>
           <button
-            onClick={() => void handleAction('generate')}
-            className="rounded-xl bg-amber-700 px-3.5 py-1.5 text-white font-bold hover:bg-amber-600 transition"
+            onClick={() => void handleAction(plan?.id ? 'replan' : 'generate')}
+            disabled={busy}
+            className="rounded-xl bg-amber-700 px-3.5 py-1.5 text-white font-bold hover:bg-amber-600 disabled:opacity-50 transition shrink-0"
           >
-            Aktualizovat
+            {plan && ['APPROVED', 'ACTIVE'].includes(plan.status) ? 'Aktualizovat tuto trasu' : 'Aktualizovat návrh'}
           </button>
         </div>
       )}
@@ -865,17 +1059,19 @@ export function WorkRoutePlanner({
                         <button
                           type="button"
                           onClick={() => {
-                            setTransferTargetId('');
+                            setTransferTargetId(c.employeeIds[0] ?? '');
+                            setTransferVehicleId(c.vehicleId ?? '');
                             setTransferModal({
                               open: true,
                               crewId: c.id,
                               crewName: c.name || `Posádka ${index + 1}`,
                               currentWorkerNames: assignedEmployees.map((e) => e.name),
                               currentEmployeeIds: c.employeeIds,
+                              currentVehicleId: c.vehicleId ?? null,
                             });
                           }}
                           className="flex items-center gap-1 rounded-xl bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
-                          title="Předat trasu jinému pracovníkovi"
+                          title="Předat trasu jinému pracovníkovi nebo změnit auto"
                         >
                           <UserCheck size={14} />
                           <span className="hidden sm:inline">Předat</span>
@@ -1054,8 +1250,9 @@ export function WorkRoutePlanner({
                     onChange={(e) => setSourceFilter(e.target.value)}
                   >
                     <option value="all">Všechny typy</option>
-                    <option value="work">Běžné montáže</option>
-                    {navigation && <option value="navigation">Navigation body</option>}
+                    <option value="work">Běžné montáže / nabídky</option>
+                    {navigation && <option value="navigation">Navigační systémy</option>}
+                    {unified && <option value="field">Terénní práce</option>}
                   </select>
 
                   <label className="flex items-center gap-1.5 cursor-pointer font-medium">
@@ -1308,17 +1505,54 @@ export function WorkRoutePlanner({
                   <button
                     type="button"
                     onClick={() => {
-                      setTransferTargetId('');
+                      setActiveTab('jobs');
+                      setToast(
+                        plan && ['APPROVED', 'ACTIVE'].includes(plan.status)
+                          ? 'Zaškrtněte další zakázky v levém panelu a klikněte na „Aktualizovat tuto trasu“.'
+                          : 'Zaškrtněte další zakázky v levém panelu a přepočítejte návrh.'
+                      );
+                      setTimeout(() => setToast(null), 5000);
+                    }}
+                    className="flex items-center gap-1.5 rounded-xl bg-sky-50 border border-sky-200 px-3 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 transition shadow-2xs"
+                    title="Přidat do této trasy další zakázky z fronty práce"
+                  >
+                    <Plus size={14} />
+                    <span>Přidat práci do trasy</span>
+                  </button>
+
+                  {plan && ['DRAFT', 'APPROVED', 'ACTIVE'].includes(plan.status) && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openReschedule(
+                          activeCrew.id,
+                          activeCrew.name || `Posádka ${plan ? plan.result.crews.indexOf(activeCrew) + 1 : 1}`
+                        )
+                      }
+                      className="flex items-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition shadow-2xs"
+                      title="Přesunout tuto trasu na jiný den"
+                    >
+                      <Calendar size={14} />
+                      <span>Přesunout den</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTransferTargetId(activeCrew.employeeIds[0] ?? '');
+                      setTransferVehicleId(activeCrew.vehicleId ?? '');
                       setTransferModal({
                         open: true,
                         crewId: activeCrew.id,
                         crewName: activeCrew.name || `Posádka ${plan ? plan.result.crews.indexOf(activeCrew) + 1 : 1}`,
                         currentWorkerNames: activeCrew.names,
                         currentEmployeeIds: activeCrew.employeeIds,
+                        currentVehicleId: activeCrew.vehicleId ?? null,
                       });
                     }}
                     className="flex items-center gap-1.5 rounded-xl bg-indigo-50 border border-indigo-200 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
-                    title="Předat celou trasu jinému pracovníkovi z týmu"
+                    title="Předat celou trasu jinému pracovníkovi nebo změnit auto"
                   >
                     <UserCheck size={14} />
                     <span>Předat trasu</span>
@@ -1370,12 +1604,41 @@ export function WorkRoutePlanner({
               </div>
             </section>
           ) : (
-            <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-10 text-center space-y-2">
-              <Navigation size={32} className="mx-auto text-slate-300" />
-              <h3 className="font-bold text-sm text-slate-700">Žádný aktivní plán trasy</h3>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Vyberte zakázky a posádky v levém panelu a klikněte na tlačítko <strong>„Naplánovat trasy 🪄“</strong>.
-              </p>
+            <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-8 sm:p-10 text-center space-y-4">
+              <div className="space-y-2">
+                <Navigation size={32} className="mx-auto text-slate-300" />
+                <h3 className="font-bold text-sm text-slate-700">Na vybraný den ({formatDayChip(date)}) není naplánovaný výjezd</h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  Vyberte zakázky a posádky v levém panelu a klikněte na tlačítko <strong>„Naplánovat trasy 🪄“</strong>, nebo přepněte na některý z dnů s naplánovanými výjezdy níže.
+                </p>
+              </div>
+
+              {loaded?.scheduledDays && loaded.scheduledDays.filter((d) => d.date !== date).length > 0 && (
+                <div className="pt-3 border-t border-slate-100 max-w-xl mx-auto space-y-2">
+                  <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                    Nejbližší naplánované výjezdy v jiných dnech
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {loaded.scheduledDays
+                      .filter((d) => d.date !== date)
+                      .slice(0, 8)
+                      .map((d) => (
+                        <button
+                          key={d.date}
+                          type="button"
+                          onClick={() => setDate(d.date)}
+                          className="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs font-bold text-sky-900 hover:bg-sky-100 transition cursor-pointer"
+                        >
+                          <Calendar size={13} className="text-sky-600" />
+                          <span>{formatDayChip(d.date)}</span>
+                          <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-extrabold text-sky-800 border border-sky-200">
+                            {d.planCount} {d.planCount === 1 ? 'jízda' : d.planCount < 5 ? 'jízdy' : 'jízd'} · {d.stopCount} zast.
+                          </span>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </main>
@@ -1452,7 +1715,7 @@ export function WorkRoutePlanner({
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <UserCheck size={18} className="text-indigo-600" />
-                Předat trasu na jiného pracovníka
+                Předat trasu / změnit auto
               </h3>
               <button
                 type="button"
@@ -1477,7 +1740,7 @@ export function WorkRoutePlanner({
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  Předat na člena týmu:
+                  Pracovník / vedoucí posádky:
                 </label>
                 <select
                   value={transferTargetId}
@@ -1485,13 +1748,32 @@ export function WorkRoutePlanner({
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 transition"
                 >
                   <option value="">-- Vyberte pracovníka z týmu --</option>
-                  {loaded?.data?.employees
-                    ?.filter((e) => !transferModal.currentEmployeeIds.includes(e.id))
-                    .map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.name} ({e.roles?.join(', ') || 'Pracovník'}) {!e.available ? '⚠️ má absenci' : ''}
-                      </option>
-                    ))}
+                  {loaded?.data?.employees?.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.name} ({e.roles?.join(', ') || 'Pracovník'}){' '}
+                      {transferModal.currentEmployeeIds[0] === e.id ? '· aktuální' : ''}
+                      {!e.available ? ' ⚠️ má absenci' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Vozidlo posádky:
+                </label>
+                <select
+                  value={transferVehicleId}
+                  onChange={(e) => setTransferVehicleId(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 transition"
+                >
+                  <option value="">Bez vybraného vozidla</option>
+                  {loaded?.data?.vehicles?.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name} · {v.status === 'AVAILABLE' ? 'Volné' : v.status}
+                      {transferModal.currentVehicleId === v.id ? ' (aktuální)' : ''}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1545,7 +1827,145 @@ export function WorkRoutePlanner({
                   onClick={() => void handleTransferSubmit()}
                   className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-500 disabled:opacity-50 transition"
                 >
-                  {busy ? 'Předávám...' : 'Předat trasu'}
+                  {busy ? 'Ukládám...' : 'Uložit posádku / auto'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reschedule Route Modal */}
+      {rescheduleModal && plan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Calendar size={18} className="text-amber-600" />
+                Přesunout trasu na jiný den
+              </h3>
+              <button
+                type="button"
+                onClick={() => setRescheduleModal(null)}
+                className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <div className="rounded-2xl bg-amber-50/70 border border-amber-200 p-3.5 text-xs text-amber-950 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold">Původní datum:</span>
+                  <span className="font-extrabold">{formatDayChip(plan.date)} ({plan.date})</span>
+                </div>
+                <p className="text-[11px] text-amber-900/80">
+                  Nedokončené zastávky, termíny montáží a rezervace aut se automaticky přesunou na nový den. Již hotové zastávky zůstanou zachované.
+                </p>
+              </div>
+
+              {(plan.result.crews.length ?? 0) > 1 && rescheduleModal.crewId && (
+                <div className="space-y-1.5 text-xs">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
+                    Co chcete přesunout:
+                  </label>
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="rescheduleScope"
+                      checked={rescheduleScope === 'crew'}
+                      onChange={() => setRescheduleScope('crew')}
+                      className="text-amber-600 focus:ring-amber-500"
+                    />
+                    <span className="font-semibold text-slate-800">
+                      Jen vybranou trasu ({rescheduleModal.crewName})
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="rescheduleScope"
+                      checked={rescheduleScope === 'plan'}
+                      onChange={() => setRescheduleScope('plan')}
+                      className="text-amber-600 focus:ring-amber-500"
+                    />
+                    <span className="font-semibold text-slate-800">
+                      Všechny posádky tohoto plánu ({plan.result.crews.length})
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Nové datum výjezdu:
+                </label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {[
+                    { label: 'Zítra', offset: 1 },
+                    { label: 'Pozítří', offset: 2 },
+                    { label: '+3 dny', offset: 3 },
+                    { label: '+7 dní', offset: 7 },
+                  ].map((q) => {
+                    const target = planningDayOffset(
+                      new Date(`${plan.date}T12:00:00Z`),
+                      loaded?.profile?.timezone ?? 'Europe/Prague',
+                      q.offset
+                    );
+                    return (
+                      <button
+                        key={q.label}
+                        type="button"
+                        onClick={() => setRescheduleDate(target)}
+                        className={`rounded-lg px-2.5 py-1 text-xs font-bold border transition ${
+                          rescheduleDate === target
+                            ? 'bg-amber-600 text-white border-amber-600'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {q.label} ({formatDayChip(target)})
+                      </button>
+                    );
+                  })}
+                </div>
+                <input
+                  type="date"
+                  value={rescheduleDate}
+                  onChange={(e) => setRescheduleDate(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-100 transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Nový čas odjezdu (volitelné):
+                </label>
+                <input
+                  type="time"
+                  value={rescheduleStartTime}
+                  onChange={(e) => setRescheduleStartTime(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm font-semibold text-slate-800 focus:border-amber-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-100 transition"
+                />
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Ponechte prázdné pro zachování původního času odjezdu.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setRescheduleModal(null)}
+                  className="rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
+                >
+                  Zrušit
+                </button>
+                <button
+                  type="button"
+                  disabled={!rescheduleDate || rescheduleDate === plan.date || busy}
+                  onClick={() => void handleRescheduleSubmit()}
+                  className="rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-amber-500 disabled:opacity-50 transition"
+                >
+                  {busy ? 'Přesouvám...' : 'Přesunout trasu'}
                 </button>
               </div>
             </div>

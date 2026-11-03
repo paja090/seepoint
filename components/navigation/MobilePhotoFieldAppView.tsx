@@ -28,6 +28,7 @@ import {
   getFriendlyPhotoErrorMessage,
   parseApiResponseSafely,
 } from '@/lib/client-photo-processing';
+import type { MobilePhotoCampaign, MobilePhotoCampaignSurface } from '@/lib/mobile-photo-campaigns';
 
 export type NearbyCarrier = {
   id: string;
@@ -80,6 +81,14 @@ function formatCzechDate(value: string | null) {
   return value ? new Date(value).toLocaleDateString('cs-CZ') : null;
 }
 
+const SOURCE_TYPE_LABELS: Record<MobilePhotoCampaign['sourceType'], { label: string; className: string }> = {
+  OFFER: { label: 'Nabídka', className: 'bg-purple-100 text-purple-800' },
+  CRM_ORDER: { label: 'Zakázka', className: 'bg-sky-100 text-sky-800' },
+  NAVIGATION: { label: 'Navigace', className: 'bg-indigo-100 text-indigo-800' },
+  FIELD_WORK: { label: 'Terénní práce', className: 'bg-amber-100 text-amber-900' },
+  WORK_ORDER: { label: 'Montáž', className: 'bg-teal-100 text-teal-800' },
+};
+
 type ClientMismatch = {
   photoId: string;
   expectedSurfaceId: string | null;
@@ -96,35 +105,12 @@ export function MobilePhotoFieldAppView() {
 
   // View Mode Tab State
   const [activeTab, setActiveTab] = useState<'campaigns' | 'nearby'>('campaigns');
-  const [campaigns, setCampaigns] = useState<Array<{
-    id: string;
-    title: string;
-    clientName: string;
-    status: string;
-    publicToken?: string | null;
-    totalSurfaces: number;
-    installedCount: number;
-    progressPercent: number;
-    surfaces: Array<{
-      itemId: string;
-      surfaceId: string;
-      surfaceName: string;
-      side: string;
-      carrierId: string;
-      carrierCode: string;
-      carrierName: string;
-      address: string;
-      city: string;
-      latitude: number | null;
-      longitude: number | null;
-      dateFrom: string | null;
-      dateTo: string | null;
-      isInstalled: boolean;
-      installedPhotoUrl: string | null;
-    }>;
-  }>>([]);
+  const [campaigns, setCampaigns] = useState<MobilePhotoCampaign[]>([]);
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
   const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
+  const [campaignSearch, setCampaignSearch] = useState('');
+  const [quickUploadingItemKey, setQuickUploadingItemKey] = useState<string | null>(null);
+  const [quickBanner, setQuickBanner] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
   // Carriers State
   const [carriers, setCarriers] = useState<NearbyCarrier[]>([]);
@@ -179,9 +165,12 @@ export function MobilePhotoFieldAppView() {
         const data = await res.json();
         if (Array.isArray(data.campaigns)) {
           setCampaigns(data.campaigns);
-          if (data.campaigns.length > 0 && !expandedCampaignId) {
-            setExpandedCampaignId(data.campaigns[0].id);
-          }
+          setExpandedCampaignId((prev) => {
+            if (prev && data.campaigns.some((c: MobilePhotoCampaign) => c.id === prev)) {
+              return prev;
+            }
+            return data.campaigns[0]?.id ?? null;
+          });
         }
       }
     } catch (err) {
@@ -254,42 +243,114 @@ export function MobilePhotoFieldAppView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleStartCampaignPhoto = (
-    campaign: (typeof campaigns)[number],
-    surface: (typeof campaigns)[number]['surfaces'][number]
+  const handleInstantCampaignCapture = async (
+    campaign: MobilePhotoCampaign,
+    surface: MobilePhotoCampaignSurface,
+    e: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const syntheticCarrier: NearbyCarrier = {
-      id: surface.carrierId,
-      code: surface.carrierCode,
-      name: surface.carrierName,
-      city: surface.city,
-      street: surface.address,
-      latitude: surface.latitude,
-      longitude: surface.longitude,
-      surfaces: [
-        {
-          id: surface.surfaceId,
-          name: surface.surfaceName,
-          side: surface.side === 'Strana B' ? 'SIDE_B' : 'SIDE_A',
-          status: 'OCCUPIED',
-          currentClient: { id: null, name: campaign.clientName },
-          currentCampaign: { id: campaign.id, name: campaign.title },
-          occupiedFrom: surface.dateFrom,
-          occupiedUntil: surface.dateTo,
-          latestPhotoUrl: surface.installedPhotoUrl,
-          artworkUrl: null,
-        },
-      ],
-      photos: [],
-    };
+    const rawFile = e.target.files?.[0];
+    e.target.value = '';
+    if (!rawFile) return;
 
-    setSelectedCarrier(syntheticCarrier);
-    setSelectedSurfaceId(surface.surfaceId);
-    setSide(surface.side === 'Strana B' ? 'SIDE_B' : 'SIDE_A');
-    setPurpose('CLIENT_REPORT');
-    setPhotoNote(`Výlep kampaně: ${campaign.title} (${campaign.clientName})`);
+    const itemKey = `${campaign.id}:${surface.itemId}`;
+    setQuickUploadingItemKey(itemKey);
+    setQuickBanner(null);
 
-    fileInputRef.current?.click();
+    try {
+      const processed = await processPhotoForUpload(rawFile);
+      const fd = new FormData();
+      fd.append('file', processed.file);
+      fd.append('quickCampaignCapture', 'true');
+      fd.append('requireGps', 'false');
+      fd.append('side', surface.side === 'Strana B' ? 'SIDE_B' : 'SIDE_A');
+      fd.append('purpose', 'CLIENT_REPORT');
+      fd.append('note', `Výlep zakázky: ${campaign.title} (${campaign.clientName})`);
+
+      if (surface.carrierId) fd.append('carrierId', surface.carrierId);
+      if (
+        surface.surfaceId &&
+        surface.targetKind !== 'NAVIGATION_POINT' &&
+        surface.targetKind !== 'FIELD_POINT'
+      ) {
+        fd.append('surfaceId', surface.surfaceId);
+      }
+      if (surface.crmRealizationId) fd.append('crmRealizationId', surface.crmRealizationId);
+      if (surface.workOrderItemId) fd.append('workOrderItemId', surface.workOrderItemId);
+      if (surface.navigationOrderId) fd.append('navigationOrderId', surface.navigationOrderId);
+      if (surface.navigationPointId) fd.append('navigationPointId', surface.navigationPointId);
+      if (surface.electionRemovalPointId) fd.append('electionRemovalPointId', surface.electionRemovalPointId);
+
+      if (coords) {
+        fd.append('latitude', String(coords.lat));
+        fd.append('longitude', String(coords.lng));
+        fd.append('accuracyMeters', String(coords.accuracy));
+      }
+
+      const uploadUrl = new URL('/api/mobile-photos/upload', window.location.origin);
+      const res = await fetch(uploadUrl.toString(), {
+        method: 'POST',
+        body: fd,
+      });
+
+      const parsed = await parseApiResponseSafely<{
+        error?: string;
+        message?: string;
+        photo?: { id: string; url: string };
+      }>(res);
+
+      if (!parsed.ok || !parsed.data) {
+        throw new Error(parsed.errorMessage || 'Fotografii se nepodařilo uložit.');
+      }
+
+      const uploadedUrl = parsed.data.photo?.url || null;
+      let completedWholeCampaign = false;
+      let nextInstalledCount = campaign.installedCount;
+
+      setCampaigns((prev) => {
+        const updated = prev.map((c) => {
+          if (c.id !== campaign.id) return c;
+          const nextSurfaces = c.surfaces.map((s) =>
+            s.itemId === surface.itemId
+              ? { ...s, isInstalled: true, installedPhotoUrl: uploadedUrl || s.installedPhotoUrl }
+              : s
+          );
+          const count = nextSurfaces.filter((s) => s.isInstalled).length;
+          nextInstalledCount = count;
+          if (count >= c.totalSurfaces) {
+            completedWholeCampaign = true;
+          }
+          return {
+            ...c,
+            surfaces: nextSurfaces,
+            installedCount: count,
+            progressPercent: c.totalSurfaces > 0 ? Math.round((count / c.totalSurfaces) * 100) : 100,
+          };
+        });
+
+        const remaining = updated.filter((c) => c.installedCount < c.totalSurfaces);
+        if (completedWholeCampaign) {
+          setExpandedCampaignId(remaining[0]?.id ?? null);
+        }
+        return remaining;
+      });
+
+      setQuickBanner({
+        tone: 'success',
+        text: completedWholeCampaign
+          ? `✅ Zakázka „${campaign.title}“ (${campaign.clientName}) je kompletně nafocená a byla uzavřena!`
+          : `📸 Fotka uložena (${nextInstalledCount}/${campaign.totalSurfaces}) — ${surface.carrierCode} (${campaign.clientName})`,
+      });
+
+      void fetchCampaigns();
+    } catch (err) {
+      console.error('[mobile-photos/instant-campaign-capture]', err);
+      setQuickBanner({
+        tone: 'error',
+        text: getFriendlyPhotoErrorMessage(err),
+      });
+    } finally {
+      setQuickUploadingItemKey(null);
+    }
   };
 
   const requestLocation = () => {
@@ -386,7 +447,7 @@ export function MobilePhotoFieldAppView() {
   const handleUploadPhoto = async () => {
     if (!photoFile || !selectedCarrier) return;
     if (!coords) {
-      setUploadErrorMsg('Před uložením fotografie je nutné získat aktuální GPS polohu zařízení.');
+      setUploadErrorMsg('Před uložením fotografie načtěte prosím GPS polohu telefonu.');
       requestLocation();
       return;
     }
@@ -532,6 +593,23 @@ export function MobilePhotoFieldAppView() {
   };
 
   const filteredCarriers = carriers;
+  const normalizedCampaignSearch = campaignSearch.trim().toLowerCase();
+  const filteredCampaigns = normalizedCampaignSearch
+    ? campaigns.filter((camp) => {
+        if (
+          camp.title.toLowerCase().includes(normalizedCampaignSearch) ||
+          camp.clientName.toLowerCase().includes(normalizedCampaignSearch)
+        ) {
+          return true;
+        }
+        return camp.surfaces.some(
+          (s) =>
+            s.carrierCode.toLowerCase().includes(normalizedCampaignSearch) ||
+            s.address.toLowerCase().includes(normalizedCampaignSearch) ||
+            s.city.toLowerCase().includes(normalizedCampaignSearch)
+        );
+      })
+    : campaigns;
 
   return (
     <div className="mx-auto max-w-lg space-y-4 pb-16">
@@ -709,10 +787,64 @@ export function MobilePhotoFieldAppView() {
       </div>
 
       {activeTab === 'campaigns' ? (
-        <div className="space-y-4">
+        <div className="space-y-3.5">
+          {/* Team emergency / shared access note */}
+          <div className="rounded-2xl border border-purple-200 bg-purple-50/90 px-3.5 py-2.5 text-[11px] font-semibold text-purple-900">
+            👥 <strong>Týmový přehled aktivních zakázek:</strong> Fotit může kdokoliv z týmu jedním stisknutím foťáku i bez přiřazené trasy. Jakmile je zakázka kompletně nafocená, sama ze seznamu zmizí.
+          </div>
+
+          {quickBanner && (
+            <div
+              className={`flex items-center justify-between gap-2 rounded-2xl p-3.5 text-xs font-bold border shadow-sm ${
+                quickBanner.tone === 'success'
+                  ? 'bg-emerald-950/95 text-emerald-200 border-emerald-700'
+                  : 'bg-rose-950/95 text-rose-200 border-rose-700'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                {quickBanner.tone === 'success' ? (
+                  <CheckCircle2 size={17} className="text-emerald-400 shrink-0" />
+                ) : (
+                  <AlertTriangle size={17} className="text-rose-400 shrink-0" />
+                )}
+                <span>{quickBanner.text}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuickBanner(null)}
+                className="px-2 py-0.5 text-slate-300 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Search & Refresh */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Hledat klienta, nabídku, kód nosiče nebo město..."
+                value={campaignSearch}
+                onChange={(e) => setCampaignSearch(e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-800 shadow-sm focus:border-purple-400 focus:outline-none"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => void fetchCampaigns()}
+              disabled={loadingCampaigns}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+              title="Obnovit zakázky"
+            >
+              <RefreshCw size={15} className={loadingCampaigns ? 'animate-spin text-purple-600' : ''} />
+            </button>
+          </div>
+
           <div className="flex items-center justify-between px-1">
             <h2 className="text-xs font-black uppercase tracking-wider text-slate-500">
-              Zakázky k realizaci ({campaigns.length})
+              Zakázky k nafocení ({filteredCampaigns.length})
             </h2>
             {loadingCampaigns && (
               <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
@@ -721,15 +853,22 @@ export function MobilePhotoFieldAppView() {
             )}
           </div>
 
-          {campaigns.length === 0 && !loadingCampaigns && (
+          {filteredCampaigns.length === 0 && !loadingCampaigns && (
             <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center space-y-2">
-              <p className="text-sm font-bold text-slate-700">Žádné aktivní kampaně k výlepu</p>
-              <p className="text-xs text-slate-400">Jakmile je nabídka schválena, zakázka a její plochy se zde automaticky zobrazí.</p>
+              <p className="text-sm font-bold text-slate-700">
+                {normalizedCampaignSearch ? 'Žádná zakázka neodpovídá hledání' : 'Všechny aktivní zakázky jsou nafocené 🎉'}
+              </p>
+              <p className="text-xs text-slate-400">
+                {normalizedCampaignSearch
+                  ? 'Zkuste upravit hledaný výraz.'
+                  : 'Jakmile vznikne nová schválená nabídka, zakázka nebo terénní práce, automaticky se zobrazí celému týmu.'}
+              </p>
             </div>
           )}
 
-          {campaigns.map((camp) => {
+          {filteredCampaigns.map((camp) => {
             const isExpanded = expandedCampaignId === camp.id;
+            const sourceBadge = SOURCE_TYPE_LABELS[camp.sourceType];
             return (
               <div key={camp.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
                 <div
@@ -737,12 +876,15 @@ export function MobilePhotoFieldAppView() {
                   className="cursor-pointer flex items-start justify-between gap-3"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black uppercase tracking-wider bg-purple-100 text-purple-800 px-2 py-0.5 rounded-md">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${sourceBadge.className}`}>
+                        {sourceBadge.label}
+                      </span>
+                      <span className="text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-800 px-2 py-0.5 rounded-md">
                         {camp.clientName}
                       </span>
-                      <span className="text-[10px] font-bold text-slate-400">
-                        {camp.installedCount}/{camp.totalSurfaces} vylepeno
+                      <span className="text-[10px] font-bold text-slate-500">
+                        {camp.installedCount}/{camp.totalSurfaces} hotovo
                       </span>
                     </div>
                     <h3 className="text-base font-black text-slate-900 mt-1 truncate">{camp.title}</h3>
@@ -761,55 +903,77 @@ export function MobilePhotoFieldAppView() {
                 {isExpanded && (
                   <div className="pt-2 border-t border-slate-100 space-y-2.5">
                     <div className="text-[11px] font-black uppercase text-slate-400 px-1">
-                      Plochy kampaně ({camp.surfaces.length}):
+                      Položky k nafocení ({camp.surfaces.length}):
                     </div>
-                    {camp.surfaces.map((surf) => (
-                      <div
-                        key={surf.surfaceId}
-                        className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="bg-slate-900 text-white font-black text-xs px-2 py-0.5 rounded-md">
-                              {surf.carrierCode}
-                            </span>
-                            <span className="text-xs font-bold text-slate-700">{surf.side}</span>
-                            {surf.isInstalled && (
-                              <span className="text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-300">
-                                ✓ Vylepeno
+                    {camp.surfaces.map((surf) => {
+                      const itemKey = `${camp.id}:${surf.itemId}`;
+                      const isUploadingThis = quickUploadingItemKey === itemKey;
+                      const isBusy = quickUploadingItemKey !== null;
+                      return (
+                        <div
+                          key={surf.itemId}
+                          className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="bg-slate-900 text-white font-black text-xs px-2 py-0.5 rounded-md">
+                                {surf.carrierCode}
                               </span>
-                            )}
+                              <span className="text-xs font-bold text-slate-700">{surf.side}</span>
+                              {surf.isInstalled && (
+                                <span className="text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-300">
+                                  ✓ Nafoceno
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs font-semibold text-slate-800 mt-1 truncate">{surf.address}</p>
+                            {surf.city ? <p className="text-[11px] text-slate-500">{surf.city}</p> : null}
                           </div>
-                          <p className="text-xs font-semibold text-slate-800 mt-1 truncate">{surf.address}</p>
-                          <p className="text-[11px] text-slate-500">{surf.city}</p>
-                        </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
-                          {surf.installedPhotoUrl && (
-                            <a
-                              href={toPhotoFullUrl(surf.installedPhotoUrl)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="relative w-11 h-11 rounded-xl overflow-hidden border border-slate-200 shrink-0 block"
+                          <div className="flex items-center gap-2 shrink-0">
+                            {surf.installedPhotoUrl && (
+                              <a
+                                href={toPhotoFullUrl(surf.installedPhotoUrl)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="relative w-11 h-11 rounded-xl overflow-hidden border border-slate-200 shrink-0 block"
+                              >
+                                <Image src={toPhotoThumbnailUrl(surf.installedPhotoUrl)} alt="Foto" fill unoptimized className="object-cover" />
+                              </a>
+                            )}
+                            <label
+                              className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-black shadow-xs transition select-none ${
+                                isBusy
+                                  ? 'opacity-60 cursor-wait bg-slate-300 text-slate-700'
+                                  : surf.isInstalled
+                                  ? 'cursor-pointer bg-slate-200 hover:bg-slate-300 text-slate-800 active:scale-95'
+                                  : 'cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20 active:scale-95'
+                              }`}
                             >
-                              <Image src={toPhotoThumbnailUrl(surf.installedPhotoUrl)} alt="Foto" fill unoptimized className="object-cover" />
-                            </a>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleStartCampaignPhoto(camp, surf)}
-                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold shadow-xs transition ${
-                              surf.isInstalled
-                                ? 'bg-slate-200 hover:bg-slate-300 text-slate-800'
-                                : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
-                            }`}
-                          >
-                            <Camera size={14} />
-                            <span>{surf.isInstalled ? 'Pře-fotit' : 'Vyfotit výlep'}</span>
-                          </button>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                disabled={isBusy}
+                                onChange={(e) => void handleInstantCampaignCapture(camp, surf, e)}
+                                className="hidden"
+                              />
+                              {isUploadingThis ? (
+                                <>
+                                  <RefreshCw size={14} className="animate-spin" />
+                                  <span>Ukládám…</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Camera size={15} />
+                                  <span>{surf.isInstalled ? 'Přefotit' : 'Vyfotit'}</span>
+                                </>
+                              )}
+                            </label>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

@@ -16,7 +16,7 @@ export async function loadProfile(db: Prisma.TransactionClient = prisma): Promis
   return profileForNavigation(profile, await navigationAvailable(db));
 }
 export async function loadPlanningData(date: string, options: {
-  crews?: CrewInput[]; jobIds?: string[]; includeField?: boolean; now?: string; reuseReservationIds?: string[]; excludePlanIds?: string[];
+  crews?: CrewInput[]; jobIds?: string[]; includeField?: boolean; includeUpcoming?: boolean; now?: string; reuseReservationIds?: string[]; excludePlanIds?: string[];
 } = {}, db: Prisma.TransactionClient = prisma): Promise<PlanningInput> {
   const { organizationId } = requireTenantContext();
   const profile = await loadProfile(db);
@@ -28,18 +28,21 @@ export async function loadPlanningData(date: string, options: {
   const nextDay = new Date(Date.parse(`${date}T12:00:00Z`) + 86400000).toISOString().slice(0, 10);
   const end = zonedTime(nextDay, '00:00', profile.timezone);
   const day = new Date(`${date}T00:00:00Z`);
+  const unlinkedNavStatuses: import('@prisma/client').NavigationOrderStatus[] = options.includeUpcoming
+    ? ['POTVRZENO_KLIENTEM', 'SMLOUVA_OBJEDNAVKA', 'GRAFICKE_PODKLADY', 'SCHVALENI_GRAFIKY', 'TISK_VYROBA', 'PRIPRAVENO_K_INSTALACI', 'INSTALACE', 'FOTODOKUMENTACE']
+    : ['PRIPRAVENO_K_INSTALACI', 'INSTALACE', 'FOTODOKUMENTACE'];
   const [employees, absences, vehicles, reservations, orders, plans, otherTasks, problems, unlinkedNavigation, plannerBlocks] = await Promise.all([
     db.employee.findMany({ where: { organizationId }, orderBy: { id: 'asc' } }),
     db.employeeAbsence.findMany({ where: { organizationId, status: 'APPROVED', dateFrom: { lte: day }, dateTo: { gte: day } } }),
     db.vehicle.findMany({ where: { organizationId }, orderBy: { id: 'asc' } }),
     db.vehicleReservation.findMany({ where: { organizationId, status: { in: ['RESERVED', 'ACTIVE'] }, dateFrom: { lte: day }, dateTo: { gte: day } } }),
-    db.workOrder.findMany({ where: { organizationId, ...(!navigation ? { navigationOrderId: null } : {}), ...(options.jobIds ? { OR: [{ id: { in: options.jobIds.filter(id => !id.startsWith('navigation-point:') && !id.startsWith('work-item:')) } }, { items: { some: { id: { in: options.jobIds.filter(id => id.startsWith('work-item:')).map(id => id.slice(10)) } } } }, { navigationOrder: { points: { some: { id: { in: options.jobIds.filter(id => id.startsWith('navigation-point:')).map(id => id.slice(17)) } } } } }] } : { scheduledAt: { lt: new Date(end) }, status: { notIn: ['DONE', 'CANCELLED'] } }) },
+    db.workOrder.findMany({ where: { organizationId, ...(!navigation ? { navigationOrderId: null } : {}), ...(options.jobIds ? { OR: [{ id: { in: options.jobIds.filter(id => !id.startsWith('navigation-point:') && !id.startsWith('work-item:')) } }, { items: { some: { id: { in: options.jobIds.filter(id => id.startsWith('work-item:')).map(id => id.slice(10)) } } } }, { navigationOrder: { points: { some: { id: { in: options.jobIds.filter(id => id.startsWith('navigation-point:')).map(id => id.slice(17)) } } } } }] } : { ...(options.includeUpcoming ? {} : { scheduledAt: { lt: new Date(end) } }), status: { notIn: ['DONE', 'CANCELLED'] } }) },
       include: { assignments: true, items: { include: { carrier: true, surface: { include: { carrier: true } }, crmRealization: true } }, workTasks: true, crmOrder: true, crmRealizations: true,
         navigationOrder: { include: { crmOrder: true, points: { include: { carrier: true, surface: true } } } } }, orderBy: { id: 'asc' }, take: 201 }),
     db.fieldPlan.findMany({ where: { organizationId, date, status: { in: ['APPROVED', 'ACTIVE'] }, id: { notIn: options.excludePlanIds ?? [] } } }),
     db.workTask.findMany({ where: { organizationId, status: { in: ['TODO', 'IN_PROGRESS'] }, scheduledDate: { gte: new Date(start), lt: new Date(end) } }, select: { workOrderId: true, assignedToEmployeeId: true } }),
     db.crmAuditLog.findMany({ where: { organizationId, entityType: 'WorkOrder', action: { in: ['FIELD_EXECUTION_BLOCKED', 'FIELD_EXECUTION_RESOLVED'] } }, orderBy: { createdAt: 'desc' }, select: { entityId: true, action: true } }),
-    navigation ? db.navigationOrder.findMany({ where: { organizationId, workOrders: { none: {} }, ...(options.jobIds ? { points: { some: { id: { in: options.jobIds.filter(id => id.startsWith('navigation-point:')).map(id => id.slice(17)) } } } } : { status: { in: ['PRIPRAVENO_K_INSTALACI', 'INSTALACE', 'FOTODOKUMENTACE'] } }) },
+    navigation ? db.navigationOrder.findMany({ where: { organizationId, workOrders: { none: {} }, ...(options.jobIds ? { points: { some: { id: { in: options.jobIds.filter(id => id.startsWith('navigation-point:')).map(id => id.slice(17)) } } } } : { status: { in: unlinkedNavStatuses } }) },
       include: { points: { include: { carrier: true, surface: true } }, crmOrder: { include: { client: true } } }, orderBy: { id: 'asc' }, take: 201 }) : Promise.resolve([]),
     db.plannerBlock?.findMany ? db.plannerBlock.findMany({ where: { organizationId, startAt: { lt: new Date(end) }, endAt: { gt: new Date(start) } }, select: { userId: true } }) : Promise.resolve([]),
   ]);
@@ -60,15 +63,22 @@ export async function loadPlanningData(date: string, options: {
     if (rows.some(row => row && row.organizationId !== organizationId)) throw new Error('Cross-tenant reference rejected.');
   };
   assertRows([...employees, ...vehicles, ...reservations, ...absences]);
+  const translatedCampaignIds: string[] = [];
   let jobs: PlanningJob[] = orders.flatMap(o => {
     assertRows([o, o.crmOrder, o.navigationOrder, o.navigationOrder?.crmOrder ?? null, ...o.crmRealizations, ...o.items, ...o.assignments, ...o.workTasks,
       ...o.items.flatMap(i => [i.carrier, i.surface]), ...(o.navigationOrder?.points ?? []), ...(o.navigationOrder?.points.flatMap(p => [p.carrier, p.surface]) ?? [])]);
     if ((o.crmOrderId && !o.crmOrder) || (o.navigationOrderId && !o.navigationOrder) || o.items.some(i => (i.carrierId && !i.carrier) || (i.surfaceId && !i.surface))) throw new Error('Neplatná tenantová vazba zakázky.');
     if (o.navigationOrder?.points.some(p => (p.carrierId && !p.carrier) || (p.surfaceId && !p.surface))) throw new Error('Cross-tenant Navigation reference rejected.');
-    const isWorkshop = (o.planningConstraints as Record<string, unknown> | null)?.scope === 'WORKSHOP';
+    const pcMeta = o.planningConstraints as Record<string, unknown> | null;
+    const isWorkshop = pcMeta?.scope === 'WORKSHOP';
     if (isWorkshop && !options.jobIds?.includes(o.id)) return [];
-    const isDispatchIntake = (o.planningConstraints as Record<string, unknown> | null)?.dispatchIntake === true;
-    if (isDispatchIntake) return [];
+    if (pcMeta?.dispatchIntake === true) return [];
+    if (pcMeta?.dispatchCampaign === true) {
+      if (options.jobIds?.includes(o.id) && typeof pcMeta.electionCampaignId === 'string') {
+        translatedCampaignIds.push(pcMeta.electionCampaignId);
+      }
+      return [];
+    }
 
     const constraints = parseConstraints(o.planningConstraints);
     const explicitRequired = constraints.requiredEmployeeIds ? [...constraints.requiredEmployeeIds] : undefined;
@@ -82,6 +92,7 @@ export async function loadPlanningData(date: string, options: {
     if (explicitRequired && explicitRequired.length > 0) {
       constraints.requiredEmployeeIds = [...new Set(explicitRequired)];
       const busyExplicit = explicitRequired.filter(id => busyEmployees.has(id));
+      if (busyExplicit.length > 0) {
         const busyNames = busyExplicit
           .map(id => {
             const emp = employees.find(e => e.id === id);
@@ -89,6 +100,7 @@ export async function loadPlanningData(date: string, options: {
           })
           .join(', ');
         blockedReason = `Povinný pracovník (${busyNames}) již má na tento den schválený jiný výjezd.`;
+      }
     } else {
       // If no explicit hard requirement was configured in planning constraints,
       // route to assigned workers only if they are not already committed to another approved plan on this day.
@@ -135,12 +147,18 @@ export async function loadPlanningData(date: string, options: {
       scheduledAt: (nav.plannedInstallationAt ?? nav.installationDate ?? nav.createdAt).toISOString(), campaignDateFrom: nav.rentStart?.toISOString() ?? nav.crmOrder.dateFrom?.toISOString(),
       location: null, serviceMinutes: null, constraints: {}, updatedAt: nav.updatedAt.toISOString() + '/' + nav.crmOrder.updatedAt.toISOString() }, nav, employees, profile.navigationPointMinutes));
   }
-  const withField = options.includeField || options.jobIds?.some(isFieldJobId);
-  if (withField) jobs.push(...await loadFieldJobs(db, options.jobIds));
+  const withField = options.includeField || options.jobIds?.some(isFieldJobId) || translatedCampaignIds.length > 0;
+  if (withField) {
+    jobs.push(...await loadFieldJobs(db, options.jobIds, { excludePlanIds: options.excludePlanIds, campaignIds: translatedCampaignIds }));
+  }
   if (options.jobIds) {
     // WorkOrder IDs from legacy plans expand into points; new plans carry individual point IDs.
     for (const id of new Set(options.jobIds)) if (!orders.some(o => o.id === id) && !jobs.some(j => j.id === id)) throw new Error('Zakázka nebo bod nebyl nalezen v aktivní organizaci.');
-    jobs = jobs.filter(j => options.jobIds!.includes(j.id) || Boolean(j.parentWorkOrderId && options.jobIds!.includes(j.parentWorkOrderId)));
+    jobs = jobs.filter(j =>
+      options.jobIds!.includes(j.id) ||
+      Boolean(j.parentWorkOrderId && options.jobIds!.includes(j.parentWorkOrderId)) ||
+      Boolean(j.electionCampaignId && translatedCampaignIds.includes(j.electionCampaignId))
+    );
   } else jobs = jobs.filter(j => !['DONE', 'CANCELLED'].includes(j.status));
   for (const plan of plans) {
     const summary = plan.planningSummary as unknown as import('./contracts').PlanningResult;

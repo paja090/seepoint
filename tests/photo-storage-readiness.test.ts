@@ -77,7 +77,9 @@ test('mobile carrier discovery is bounded, searchable and resistant to stale res
 
 test('photo confirmation is authenticated, one-way and idempotent', () => {
   const api = read('app/api/mobile-photos/confirm/route.ts');
-  assert.match(api, /requireApiAccess\('navigationProjects'\)/);
+  assert.match(api, /requireApiAccess\(/);
+  assert.match(api, /'photoDocumentation'/);
+  assert.match(api, /'navigationProjects'/);
   assert.match(api, /alreadyConfirmed: true/);
   assert.match(api, /surfaceId: null/);
   assert.match(api, /updateMany/);

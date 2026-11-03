@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Calendar, Car, CheckCircle2, Clock, MapPin, PhoneCall, Route, ShieldCheck, Truck, Wallet } from 'lucide-react';
+import { Calendar, Camera, Car, CheckCircle2, Clock, MapPin, PhoneCall, Route, ShieldCheck, Truck, Wallet } from 'lucide-react';
 import { Button, Card, StatCard } from '@/components/ui';
 
 interface WorkerDashboardProps {
@@ -49,13 +49,22 @@ export function WorkerDashboard({
             </p>
           </div>
 
-          <Link
-            href="/my-tasks"
-            className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 px-6 py-3 text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/25 hover:brightness-110 active:scale-95 transition"
-          >
-            <Route size={18} />
-            <span>🚀 Otevřít Moje Úkoly ({assignedTasksCount})</span>
-          </Link>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Link
+              href="/mobile-photos"
+              className="flex items-center gap-2 rounded-2xl border border-emerald-400/50 bg-emerald-500/15 px-5 py-3 text-sm font-black text-emerald-200 hover:bg-emerald-500/25 active:scale-95 transition"
+            >
+              <Camera size={18} />
+              <span>📸 Foťák zakázek</span>
+            </Link>
+            <Link
+              href="/my-tasks"
+              className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 px-6 py-3 text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/25 hover:brightness-110 active:scale-95 transition"
+            >
+              <Route size={18} />
+              <span>🚀 Otevřít Moje Úkoly ({assignedTasksCount})</span>
+            </Link>
+          </div>
         </div>
       </div>
 
