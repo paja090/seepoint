@@ -11,12 +11,16 @@ export const dynamic = 'force-dynamic';
 export default async function MobilePhotosPage() {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
-  if (!canAccess(user.role, 'navigationProjects') && !canAccess(user.role, 'carriers')) {
+  const isTeamRole = ['ADMIN', 'MANAGER', 'SALES', 'TECHNICIAN', 'WORKER'].includes(user.role);
+  if (!isTeamRole && !canAccess(user.role, 'navigationProjects') && !canAccess(user.role, 'carriers')) {
     redirect('/dashboard');
   }
-  const hasNav = hasModuleAccess(user, 'navigation', 'navigationProjects');
-  const hasCarriers = hasModuleAccess(user, 'carriers', 'carriers');
-  if (!hasNav && !hasCarriers) {
+  const hasAccess =
+    hasModuleAccess(user, 'photoDocumentation', 'photoDocumentation') ||
+    hasModuleAccess(user, 'navigation', 'navigationProjects') ||
+    hasModuleAccess(user, 'carriers', 'carriers') ||
+    hasModuleAccess(user, 'work', 'work');
+  if (!hasAccess) {
     redirect('/module-unavailable');
   }
 

@@ -12,7 +12,17 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
   if (user.mustChangePassword && !allowPasswordChange) redirect('/profile?firstLogin=1');
 
   const visibleHubs = getVisibleNavigation(user);
-  const utilityAccess = { team: hasModuleAccess(user, 'employees', 'team'), photos: hasModuleAccess(user, 'navigation', 'navigationProjects') };
+  const canUseTeamCamera = Boolean(
+    user.organizationId &&
+      user.organization?.isActive &&
+      user.membership?.isActive &&
+      ['ADMIN', 'MANAGER', 'SALES', 'TECHNICIAN', 'WORKER'].includes(user.role) &&
+      (hasModuleAccess(user, 'photoDocumentation', 'photoDocumentation') ||
+        hasModuleAccess(user, 'navigation', 'navigationProjects') ||
+        hasModuleAccess(user, 'carriers', 'carriers') ||
+        hasModuleAccess(user, 'work', 'work'))
+  );
+  const utilityAccess = { team: hasModuleAccess(user, 'employees', 'team'), photos: canUseTeamCamera };
 
   const userName = user.employee
     ? `${user.employee.firstName} ${user.employee.lastName}`.trim()

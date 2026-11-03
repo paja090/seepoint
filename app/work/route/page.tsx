@@ -1,6 +1,7 @@
 import { enterTenantContext } from '@/lib/tenant-context';
 import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
+import { hasModuleAccess } from '@/lib/module-policy';
 import { WorkRoutePlanner } from '@/components/WorkRoutePlanner';
 import { navigationAvailable } from '@/lib/field-planning/capabilities';
 import { loadProfile } from '@/lib/field-planning/data';
@@ -23,11 +24,13 @@ export default async function WorkRoutePage({
     : dayInZone(new Date(), profile?.timezone ?? 'Europe/Prague');
   const initialJobIds = resolved?.jobIds ? resolved.jobIds.split(',').map((id) => id.trim()).filter(Boolean) : undefined;
   const initialPlanId = resolved?.id || undefined;
+  const fieldEnabled = hasModuleAccess(user, 'electionRemoval', 'electionRemoval');
 
   return (
     <AppShell>
       <WorkRoutePlanner
         navigation={await navigationAvailable()}
+        unified={fieldEnabled}
         defaultDate={initialDate}
         initialJobIds={initialJobIds}
         initialPlanId={initialPlanId}

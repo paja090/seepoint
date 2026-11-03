@@ -422,6 +422,47 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
             })}
           </span>
         </div>
+
+        {/* Scheduled Days Quick Switcher */}
+        {data.scheduledDays && data.scheduledDays.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5">
+            <span className="text-[11px] font-bold text-slate-400 shrink-0">Plánované dny:</span>
+            {data.scheduledDays.map((day) => {
+              const isSelected = day.date === currentDate;
+              const dayLabel =
+                day.date === todayStr
+                  ? 'Dnes'
+                  : day.date === tomorrowStr
+                  ? 'Zítra'
+                  : new Date(`${day.date}T12:00:00Z`).toLocaleDateString('cs-CZ', {
+                      weekday: 'short',
+                      day: 'numeric',
+                      month: 'numeric',
+                    });
+              return (
+                <button
+                  key={day.date}
+                  type="button"
+                  onClick={() => void loadDateRoute(day.date)}
+                  className={`inline-flex items-center gap-1.5 shrink-0 rounded-xl border px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
+                    isSelected
+                      ? 'border-sky-600 bg-sky-600 text-white shadow-xs'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-sky-300 hover:bg-sky-50'
+                  }`}
+                >
+                  <span>{dayLabel}</span>
+                  <span
+                    className={`rounded-md px-1.5 py-0.2 text-[10px] ${
+                      isSelected ? 'bg-sky-700 text-sky-100' : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {day.stopCount} zast.
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </header>
 
       {error && (
@@ -448,16 +489,52 @@ export function MyRouteView({ initial, initialNow }: { initial: MyRouteDTO; init
           <p className="text-xs text-slate-500 max-w-md mx-auto">
             Jakmile dispečer schválí trasu pro vaši posádku, uvidíte zde zastávky s přímou navigací.
           </p>
-          {currentDate === todayStr && (
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => loadDateRoute(tomorrowStr)}
-                className="text-xs font-bold text-sky-600 hover:text-sky-800 underline cursor-pointer"
-              >
-                Zkontrolovat trasu na zítřek →
-              </button>
+          {data.scheduledDays && data.scheduledDays.some((d) => d.date !== currentDate) ? (
+            <div className="pt-3 space-y-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Nejbližší dny s naplánovanou jízdou:
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {data.scheduledDays
+                  .filter((d) => d.date !== currentDate)
+                  .slice(0, 6)
+                  .map((d) => (
+                    <button
+                      key={d.date}
+                      type="button"
+                      onClick={() => void loadDateRoute(d.date)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 transition cursor-pointer"
+                    >
+                      <span>
+                        {d.date === todayStr
+                          ? 'Dnes'
+                          : d.date === tomorrowStr
+                          ? 'Zítra'
+                          : new Date(`${d.date}T12:00:00Z`).toLocaleDateString('cs-CZ', {
+                              weekday: 'short',
+                              day: 'numeric',
+                              month: 'numeric',
+                            })}
+                      </span>
+                      <span className="text-[11px] font-normal text-sky-700">
+                        ({d.stopCount} zastávek)
+                      </span>
+                    </button>
+                  ))}
+              </div>
             </div>
+          ) : (
+            currentDate === todayStr && (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => loadDateRoute(tomorrowStr)}
+                  className="text-xs font-bold text-sky-600 hover:text-sky-800 underline cursor-pointer"
+                >
+                  Zkontrolovat trasu na zítřek →
+                </button>
+              </div>
+            )
           )}
         </div>
       )}

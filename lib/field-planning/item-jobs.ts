@@ -29,7 +29,7 @@ export function workItemJobs(base: PlanningJob, items: FieldItem[], profile: Pla
     const requiredEmployeeIds = [...(base.constraints.requiredEmployeeIds ?? [])];
     if (item.crmRealization?.assignedUserId) { const assigned = employees.find(e => e.userId === item.crmRealization!.assignedUserId); if (!assigned) blockedReason = 'Přiřazený realizátor nemá dostupný profil Employee v organizaci.'; else requiredEmployeeIds.push(assigned.id); }
     if (item.crmRealizationId && !['INSTALLATION', 'REINSTALLATION'].includes(base.workType)) blockedReason = 'Typ práce neodpovídá propojené montážní realizaci.';
-    if (item.crmRealization && !['PRODUCED', 'SCHEDULED', 'INSTALLATION_IN_PROGRESS', 'INSTALLED', 'PHOTOGRAPHED', 'DELIVERED_TO_CLIENT', 'COMPLETED', 'CLAIM'].includes(item.crmRealization.status)) blockedReason = 'CRM realizace ještě není připravena k práci v terénu.';
+    if (item.crmRealization && !['WAITING_FOR_MATERIALS', 'MATERIALS_APPROVED', 'WAITING_FOR_PRODUCTION', 'PRODUCED', 'SCHEDULED', 'INSTALLATION_IN_PROGRESS', 'INSTALLED', 'PHOTOGRAPHED', 'DELIVERED_TO_CLIENT', 'COMPLETED', 'CLAIM'].includes(item.crmRealization.status)) blockedReason = 'CRM realizace ještě není připravena k práci v terénu.';
     if (!coordinates(carrier)) blockedReason = 'Položka nemá platné GPS nosiče.';
     if (item.issueNote || item.crmRealization?.claimNote || item.crmRealization?.status === 'CLAIM') blockedReason = 'Položka má nevyřešený provozní problém.';
     return { ...base, id: itemJobId(item.id), sourceType: 'WORK_ORDER_ITEM', sourceId: item.id, workOrderItemId: item.id,

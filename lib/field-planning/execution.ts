@@ -16,6 +16,8 @@ import { reportNavigationPointIssue } from '../navigation/point-issue';
 import type { PlanningInput, PlanningResult, MyRouteDTO, MyRouteStop } from './contracts';
 import { computeRouteLiveETA } from './live-eta';
 import { loadPlanCrewLocations } from './live-location';
+import { loadScheduledRouteDays } from './scheduled-days';
+import { isModuleEnabled } from '../organization-modules';
 
 export async function myRoute(userId: string, dateOrNow?: string | Date, db = prisma, scope?: { allCrews: boolean; planIds: string[] }): Promise<MyRouteDTO> {
   const { organizationId } = requireTenantContext();
@@ -334,7 +336,33 @@ export async function myRoute(userId: string, dateOrNow?: string | Date, db = pr
       });
     }
   }
-  return { timezone: profile.timezone, date: targetDate, routes: routes.filter(r => r.stops.length) };
+  let scheduledDays: MyRouteDTO['scheduledDays'] = undefined;
+  if (!scope) {
+    try {
+      const org = db.organization?.findUnique
+        ? await db.organization.findUnique({ where: { id: organizationId }, select: { plan: true, enabledModules: true } })
+        : null;
+      const fieldEnabled = org ? isModuleEnabled(org, 'electionRemoval') : true;
+      scheduledDays = await loadScheduledRouteDays(
+        {
+          aroundDate: targetDate,
+          fieldEnabled,
+          navigationEnabled: navigation,
+          employeeId: isAdminOrManager ? null : employee?.id ?? null,
+          includeDrafts: false,
+        },
+        db
+      );
+    } catch {
+      scheduledDays = [];
+    }
+  }
+  return {
+    timezone: profile.timezone,
+    date: targetDate,
+    ...(scheduledDays !== undefined ? { scheduledDays } : {}),
+    routes: routes.filter(r => r.stops.length),
+  };
 }
 export { fieldProblemTypes, type MyRouteDTO, type MyRouteStop, type MyRouteCarrier } from './contracts';
 

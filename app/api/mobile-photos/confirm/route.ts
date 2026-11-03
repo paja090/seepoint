@@ -2,15 +2,21 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { logCarrierHistoryEvent } from '@/lib/navigation/carrier-history-service';
 import { runPostSaveTasks } from '@/lib/mobile-photo-upload';
+import { enterTenantContext } from '@/lib/tenant-context';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 
 export async function POST(req: Request) {
   try {
-    let auth = await requireApiAccess('navigationProjects');
-    if (isApiDenied(auth)) {
-      auth = await requireApiAccess('carriers');
-      if (isApiDenied(auth)) return auth;
+    const auth = await requireApiAccess(
+      ['photoDocumentation', 'myTasks', 'work', 'carriers', 'offers', 'navigationProjects'],
+      null
+    );
+    if (isApiDenied(auth)) return auth;
+    const organizationId = auth.organizationId || auth.membership?.organizationId;
+    if (!organizationId || !auth.organization?.isActive || !auth.membership?.isActive) {
+      return NextResponse.json({ error: 'Organizace není aktivní.' }, { status: 403 });
     }
+    enterTenantContext({ organizationId, userId: auth.id, source: 'session' });
     const input = await req.json() as { photoId?: string; surfaceId?: string };
     if (!input.photoId || !input.surfaceId) return NextResponse.json({ error: 'Chybí fotografie nebo plocha.' }, { status: 400 });
     const photo = await prisma.photo.findUnique({ where: { id: input.photoId }, select: {

@@ -4,21 +4,20 @@ import { plusDays } from '../planner/time';
 import { prisma } from '../db';
 import { requireTenantContext } from '../tenant-context';
 import { loadPlanningData, loadProfile } from '../field-planning/data';
-import { planningDayOffset } from '../field-planning/presentation';
-import { zonedTime } from '../field-planning/profile';
+import { loadScheduledRouteDays } from '../field-planning/scheduled-days';
 import { convertElectionPointToJob } from '../election-removal/planning-job';
 import type { PlanningJob } from '../field-planning/contracts';
 import { dispatchQueue, type DispatchPlan } from './queue';
 
 export async function loadDispatch(date: string, fieldEnabled: boolean, navigationEnabled: boolean, options: { week?: boolean; userId?: string } = {}) {
   const {organizationId}=requireTenantContext();
-  const profile=await loadProfile();const timezone=profile?.timezone ?? 'Europe/Prague';
-  const next=planningDayOffset(new Date(zonedTime(date,'12:00',timezone)),timezone,1);
+  const profile=await loadProfile();
   const messages:string[]=[];
-  const [ordinary,points,plans]=await Promise.all([
-    profile?.enabled ? loadPlanningData(date).catch(error=>{messages.push(error instanceof Error?error.message:'Pracovní frontu se nepodařilo načíst.');return null;}) : Promise.resolve(null),
-    fieldEnabled ? prisma.electionRemovalPoint.findMany({where:{organizationId,status:{notIn:['COMPLETED','CANCELLED']},campaign:{organizationId,status:{notIn:['ARCHIVED','CANCELLED']},OR:[{targetDate:null},{targetDate:{lt:new Date(zonedTime(next,'00:00',timezone))}}]}},include:{campaign:{select:{id:true,name:true,clientName:true,targetDate:true,createdAt:true}},steps:{orderBy:{sequence:'asc'}},assignedFieldPlan:{select:{id:true,status:true}}},orderBy:{createdAt:'asc'},take:501}) : Promise.resolve([]),
+  const [ordinary,points,plans,scheduledDays]=await Promise.all([
+    profile?.enabled ? loadPlanningData(date,{includeUpcoming:true}).catch(error=>{messages.push(error instanceof Error?error.message:'Pracovní frontu se nepodařilo načíst.');return null;}) : Promise.resolve(null),
+    fieldEnabled ? prisma.electionRemovalPoint.findMany({where:{organizationId,status:{notIn:['COMPLETED','CANCELLED']},campaign:{organizationId,status:{notIn:['ARCHIVED','CANCELLED']}}},include:{campaign:{select:{id:true,name:true,clientName:true,targetDate:true,createdAt:true}},steps:{orderBy:{sequence:'asc'}},assignedFieldPlan:{select:{id:true,status:true}}},orderBy:{createdAt:'asc'},take:501}) : Promise.resolve([]),
     prisma.fieldPlan.findMany({where:{organizationId,date:options.week?{gte:date,lt:plusDays(date,7)}:date,status:{in:['DRAFT','APPROVED','ACTIVE','COMPLETED']},...(!fieldEnabled?{electionCampaignId:null}:{})},select:{id:true,date:true,status:true,electionCampaignId:true,version:true,planningSummary:true},orderBy:{version:'desc'},take:101}),
+    loadScheduledRouteDays({aroundDate:date,fieldEnabled,navigationEnabled,includeDrafts:true}).catch(()=>[]),
   ]);
   if(!profile?.enabled) messages.push('Nejdříve potvrďte skutečné depo a zapněte plánování v Nastavení depa.');
   if(points.length>500 || plans.length>100) messages.push('Zobrazeno nejvýše 500 terénních bodů a 100 výjezdů. Další najdete v původních přehledech.');
@@ -41,5 +40,5 @@ export async function loadDispatch(date: string, fieldEnabled: boolean, navigati
       messages.push('Průběh realizace se nepodařilo načíst. Obnovte přehled nebo otevřete detail výjezdu.');
     }
   }
-  return {items:dispatchQueue(jobs,dayPlans,fieldAssignments),plans:visiblePlans,profile,messages,progress};
+  return {items:dispatchQueue(jobs,dayPlans,fieldAssignments),plans:visiblePlans,profile,messages,progress,scheduledDays};
 }

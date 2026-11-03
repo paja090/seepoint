@@ -164,9 +164,22 @@ export type MyRouteStop = {
 };
 
 
+export type ScheduledRouteDay = {
+  date: string;
+  planCount: number;
+  crewCount: number;
+  stopCount: number;
+  hasApproved: boolean;
+  hasActive: boolean;
+  hasDraft: boolean;
+  crewNames: string[];
+  clientNames: string[];
+};
+
 export type MyRouteDTO = {
   timezone: string;
   date?: string;
+  scheduledDays?: ScheduledRouteDay[];
   routes: Array<{
     planId: string;
     crewId?: string;
