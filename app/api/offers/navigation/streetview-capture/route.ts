@@ -122,7 +122,7 @@ export async function POST(request: Request) {
         mimeType: 'image/jpeg',
         size: storage.bytes.byteLength,
         type: 'LOCATION',
-        navigationPointId: pointInDb ? pointInDb.id : undefined,
+        surveyNavigationPointId: pointInDb ? pointInDb.id : undefined,
         isPrimary: true,
         isClientVisible: true,
         note: `Google Street View snímek místa (azimut ${heading}°, sklon ${pitch}°)`,
