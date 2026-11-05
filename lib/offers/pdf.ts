@@ -27,6 +27,23 @@ function configurePdfMake() {
 const money = (amount: number) => `${Math.round(amount).toLocaleString('cs-CZ')} Kč`;
 const safe = (value?: string | null, fallback = '—') => value?.trim() || fallback;
 
+export function formatSalespersonPhone(phone?: string | null): string {
+  const defaultPhone = '+420 777 807 717';
+  if (!phone || phone.trim() === '' || phone === '—') return defaultPhone;
+  const cleaned = phone.replace(/\s+/g, '');
+  if (cleaned === '777807717' || cleaned === '+420777807717') {
+    return defaultPhone;
+  }
+  if (/^\d{9}$/.test(cleaned)) {
+    return `+420 ${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)} ${cleaned.slice(6)}`;
+  }
+  if (/^\+420\d{9}$/.test(cleaned)) {
+    const num = cleaned.slice(4);
+    return `+420 ${num.slice(0, 3)} ${num.slice(3, 6)} ${num.slice(6)}`;
+  }
+  return phone.trim();
+}
+
 export async function resolveImageToDataUrl(
   urlOrId: string | null | undefined,
   fallbackPhotoId?: string | null
@@ -499,7 +516,15 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
       {
         table: { body: [[{ stack: [
           { text: 'Potřebujete poradit nebo vybrat jiné pozice?', bold: true, fontSize: 10 },
-          { text: [safe(offer.salesperson.name), safe(offer.salesperson.email), safe(offer.salesperson.phone)].filter((value) => value !== '—').join('  •  ') || 'Kontakt je dostupný v interaktivní nabídce.', color: MUTED, margin: [0, 2, 0, 0] },
+          {
+            text: [
+              safe(offer.salesperson.name || 'Pavel Šubert'),
+              safe(offer.salesperson.email || 'subert.pvel@gmail.com'),
+              formatSalespersonPhone(offer.salesperson.phone),
+            ].filter((value) => value !== '—').join('  •  '),
+            color: MUTED,
+            margin: [0, 2, 0, 0],
+          },
         ], margin: [12, 10, 12, 10] }]] },
         layout: { fillColor: '#F8FAFC', hLineColor: () => '#E2E8F0', vLineColor: () => '#E2E8F0' },
         margin: [0, 10, 0, 0],

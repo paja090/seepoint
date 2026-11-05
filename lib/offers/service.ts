@@ -220,16 +220,18 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
     createdBy: (() => {
       const spEmployee = row.createdByUser?.employees?.[0];
       const avatarUrl = spEmployee?.photos?.[0]?.url ?? null;
-      const phone = row.contactPhone ?? spEmployee?.phone ?? null;
+      const rawPhone = spEmployee?.phone ?? (row.createdByUser?.email === 'subert.pvel@gmail.com' || row.createdBy === 'Pavel Šubert' ? '+420 777 807 717' : null);
+      const phone = rawPhone ? (rawPhone.replace(/\s+/g, '') === '777807717' ? '+420 777 807 717' : rawPhone) : '+420 777 807 717';
+      const email = row.createdByUser?.email ?? (row.createdBy === 'Pavel Šubert' ? 'subert.pvel@gmail.com' : 'info@seepoint.cz');
       return row.createdByUser
         ? {
             id: row.createdByUser.id,
             name: row.createdByUser.name,
-            email: publicView ? undefined : row.createdByUser.email,
+            email,
             phone,
             avatarUrl,
           }
-        : { name: row.createdBy ?? 'Obchodní kontakt', phone: row.contactPhone ?? null, avatarUrl: null };
+        : { name: row.createdBy ?? 'Pavel Šubert', email: 'subert.pvel@gmail.com', phone: '+420 777 807 717', avatarUrl: null };
     })(),
     client: {
       name: row.client.name,

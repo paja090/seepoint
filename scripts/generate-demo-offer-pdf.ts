@@ -15,7 +15,7 @@ const demo: ProposalOffer = {
   validUntil: '24. 7. 2026',
   cities: ['Brno'],
   client: { id: 'demo-client', name: 'ACME Development a.s.', logoLabel: 'AD', contactPerson: 'Jan Novák', email: 'jan.novak@example.cz' },
-  salesperson: { id: 'demo-sales', name: 'Petr Svoboda', role: 'Obchodní kontakt SeePOINT', phone: '+420 777 123 456', email: 'petr.svoboda@seepoint.cz' },
+  salesperson: { id: 'demo-sales', name: 'Pavel Šubert', role: 'Obchodní kontakt SeePOINT', phone: '+420 777 807 717', email: 'subert.pvel@gmail.com' },
   heroImage: '', heroImageAlt: '',
   stats: { carriers: 6, mediaTypes: 3, locations: 5, photos: 6, total: 170_126, days: 31 },
   mediaMix: [],
@@ -47,8 +47,15 @@ const demo: ProposalOffer = {
   ],
 };
 
-const outputDirectory = resolve('output/pdf');
-await mkdir(outputDirectory, { recursive: true });
-const output = resolve(outputDirectory, 'demo-nabidka-seepoint.pdf');
-await writeFile(output, await createOfferPdf(demo));
-console.log(output);
+async function run() {
+  const outputDirectory = resolve('output/pdf');
+  await mkdir(outputDirectory, { recursive: true });
+  const output = resolve(outputDirectory, 'demo-nabidka-seepoint.pdf');
+  await writeFile(output, await createOfferPdf(demo));
+  console.log(output);
+}
+
+run().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

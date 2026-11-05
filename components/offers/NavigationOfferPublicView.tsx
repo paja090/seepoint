@@ -305,8 +305,8 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
   const { showReferences, showRealizations, showPartnershipGuarantee, showAboutCompany } = navigationPresentation(offer.branding, presentationSettings);
   const isDefaultSeePoint = hasSeePointPortfolio(offer.branding);
   const companyName = offerBrandName(offer.branding);
-  const companyEmail = offer.branding?.email || '';
-  const companyPhone = offer.branding?.phone || '';
+  const companyEmail = offer.branding?.email || (isDefaultSeePoint ? 'info@seepoint.cz' : '');
+  const companyPhone = offer.branding?.phone || (isDefaultSeePoint ? '+420 777 807 717' : '');
   const companyWebsite = offer.branding?.website || '';
   const companyAddress = [offer.branding?.street, offer.branding?.city, offer.branding?.postalCode].filter(Boolean).join(', ');
 
