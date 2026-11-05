@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { NavigationSignVisualizer } from '@/components/navigation-documentation/NavigationSignVisualizer';
 import { compressImageFile } from '@/lib/image-compress';
@@ -219,6 +221,8 @@ export function NavigationOfferCockpit({
   const [recalculatingRoutes, setRecalculatingRoutes] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [activeVisualizerPointId, setActiveVisualizerPointId] = useState<string | null>(null);
+  const [savedOfferId, setSavedOfferId] = useState<string | undefined>(initialOffer?.id);
+  const [savedPortalToken, setSavedPortalToken] = useState<string | undefined>(initialOffer?.portalToken);
 
   // Catalog rules and resolved rates
   const [catalogRules, setCatalogRules] = useState<NavigationPriceRuleLike[]>([]);
@@ -704,7 +708,7 @@ export function NavigationOfferCockpit({
   }
 
   // Canonical save method
-  async function handleSave() {
+  async function handleSave(options?: { redirect?: boolean }) {
     const primaryTarget = targets[0];
     if (!primaryTarget || !primaryTarget.latitude || !primaryTarget.longitude) {
       setMessage('Nejprve označte alespoň jedno cílové místo (prodejnu) v mapě.');
@@ -793,11 +797,14 @@ export function NavigationOfferCockpit({
       }),
     };
 
+    const targetOfferIdForRequest = savedOfferId || initialOffer?.id;
+    const shouldRedirect = options?.redirect ?? (currentStep === 'PRICING_OR_REVIEW');
+
     try {
       const res = await fetch(
-        initialOffer?.id ? `/api/offers/navigation/${initialOffer.id}` : '/api/offers/navigation',
+        targetOfferIdForRequest ? `/api/offers/navigation/${targetOfferIdForRequest}` : '/api/offers/navigation',
         {
-          method: initialOffer?.id ? 'PATCH' : 'POST',
+          method: targetOfferIdForRequest ? 'PATCH' : 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         }
@@ -808,18 +815,33 @@ export function NavigationOfferCockpit({
         throw new Error(data.error || 'Uložení navigační nabídky selhalo.');
       }
 
+      const finalOfferId = data.id || targetOfferIdForRequest;
+      if (finalOfferId) {
+        setSavedOfferId(finalOfferId);
+      }
+      if (data.token) {
+        setSavedPortalToken(data.token);
+      }
       setHasUnsavedChanges(false);
-      setMessage('✓ Navigační nabídka byla úspěšně uložena.');
 
-      if (!initialOffer?.id && data.id) {
-        router.push(`/offers/${data.id}`);
+      if (shouldRedirect && finalOfferId) {
+        setMessage('✓ Navigační nabídka byla úspěšně uložena. Přesměrovávám na přehled...');
+        router.push(`/offers/${finalOfferId}`);
+        router.refresh();
       } else {
+        setMessage('✓ Navigační nabídka byla úspěšně uložena.');
+        if (!initialOffer?.id && data.id && typeof window !== 'undefined') {
+          window.history.replaceState(null, '', `/offers/${data.id}/navigation/edit`);
+        }
         router.refresh();
       }
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Chyba při ukládání nabídky.');
-    } finally {
       setSaving(false);
+    } finally {
+      if (!shouldRedirect) {
+        setSaving(false);
+      }
     }
   }
 
@@ -841,6 +863,17 @@ export function NavigationOfferCockpit({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* Top back navigation link */}
+      <div className="flex items-center justify-between">
+        <Link
+          href={(savedOfferId || initialOffer?.id) ? `/offers/${savedOfferId || initialOffer?.id}` : '/offers'}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 transition"
+        >
+          <ArrowLeft size={14} />
+          <span>{(savedOfferId || initialOffer?.id) ? 'Zpět na přehled nabídky' : 'Zpět na přehled nabídek'}</span>
+        </Link>
+      </div>
+
       {/* Step Header & Prominent Mode Selector */}
       <NavigationOfferStepHeader
         currentStep={currentStep}
@@ -1002,8 +1035,8 @@ export function NavigationOfferCockpit({
                 setClientMessage(msg);
                 setHasUnsavedChanges(true);
               }}
-              savedOfferId={initialOffer?.id}
-              portalToken={initialOffer?.portalToken}
+              savedOfferId={savedOfferId || initialOffer?.id}
+              portalToken={savedPortalToken || initialOffer?.portalToken}
             />
           )}
         </>
