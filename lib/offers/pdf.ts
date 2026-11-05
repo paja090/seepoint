@@ -120,6 +120,11 @@ function formatArrowDirectionPdf(arrowEnum?: string | null) {
     case 'RIGHT': return '➔ Vpravo';
     case 'SLANTED_LEFT': return '↖ Šikmo vlevo';
     case 'SLANTED_RIGHT': return '↗ Šikmo vpravo';
+    case 'STRAIGHT_LEFT': return '⬆⬅ Rovně a vlevo';
+    case 'STRAIGHT_RIGHT': return '⬆➔ Rovně a vpravo';
+    case 'LEFT_STRAIGHT': return '⬅⬆ Vlevo a rovně';
+    case 'RIGHT_STRAIGHT': return '➔⬆ Vpravo a rovně';
+    case 'LEFT_RIGHT': return '⬅➔ Vlevo a vpravo';
     case 'U_TURN': return '↩ Otočení do protisměru';
     case 'TWO_WAY': return '↔ Obousměrný';
     case 'ROUNDABOUT_1': return '🔄 Kruhový objezd (1. výjezd)';

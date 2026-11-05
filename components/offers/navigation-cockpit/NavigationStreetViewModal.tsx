@@ -12,6 +12,9 @@ import {
   Eye,
   RotateCw,
   Compass,
+  Camera,
+  Sparkles,
+  Image as ImageIcon,
 } from 'lucide-react';
 import type { DraftPoint } from './types';
 import { getPointPinVisual } from '@/lib/offers/navigation-carrier-types';
@@ -22,6 +25,7 @@ interface NavigationStreetViewModalProps {
   onClose: () => void;
   onSelectPoint: (point: DraftPoint) => void;
   onUpdatePoint: (id: string, updates: Partial<DraftPoint>) => void;
+  onOpenVisualizer?: (pointId: string) => void;
   apiKey?: string;
 }
 
@@ -31,6 +35,7 @@ export function NavigationStreetViewModal({
   onClose,
   onSelectPoint,
   onUpdatePoint,
+  onOpenVisualizer,
   apiKey,
 }: NavigationStreetViewModalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -38,6 +43,9 @@ export function NavigationStreetViewModal({
   const [status, setStatus] = useState<'loading' | 'ready' | 'not_found' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [savedBadge, setSavedBadge] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+  const [captureSuccessMsg, setCaptureSuccessMsg] = useState('');
+  const [capturePreviewUrl, setCapturePreviewUrl] = useState<string | null>(null);
 
   const effectiveApiKey =
     apiKey ||
@@ -61,6 +69,64 @@ export function NavigationStreetViewModal({
       onSelectPoint(points[currentIndex + 1]);
     }
   }, [hasNext, currentIndex, points, onSelectPoint]);
+
+  const handleCaptureSnapshot = useCallback(async () => {
+    if (!point || capturing) return;
+    setCapturing(true);
+    setCaptureSuccessMsg('');
+    setErrorMessage('');
+
+    try {
+      const pano = panoramaRef.current as {
+        getPov?: () => { heading: number; pitch: number };
+        getZoom?: () => number;
+        getPano?: () => string;
+        getPosition?: () => { lat: () => number; lng: () => number };
+      } | null;
+
+      const pov = pano?.getPov?.() || { heading: 0, pitch: 0 };
+      const zoom = pano?.getZoom?.() || 1;
+      const panoId = pano?.getPano?.();
+      const pos = pano?.getPosition?.();
+      const lat = pos?.lat?.() || point.latitude;
+      const lng = pos?.lng?.() || point.longitude;
+      const fov = Math.max(20, Math.min(120, Math.round(180 / Math.pow(2, zoom))));
+
+      const res = await fetch('/api/offers/navigation/streetview-capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          latitude: lat,
+          longitude: lng,
+          heading: pov.heading,
+          pitch: pov.pitch,
+          fov,
+          pano: panoId,
+          navigationPointId: point.id.startsWith('point-') ? undefined : point.id,
+          apiKey: effectiveApiKey,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Pořízení snímku ze Street View selhalo.');
+      }
+
+      onUpdatePoint(point.id, {
+        sitePhotoId: data.photoId || point.sitePhotoId,
+        sitePhotoUrl: data.url || data.dataUrl,
+      });
+
+      setCapturePreviewUrl(data.dataUrl || data.url);
+      setCaptureSuccessMsg('✓ Snímek sloupu byl úspěšně vyfocen a uložen jako fotodokumentace.');
+      setSavedBadge(true);
+      setTimeout(() => setSavedBadge(false), 2500);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Nepodařilo se pořídit snímek.');
+    } finally {
+      setCapturing(false);
+    }
+  }, [point, capturing, effectiveApiKey, onUpdatePoint]);
 
   // ESC and Arrow key listeners
   useEffect(() => {
@@ -261,6 +327,17 @@ export function NavigationStreetViewModal({
               </div>
             )}
 
+            <button
+              type="button"
+              disabled={capturing || status !== 'ready'}
+              onClick={() => void handleCaptureSnapshot()}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-3.5 py-2 text-xs font-black shadow-md hover:shadow-lg transition cursor-pointer disabled:opacity-50"
+              title="Vyfotit aktuální pohled na sloup ze Street View a uložit přímo k bodu do fotodokumentace"
+            >
+              <Camera size={14} className={capturing ? 'animate-pulse' : ''} />
+              <span>{capturing ? 'Ukládám…' : '📸 Vyfotit pro vizualizaci'}</span>
+            </button>
+
             <a
               href={directMapsUrl}
               target="_blank"
@@ -389,6 +466,72 @@ export function NavigationStreetViewModal({
               )}
             </div>
 
+            {/* Fotodokumentace a vizualizace sloupu ze Street View */}
+            <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-950/30 via-slate-950/70 to-slate-950/70 p-3.5 space-y-3 shadow-xs">
+              <div className="flex items-center justify-between gap-2">
+                <div className="space-y-0.5">
+                  <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
+                    <Camera size={13} className="text-amber-400" />
+                    <span>Fotodokumentace ze Street View</span>
+                  </span>
+                  <p className="text-[10px] text-slate-400">
+                    Snímek pro klientskou vizualizaci i montážní techniky.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={capturing || status !== 'ready'}
+                  onClick={() => void handleCaptureSnapshot()}
+                  className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-3 py-1.5 text-xs font-black shadow-md transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+                >
+                  <Camera size={12} className={capturing ? 'animate-pulse' : ''} />
+                  <span>{capturing ? 'Ukládám…' : '📸 Vyfotit'}</span>
+                </button>
+              </div>
+
+              {/* Náhled existující nebo právě pořízené fotografie */}
+              {(capturePreviewUrl || point.sitePhotoUrl) && (
+                <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-2.5 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <img
+                      src={capturePreviewUrl || point.sitePhotoUrl}
+                      alt="Fotodokumentace sloupu"
+                      className="h-12 w-16 object-cover rounded-lg border border-slate-700 shrink-0 bg-slate-950"
+                    />
+                    <div className="min-w-0">
+                      <span className="block text-[11px] font-bold text-emerald-400 truncate">
+                        ✓ Fotografie uložena
+                      </span>
+                      <span className="block text-[10px] text-slate-400 truncate">
+                        Připraveno pro vizualizátor
+                      </span>
+                    </div>
+                  </div>
+
+                  {onOpenVisualizer && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenVisualizer(point.id);
+                      }}
+                      className="rounded-lg bg-sky-600 hover:bg-sky-500 text-white px-2.5 py-1.5 text-[11px] font-black transition flex items-center gap-1 shrink-0 cursor-pointer shadow-xs"
+                      title="Otevřít vizualizátor a nasadit na tuto fotku směrovou tabuli"
+                    >
+                      <Sparkles size={12} />
+                      <span>Vizualizovat</span>
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {captureSuccessMsg && (
+                <p className="text-[10px] font-bold text-emerald-400 animate-in fade-in">
+                  {captureSuccessMsg}
+                </p>
+              )}
+            </div>
+
             {/* Číslo sloupu VO */}
             <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-3.5 space-y-2">
               <label className="block text-xs font-black text-white">
@@ -443,12 +586,18 @@ export function NavigationStreetViewModal({
               </label>
               <div className="grid grid-cols-3 gap-1.5">
                 {[
-                  { value: 'LEFT', label: '⬅ Vlevo' },
                   { value: 'STRAIGHT', label: '⬆ Rovně' },
+                  { value: 'LEFT', label: '⬅ Vlevo' },
                   { value: 'RIGHT', label: '➡ Vpravo' },
+                  { value: 'STRAIGHT_LEFT', label: '⬆⬅ Rovně + vlevo' },
+                  { value: 'STRAIGHT_RIGHT', label: '⬆➡ Rovně + vpravo' },
+                  { value: 'LEFT_STRAIGHT', label: '⬅⬆ Vlevo + rovně' },
+                  { value: 'RIGHT_STRAIGHT', label: '➡⬆ Vpravo + rovně' },
+                  { value: 'LEFT_RIGHT', label: '⬅➡ Vlevo + vpravo' },
                   { value: 'SLANTED_LEFT', label: '↖ Šikmo vlevo' },
-                  { value: 'ROUNDABOUT', label: '🔄 Kruháč' },
                   { value: 'SLANTED_RIGHT', label: '↗ Šikmo vpravo' },
+                  { value: 'ROUNDABOUT', label: '🔄 Kruháč' },
+                  { value: 'TWO_WAY', label: '↔ Obousměrný' },
                 ].map((s) => (
                   <button
                     key={s.value}

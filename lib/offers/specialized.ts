@@ -106,7 +106,9 @@ export function parseNavigationOfferInput(raw: unknown) {
         : ('CALCULATED' as const);
     
     const validArrows = [
-      'LEFT', 'RIGHT', 'STRAIGHT', 'SLANTED_LEFT', 'SLANTED_RIGHT', 'U_TURN', 'TWO_WAY',
+      'LEFT', 'RIGHT', 'STRAIGHT', 'SLANTED_LEFT', 'SLANTED_RIGHT',
+      'STRAIGHT_LEFT', 'STRAIGHT_RIGHT', 'LEFT_STRAIGHT', 'RIGHT_STRAIGHT', 'LEFT_RIGHT',
+      'U_TURN', 'TWO_WAY',
       'ROUNDABOUT_1', 'ROUNDABOUT_2', 'ROUNDABOUT_3', 'ROUNDABOUT_4', 'ROUNDABOUT_5', 'ROUNDABOUT',
     ];
     const arrowDir = (validArrows.includes(text(point.arrowDirectionEnum))

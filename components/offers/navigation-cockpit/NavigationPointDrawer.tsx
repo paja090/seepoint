@@ -339,6 +339,11 @@ export function NavigationPointDrawer({
                 <option value="STRAIGHT">⬆️ Rovně (STRAIGHT)</option>
                 <option value="LEFT">⬅️ Vlevo (LEFT)</option>
                 <option value="RIGHT">➡️ Vpravo (RIGHT)</option>
+                <option value="STRAIGHT_LEFT">⬆️⬅️ Rovně a vlevo (STRAIGHT_LEFT)</option>
+                <option value="STRAIGHT_RIGHT">⬆️➡️ Rovně a vpravo (STRAIGHT_RIGHT)</option>
+                <option value="LEFT_STRAIGHT">⬅️⬆️ Vlevo a rovně (LEFT_STRAIGHT)</option>
+                <option value="RIGHT_STRAIGHT">➡️⬆️ Vpravo a rovně (RIGHT_STRAIGHT)</option>
+                <option value="LEFT_RIGHT">⬅️➡️ Vlevo a vpravo (LEFT_RIGHT)</option>
                 <option value="SLANTED_LEFT">↖️ Šikmo vlevo (SLANTED_LEFT)</option>
                 <option value="SLANTED_RIGHT">↗️ Šikmo vpravo (SLANTED_RIGHT)</option>
                 <option value="U_TURN">↩️ Otočení (U_TURN)</option>
@@ -510,21 +515,35 @@ export function NavigationPointDrawer({
               </div>
             </div>
 
-            <label className="btn btn-secondary text-xs px-3 py-1.5 font-bold flex items-center gap-1 cursor-pointer shrink-0">
-              <Upload size={13} />
-              <span>{point.sitePhotoUrl ? 'Nahradit' : 'Nahrát'}</span>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file && onUploadSitePhoto) {
-                    onUploadSitePhoto(point.id, file);
-                  }
-                }}
-              />
-            </label>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {onOpenStreetView && (
+                <button
+                  type="button"
+                  onClick={() => onOpenStreetView(point)}
+                  className="rounded-lg border border-sky-300 bg-sky-50 px-2.5 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 transition flex items-center gap-1 cursor-pointer"
+                  title="Otevřít 360° Street View a jedním klikem vyfotit reálný sloup"
+                >
+                  <Camera size={13} className="text-sky-600" />
+                  <span>Ze Street View</span>
+                </button>
+              )}
+
+              <label className="btn btn-secondary text-xs px-3 py-1.5 font-bold flex items-center gap-1 cursor-pointer">
+                <Upload size={13} />
+                <span>{point.sitePhotoUrl ? 'Nahradit' : 'Nahrát'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file && onUploadSitePhoto) {
+                      onUploadSitePhoto(point.id, file);
+                    }
+                  }}
+                />
+              </label>
+            </div>
           </div>
 
           {/* Vizualizace */}
