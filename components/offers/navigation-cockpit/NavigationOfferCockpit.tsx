@@ -16,6 +16,7 @@ import { formatNavigationPositionName } from '@/lib/navigation/navigation-naming
 import {
   inferArrowDirectionFromRoute,
   formatNavigationPointDetails,
+  extractCleanStreetName,
 } from '@/lib/ai-offers/route-direction-helper';
 import {
   CARRIER_PIN_COLORS,
@@ -472,10 +473,15 @@ export function NavigationOfferCockpit({
 
           // 3. Address resolution
           let addr = p.address;
-          if (!addr) {
-            addr = await reverseGeocodeLocation(p.latitude, p.longitude);
+          if (!addr || addr.startsWith('[') || addr.includes('Příjezdový bod')) {
+            const fresh = await reverseGeocodeLocation(p.latitude, p.longitude);
+            if (fresh) {
+              addr = fresh;
+            } else if (addr) {
+              addr = addr.replace(/^\[.*?\]\s*/g, '').replace(/^(Příjezdový\s+bod|Rozhodovací\s+bod|Navigační\s+bod)\s*(na|v|po)?\s*/i, '').trim();
+            }
           }
-          const streetPart = addr ? addr.split(',')[0]?.trim() : (city || 'město');
+          const streetPart = extractCleanStreetName(addr || p.address) || (city || 'město');
 
           // 4. Municipal zoning evaluation
           const zoning = evaluateNavigationZoning({
@@ -518,10 +524,7 @@ export function NavigationOfferCockpit({
             index: idx + 1,
           });
 
-          const circuitBadge = circuit === 'INNER' ? '🔵 Vnitřní okruh (dojezd)' : '🟣 Vnější okruh (hlavní tah)';
-          const updatedClientNote = p.clientNote && !p.clientNote.includes('okruh')
-            ? `${circuitBadge}: ${p.clientNote} · ${details.reasons[1]}`
-            : details.reasons.join(' · ');
+          const updatedClientNote = details.commercialPitch;
 
           return {
             ...p,

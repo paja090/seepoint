@@ -53,6 +53,41 @@ function useSafeRouter() {
   }
 }
 
+export function cleanDisplayAddress(rawAddress?: string | null): string {
+  if (!rawAddress) return '';
+  let addr = rawAddress.trim();
+  addr = addr.replace(/^\[(?:Vnitřní|Vnější)\s+okruh\]\s*/gi, '');
+  addr = addr.replace(/^(Příjezdový\s+bod|Rozhodovací\s+bod|Navigační\s+bod|Klíčový\s+bod|Bod|Trasa)\s*(na|v|po)?\s*/gi, '');
+  return addr.trim();
+}
+
+export function cleanDisplayLabel(rawLabel?: string | null): string {
+  if (!rawLabel) return '';
+  let lbl = rawLabel.trim();
+  lbl = lbl.replace(/\[(?:Vnitřní|Vnější)\s+okruh\]\s*/gi, '');
+  lbl = lbl.replace(/(?:Příjezdový\s+bod|Rozhodovací\s+bod|Navigační\s+bod|Klíčový\s+bod|Bod|Trasa)\s*(?:na|v|po)?\s*/gi, '');
+  lbl = lbl.replace(/\s*[-–]\s*[-–]\s*/g, ' – ');
+  return lbl.trim();
+}
+
+export function formatNavigationClientNote(rawNote?: string | null): string {
+  if (!rawNote) return '';
+  let note = rawNote;
+  // 1. Remove municipal regulatory / zoning disclaimer (not relevant for client, user request)
+  note = note.replace(/\s*·?\s*Bod leží v regulované zóně[^·\n]*/gi, '');
+  note = note.replace(/\s*·?\s*🛡️\s*Bezpečnostní filtr sítě[^·\n]*/gi, '');
+  note = note.replace(/\s*·?\s*Navigační deska na sloupu VO je povolena[^·\n]*/gi, '');
+  // 2. Remove internal jargon "Směrové rčení:"
+  note = note.replace(/\s*·?\s*Směrové rčení:[^·\n]*/gi, '');
+  // 3. Remove repetitive [Vnitřní okruh] Příjezdový bod na / [Vnější okruh] prefixes inside the sentence
+  note = note.replace(/\[(?:Vnitřní|Vnější)\s+okruh\]\s*(?:Příjezdový\s+bod\s+na\s*)?/gi, '');
+  // 4. Remove duplicate turn repetitions like "Odbočení vpravo (vpravo) na" -> "Odbočení vpravo na"
+  note = note.replace(/\((vpravo|vlevo|rovně)\)/gi, '');
+  // 5. Clean up stray separators
+  note = note.replace(/\s*·\s*·+/g, ' · ').replace(/\s*·\s*$/, '').trim();
+  return note;
+}
+
 export function ArrowBadge({ arrowEnum }: { arrowEnum?: string | null }) {
   switch (arrowEnum) {
     case 'LEFT':
@@ -1065,15 +1100,15 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                   </div>
 
                   {/* Address & Notes */}
-                  {point.address && (
+                  {point.address && cleanDisplayAddress(point.address) && (
                     <div className="mt-2 text-xs font-medium text-slate-600">
-                      📍 {point.address}
+                      📍 {cleanDisplayAddress(point.address)}
                     </div>
                   )}
 
-                  {point.clientNote && (
+                  {point.clientNote && formatNavigationClientNote(point.clientNote) && (
                     <p className="mt-2 rounded-lg bg-white/80 p-2 text-xs text-slate-700 border border-slate-100">
-                      {point.clientNote}
+                      {formatNavigationClientNote(point.clientNote)}
                     </p>
                   )}
 
@@ -1330,8 +1365,10 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                     <tr key={`phase1-row-${point.id}`}>
                       <td className="px-5 py-3.5 font-mono font-black text-sky-800">#{idx + 1}</td>
                       <td className="px-5 py-3.5">
-                        <p className="font-bold text-slate-900">{point.label}</p>
-                        {point.address && <p className="text-xs text-slate-500 mt-0.5">📍 {point.address}</p>}
+                        <p className="font-bold text-slate-900">{cleanDisplayLabel(point.label)}</p>
+                        {point.address && cleanDisplayAddress(point.address) && (
+                          <p className="text-xs text-slate-500 mt-0.5">📍 {cleanDisplayAddress(point.address)}</p>
+                        )}
                       </td>
                       <td className="px-4 py-3.5">
                         <ArrowBadge arrowEnum={typeof pObj.arrowDirectionEnum === 'string' ? pObj.arrowDirectionEnum : undefined} />

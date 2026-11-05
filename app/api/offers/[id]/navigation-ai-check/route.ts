@@ -6,6 +6,7 @@ import { computeGoogleRoute } from '@/lib/google-maps';
 import {
   inferArrowDirectionFromRoute,
   formatNavigationPointDetails,
+  extractCleanStreetName,
   type ArrowDirection,
 } from '@/lib/ai-offers/route-direction-helper';
 import { formatNavigationPositionName } from '@/lib/navigation/navigation-naming';
@@ -103,7 +104,7 @@ export async function POST(
         }
 
         // 3. Municipal zoning evaluation
-        const streetPart = point.address ? point.address.split(',')[0]?.trim() : city;
+        const streetPart = extractCleanStreetName(point.address) || city;
         const zoning = evaluateNavigationZoning({
           latitude: point.latitude,
           longitude: point.longitude,
@@ -148,10 +149,7 @@ export async function POST(
           index: index + 1,
         });
 
-        const circuitBadge = circuit === 'INNER' ? '🔵 Vnitřní okruh (dojezd)' : '🟣 Vnější okruh (hlavní tah)';
-        const updatedClientNote = point.clientNote && !point.clientNote.includes('okruh')
-          ? `${circuitBadge}: ${point.clientNote} · ${details.reasons[1]}`
-          : details.reasons.join(' · ');
+        const updatedClientNote = details.commercialPitch;
 
         // 6. Update in database
         const updated = await prisma.navigationPoint.update({

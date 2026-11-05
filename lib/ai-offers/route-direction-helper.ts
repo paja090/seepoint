@@ -242,7 +242,25 @@ export function formatNavigationDistance(distMeters?: number | null): string {
 }
 
 /**
- * Formats truthful Czech title and reasons for a navigation offer point
+ * Extracts and cleans a street name from a raw address or descriptive waypoint title
+ */
+export function extractCleanStreetName(raw?: string | null): string {
+  if (!raw) return 'městská třída';
+  let s = raw.split(',')[0].trim();
+  s = s.replace(/^\[.*?\]\s*/g, '');
+  s = s.replace(/^(Příjezdový\s+bod|Rozhodovací\s+bod|Navigační\s+bod|Klíčový\s+bod|Bod|Trasa|Odbočení\s+(vpravo|vlevo)|Průjezd\s+po)\s*(na|v|po|k)?\s*/i, '');
+  s = s.replace(/\s*\(.*?$/, '').trim();
+  s = s.replace(/\s+\d+\/\d+.*$/, '');
+  s = s.replace(/\s+\d+.*$/, '');
+  s = s.trim();
+  if (!s || /č\.p\.|ostrava|havířov|brno|praha|česko/i.test(s)) return 'městská třída';
+  return s;
+}
+
+/**
+ * Formats truthful Czech title and reasons for a navigation offer point,
+ * focused on selling the commercial and navigational value of the spot
+ * to the client without repetitive jargon or regulatory disclaimers.
  */
 export function formatNavigationPointDetails(params: {
   circuit: 'INNER' | 'OUTER';
@@ -253,9 +271,9 @@ export function formatNavigationPointDetails(params: {
   distanceMeters: number;
   zoning: ReturnType<typeof evaluateNavigationZoning> | (Partial<ReturnType<typeof evaluateNavigationZoning>> & { isAllowed: boolean; reason: string });
   index?: number;
-}): { title: string; reasons: string[] } {
+}): { title: string; reasons: string[]; commercialPitch: string } {
   const { circuit, streetPart, turnText, turnVerb, distanceMeters, zoning } = params;
-  const cleanStreet = streetPart && !/č\.p\.|ostrava|česko/i.test(streetPart) ? streetPart : 'městská komunikace';
+  const cleanStreet = extractCleanStreetName(streetPart);
   const distFormatted = formatNavigationDistance(distanceMeters);
 
   if (!zoning.isAllowed) {
@@ -264,7 +282,7 @@ export function formatNavigationPointDetails(params: {
       `⚠️ ${zoning.reason}`,
       zoning.warning || `Vzdálenost ${distFormatted} před cílem.`,
     ];
-    return { title, reasons };
+    return { title, reasons, commercialPitch: reasons.join(' ') };
   }
 
   const isInner = circuit === 'INNER';
@@ -277,13 +295,33 @@ export function formatNavigationPointDetails(params: {
     title = `[Vnější okruh] ${prefix} ${cleanStreet} (${distFormatted})`;
   }
 
+  // Direction-specific commercial benefit for the client
+  let directionSalesPitch = '';
+  if (turnText === 'vpravo' || turnVerb.toLowerCase().includes('vpravo')) {
+    directionSalesPitch = isInner
+      ? 'Umožňuje plynulé a bezpečné navedení k vjezdu do areálu / na parkoviště odbočením vpravo.'
+      : 'Zajišťuje včasné a plynulé zařazení do odbočovacího pruhu vpravo bez nutnosti křížit protisměr.';
+  } else if (turnText === 'vlevo' || turnVerb.toLowerCase().includes('vlevo')) {
+    directionSalesPitch = isInner
+      ? 'Jasně naviguje zákazníky přímo k vjezdu do areálu s odbočením vlevo na křižovatce.'
+      : 'Poskytuje řidičům včasné upozornění s dostatečným předstihem pro bezpečné zařazení a odbočení vlevo.';
+  } else {
+    directionSalesPitch = isInner
+      ? 'Finální potvrzení přímého příjezdu k provozovně v bezprostřední dojezdové zóně.'
+      : 'Potvrzuje správný směr po hlavní příjezdové tepně a udržuje silnou vizibilitu značky v hustém provozu.';
+  }
+
+  // Commercial pitch selling WHY this position is advantageous (prodej pozice bez úředních frází)
+  const commercialPitch = isInner
+    ? `🔵 Vnitřní okruh (dojezdová zóna · ${cleanStreet} · ${distFormatted} před cílem): Klíčový rozhodovací bod v těsné blízkosti provozovny. Zajišťuje, že zákazník nemine finální odbočku a bezpečně dorazí k cíli. ${directionSalesPitch}`
+    : `🟣 Vnější okruh (hlavní tah · ${cleanStreet} · ${distFormatted} před cílem): Strategická pozice na frekventované městské třídě s vysokým průjezdem vozidel. Zachycuje zákazníky s dostatečným předstihem a navádí je směrem k provozovně. ${directionSalesPitch}`;
+
   const reasons = [
     isInner
-      ? `🔵 Vnitřní okruh (dojezd): Klíčové místo pro ${turnVerb.toLowerCase()} k provozovně (${distFormatted} před cílem).`
-      : `🟣 Vnější okruh (hlavní tah): Bod zachycuje řidiče na městské třídě ${cleanStreet} a navádí do lokality (${distFormatted} před cílem).`,
-    `Směrové rčení: ${turnVerb} (${turnText}) na ${cleanStreet} ve vzdálenosti ${distFormatted} před cílem.`,
-    zoning.reason,
+      ? `🔵 Vnitřní okruh (dojezd): Klíčový rozhodovací bod v těsné blízkosti provozovny (${distFormatted} před cílem). ${directionSalesPitch}`
+      : `🟣 Vnější okruh (hlavní tah): Strategická pozice na městské třídě ${cleanStreet} (${distFormatted} před cílem). Zachycuje tranzitní dopravu i přijíždějící zákazníky. ${directionSalesPitch}`,
+    `${turnVerb} na ${cleanStreet} (${distFormatted} před cílem).`,
   ];
 
-  return { title, reasons };
+  return { title, reasons, commercialPitch };
 }

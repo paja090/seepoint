@@ -369,18 +369,26 @@ export function formatNavigationPointDesignation(
   // 3. Resolve Street / Location
   let street = '';
   if (point.label && /^P\d+\s*[-–]/i.test(point.label)) {
+    const cleanedLabel = point.label
+      .replace(/\[(?:Vnitřní|Vnější)\s+okruh\]\s*(?:Příjezdový\s+bod\s+na\s*)?/gi, '')
+      .replace(/\s*[-–]\s*[-–]\s*/g, ' – ')
+      .trim();
+    const cleanAddr = (point.address || '')
+      .replace(/^\[(?:Vnitřní|Vnější)\s+okruh\]\s*(?:Příjezdový\s+bod\s+na\s*)?/gi, '')
+      .trim();
     return {
       code,
-      street: point.address || '',
+      street: cleanAddr,
       distance,
       direction,
-      fullTitle: point.label,
+      fullTitle: cleanedLabel,
     };
   }
 
   if (point.address && typeof point.address === 'string' && point.address.trim().length > 0) {
-    const firstPart = point.address.split(',')[0].trim();
-    street = firstPart.replace(/^ul(\.|\s+)/i, '');
+    let firstPart = point.address.split(',')[0].trim();
+    firstPart = firstPart.replace(/^\[(?:Vnitřní|Vnější)\s+okruh\]\s*(?:Příjezdový\s+bod\s+na\s*)?/gi, '');
+    street = firstPart.replace(/^ul(\.|\s+)/i, '').trim();
   } else if (
     point.label &&
     typeof point.label === 'string' &&
@@ -388,7 +396,9 @@ export function formatNavigationPointDesignation(
     !/^bod \d+/i.test(point.label) &&
     !/^sloup vo/i.test(point.label)
   ) {
-    street = point.label.trim();
+    street = point.label
+      .replace(/^\[(?:Vnitřní|Vnější)\s+okruh\]\s*(?:Příjezdový\s+bod\s+na\s*)?/gi, '')
+      .trim();
   }
 
   if (!street) {

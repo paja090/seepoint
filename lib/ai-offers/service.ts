@@ -10,6 +10,7 @@ import { inferMediaType, inferQuantity, recommendOfferType } from './intent-pars
 import { generateNavigationPreview } from './navigation-generator';
 import { generateStandardMediaPreview } from './standard-media-generator';
 import type { AiNavigationPointInput, AiOfferPreview, AiOfferRequest, AiResolvedClient } from './types';
+import { extractCleanStreetName } from './route-direction-helper';
 
 const pricingSegments: ClientPricingSegment[] = ['COMMERCIAL', 'CULTURE_SPORT', 'PUBLIC_NONPROFIT', 'CUSTOM'];
 const offerTypes: OfferType[] = ['STANDARD_MEDIA', 'NAVIGATION', 'CITY_GALLERY'];
@@ -205,16 +206,22 @@ async function confirmNavigation(user: CurrentUser, request: AiOfferRequest, cli
     internalNote: `AI Copilot: ${request.prompt}`, clientMessage: preview.explanation,
     targetName: preview.target.name, targetAddress: preview.target.address, targetLatitude: preview.target.latitude, targetLongitude: preview.target.longitude,
     proposalMode: 'LOCATION_SELECTION',
-    points: preview.items.map((item) => ({
-      carrierId: null, surfaceId: null, latitude: item.latitude, longitude: item.longitude, address: item.title,
-      label: item.carrierCode, navigationType: 'Směrová tabule', quantity: 1,
-      unitPrice: item.rentalTotal ?? 0,
-      installationPrice: item.componentPrices?.INSTALLATION?.unitPrice ?? 0, removalPrice: item.componentPrices?.REMOVAL?.unitPrice ?? 0,
-      productionPrice: (item.componentPrices?.PRODUCTION?.unitPrice ?? 0) + (item.componentPrices?.PRINT?.unitPrice ?? 0), calculatedDistanceMeters: item.distanceMeters,
-      routeDistanceMeters: item.distanceMeters, routeDurationSeconds: item.routeDurationSeconds, routePolyline: item.routePolyline,
-      arrowDirectionEnum: item.arrowDirection, pillarType: item.mountingType ?? '', clientNote: [item.circuitLabel ? `[${item.circuitLabel}]` : '', item.reasons.join(' ')].filter(Boolean).join(' '),
-      internalNote: item.finalPrice === null ? 'AI návrhový bod bez potvrzené ceny. Vyžaduje fotografii a terénní ověření konstrukce.' : 'AI návrhový bod. Typ konstrukce a cenu potvrďte podle fotografie z terénu.',
-    })),
+    points: preview.items.map((item) => {
+      const cleanStreet = extractCleanStreetName(item.title) || item.title;
+      const salesPitch = item.reasons.find((r) => r.includes('okruh') || r.includes('tah') || r.includes('dojezd')) || item.reasons[0] || '';
+      return {
+        carrierId: null, surfaceId: null, latitude: item.latitude, longitude: item.longitude,
+        address: cleanStreet,
+        label: item.carrierCode, navigationType: 'Směrová tabule', quantity: 1,
+        unitPrice: item.rentalTotal ?? 0,
+        installationPrice: item.componentPrices?.INSTALLATION?.unitPrice ?? 0, removalPrice: item.componentPrices?.REMOVAL?.unitPrice ?? 0,
+        productionPrice: (item.componentPrices?.PRODUCTION?.unitPrice ?? 0) + (item.componentPrices?.PRINT?.unitPrice ?? 0), calculatedDistanceMeters: item.distanceMeters,
+        routeDistanceMeters: item.distanceMeters, routeDurationSeconds: item.routeDurationSeconds, routePolyline: item.routePolyline,
+        arrowDirectionEnum: item.arrowDirection, pillarType: item.mountingType ?? '',
+        clientNote: salesPitch,
+        internalNote: item.finalPrice === null ? 'AI návrhový bod bez potvrzené ceny. Vyžaduje fotografii a terénní ověření konstrukce.' : 'AI návrhový bod. Typ konstrukce a cenu potvrďte podle fotografie z terénu.',
+      };
+    }),
   });
   await prisma.offer.update({ where: { id: result.id }, data: { pricingSegment: client.pricingSegment } });
   const points = await prisma.navigationPoint.findMany({ where: { navigationOffer: { offerId: result.id } }, orderBy: { sortOrder: 'asc' } });

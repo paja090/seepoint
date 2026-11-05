@@ -246,11 +246,7 @@ export async function generateNavigationPreview(input: {
           zoning,
           index: index + 1,
         });
-        pointTitle = formatted.title;
-        pointReasons = [
-          ...formatted.reasons,
-          `🛡️ Bezpečnostní filtr sítě: Bod byl automaticky situován na městskou obslužnou komunikaci (${streetPart}) mimo dálnice a památkovou zónu.`,
-        ];
+        pointReasons = formatted.reasons;
       }
     }
 

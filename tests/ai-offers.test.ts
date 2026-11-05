@@ -187,7 +187,8 @@ test('formatNavigationPointDetails produces truthful title and descriptions', as
   });
   assert.match(innerResult.title, /\[Vnitřní okruh\] Odbočení vpravo na Výstavní \(450 m\)/);
   assert.ok(innerResult.reasons.some((r) => r.includes('Vnitřní okruh (dojezd)')));
-  assert.ok(innerResult.reasons.some((r) => r.includes('Směrové rčení: Odbočení vpravo (vpravo) na Výstavní')));
+  assert.ok(innerResult.commercialPitch.includes('Výstavní') && innerResult.commercialPitch.includes('vpravo'));
+  assert.ok(!innerResult.reasons.some((r) => r.includes('regulované zóně') || r.includes('Směrové rčení')));
 
   // Outer circuit left turn
   const outerResult = formatNavigationPointDetails({
@@ -201,6 +202,8 @@ test('formatNavigationPointDetails produces truthful title and descriptions', as
   });
   assert.match(outerResult.title, /\[Vnější okruh\] Odbočení vlevo na Opavská \(1,4 km\)/);
   assert.ok(outerResult.reasons.some((r) => r.includes('Vnější okruh (hlavní tah)')));
+  assert.ok(outerResult.commercialPitch.includes('Opavská') && outerResult.commercialPitch.includes('vlevo'));
+  assert.ok(!outerResult.reasons.some((r) => r.includes('regulované zóně') || r.includes('Směrové rčení')));
 
   // Prohibited zone
   const prohibitedResult = formatNavigationPointDetails({
