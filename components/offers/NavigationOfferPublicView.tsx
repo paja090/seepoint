@@ -1489,9 +1489,9 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-3.5 py-1.5 text-xs font-black text-sky-400 backdrop-blur-sm">
               <span className="h-2 w-2 rounded-full bg-sky-400 animate-pulse" />
-              {isHavirov
+              {isDefaultSeePoint && isHavirov
                 ? 'Město: Havířov (horní půlkruh)'
-                : isOstrava
+                : isDefaultSeePoint && isOstrava
                 ? 'Rozměr: 670 × 900 mm (Ostrava)'
                 : targetCity
                 ? `Lokalita: ${targetCity} (dle pasportu)`
@@ -1504,8 +1504,8 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
           {/* Left Column: Premium Interactive Graphic Artwork Frame (7 Cols) */}
           <div className="lg:col-span-7 flex flex-col items-center">
             {!((typeof (navigation as unknown as Record<string, unknown>).graphicArtworkUrl === 'string' && (navigation as unknown as Record<string, unknown>).graphicArtworkUrl)) ? (
-              isHavirov ? (
-                <div className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 p-8 text-center space-y-4 shadow-xl">
+              isDefaultSeePoint && isHavirov ? (
+                <div className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 p-6 md:p-7 text-center space-y-4 shadow-xl">
                   <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-2xl">
                     🏛️
                   </div>
@@ -1525,9 +1525,91 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                       </span>
                     )}
                   </div>
+
+                  {/* Real Photo Showcase for Havířov & Ostrava */}
+                  <div className="pt-2 w-full space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                        <span>📸</span> Ukázky schválených navigačních cedulí v terénu
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        Kliknutím zvětšíte
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+                      {/* Havířov primary */}
+                      <div
+                        className="group relative rounded-xl border border-indigo-500/50 bg-slate-900/90 overflow-hidden cursor-pointer shadow-lg hover:border-indigo-400 hover:shadow-indigo-500/10 transition duration-300"
+                        onClick={() => setActiveLightboxImage('/offer/real-havirov.jpg')}
+                      >
+                        <div className="relative h-44 w-full overflow-hidden bg-slate-950">
+                          <img
+                            src="/offer/real-havirov.jpg"
+                            alt="Realizace Havířov – schválený atyp s horním půlkruhem na sloupu VO"
+                            className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-transparent opacity-70 group-hover:opacity-40 transition" />
+                          <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                            <span className="rounded-lg bg-indigo-950/90 border border-indigo-600/60 px-2 py-0.5 text-[10px] font-black text-indigo-300 backdrop-blur-xs">
+                              🏛️ Havířov (horní půlkruh)
+                            </span>
+                          </div>
+                          <div className="absolute bottom-2 right-2 rounded-md bg-slate-950/85 border border-slate-700/60 px-2 py-0.5 text-[10px] font-semibold text-slate-300 backdrop-blur-xs flex items-center gap-1 group-hover:text-white transition">
+                            <span>🔍</span> Zvětšit
+                          </div>
+                        </div>
+                        <div className="p-3 bg-slate-950/90 border-t border-slate-800">
+                          <p className="text-xs font-bold text-white truncate">Havířov – atypický formát s půlkruhem</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                            Schválený tvar s horním půlkruhem dle platného pasportu města Havířov na sloupu VO.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Ostrava standard */}
+                      <div
+                        className="group relative rounded-xl border border-slate-800 bg-slate-900/90 overflow-hidden cursor-pointer shadow-lg hover:border-sky-500/50 hover:shadow-sky-500/10 transition duration-300"
+                        onClick={() => setActiveLightboxImage('/offer/real-mcdonalds.jpg')}
+                      >
+                        <div className="relative h-44 w-full overflow-hidden bg-slate-950">
+                          <img
+                            src="/offer/real-mcdonalds.jpg"
+                            alt="Ukázka realizace Ostrava – schválený rozměr 670 × 900 mm na sloupu VO"
+                            className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-transparent opacity-70 group-hover:opacity-40 transition" />
+                          <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                            <span className="rounded-lg bg-sky-950/90 border border-sky-600/50 px-2 py-0.5 text-[10px] font-black text-sky-300 backdrop-blur-xs">
+                              🏙️ Ostrava (670 × 900 mm)
+                            </span>
+                          </div>
+                          <div className="absolute bottom-2 right-2 rounded-md bg-slate-950/85 border border-slate-700/60 px-2 py-0.5 text-[10px] font-semibold text-slate-300 backdrop-blur-xs flex items-center gap-1 group-hover:text-white transition">
+                            <span>🔍</span> Zvětšit
+                          </div>
+                        </div>
+                        <div className="p-3 bg-slate-950/90 border-t border-slate-800">
+                          <p className="text-xs font-bold text-white truncate">Ostrava – instalace na sloupu VO</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                            Standardní rozměr 670 × 900 mm na sloupech VO (ve správě DPO a Ostravských komunikací).
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-1 flex flex-wrap items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveLightboxImage('/offer/navigation-proof-template.jpg')}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/90 px-4 py-2 text-xs font-bold text-slate-300 hover:text-white hover:border-sky-500/50 transition cursor-pointer"
+                      >
+                        <span>📐</span> Zobrazit technický nákres šablony panelu (670 × 900 mm)
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              ) : isOstrava ? (
-                <div className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 p-8 text-center space-y-4 shadow-xl">
+              ) : isDefaultSeePoint && isOstrava ? (
+                <div className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 p-6 md:p-7 text-center space-y-4 shadow-xl">
                   <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/20 text-sky-400 border border-sky-500/30 text-2xl">
                     🏙️
                   </div>
@@ -1550,14 +1632,185 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                       </span>
                     )}
                   </div>
-                  <div className="pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setActiveLightboxImage('/offer/navigation-proof-template.jpg')}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/90 px-4 py-2 text-xs font-bold text-slate-300 hover:text-white hover:border-sky-500/50 transition cursor-pointer"
-                    >
-                      <span>👁️</span> Zobrazit technický nákres šablony panelu (670 × 900 mm)
-                    </button>
+
+                  {/* Real Photo Showcase for Ostrava & Havířov */}
+                  <div className="pt-2 w-full space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                        <span>📸</span> Ukázky schválených navigačních cedulí v terénu
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        Kliknutím zvětšíte
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+                      {/* Ostrava primary */}
+                      <div
+                        className="group relative rounded-xl border border-sky-500/50 bg-slate-900/90 overflow-hidden cursor-pointer shadow-lg hover:border-sky-400 hover:shadow-sky-500/10 transition duration-300"
+                        onClick={() => setActiveLightboxImage('/offer/real-mcdonalds.jpg')}
+                      >
+                        <div className="relative h-44 w-full overflow-hidden bg-slate-950">
+                          <img
+                            src="/offer/real-mcdonalds.jpg"
+                            alt="Ukázka realizace Ostrava – schválený rozměr 670 × 900 mm na sloupu VO"
+                            className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-transparent opacity-70 group-hover:opacity-40 transition" />
+                          <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                            <span className="rounded-lg bg-sky-950/90 border border-sky-600/60 px-2 py-0.5 text-[10px] font-black text-sky-300 backdrop-blur-xs">
+                              🏙️ Ostrava (670 × 900 mm)
+                            </span>
+                          </div>
+                          <div className="absolute bottom-2 right-2 rounded-md bg-slate-950/85 border border-slate-700/60 px-2 py-0.5 text-[10px] font-semibold text-slate-300 backdrop-blur-xs flex items-center gap-1 group-hover:text-white transition">
+                            <span>🔍</span> Zvětšit
+                          </div>
+                        </div>
+                        <div className="p-3 bg-slate-950/90 border-t border-slate-800">
+                          <p className="text-xs font-bold text-white truncate">Ostrava – instalace na sloupu VO</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                            Standardní rozměr 670 × 900 mm na sloupech VO (ve správě DPO a Ostravských komunikací).
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Havířov reference */}
+                      <div
+                        className="group relative rounded-xl border border-slate-800 bg-slate-900/90 overflow-hidden cursor-pointer shadow-lg hover:border-indigo-500/50 hover:shadow-indigo-500/10 transition duration-300"
+                        onClick={() => setActiveLightboxImage('/offer/real-havirov.jpg')}
+                      >
+                        <div className="relative h-44 w-full overflow-hidden bg-slate-950">
+                          <img
+                            src="/offer/real-havirov.jpg"
+                            alt="Realizace Havířov – schválený atyp s horním půlkruhem na sloupu VO"
+                            className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-transparent opacity-70 group-hover:opacity-40 transition" />
+                          <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                            <span className="rounded-lg bg-indigo-950/90 border border-indigo-600/50 px-2 py-0.5 text-[10px] font-black text-indigo-300 backdrop-blur-xs">
+                              🏛️ Havířov (horní půlkruh)
+                            </span>
+                          </div>
+                          <div className="absolute bottom-2 right-2 rounded-md bg-slate-950/85 border border-slate-700/60 px-2 py-0.5 text-[10px] font-semibold text-slate-300 backdrop-blur-xs flex items-center gap-1 group-hover:text-white transition">
+                            <span>🔍</span> Zvětšit
+                          </div>
+                        </div>
+                        <div className="p-3 bg-slate-950/90 border-t border-slate-800">
+                          <p className="text-xs font-bold text-white truncate">Havířov – atypický formát s půlkruhem</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                            Schválený tvar s horním půlkruhem dle platného pasportu města Havířov na sloupu VO.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-1 flex flex-wrap items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveLightboxImage('/offer/navigation-proof-template.jpg')}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/90 px-4 py-2 text-xs font-bold text-slate-300 hover:text-white hover:border-sky-500/50 transition cursor-pointer"
+                      >
+                        <span>📐</span> Zobrazit technický nákres šablony panelu (670 × 900 mm)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : isDefaultSeePoint ? (
+                <div className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 p-6 md:p-7 text-center space-y-4 shadow-xl">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/20 text-sky-400 border border-sky-500/30 text-2xl">
+                    📍
+                  </div>
+                  <div className="space-y-1.5">
+                    <h4 className="font-bold text-white text-base">Navigační systém – {targetCity || 'lokální značení'}</h4>
+                    <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
+                      Přesný formát panelu se přizpůsobuje pasportu a technickým podmínkám daného města (standardní schválený rozměr 670 × 900 mm nebo schválený městský atyp).
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-sky-950/60 border border-sky-700/50 px-3.5 py-1.5 text-xs font-bold text-sky-300">
+                      <span>📐</span> Formát dle pasportu města
+                    </span>
+                    {showGraphicProofBadge && (
+                      <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-950/60 border border-emerald-700/50 px-3.5 py-1.5 text-xs font-bold text-emerald-300">
+                        <span>✨</span> Grafická korektura v ceně
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Real Photo Showcase for SeePoint standard formats */}
+                  <div className="pt-2 w-full space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                        <span>📸</span> Ukázky schválených navigačních cedulí v terénu
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        Kliknutím zvětšíte
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+                      <div
+                        className="group relative rounded-xl border border-slate-800 bg-slate-900/90 overflow-hidden cursor-pointer shadow-lg hover:border-sky-500/50 transition duration-300"
+                        onClick={() => setActiveLightboxImage('/offer/real-mcdonalds.jpg')}
+                      >
+                        <div className="relative h-44 w-full overflow-hidden bg-slate-950">
+                          <img
+                            src="/offer/real-mcdonalds.jpg"
+                            alt="Ostrava standard 670 × 900 mm"
+                            className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-transparent opacity-70 group-hover:opacity-40 transition" />
+                          <div className="absolute top-2 left-2">
+                            <span className="rounded-lg bg-sky-950/90 border border-sky-600/50 px-2 py-0.5 text-[10px] font-black text-sky-300 backdrop-blur-xs">
+                              🏙️ Ostrava (670 × 900 mm)
+                            </span>
+                          </div>
+                          <div className="absolute bottom-2 right-2 rounded-md bg-slate-950/85 border border-slate-700/60 px-2 py-0.5 text-[10px] font-semibold text-slate-300 backdrop-blur-xs flex items-center gap-1 group-hover:text-white transition">
+                            <span>🔍</span> Zvětšit
+                          </div>
+                        </div>
+                        <div className="p-3 bg-slate-950/90 border-t border-slate-800">
+                          <p className="text-xs font-bold text-white truncate">Ostrava – standardní rozměr 670 × 900 mm</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">Schválený formát pro sloupy VO (DPO / Ostrava).</p>
+                        </div>
+                      </div>
+
+                      <div
+                        className="group relative rounded-xl border border-slate-800 bg-slate-900/90 overflow-hidden cursor-pointer shadow-lg hover:border-indigo-500/50 transition duration-300"
+                        onClick={() => setActiveLightboxImage('/offer/real-havirov.jpg')}
+                      >
+                        <div className="relative h-44 w-full overflow-hidden bg-slate-950">
+                          <img
+                            src="/offer/real-havirov.jpg"
+                            alt="Havířov atyp s půlkruhem"
+                            className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-transparent opacity-70 group-hover:opacity-40 transition" />
+                          <div className="absolute top-2 left-2">
+                            <span className="rounded-lg bg-indigo-950/90 border border-indigo-600/50 px-2 py-0.5 text-[10px] font-black text-indigo-300 backdrop-blur-xs">
+                              🏛️ Havířov (horní půlkruh)
+                            </span>
+                          </div>
+                          <div className="absolute bottom-2 right-2 rounded-md bg-slate-950/85 border border-slate-700/60 px-2 py-0.5 text-[10px] font-semibold text-slate-300 backdrop-blur-xs flex items-center gap-1 group-hover:text-white transition">
+                            <span>🔍</span> Zvětšit
+                          </div>
+                        </div>
+                        <div className="p-3 bg-slate-950/90 border-t border-slate-800">
+                          <p className="text-xs font-bold text-white truncate">Havířov – atypický formát s půlkruhem</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">Schválený tvar dle pasportu města Havířov.</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-1 flex flex-wrap items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveLightboxImage('/offer/navigation-proof-template.jpg')}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/90 px-4 py-2 text-xs font-bold text-slate-300 hover:text-white hover:border-sky-500/50 transition cursor-pointer"
+                      >
+                        <span>📐</span> Zobrazit technický nákres šablony panelu (670 × 900 mm)
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -1637,9 +1890,9 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 <span className="text-base leading-none">📐</span>
                 <div>
                   <span className="font-bold text-white block">Rozměry panelu:</span>
-                  {isHavirov ? (
+                  {isDefaultSeePoint && isHavirov ? (
                     <span className="text-slate-400">Město Havířov používá schválený <strong>atypický tvar s horním půlkruhem</strong> (dle schváleného pasportu města Havířov).</span>
-                  ) : isOstrava ? (
+                  ) : isDefaultSeePoint && isOstrava ? (
                     <span className="text-slate-400">Standardní formát pro město Ostrava <strong>670 × 900 mm</strong> na sloupech VO.</span>
                   ) : (
                     <span className="text-slate-400">Standardní formát navigačních panelů (obvykle <strong>670 × 900 mm</strong>) přizpůsobený pasportu a technickým podmínkám daného města.</span>
@@ -1875,7 +2128,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* 1. Penny Fryčovice */}
                 <div
                   className="group relative h-56 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between"
@@ -1926,7 +2179,32 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                   </div>
                 </div>
 
-                {/* 3. LIDL */}
+                {/* 3. Havířov KFC */}
+                <div
+                  className="group relative h-56 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between"
+                  onClick={() => setActiveLightboxImage('/offer/real-havirov.jpg')}
+                >
+                  <img
+                    src="/offer/real-havirov.jpg"
+                    alt="Ukázka realizace – KFC Havířov"
+                    className="h-full w-full object-cover group-hover:scale-105 transition duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-3.5 flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-xs text-rose-300 bg-rose-950/90 px-2.5 py-1 rounded-lg border border-rose-800/60 backdrop-blur-xs">KFC Havířov</span>
+                      <span className="text-[10px] font-bold text-emerald-300 bg-emerald-950/90 px-2 py-0.5 rounded border border-emerald-800/60 backdrop-blur-xs">✓ Horní půlkruh VO</span>
+                    </div>
+                    <div className="space-y-0.5 text-white">
+                      <p className="text-xs font-bold flex items-center justify-between">
+                        <span>📍 KFC Havířov – Národní třída (1,8 km)</span>
+                        <span className="text-sky-400 text-[11px] group-hover:underline font-normal">🔍 Zvětšit</span>
+                      </p>
+                      <p className="text-[11px] text-slate-300 font-medium">Atypický formát s horním půlkruhem dle pasportu města Havířov na sloupu VO.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. LIDL */}
                 <div
                   className="group relative h-56 rounded-xl border border-slate-800 bg-slate-900 overflow-hidden cursor-pointer flex flex-col justify-between"
                   onClick={() => setActiveLightboxImage('/offer/real-lidl.jpg')}
