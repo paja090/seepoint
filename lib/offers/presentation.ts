@@ -332,10 +332,10 @@ export function toProposalOffer(offer: OfferView): ProposalOffer {
     client: { id: offer.clientId ?? 'client', name: offer.client.name, logoLabel: offer.client.name.slice(0, 2).toUpperCase(), logoUrl: offer.client.logoUrl, contactPerson: offer.contactPerson || offer.client.contactPerson || '', email: offer.contactEmail || offer.client.email || '' },
     salesperson: {
       id: offer.createdBy.id ?? 'sales',
-      name: offer.createdBy.name,
+      name: offer.createdBy.name || 'Pavel Šubert',
       role: 'Váš obchodní zástupce',
-      phone: offer.contactPhone || offer.createdBy.phone || '',
-      email: offer.contactEmail || offer.createdBy.email || '',
+      phone: offer.createdBy.phone || '+420 777 807 717',
+      email: offer.createdBy.email || (offer.createdBy.name === 'Pavel Šubert' ? 'subert.pvel@gmail.com' : 'info@seepoint.cz'),
       avatar: offer.createdBy.avatarUrl || undefined,
     },
     heroImage: carriers[0]?.image || portfolioImage(offer.offerType === 'NAVIGATION' ? '/offer/media-navigation.png' : offer.offerType === 'CITY_GALLERY' ? '/offer/hero-campaign.png' : '/offer/hero-city-poster.png'),
