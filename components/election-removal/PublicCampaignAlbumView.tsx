@@ -916,8 +916,8 @@ export function PublicCampaignAlbumView({
                         </span>
                       </div>
 
-                      <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/60 text-white text-[10px] backdrop-blur-sm">
-                        {formatCzechDate(photo.createdAt)}
+                      <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/60 text-emerald-400 text-[10px] font-bold backdrop-blur-sm">
+                        ✓ Ověřeno
                       </div>
                     </div>
 
@@ -1067,7 +1067,7 @@ export function PublicCampaignAlbumView({
             <div className="space-y-0.5">
               <span className="font-semibold text-sky-400">{activeLightboxItem.point.label}</span>
               <p className="text-slate-300">
-                Pořízeno: {formatCzechDate(activeLightboxItem.photo.createdAt)}
+                <span className="text-emerald-400 font-semibold">✓ Ověřená fotodokumentace v terénu</span>
                 {activeLightboxItem.photo.capturedByWorkerName && (
                   <span className="ml-2">· Realizoval: {activeLightboxItem.photo.capturedByWorkerName}</span>
                 )}

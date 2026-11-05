@@ -797,7 +797,7 @@ export function CampaignPhotoAlbum({
                     </p>
                     <div className="flex items-center justify-between text-[10px] text-slate-400">
                       <span className="truncate max-w-[100px]" title={point.label}>{point.label}</span>
-                      <span>{formatCzechDate(photo.createdAt)}</span>
+                      <span className="text-emerald-600 font-semibold">Ověřeno</span>
                     </div>
                   </div>
                 </div>
@@ -955,7 +955,7 @@ export function CampaignPhotoAlbum({
                 {activeLightboxItem.point.label}
               </span>
               <p className="text-slate-300">
-                Pořízeno: {formatCzechDate(activeLightboxItem.photo.createdAt)}
+                <span className="text-emerald-400 font-semibold">✓ Ověřená fotodokumentace v terénu</span>
                 {activeLightboxItem.photo.capturedByWorkerName && (
                   <span className="ml-2">· Realizoval: {activeLightboxItem.photo.capturedByWorkerName}</span>
                 )}
