@@ -79,6 +79,56 @@ export function ArrowBadge({ arrowEnum }: { arrowEnum?: string | null }) {
           <ArrowUpRight size={14} className="text-sky-700 stroke-[3]" /> ŠIKMO VPRAVO
         </span>
       );
+    case 'STRAIGHT_LEFT':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-teal-100 px-2.5 py-1 text-xs font-black text-teal-900 border border-teal-300">
+          <span className="inline-flex items-center gap-0.5">
+            <ArrowUp size={13} className="text-teal-700 stroke-[3]" />
+            <ArrowLeft size={13} className="text-teal-700 stroke-[3]" />
+          </span>
+          ROVNĚ A VLEVO
+        </span>
+      );
+    case 'STRAIGHT_RIGHT':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-teal-100 px-2.5 py-1 text-xs font-black text-teal-900 border border-teal-300">
+          <span className="inline-flex items-center gap-0.5">
+            <ArrowUp size={13} className="text-teal-700 stroke-[3]" />
+            <ArrowRight size={13} className="text-teal-700 stroke-[3]" />
+          </span>
+          ROVNĚ A VPRAVO
+        </span>
+      );
+    case 'LEFT_STRAIGHT':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-100 px-2.5 py-1 text-xs font-black text-cyan-900 border border-cyan-300">
+          <span className="inline-flex items-center gap-0.5">
+            <ArrowLeft size={13} className="text-cyan-700 stroke-[3]" />
+            <ArrowUp size={13} className="text-cyan-700 stroke-[3]" />
+          </span>
+          VLEVO A ROVNĚ
+        </span>
+      );
+    case 'RIGHT_STRAIGHT':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-100 px-2.5 py-1 text-xs font-black text-cyan-900 border border-cyan-300">
+          <span className="inline-flex items-center gap-0.5">
+            <ArrowRight size={13} className="text-cyan-700 stroke-[3]" />
+            <ArrowUp size={13} className="text-cyan-700 stroke-[3]" />
+          </span>
+          VPRAVO A ROVNĚ
+        </span>
+      );
+    case 'LEFT_RIGHT':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-purple-100 px-2.5 py-1 text-xs font-black text-purple-900 border border-purple-300">
+          <span className="inline-flex items-center gap-0.5">
+            <ArrowLeft size={13} className="text-purple-700 stroke-[3]" />
+            <ArrowRight size={13} className="text-purple-700 stroke-[3]" />
+          </span>
+          VLEVO I VPRAVO
+        </span>
+      );
     case 'U_TURN':
       return (
         <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-900 border border-amber-300">
