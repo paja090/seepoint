@@ -24,6 +24,7 @@ import {
   RotateCw,
   Calendar,
   Maximize2,
+  Eye,
 } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { canDownloadInstallationSheet, canDownloadOfferPdf } from '@/lib/offers/navigation-document-access';
@@ -996,6 +997,20 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                       <span className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2 py-1 text-xs font-bold text-sky-900 border border-sky-200 truncate max-w-full">
                         🎯 Směr: {targets.find((t) => t.id === ((pObj.targetId as string) || targets[0].id))?.name || 'Prodejna'}
                       </span>
+                    )}
+
+                    {Boolean(point.latitude && point.longitude) && (
+                      <a
+                        href={`https://www.google.com/maps?q=&layer=c&cbll=${point.latitude},${point.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2 py-1 text-xs font-bold text-sky-700 border border-sky-200 hover:bg-sky-100 hover:text-sky-900 transition"
+                        title="Otevřít 360° Google Street View v novém okně"
+                      >
+                        <Eye size={12} className="text-sky-600" />
+                        <span>Street View ↗</span>
+                      </a>
                     )}
                   </div>
 

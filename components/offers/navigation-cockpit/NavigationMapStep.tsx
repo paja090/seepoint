@@ -5,11 +5,13 @@ import {
   Plus,
   Crosshair,
   Sparkles,
+  Eye,
 } from 'lucide-react';
 import type { DraftPoint, DraftTarget } from './types';
 import { GoogleNavigationOfferMap } from '../GoogleNavigationOfferMap';
 import { NavigationPointList } from './NavigationPointList';
 import { NavigationPointDrawer } from './NavigationPointDrawer';
+import { NavigationStreetViewModal } from './NavigationStreetViewModal';
 
 interface NavigationMapStepProps {
   points: DraftPoint[];
@@ -48,6 +50,7 @@ export function NavigationMapStep({
 }: NavigationMapStepProps) {
   const [selectedPointId, setSelectedPointId] = useState<string | null>(points[0]?.id || null);
   const [editingPoint, setEditingPoint] = useState<DraftPoint | null>(null);
+  const [streetViewPoint, setStreetViewPoint] = useState<DraftPoint | null>(null);
 
   const activeTarget = targets[0];
 
@@ -140,6 +143,21 @@ export function NavigationMapStep({
             <span>Zaměřit cíl ({activeTarget?.name || 'Prodejnu'})</span>
           </button>
 
+          {points.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                const targetPt = points.find((p) => p.id === selectedPointId) || points[0];
+                setStreetViewPoint(targetPt);
+              }}
+              className="rounded-xl border border-sky-200 bg-sky-50 px-3.5 py-2 text-xs font-bold text-sky-900 hover:bg-sky-100 hover:border-sky-300 shadow-2xs transition flex items-center gap-1.5 cursor-pointer"
+              title="Otevřít 360° Street View průzkum pro ověření sloupů VO a odečtení čísel sloupů z kanceláře"
+            >
+              <Eye size={14} className="text-sky-600" />
+              <span>360° Street View (průzkum VO)</span>
+            </button>
+          )}
+
           {targets.length > 0 && points.length > 0 && (
             <button
               type="button"
@@ -231,6 +249,7 @@ export function NavigationMapStep({
             selectedPointId={selectedPointId}
             onSelectPoint={handleSelectPoint}
             onOpenDetail={handleOpenDetail}
+            onOpenStreetView={(pt) => setStreetViewPoint(pt)}
             onDuplicatePoint={handleDuplicatePoint}
             onDeletePoint={handleDeletePoint}
             onMovePoint={handleMovePoint}
@@ -251,6 +270,7 @@ export function NavigationMapStep({
             proposalMode={proposalMode}
             onOpenVisualizer={onOpenVisualizer}
             onUploadSitePhoto={onUploadSitePhoto}
+            onOpenStreetView={(pt) => setStreetViewPoint(pt)}
             onApplyCatalogRatesToPoint={(ptId) => {
               onApplyCatalogRatesToPoint?.(ptId);
             }}
@@ -260,6 +280,20 @@ export function NavigationMapStep({
           />
         );
       })()}
+
+      {/* 360° Street View Modal for Rapid Field Verification */}
+      {streetViewPoint && (
+        <NavigationStreetViewModal
+          point={points.find((p) => p.id === streetViewPoint.id) || streetViewPoint}
+          points={points}
+          onClose={() => setStreetViewPoint(null)}
+          onSelectPoint={(pt) => {
+            setStreetViewPoint(pt);
+            setSelectedPointId(pt.id);
+          }}
+          onUpdatePoint={handleUpdatePoint}
+        />
+      )}
     </div>
   );
 }
