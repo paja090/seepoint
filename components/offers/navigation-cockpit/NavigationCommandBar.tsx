@@ -7,7 +7,7 @@ interface NavigationCommandBarProps {
   currentStep: NavigationWorkflowStep;
   onPrevStep: () => void;
   onNextStep: () => void;
-  onSave: () => void;
+  onSave: (options?: { redirect?: boolean }) => void;
   saving: boolean;
   hasUnsavedChanges?: boolean;
   message?: string;
@@ -59,35 +59,51 @@ export function NavigationCommandBar({
 
         {/* Right: Save Draft & Next / Complete button */}
         <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            disabled={saving}
-            onClick={onSave}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-800 hover:bg-slate-50 transition cursor-pointer disabled:opacity-50 shadow-2xs"
-          >
-            {saving ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
-            <span>{saving ? 'Ukládám...' : 'Uložit nabídku navigace'}</span>
-          </button>
-
           {!isLastStep ? (
-            <button
-              type="button"
-              onClick={onNextStep}
-              className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-2 text-xs font-bold text-white hover:bg-slate-800 transition cursor-pointer shadow-xs"
-            >
-              <span>Pokračovat</span>
-              <ArrowRight size={14} />
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => onSave({ redirect: false })}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-800 hover:bg-slate-50 transition cursor-pointer disabled:opacity-50 shadow-2xs"
+                title="Průběžně uložit koncept"
+              >
+                {saving ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
+                <span>{saving ? 'Ukládám...' : 'Uložit koncept'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onNextStep}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-2 text-xs font-bold text-white hover:bg-slate-800 transition cursor-pointer shadow-xs"
+              >
+                <span>Pokračovat</span>
+                <ArrowRight size={14} />
+              </button>
+            </>
           ) : (
-            <button
-              type="button"
-              disabled={saving}
-              onClick={onSave}
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition cursor-pointer shadow-xs disabled:opacity-50"
-            >
-              <Check size={15} />
-              <span>{saving ? 'Ukládám...' : 'Uložit nabídku navigace'}</span>
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => onSave({ redirect: false })}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer disabled:opacity-50 shadow-2xs"
+                title="Uložit změny a zůstat v editoru"
+              >
+                {saving ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
+                <span>{saving ? 'Ukládám...' : 'Uložit koncept'}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => onSave({ redirect: true })}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition cursor-pointer shadow-xs disabled:opacity-50"
+              >
+                {saving ? <RefreshCw size={14} className="animate-spin" /> : <Check size={15} />}
+                <span>{saving ? 'Ukládám a přesměrovávám...' : 'Uložit nabídku'}</span>
+              </button>
+            </>
           )}
         </div>
       </div>
