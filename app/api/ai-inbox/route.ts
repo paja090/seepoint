@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { canAccess } from '@/lib/rbac';
 import { listAiInboxMessages } from '@/lib/ai-inbox/service';
+import type { AiInboxSortOption } from '@/lib/ai-inbox/importance';
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
@@ -25,6 +26,7 @@ export async function GET(request: Request) {
   const search = url.searchParams.get('search') || undefined;
   const rawReview = url.searchParams.get('requiresReview');
   const requiresReview = rawReview === 'true' ? true : rawReview === 'false' ? false : undefined;
+  const sortBy = (url.searchParams.get('sortBy') as AiInboxSortOption) || undefined;
 
   const take = Math.min(100, Math.max(1, Number.parseInt(url.searchParams.get('take') || '50', 10)));
   const skip = Math.max(0, Number.parseInt(url.searchParams.get('skip') || '0', 10));
@@ -38,6 +40,7 @@ export async function GET(request: Request) {
       requiresReview,
       take,
       skip,
+      sortBy,
     });
 
     return NextResponse.json(data);

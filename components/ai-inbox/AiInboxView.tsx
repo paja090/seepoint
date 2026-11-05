@@ -15,6 +15,7 @@ import {
   FolderKanban,
   Trash2,
   Settings,
+  ArrowUpDown,
 } from 'lucide-react';
 import { AiInboxMessageCard, type AiInboxListItem } from './AiInboxMessageCard';
 import { AiInboxOrderGroupCard } from './AiInboxOrderGroupCard';
@@ -22,6 +23,7 @@ import { AiInboxDetailModal, type AiInboxMessageDetailData } from './AiInboxDeta
 import { MailboxSettingsModal, type MailboxSettingsData } from './MailboxSettingsModal';
 import { CLASSIFICATION_LABELS } from '@/lib/ai-inbox/classifier';
 import { groupAiInboxMessagesByOrder } from '@/lib/ai-inbox/grouping';
+import { sortAiInboxItems, type AiInboxSortOption } from '@/lib/ai-inbox/importance';
 
 export type MailboxItem = {
   id: string;
@@ -42,6 +44,7 @@ export function AiInboxView({
   const [items, setItems] = useState<AiInboxListItem[]>(initialItems);
   const [activeTab, setActiveTab] = useState<'ATTENTION' | 'NEW' | 'PROCESSED' | 'SPAM' | 'ALL'>('ATTENTION');
   const [viewMode, setViewMode] = useState<'BY_ORDER' | 'INDIVIDUAL'>('BY_ORDER');
+  const [sortBy, setSortBy] = useState<AiInboxSortOption>('IMPORTANCE_AND_TIME');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMailboxId, setSelectedMailboxId] = useState<string>('ALL');
   const [selectedClassification, setSelectedClassification] = useState<string>('ALL');
@@ -211,8 +214,15 @@ export function AiInboxView({
     return true;
   });
 
+  // Sorted & Filtered items
+  const sortedFilteredItems = React.useMemo(() => {
+    return sortAiInboxItems(filteredItems, sortBy);
+  }, [filteredItems, sortBy]);
+
   // Grouped order conversations
-  const orderGroups = React.useMemo(() => groupAiInboxMessagesByOrder(filteredItems), [filteredItems]);
+  const orderGroups = React.useMemo(() => {
+    return groupAiInboxMessagesByOrder(filteredItems, sortBy);
+  }, [filteredItems, sortBy]);
 
   return (
     <div className="space-y-6">
@@ -458,8 +468,8 @@ export function AiInboxView({
         </div>
       </div>
 
-      {/* VIEW MODE TOGGLE BAR */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+      {/* VIEW MODE TOGGLE & SORTING BAR */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
         <div className="inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
           <button
             type="button"
@@ -484,19 +494,32 @@ export function AiInboxView({
             }`}
           >
             <Mail size={13} className={viewMode === 'INDIVIDUAL' ? 'text-fuchsia-600' : 'text-slate-400'} />
-            <span>Jednotlivé zprávy ({filteredItems.length})</span>
+            <span>Jednotlivé zprávy ({sortedFilteredItems.length})</span>
           </button>
         </div>
 
-        <div className="text-xs text-slate-400 hidden sm:block">
-          {viewMode === 'BY_ORDER'
-            ? 'E-maily k jedné zakázce jsou sjednoceny do uceleného konverzačního vlákna'
-            : 'Klasické zobrazení každého příchozího e-mailu samostatně'}
+        {/* Sorting Dropdown */}
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <label htmlFor="ai-inbox-sort" className="flex items-center gap-1 text-xs font-bold text-slate-600 shrink-0">
+            <ArrowUpDown size={13} className="text-slate-400" />
+            <span>Řazení:</span>
+          </label>
+          <select
+            id="ai-inbox-sort"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as AiInboxSortOption)}
+            className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-2xs hover:border-slate-400 focus:border-fuchsia-500 focus:ring-1 focus:ring-fuchsia-500 cursor-pointer"
+          >
+            <option value="IMPORTANCE_AND_TIME">⚡ Dle důležitosti a času příchodu (doporučeno)</option>
+            <option value="NEWEST">🕒 Od nejnovějších</option>
+            <option value="OLDEST">⏳ Od nejstarších</option>
+            <option value="IMPORTANCE_ONLY">⭐ Pouze dle důležitosti</option>
+          </select>
         </div>
       </div>
 
       {/* MESSAGES LIST */}
-      {filteredItems.length === 0 ? (
+      {sortedFilteredItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white py-16 px-4 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-fuchsia-50 text-fuchsia-600 mb-3">
             <Inbox size={24} />
@@ -535,7 +558,7 @@ export function AiInboxView({
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredItems.map((item) => (
+          {sortedFilteredItems.map((item) => (
             <AiInboxMessageCard
               key={item.id}
               item={item}

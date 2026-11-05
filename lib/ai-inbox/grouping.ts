@@ -1,11 +1,21 @@
 import type { OrderConversationGroup } from './types';
 import type { AiInboxListItem } from '@/components/ai-inbox/AiInboxMessageCard';
+import {
+  calculateAiInboxImportance,
+  sortAiInboxItems,
+  PRIORITY_TIER_META,
+  type AiInboxSortOption,
+  type AiInboxPriorityTier,
+} from './importance';
 
 /**
  * Seskupí e-maily v AI Inboxu podle zakázek a konverzačních vláken.
- * Čistá funkce použitelná na serveru i na klientovi.
+ * Řadí skupiny i zprávy uvnitř skupin podle zvoleného režimu řazení.
  */
-export function groupAiInboxMessagesByOrder(items: AiInboxListItem[]): OrderConversationGroup[] {
+export function groupAiInboxMessagesByOrder(
+  items: AiInboxListItem[],
+  sortOption: AiInboxSortOption = 'IMPORTANCE_AND_TIME'
+): OrderConversationGroup[] {
   const groupsMap = new Map<string, OrderConversationGroup>();
 
   for (const item of items) {
@@ -26,7 +36,7 @@ export function groupAiInboxMessagesByOrder(items: AiInboxListItem[]): OrderConv
     } else if (item.navigationOrder?.id) {
       key = `nav-${item.navigationOrder.id}`;
       type = 'NAVIGATION_ORDER';
-      orderNumber = item.navigationOrder.orderNumber;
+      orderNumber = item.navigationOrder.orderNumber || null;
       title = `Navigační zakázka ${item.navigationOrder.orderNumber || ''}`;
       status = item.navigationOrder.status;
     } else if (item.offer?.id) {
@@ -66,6 +76,8 @@ export function groupAiInboxMessagesByOrder(items: AiInboxListItem[]): OrderConv
         latestReceivedAt: item.receivedAt,
         latestAiSummary: item.aiSummary,
         participants: [],
+        priorityTier: 'NORMAL',
+        maxImportanceScore: 0,
       };
       groupsMap.set(key, group);
     }
@@ -105,15 +117,67 @@ export function groupAiInboxMessagesByOrder(items: AiInboxListItem[]): OrderConv
     }
   }
 
-  // Řazení: skupiny vyžadující pozornost nebo s novými zprávami nahoře, následně podle času poslední zprávy
+  // Vyhodnocení prioritního pásma a seřazení zpráv uvnitř každé skupiny
   const groups = Array.from(groupsMap.values());
+  for (const group of groups) {
+    // Seřadit zprávy uvnitř skupiny dle zvoleného řazení
+    group.items = sortAiInboxItems(group.items, sortOption);
+
+    // Zjistit nejvyšší prioritní pásmo a skóre uvnitř skupiny
+    let highestTier: AiInboxPriorityTier = 'LOW';
+    let maxScore = -999;
+
+    for (const item of group.items) {
+      const evaluation = calculateAiInboxImportance(item);
+      if (evaluation.score > maxScore) {
+        maxScore = evaluation.score;
+      }
+      const currentOrder = PRIORITY_TIER_META[evaluation.tier]?.order ?? 0;
+      const highestOrder = PRIORITY_TIER_META[highestTier]?.order ?? 0;
+      if (currentOrder > highestOrder) {
+        highestTier = evaluation.tier;
+      }
+    }
+
+    group.priorityTier = highestTier;
+    group.maxImportanceScore = maxScore;
+  }
+
+  // Řazení skupin podle zvoleného kritéria
   groups.sort((a, b) => {
+    if (sortOption === 'NEWEST') {
+      return new Date(b.latestReceivedAt).getTime() - new Date(a.latestReceivedAt).getTime();
+    }
+
+    if (sortOption === 'OLDEST') {
+      return new Date(a.latestReceivedAt).getTime() - new Date(b.latestReceivedAt).getTime();
+    }
+
+    if (sortOption === 'IMPORTANCE_ONLY') {
+      const scoreDiff = (b.maxImportanceScore ?? 0) - (a.maxImportanceScore ?? 0);
+      if (scoreDiff !== 0) return scoreDiff;
+      return new Date(b.latestReceivedAt).getTime() - new Date(a.latestReceivedAt).getTime();
+    }
+
+    // Výchozí režim: IMPORTANCE_AND_TIME
+    // 1. Prioritní pásmo skupiny (URGENT > HIGH > NORMAL > LOW > SPAM)
+    const tierOrderA = PRIORITY_TIER_META[a.priorityTier ?? 'NORMAL']?.order ?? 0;
+    const tierOrderB = PRIORITY_TIER_META[b.priorityTier ?? 'NORMAL']?.order ?? 0;
+    if (tierOrderA !== tierOrderB) {
+      return tierOrderB - tierOrderA;
+    }
+
+    // 2. Počet zpráv vyžadujících pozornost
     if (a.attentionCount !== b.attentionCount) {
       return b.attentionCount - a.attentionCount;
     }
+
+    // 3. Počet nových zpráv
     if (a.newCount !== b.newCount) {
       return b.newCount - a.newCount;
     }
+
+    // 4. Čas poslední zprávy (novější nahoře)
     return new Date(b.latestReceivedAt).getTime() - new Date(a.latestReceivedAt).getTime();
   });
 
