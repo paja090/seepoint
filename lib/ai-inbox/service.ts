@@ -319,6 +319,15 @@ export async function syncMailbox(
   }
 }
 
+import {
+  calculateAiInboxImportance,
+  sortAiInboxItems,
+  PRIORITY_TIER_META,
+  type AiInboxSortOption,
+  type AiInboxPriorityTier,
+} from './importance';
+import type { AiInboxListItem } from '@/components/ai-inbox/AiInboxMessageCard';
+
 export type AiInboxListFilters = {
   status?: string;
   classification?: string;
@@ -327,6 +336,7 @@ export type AiInboxListFilters = {
   requiresReview?: boolean;
   take?: number;
   skip?: number;
+  sortBy?: AiInboxSortOption;
 };
 
 export async function listAiInboxMessages(organizationId: string, filters?: AiInboxListFilters) {
@@ -369,7 +379,7 @@ export async function listAiInboxMessages(organizationId: string, filters?: AiIn
     prisma.aiInboxMessage.count({ where }),
     prisma.aiInboxMessage.findMany({
       where,
-      orderBy: { receivedAt: 'desc' },
+      orderBy: filters?.sortBy === 'OLDEST' ? { receivedAt: 'asc' } : { receivedAt: 'desc' },
       take: filters?.take ?? 50,
       skip: filters?.skip ?? 0,
       include: {
@@ -398,7 +408,12 @@ export async function listAiInboxMessages(organizationId: string, filters?: AiIn
     }),
   ]);
 
-  return { totalCount, items };
+  const sortedItems = sortAiInboxItems(
+    items as unknown as AiInboxListItem[],
+    filters?.sortBy || 'IMPORTANCE_AND_TIME'
+  );
+
+  return { totalCount, items: sortedItems };
 }
 
 export async function getAiInboxMessageDetail(organizationId: string, messageId: string) {
@@ -619,6 +634,15 @@ export async function getAiInboxMessageDetail(organizationId: string, messageId:
 }
 
 export { groupAiInboxMessagesByOrder } from './grouping';
+export {
+  calculateAiInboxImportance,
+  sortAiInboxItems,
+  PRIORITY_TIER_META,
+} from './importance';
+export type {
+  AiInboxPriorityTier,
+  AiInboxSortOption,
+} from './importance';
 
 
 

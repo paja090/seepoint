@@ -17,6 +17,7 @@ import {
   Users,
 } from 'lucide-react';
 import type { OrderConversationGroup } from '@/lib/ai-inbox/types';
+import { PRIORITY_TIER_META } from '@/lib/ai-inbox/importance';
 import type { AiInboxListItem } from './AiInboxMessageCard';
 import { AiInboxMessageCard } from './AiInboxMessageCard';
 
@@ -57,15 +58,19 @@ export function AiInboxOrderGroupCard({
   const isClient = group.type === 'CLIENT';
 
   const hasSelectedChild = group.items.some((i) => i.id === selectedMessageId);
+  const isUrgent = group.priorityTier === 'URGENT';
+  const isHigh = group.priorityTier === 'HIGH';
 
   return (
     <div
       className={`rounded-2xl border transition-all ${
         hasSelectedChild
           ? 'border-fuchsia-400 bg-white ring-2 ring-fuchsia-300/40 shadow-md'
-          : group.attentionCount > 0
-            ? 'border-amber-300 bg-white shadow-xs'
-            : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-xs'
+          : isUrgent
+            ? 'border-rose-400 bg-white ring-1 ring-rose-300/40 shadow-xs'
+            : isHigh || group.attentionCount > 0
+              ? 'border-amber-300 bg-white shadow-xs'
+              : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-xs'
       }`}
     >
       {/* Header bar */}
@@ -144,6 +149,22 @@ export function AiInboxOrderGroupCard({
                 {group.messageCount} {group.messageCount === 1 ? 'zpráva' : group.messageCount < 5 ? 'zprávy' : 'zpráv'}
               </span>
             </span>
+
+            {/* Urgent priority indicator */}
+            {isUrgent && (
+              <span className="inline-flex items-center gap-1 rounded-lg bg-rose-100 px-2.5 py-1 text-xs font-black text-rose-900 border border-rose-300 shadow-2xs">
+                <span>🔥</span>
+                <span>Urgentní</span>
+              </span>
+            )}
+
+            {/* High priority indicator */}
+            {!isUrgent && isHigh && (
+              <span className="inline-flex items-center gap-1 rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-900 border border-amber-300 shadow-2xs">
+                <span>⚡</span>
+                <span>Prioritní</span>
+              </span>
+            )}
 
             {/* New incoming indicator */}
             {group.newCount > 0 && (

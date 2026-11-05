@@ -3,6 +3,11 @@
 import React from 'react';
 import { Paperclip, Sparkles, AlertCircle, CheckCircle2, Clock, Building2, FolderKanban, Compass, FileText, Trash2, MessageSquare } from 'lucide-react';
 import { CLASSIFICATION_LABELS, getConfidenceBadge } from '@/lib/ai-inbox/classifier';
+import {
+  calculateAiInboxImportance,
+  PRIORITY_TIER_META,
+  type AiInboxPriorityTier,
+} from '@/lib/ai-inbox/importance';
 import type { AiInboxClassification, AiInboxStatus } from '@/lib/ai-inbox/types';
 
 export type AiInboxListItem = {
@@ -21,8 +26,10 @@ export type AiInboxListItem = {
   client?: { id: string; name: string; companyId: string | null } | null;
   crmOrder?: { id: string; orderNumber: string; title: string; status: string } | null;
   offer?: { id: string; title: string; status: string } | null;
-  navigationOrder?: { id: string; orderNumber: string; status: string } | null;
+  navigationOrder?: { id: string; orderNumber?: string; status: string } | null;
   _count?: { attachments: number; actions: number };
+  priorityTier?: AiInboxPriorityTier;
+  importanceScore?: number;
 };
 
 function formatRelativeTime(dateInput: string | Date): string {
@@ -61,6 +68,9 @@ export function AiInboxMessageCard({
   const isAnalyzing = item.processingStatus === 'ANALYZING';
   const isError = item.processingStatus === 'ERROR';
 
+  const priorityTier = item.priorityTier || calculateAiInboxImportance(item).tier;
+  const priorityMeta = PRIORITY_TIER_META[priorityTier];
+
   return (
     <div
       onClick={() => onSelect(item)}
@@ -69,9 +79,13 @@ export function AiInboxMessageCard({
           ? 'border-fuchsia-500 bg-fuchsia-50/40 ring-2 ring-fuchsia-400/30'
           : isProcessed
             ? 'border-slate-200 bg-slate-50/60 opacity-80 hover:opacity-100'
-            : item.requiresReview
-              ? 'border-amber-300 bg-white hover:border-amber-400'
-              : 'border-slate-200 bg-white hover:border-slate-300'
+            : priorityTier === 'URGENT'
+              ? 'border-rose-400 bg-rose-50/20 hover:border-rose-500 shadow-xs'
+              : priorityTier === 'HIGH'
+                ? 'border-amber-300 bg-amber-50/15 hover:border-amber-400 shadow-xs'
+                : item.requiresReview
+                  ? 'border-amber-300 bg-white hover:border-amber-400'
+                  : 'border-slate-200 bg-white hover:border-slate-300'
       }`}
     >
       {/* Top row: Sender, Mailbox, Time */}
@@ -83,6 +97,15 @@ export function AiInboxMessageCard({
           {item.fromName && (
             <span className="hidden sm:inline truncate text-xs text-slate-400">
               &lt;{item.fromEmail}&gt;
+            </span>
+          )}
+          {!isProcessed && (priorityTier === 'URGENT' || priorityTier === 'HIGH') && (
+            <span
+              className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-black uppercase tracking-wider border shadow-2xs ${priorityMeta.badgeColor}`}
+              title={priorityMeta.description}
+            >
+              <span>{priorityMeta.icon}</span>
+              <span>{priorityMeta.label}</span>
             </span>
           )}
         </div>

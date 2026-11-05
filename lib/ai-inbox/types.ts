@@ -208,8 +208,10 @@ export type OrderConversationGroup = {
     client?: { id: string; name: string; companyId: string | null } | null;
     crmOrder?: { id: string; orderNumber: string; title: string; status: string } | null;
     offer?: { id: string; title: string; status: string } | null;
-    navigationOrder?: { id: string; orderNumber: string; status: string } | null;
+    navigationOrder?: { id: string; orderNumber?: string; status: string } | null;
     _count?: { attachments: number; actions: number };
+    priorityTier?: 'URGENT' | 'HIGH' | 'NORMAL' | 'LOW' | 'SPAM';
+    maxImportanceScore?: number;
   }>;
   messageCount: number;
   attentionCount: number;
@@ -218,5 +220,8 @@ export type OrderConversationGroup = {
   latestReceivedAt: string | Date;
   latestAiSummary?: string | null;
   participants: Array<{ name: string; email?: string | null; isTeam?: boolean }>;
+  priorityTier?: 'URGENT' | 'HIGH' | 'NORMAL' | 'LOW' | 'SPAM';
+  maxImportanceScore?: number;
 };
+
 
