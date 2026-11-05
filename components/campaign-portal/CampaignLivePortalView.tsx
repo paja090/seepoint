@@ -183,6 +183,8 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
   let campaignDays = 0;
   let daysRemaining = 0;
 
+  const hasExplicitEndDate = Boolean(strategy?.dateTo || (validDates.length > 0 && validDates.some((d) => d.to)));
+
   if (strategy?.dateFrom && strategy?.dateTo) {
     const from = new Date(strategy.dateFrom);
     const to = new Date(strategy.dateTo);
@@ -202,14 +204,14 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
     campaignDays = Math.ceil((maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24));
     daysRemaining = Math.max(0, Math.ceil((maxDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
   } else if (isNavigation) {
-    campaignDays = 365;
-    const baseDate = offer.acceptedAt ? new Date(offer.acceptedAt) : new Date(offer.createdAt);
-    startDateStr = baseDate.toLocaleDateString('cs-CZ');
-    const end = new Date(baseDate);
-    end.setFullYear(end.getFullYear() + 1);
-    endDateStr = end.toLocaleDateString('cs-CZ');
-    const today = new Date();
-    daysRemaining = Math.max(0, Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+    // Navigace bez explicitního data ukončení je dlouhodobý provoz s aktivní licencí
+    const baseDate = offer.acceptedAt ? new Date(offer.acceptedAt) : (offer.createdAt ? new Date(offer.createdAt) : null);
+    if (baseDate && !isNaN(baseDate.getTime())) {
+      startDateStr = baseDate.toLocaleDateString('cs-CZ');
+    }
+    endDateStr = '-';
+    campaignDays = 0;
+    daysRemaining = 0;
   }
 
   const totalUnits = isNavigation ? navPoints.length : items.length;
@@ -785,11 +787,20 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
                       🎯 Cíl: {navTarget.name}
                     </span>
                   )}
-                  {startDateStr !== '-' && (
+                  {startDateStr !== '-' && endDateStr !== '-' ? (
                     <span className="px-3 py-1 rounded-full text-xs font-bold bg-sky-900/60 text-sky-200 border border-sky-700/50">
                       {startDateStr} – {endDateStr}
                     </span>
-                  )}
+                  ) : isNavigation && !hasExplicitEndDate ? (
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-700/50 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                      Aktivní licence
+                    </span>
+                  ) : startDateStr !== '-' ? (
+                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-sky-900/60 text-sky-200 border border-sky-700/50">
+                      Od {startDateStr}
+                    </span>
+                  ) : null}
                 </div>
                 <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">{campaignTitle}</h1>
                 <p className="text-sm text-sky-200 font-medium flex items-center gap-1.5">
@@ -802,7 +813,7 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
               </div>
             </div>
             <div className="bg-slate-900/90 border border-sky-700/60 p-4 rounded-2xl text-center shrink-0">
-              {daysRemaining > 0 ? (
+              {hasExplicitEndDate && daysRemaining > 0 ? (
                 <>
                   <span className="text-[11px] uppercase font-bold text-sky-300 block">
                     {isNavigation ? 'Platnost licence' : 'Do konce kampaně zbývá'}
@@ -810,11 +821,17 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
                   <span className="text-3xl font-black text-white block mt-0.5">{daysRemaining} dní</span>
                   <span className="text-[10px] text-slate-400">Do: {endDateStr}</span>
                 </>
-              ) : validDates.length > 0 || isNavigation ? (
+              ) : hasExplicitEndDate && daysRemaining <= 0 ? (
                 <>
                   <span className="text-[11px] uppercase font-bold text-emerald-300 block">Kampaň ukončena</span>
                   <span className="text-3xl font-black text-white block mt-0.5">{campaignDays} dní</span>
                   <span className="text-[10px] text-slate-400">Celková délka</span>
+                </>
+              ) : isNavigation ? (
+                <>
+                  <span className="text-[11px] uppercase font-bold text-emerald-300 block">Platnost licence</span>
+                  <span className="text-2xl sm:text-3xl font-black text-emerald-400 block mt-0.5">Aktivní</span>
+                  <span className="text-[10px] text-slate-400">Dlouhodobý provoz sítě</span>
                 </>
               ) : (
                 <>
@@ -879,7 +896,7 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
                 {isNavigation ? 'Licenční správa' : 'Délka kampaně'}
               </span>
               <div className="text-2xl font-black text-white">
-                {campaignDays > 0 ? `${campaignDays} dní` : '-'}
+                {isNavigation && !hasExplicitEndDate ? 'Aktivní' : campaignDays > 0 ? `${campaignDays} dní` : '-'}
               </div>
               <span className="text-[11px] text-slate-400 block">
                 {isNavigation ? 'Dlouhodobé navigační značení' : campaignDays > 0 ? 'Celková délka' : 'Bude upřesněna'}

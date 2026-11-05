@@ -655,7 +655,10 @@ export function PublicNavigationClientView({
                       )}
 
                       <div className="flex items-center justify-between border-t pt-2.5 text-[11px] text-slate-400">
-                        <span>Fotodokumentace: {item.photoDate ? new Date(item.photoDate).toLocaleDateString('cs-CZ') : 'Aktuální'}</span>
+                        <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 inline shrink-0" />
+                          Fotodokumentace: Ověřeno v terénu
+                        </span>
                         {hasGps ? (
                           <a
                             href={`https://www.google.com/maps/dir/?api=1&destination=${item.latitude},${item.longitude}`}
