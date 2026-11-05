@@ -14,6 +14,7 @@ import {
   RotateCw,
   RefreshCw,
   Layers,
+  Eye,
 } from 'lucide-react';
 import type { DraftPoint, DraftTarget } from './types';
 import {
@@ -33,6 +34,7 @@ interface NavigationPointDrawerProps {
   onUploadSitePhoto?: (pointId: string, file: File) => void;
   onRecalculateRoute?: (pointId: string) => Promise<void>;
   onApplyCatalogRatesToPoint?: (pointId: string) => void;
+  onOpenStreetView?: (point: DraftPoint) => void;
 }
 
 export function NavigationPointDrawer({
@@ -45,6 +47,7 @@ export function NavigationPointDrawer({
   onUploadSitePhoto,
   onRecalculateRoute,
   onApplyCatalogRatesToPoint,
+  onOpenStreetView,
 }: NavigationPointDrawerProps) {
   if (!point) return null;
 
@@ -148,6 +151,44 @@ export function NavigationPointDrawer({
                 value={point.longitude || ''}
                 onChange={(e) => onUpdatePoint(point.id, { longitude: Number(e.target.value) })}
               />
+            </div>
+
+            {/* Street View Quick Inspection */}
+            <div className="sm:col-span-2 rounded-xl border border-sky-200 bg-gradient-to-r from-sky-50 via-white to-blue-50 p-3 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="space-y-0.5">
+                  <span className="font-bold text-sky-950 flex items-center gap-1.5 text-xs">
+                    <Eye size={13} className="text-sky-600" />
+                    <span>360° Street View průzkum sloupu VO</span>
+                  </span>
+                  <p className="text-[11px] text-slate-500">
+                    Ověřte reálný sloup veřejného osvětlení přímo z kanceláře bez výjezdu do terénu.
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {onOpenStreetView && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenStreetView(point)}
+                      className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-sky-700 transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Eye size={13} />
+                      <span>Otevřít 360°</span>
+                    </button>
+                  )}
+                  {Boolean(point.latitude && point.longitude) && (
+                    <a
+                      href={`https://www.google.com/maps?q=&layer=c&cbll=${point.latitude},${point.longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-lg border border-sky-300 bg-white px-2.5 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-100 transition flex items-center gap-1 cursor-pointer"
+                      title="Otevřít přímo na Google Maps v novém okně"
+                    >
+                      <span>Mapy ↗</span>
+                    </a>
+                  )}
+                </div>
+              </div>
             </div>
 
             {targets.length > 0 && (
@@ -312,7 +353,20 @@ export function NavigationPointDrawer({
             </div>
 
             <div>
-              <label className="block font-bold text-slate-800 mb-1">Číslo sloupu (pillarNumber)</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-bold text-slate-800">Číslo sloupu (pillarNumber)</label>
+                {onOpenStreetView && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenStreetView(point)}
+                    className="text-[10px] font-bold text-sky-600 hover:text-sky-800 hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                    title="Otevřít Street View a přečíst číslo ze štítku sloupu"
+                  >
+                    <Eye size={10} />
+                    <span>Hledat štítek</span>
+                  </button>
+                )}
+              </div>
               <input
                 type="text"
                 className="input text-xs font-mono"

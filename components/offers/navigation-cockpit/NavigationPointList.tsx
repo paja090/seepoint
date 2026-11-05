@@ -11,6 +11,7 @@ import {
   Camera,
   Check,
   Compass,
+  Eye,
 } from 'lucide-react';
 import type { DraftPoint, DraftTarget } from './types';
 import { getPointPinVisual } from '@/lib/offers/navigation-carrier-types';
@@ -25,6 +26,7 @@ interface NavigationPointListProps {
   onDeletePoint: (id: string) => void;
   onMovePoint: (fromIndex: number, toIndex: number) => void;
   proposalMode: 'LOCATION_SELECTION' | 'PRICED_QUOTE';
+  onOpenStreetView?: (point: DraftPoint) => void;
 }
 
 export function NavigationPointList({
@@ -37,6 +39,7 @@ export function NavigationPointList({
   onDeletePoint,
   onMovePoint,
   proposalMode,
+  onOpenStreetView,
 }: NavigationPointListProps) {
   if (points.length === 0) {
     return (
@@ -125,9 +128,13 @@ export function NavigationPointList({
                 </span>
               )}
 
-              {pt.pillarNumber && (
-                <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.2 rounded text-slate-700 font-bold">
-                  VO #{pt.pillarNumber}
+              {pt.pillarNumber ? (
+                <span className="font-mono text-[10px] bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded text-emerald-800 font-extrabold flex items-center gap-0.5">
+                  <Check size={9} /> VO #{pt.pillarNumber}
+                </span>
+              ) : (
+                <span className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200 font-medium">
+                  VO nezadáno
                 </span>
               )}
 
@@ -176,6 +183,21 @@ export function NavigationPointList({
               </div>
 
               <div className="flex flex-wrap items-center gap-1.5">
+                {onOpenStreetView && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenStreetView(pt);
+                    }}
+                    className="inline-flex items-center gap-1 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/90 px-2 py-0.5 font-bold cursor-pointer transition shadow-2xs"
+                    title="Otevřít 360° Street View pro nalezení a ověření sloupu VO z kanceláře"
+                  >
+                    <Eye size={11} className="text-amber-700" />
+                    <span>Street View</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={(e) => {

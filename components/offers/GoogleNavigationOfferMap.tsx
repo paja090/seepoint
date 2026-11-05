@@ -459,7 +459,7 @@ export function GoogleNavigationOfferMap({
         zoom: target ? 14 : 8,
         mapTypeId: mapType,
         mapTypeControl: true,
-        streetViewControl: false,
+        streetViewControl: true,
         fullscreenControl: true,
         mapId: 'DEMO_MAP_ID',
       });
