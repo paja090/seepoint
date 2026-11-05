@@ -37,13 +37,17 @@ export function formatDistance(dist?: number | string | null): string {
 export function cleanStreetName(rawStreet?: string | null, rawAddress?: string | null, rawCity?: string | null): string {
   let val = rawStreet || rawAddress || rawCity || 'Ostravská';
   val = val.split(',')[0].trim();
+  val = val.replace(/^\[.*?\]\s*/g, '');
+  val = val.replace(/^(Příjezdový\s+bod|Rozhodovací\s+bod|Navigační\s+bod|Klíčový\s+bod|Bod|Trasa|Odbočení\s+(vpravo|vlevo)|Průjezd\s+po)\s*(na|v|po|k)?\s*/i, '');
+  val = val.replace(/\s*\(.*?$/, '').trim();
   val = val.replace(/\s+\d+\/\d+.*$/, ''); // strip numbers like 748/9
   val = val.replace(/\s+\d+.*$/, ''); // strip trailing numbers
+  val = val.trim();
   if (/17\.\s*list/i.test(val)) return '17. listopadu';
   if (/collo/i.test(val)) return 'Collo-louky';
   if (/slav[ií]k/i.test(val)) return 'Slavíkova';
   if (/krmel/i.test(val)) return 'Krmelínská';
-  return val.trim() || 'Ostravská';
+  return val || 'Ostravská';
 }
 
 export function cleanDirectionAndDistance(
