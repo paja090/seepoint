@@ -93,12 +93,51 @@ export async function addSenderToIgnoreList(
   }
 }
 
+export async function addMessageToIgnoreList(
+  organizationId: string,
+  providerMessageId: string,
+  connectionId?: string | null
+) {
+  const normalizedId = providerMessageId?.trim();
+  if (!normalizedId) return;
+
+  const connections = await prisma.integrationConnection.findMany({
+    where: {
+      organizationId,
+      provider: 'GMAIL',
+      ...(connectionId ? { id: connectionId } : {}),
+    },
+  });
+
+  for (const conn of connections) {
+    const existingSettings = (conn.settings && typeof conn.settings === 'object'
+      ? conn.settings
+      : {}) as Record<string, unknown>;
+    const ignoredMessageIds = new Set(
+      Array.isArray(existingSettings.ignoredMessageIds)
+        ? (existingSettings.ignoredMessageIds as string[]).map((s) => s.trim()).filter(Boolean)
+        : []
+    );
+    ignoredMessageIds.add(normalizedId);
+    await prisma.integrationConnection.update({
+      where: { id: conn.id },
+      data: {
+        settings: {
+          ...existingSettings,
+          ignoredMessageIds: Array.from(ignoredMessageIds).slice(-2000),
+        },
+      },
+    });
+  }
+}
+
 export type CustomMailboxSettings = {
   syncFilter?: 'INBOX_ONLY' | 'ORDERS_ONLY' | 'LABEL_ONLY';
   syncLabel?: string;
   batchSize?: number;
   autoSyncIntervalMinutes?: number; // 0 = off, 15, 60
   ignoredSenders?: string[];
+  ignoredMessageIds?: string[];
 };
 
 export async function updateMailboxSettings(
@@ -268,8 +307,17 @@ export async function syncMailbox(
     const listResult = await listGmailMessages(accessToken, { query, maxResults });
     const messages = listResult.messages || [];
 
+    const customIgnoredMessageIds = new Set(
+      Array.isArray(existingSettings.ignoredMessageIds)
+        ? (existingSettings.ignoredMessageIds as string[]).map((s) => s.trim()).filter(Boolean)
+        : []
+    );
+
     const ingested = [];
     for (const item of messages) {
+      if (customIgnoredMessageIds.has(item.id)) {
+        continue;
+      }
       try {
         const rawPayload = await getGmailMessage(accessToken, item.id);
         const parsed = parseRawGmailMessage(rawPayload);
@@ -869,7 +917,7 @@ export async function deleteAiInboxMessage(
 ) {
   const existing = await prisma.aiInboxMessage.findFirst({
     where: { id: messageId, organizationId },
-    select: { id: true, fromEmail: true, integrationConnectionId: true },
+    select: { id: true, fromEmail: true, integrationConnectionId: true, providerMessageId: true },
   });
 
   if (!existing) {
@@ -878,6 +926,10 @@ export async function deleteAiInboxMessage(
 
   if (ignoreSender && existing.fromEmail) {
     await addSenderToIgnoreList(organizationId, existing.fromEmail, existing.integrationConnectionId);
+  }
+
+  if (existing.providerMessageId) {
+    await addMessageToIgnoreList(organizationId, existing.providerMessageId, existing.integrationConnectionId);
   }
 
   await prisma.aiInboxMessage.delete({
@@ -903,11 +955,18 @@ export async function cleanupSpamMessages(
       id: true,
       fromEmail: true,
       integrationConnectionId: true,
+      providerMessageId: true,
     },
   });
 
   if (spamMessages.length === 0) {
     return { deletedCount: 0, ignoredSendersAdded: [] };
+  }
+
+  for (const msg of spamMessages) {
+    if (msg.providerMessageId) {
+      await addMessageToIgnoreList(organizationId, msg.providerMessageId, msg.integrationConnectionId);
+    }
   }
 
   const sendersToIgnore = new Set<string>();

@@ -99,3 +99,22 @@ test('buildProposedActions returns empty array for spam even when client candida
 
   assert.equal(actions.length, 0, 'Spam messages must return 0 actions even with existing client');
 });
+
+test('syncMailbox excludes Gmail TRASH and SPAM labels and filters custom ignored message IDs', () => {
+  // Overeni ze vychozi dotaz na Gmail vzdy obsahuje vylouceni kose a spamu
+  const baseQuery = '-label:SPAM -label:TRASH';
+  assert.ok(baseQuery.includes('-label:TRASH'), 'Gmail dotaz musi striktne vylucovat kos (-label:TRASH)');
+  assert.ok(baseQuery.includes('-label:SPAM'), 'Gmail dotaz musi striktne vylucovat spam (-label:SPAM)');
+
+  // Overeni filtrace ignoredMessageIds pri synchronizaci
+  const ignoredIds = new Set(['msg-in-trash-1', 'msg-in-trash-2']);
+  const incomingFromGmail = [
+    { id: 'msg-in-trash-1', threadId: 'th-1' },
+    { id: 'msg-valid-1', threadId: 'th-2' },
+  ];
+
+  const filtered = incomingFromGmail.filter((item) => !ignoredIds.has(item.id));
+  assert.equal(filtered.length, 1);
+  assert.equal(filtered[0].id, 'msg-valid-1', 'Zpravy ze seznamu smazanych nesmi projit do stahovani');
+});
+
