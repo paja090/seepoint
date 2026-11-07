@@ -4,6 +4,7 @@ import { requireSuperAdmin } from '@/lib/organization';
 import { notFound } from 'next/navigation';
 import { OrganizationStatusButton } from '@/components/OrganizationStatusButton';
 import { OrganizationModulesCard } from '@/components/OrganizationModulesCard';
+import { OrganizationSubscriptionCard } from '@/components/OrganizationSubscriptionCard';
 import { getOrganizationFullUsageReport } from '@/lib/organization-usage';
 import Link from 'next/link';
 
@@ -137,6 +138,13 @@ export default async function OrganizationAdminDetail({ params }: { params: Prom
             </div>
           </div>
         </div>
+
+        {/* Subscription & billing state */}
+        <OrganizationSubscriptionCard
+          organizationId={organization.id}
+          initialStatus={organization.subscriptionStatus}
+          initialTrialEndsAt={organization.trialEndsAt ? organization.trialEndsAt.toISOString() : null}
+        />
 
         {/* Active Modules & Features Management Card */}
         <OrganizationModulesCard

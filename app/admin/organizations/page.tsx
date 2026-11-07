@@ -33,9 +33,12 @@ export default async function OrganizationsAdminPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Správa organizací (Super Admin)</h1>
-        <p className="mt-2 text-slate-600">Platformní administrace firem, tarifů a spotřeby AI v SeePoint OS.</p>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold">Správa organizací (Super Admin)</h1>
+          <p className="mt-2 text-slate-600">Platformní administrace firem, tarifů a spotřeby AI v SeePoint OS.</p>
+        </div>
+        <Link href="/admin/leads" className="btn-secondary">Poptávky dema z webu →</Link>
       </div>
 
       <CreateOrganizationForm />

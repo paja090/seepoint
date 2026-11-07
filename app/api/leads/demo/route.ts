@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { sendTransactionalEmail } from '@/lib/email';
 
 export const runtime = 'nodejs';
 
@@ -44,6 +45,30 @@ export async function POST(req: Request) {
     // Log analytics event server-side
     if (Array.isArray(analyticsEvents)) {
       console.log('[Analytics Event]', { type: 'demo_form_submitted', email: email.trim(), company: company.trim(), events: analyticsEvents });
+    }
+
+    // Notify sales so the "we will contact you within 24 hours" promise can be kept
+    try {
+      const notifyTo = process.env.LEAD_NOTIFICATION_EMAIL || 'info@seepoint.cz';
+      await sendTransactionalEmail({
+        to: notifyTo,
+        subject: `Nová poptávka dema: ${company.trim()}`,
+        template: 'demo-lead-notification',
+        idempotencyKey: `demo-lead-${leadId}`,
+        message: [
+          'Z webu přišla nová žádost o ukázku SeePoint OS.',
+          '',
+          `Jméno: ${name.trim()}`,
+          `Firma: ${company.trim()}`,
+          `E-mail: ${email.trim()}`,
+          `Telefon: ${typeof phone === 'string' && phone.trim() ? phone.trim() : '—'}`,
+          `Počet ploch: ${typeof surfaceCount === 'string' && surfaceCount.trim() ? surfaceCount.trim() : '—'}`,
+          '',
+          'Ozvěte se prosím do 24 hodin. Všechny poptávky najdete v administraci na /admin/leads.',
+        ].join('\n'),
+      });
+    } catch (mailErr) {
+      console.warn('Demo lead notification email failed:', mailErr);
     }
 
     return NextResponse.json({
