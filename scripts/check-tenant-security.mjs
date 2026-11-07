@@ -15,6 +15,8 @@ const PLATFORM_PRISMA_BASELINE = new Map([
   ['app/api/webhooks/resend/route.ts', 3],
   ['app/admin/organizations/[id]/page.tsx', 5],
   ['app/admin/organizations/page.tsx', 3],
+  // Super-admin only (requireSuperAdmin); DemoLead is platform-level website data without organizationId.
+  ['app/admin/leads/page.tsx', 2],
   ['app/api/admin/organizations/[id]/modules/route.ts', 3],
   ['app/api/admin/organizations/[id]/route.ts', 3],
   ['app/api/admin/organizations/route.ts', 5],

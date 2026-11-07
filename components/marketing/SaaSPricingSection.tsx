@@ -27,7 +27,7 @@ export function SaaSPricingSection({ onOpenDemoModal }: { onOpenDemoModal: (plan
       highlight: true,
       carriers: 'Až 500 nosičů',
       users: 'Až 10 uživatelů',
-      modules: 'Veřejné klientské odkazy, mobilní terén, navigace VO',
+      modules: 'Veřejné klientské odkazy, AI Inbox, mobilní terén a trasy (navigace VO jako doplněk)',
       ai: 'AI Generátor nabídek v ceně',
       support: 'Prioritní e-mail i telefon',
     },
