@@ -31,9 +31,20 @@ export default async function CompanySettingsPage() {
     <AppShell>
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="mb-2">
-          <h1 className="text-3xl font-bold">Nastavení firmy & Měření Služeb</h1>
-          <p className="mt-1 text-slate-600">Fakturační údaje, branding a měsíční spotřeba systémových zdrojů v SeePoint OS.</p>
+          <h1 className="text-3xl font-bold">Nastavení firmy, loga a kontaktů</h1>
+          <p className="mt-1 text-slate-600">Nahrajte své firemní logo, doplňte telefon a e-mail pro klientské nabídky a zkontrolujte fakturační údaje.</p>
         </div>
+
+        <CompanySettingsForm
+          organization={
+            Object.fromEntries(
+              Object.entries(organization).map(([key, value]) => [
+                key,
+                value instanceof Date ? value.toISOString() : typeof value === 'object' && value !== null ? String(value) : value,
+              ])
+            ) as Record<string, string | number | null>
+          }
+        />
 
         {/* Subscription & Soft Limits Overview Card */}
         <div className="card border-slate-200 p-6 space-y-4">
@@ -172,17 +183,6 @@ export default async function CompanySettingsPage() {
             </div>
           </div>
         </div>
-
-        <CompanySettingsForm
-          organization={
-            Object.fromEntries(
-              Object.entries(organization).map(([key, value]) => [
-                key,
-                value instanceof Date ? value.toISOString() : typeof value === 'object' && value !== null ? String(value) : value,
-              ])
-            ) as Record<string, string | number | null>
-          }
-        />
       </div>
     </AppShell>
   );
