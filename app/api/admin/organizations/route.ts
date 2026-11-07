@@ -32,9 +32,39 @@ export async function POST(request: Request) {
       : 'BUSINESS';
     const enableNavigation = body?.enableNavigation === true || body?.enableNavigation === 'on' || body?.enableNavigation === 'true';
     const enableNetwork = body?.enableNetwork !== false && body?.enableNetwork !== 'false';
-    const enabledModules: Record<string, boolean> = {};
-    if (enableNavigation) enabledModules.navigation = true;
-    if (enableNetwork) enabledModules.network = true;
+    const simpleMenu = body?.simpleMenu !== false && body?.simpleMenu !== 'false';
+    const enabledModules: Record<string, boolean> = simpleMenu
+      ? {
+          dashboard: true,
+          carriers: true,
+          crm: true,
+          offers: true,
+          occupancy: true,
+          import: true,
+          photoDocumentation: true,
+          network: enableNetwork,
+          navigation: enableNavigation,
+          // Schovat pokročilé provozní a backoffice moduly pro čistý start nové firmy:
+          warehouse: false,
+          vehicles: false,
+          shopping: false,
+          vacations: false,
+          settlements: false,
+          work: false,
+          tasks: false,
+          printProduction: false,
+          aiInbox: false,
+          commercial: false,
+          crmIntelligence: false,
+          aiRealization: false,
+          workRoute: false,
+          myTasks: false,
+          employees: false,
+        }
+      : {
+          ...(enableNavigation ? { navigation: true } : {}),
+          ...(enableNetwork ? { network: true } : {}),
+        };
 
     const existingUser = await platformPrisma.user.findUnique({ where: { email: ownerEmail } });
     if (existingUser?.status === 'SUSPENDED') return NextResponse.json({ error: 'Účet vlastníka je pozastavený. Nejdříve jej obnovte.' }, { status: 409 });

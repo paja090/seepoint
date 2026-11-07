@@ -277,6 +277,10 @@ export default async function Dashboard() {
   return (
     <AppShell>
       <ManagerDashboard
+        organizationName={user.organization?.name || 'Vaše firma'}
+        hasCompanyBranding={Boolean(user.organization?.logoUrl || user.organization?.phone || user.organization?.email)}
+        hasCreatedOffer={activeOffersList.length > 0 || waitingOffers > 0}
+        isSuperAdmin={user.platformRole === 'SUPER_ADMIN'}
         aiInboxSummary={aiInboxSummary}
         totalSurfaces={totalSurfaces}
         availableSurfaces={availableSurfaces}
