@@ -34,6 +34,9 @@ export function AdminOutreachEmailStudio({ leads }: { leads: DemoLeadRow[] }) {
   const [ctaUrl, setCtaUrl] = useState(B2B_EMAIL_TEMPLATES.NAVIGATION_VO.ctaUrl);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+  const [provisioningLeadId, setProvisioningLeadId] = useState<string | null>(null);
+  const [createdOrgsByLead, setCreatedOrgsByLead] = useState<Record<string, { id: string; slug: string }>>({});
+  const [leadActionError, setLeadActionError] = useState<string | null>(null);
 
   const activeTemplate = B2B_EMAIL_TEMPLATES[templateId];
 
@@ -61,6 +64,45 @@ export function AdminOutreachEmailStudio({ leads }: { leads: DemoLeadRow[] }) {
     setCompanyName(lead.company);
     applyTemplate('DEMO_FOLLOWUP', lead.name, lead.company);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function handleProvisionPilot(lead: DemoLeadRow) {
+    setProvisioningLeadId(lead.id);
+    setLeadActionError(null);
+    const baseSlug = lead.company
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 36) || 'partner-firma';
+
+    try {
+      const response = await fetch('/api/admin/organizations', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: lead.company,
+          slug: baseSlug,
+          ownerEmail: lead.email,
+          plan: 'BUSINESS',
+          enableNetwork: true,
+          enableNavigation: false,
+        }),
+      });
+      const result = (await response.json()) as { id?: string; slug?: string; error?: string };
+      if (!response.ok || !result.id) {
+        throw new Error(result.error || 'Vytvoření organizace selhalo.');
+      }
+      setCreatedOrgsByLead((prev) => ({
+        ...prev,
+        [lead.id]: { id: result.id!, slug: result.slug || baseSlug },
+      }));
+    } catch (err) {
+      setLeadActionError(err instanceof Error ? err.message : 'Vytvoření organizace selhalo.');
+    } finally {
+      setProvisioningLeadId(null);
+    }
   }
 
   const previewHtml = useMemo(
@@ -129,7 +171,7 @@ export function AdminOutreachEmailStudio({ leads }: { leads: DemoLeadRow[] }) {
         </div>
 
         {/* Template selector pills */}
-        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
           {TEMPLATE_LIST.map((tpl) => {
             const active = tpl.id === templateId;
             return (
@@ -269,13 +311,19 @@ export function AdminOutreachEmailStudio({ leads }: { leads: DemoLeadRow[] }) {
           <div>
             <h2 className="text-lg font-bold text-slate-900">Přijaté poptávky dema z webu</h2>
             <p className="text-xs text-slate-500">
-              Kliknutím na „Odpovědět šablonou“ předvyplníte e-mail zájemce nahoře v editoru.
+              Kliknutím na „Založit 30denní Pilot“ vytvoříte firmě tenant (BUSINESS + B2B síť) a odešlete majiteli aktivační odkaz.
             </p>
           </div>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
             {leads.length} poptávek
           </span>
         </div>
+
+        {leadActionError ? (
+          <div className="border-b border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700">
+            {leadActionError}
+          </div>
+        ) : null}
 
         {leads.length === 0 ? (
           <p className="p-6 text-center text-sm text-slate-500">Zatím nepřišla žádná poptávka z webu.</p>
@@ -292,37 +340,60 @@ export function AdminOutreachEmailStudio({ leads }: { leads: DemoLeadRow[] }) {
               </tr>
             </thead>
             <tbody>
-              {leads.map((lead) => (
-                <tr className="border-b last:border-0" key={lead.id}>
-                  <td className="whitespace-nowrap p-3 text-slate-600">{lead.createdAtFormatted}</td>
-                  <td className="p-3 font-semibold text-slate-900">{lead.company}</td>
-                  <td className="p-3">
-                    <span className="block">{lead.name}</span>
-                    <a className="text-xs text-sky-700 hover:underline" href={`mailto:${lead.email}`}>
-                      {lead.email}
-                    </a>
-                  </td>
-                  <td className="whitespace-nowrap p-3">
-                    {lead.phone ? (
-                      <a className="text-sky-700 hover:underline" href={`tel:${lead.phone.replace(/\s+/g, '')}`}>
-                        {lead.phone}
+              {leads.map((lead) => {
+                const createdOrg = createdOrgsByLead[lead.id];
+                const isProvisioning = provisioningLeadId === lead.id;
+                return (
+                  <tr className="border-b last:border-0" key={lead.id}>
+                    <td className="whitespace-nowrap p-3 text-slate-600">{lead.createdAtFormatted}</td>
+                    <td className="p-3 font-semibold text-slate-900">{lead.company}</td>
+                    <td className="p-3">
+                      <span className="block">{lead.name}</span>
+                      <a className="text-xs text-sky-700 hover:underline" href={`mailto:${lead.email}`}>
+                        {lead.email}
                       </a>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td className="p-3">{lead.surfaceCount || '—'}</td>
-                  <td className="whitespace-nowrap p-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => selectLeadForReply(lead)}
-                      className="btn-secondary text-xs"
-                    >
-                      Odpovědět šablonou ↑
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="whitespace-nowrap p-3">
+                      {lead.phone ? (
+                        <a className="text-sky-700 hover:underline" href={`tel:${lead.phone.replace(/\s+/g, '')}`}>
+                          {lead.phone}
+                        </a>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="p-3">{lead.surfaceCount || '—'}</td>
+                    <td className="whitespace-nowrap p-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {createdOrg ? (
+                          <a
+                            href={`/admin/organizations/${createdOrg.id}`}
+                            className="rounded-lg bg-emerald-100 px-2.5 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-200"
+                          >
+                            ✓ Pilot založen ({createdOrg.slug}) →
+                          </a>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={isProvisioning}
+                            onClick={() => handleProvisionPilot(lead)}
+                            className="btn-primary text-xs py-1.5 px-2.5"
+                          >
+                            {isProvisioning ? 'Zakládám…' : 'Založit 30denní Pilot'}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => selectLeadForReply(lead)}
+                          className="btn-secondary text-xs py-1.5 px-2.5"
+                        >
+                          Odpovědět šablonou ↑
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
