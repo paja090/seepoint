@@ -11,6 +11,11 @@ test('invoice settings normalize tenant defaults and reject unsafe values', () =
     defaultVatRate: '12.5',
     invoiceNumberPrefix: 'NAV-VO',
   });
+  const pngDataUri = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+  assert.deepEqual(normalizeCompanySettingsUpdate({ logoUrl: pngDataUri, website: 'moravamedia.cz' }), {
+    logoUrl: pngDataUri,
+    website: 'https://moravamedia.cz',
+  });
   assert.throws(() => normalizeCompanySettingsUpdate({ invoiceDueDays: 0 }), /1 až 365/);
   assert.throws(() => normalizeCompanySettingsUpdate({ defaultVatRate: '100.01' }), /0 až 100/);
   assert.throws(() => normalizeCompanySettingsUpdate({ invoiceNumberPrefix: '../NAV' }), /Prefix faktury/);

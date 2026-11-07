@@ -3,7 +3,7 @@ import { normalizeInvoicePrefix } from '@/lib/invoice-policy';
 
 const textLimits = {
   name: 160, companyId: 32, vatId: 32, street: 180, city: 100, postalCode: 20,
-  country: 2, email: 254, phone: 40, website: 500, logoUrl: 500,
+  country: 2, email: 254, phone: 40, website: 500, logoUrl: 1_500_000,
   primaryColor: 20, secondaryColor: 20, emailSignature: 5_000,
   bankAccount: 80, iban: 50, swift: 20, defaultCurrency: 3,
 } as const;
@@ -13,6 +13,8 @@ export type CompanySettingsUpdate = Partial<Record<keyof typeof textLimits, stri
   defaultVatRate?: string;
   invoiceNumberPrefix?: string;
 };
+
+const SAFE_LOGO_DATA_URI_RE = /^data:image\/(?:png|jpeg|jpg|webp|gif|svg\+xml);base64,[A-Za-z0-9+/=]+$/i;
 
 export function normalizeCompanySettingsUpdate(body: Record<string, unknown>): CompanySettingsUpdate {
   const data: CompanySettingsUpdate = {};
@@ -32,12 +34,26 @@ export function normalizeCompanySettingsUpdate(body: Record<string, unknown>): C
     data.defaultCurrency = currency;
   }
   if (data.email && !isValidEmailAddress(data.email)) throw new Error('Firemní e-mail nemá platný formát.');
-  for (const field of ['website', 'logoUrl'] as const) {
-    if (!data[field]) continue;
+
+  if (data.website) {
+    const rawWebsite = /^https?:\/\//i.test(data.website) ? data.website : `https://${data.website}`;
     let url: URL;
-    try { url = new URL(data[field]); } catch { throw new Error(`Pole ${field} musí obsahovat platnou URL.`); }
-    if (url.protocol !== 'https:') throw new Error(`Pole ${field} musí používat HTTPS.`);
+    try { url = new URL(rawWebsite); } catch { throw new Error('Pole website musí obsahovat platnou URL.'); }
+    if (url.protocol !== 'https:') throw new Error('Pole website musí používat HTTPS.');
+    data.website = url.toString().replace(/\/$/, '') === `https://${url.host}` ? `https://${url.host}` : url.toString();
   }
+
+  if (data.logoUrl) {
+    const rawLogo = data.logoUrl;
+    const isDataUri = SAFE_LOGO_DATA_URI_RE.test(rawLogo);
+    const isRelativePath = rawLogo.startsWith('/') && !rawLogo.startsWith('//');
+    if (!isDataUri && !isRelativePath) {
+      let url: URL;
+      try { url = new URL(rawLogo); } catch { throw new Error('Pole logoUrl musí být nahraný obrázek nebo platná HTTPS URL.'); }
+      if (url.protocol !== 'https:') throw new Error('Pole logoUrl musí používat HTTPS.');
+    }
+  }
+
   for (const field of ['primaryColor', 'secondaryColor'] as const) {
     if (data[field] && !/^#[0-9a-fA-F]{6}$/.test(data[field])) throw new Error(`Pole ${field} musí být barva ve formátu #RRGGBB.`);
   }
