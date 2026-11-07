@@ -38,7 +38,73 @@ export function AdminOutreachEmailStudio({ leads }: { leads: DemoLeadRow[] }) {
   const [createdOrgsByLead, setCreatedOrgsByLead] = useState<Record<string, { id: string; slug: string }>>({});
   const [leadActionError, setLeadActionError] = useState<string | null>(null);
 
+  // Super-simple 2-field company creator
+  const [quickCompanyName, setQuickCompanyName] = useState('');
+  const [quickOwnerEmail, setQuickOwnerEmail] = useState('');
+  const [quickCreating, setQuickCreating] = useState(false);
+  const [quickCreatedOrg, setQuickCreatedOrg] = useState<{ id: string; slug: string; message: string } | null>(null);
+  const [quickCreateError, setQuickCreateError] = useState<string | null>(null);
+
   const activeTemplate = B2B_EMAIL_TEMPLATES[templateId];
+
+  function toSlug(value: string) {
+    return (
+      value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 36) || 'partner-firma'
+    );
+  }
+
+  async function handleQuickCreateCompany(e: React.FormEvent) {
+    e.preventDefault();
+    setQuickCreating(true);
+    setQuickCreateError(null);
+    setQuickCreatedOrg(null);
+    const baseSlug = toSlug(quickCompanyName);
+
+    try {
+      const response = await fetch('/api/admin/organizations', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: quickCompanyName.trim(),
+          slug: baseSlug,
+          ownerEmail: quickOwnerEmail.trim(),
+          plan: 'BUSINESS',
+          enableNetwork: true,
+          enableNavigation: false,
+          simpleMenu: true,
+        }),
+      });
+      const result = (await response.json()) as {
+        id?: string;
+        slug?: string;
+        organization?: { id: string; slug: string };
+        message?: string;
+        error?: string;
+      };
+      const orgId = result.organization?.id || result.id;
+      const orgSlug = result.organization?.slug || result.slug || baseSlug;
+      if (!response.ok || !orgId) {
+        throw new Error(result.error || 'Vytvoření účtu selhalo.');
+      }
+      setQuickCreatedOrg({
+        id: orgId,
+        slug: orgSlug,
+        message: result.message || 'Účet byl založen a majiteli odešel e-mail s odkazem pro přihlášení.',
+      });
+      setQuickCompanyName('');
+      setQuickOwnerEmail('');
+    } catch (err) {
+      setQuickCreateError(err instanceof Error ? err.message : 'Vytvoření účtu selhalo.');
+    } finally {
+      setQuickCreating(false);
+    }
+  }
 
   function applyTemplate(nextTemplateId: B2bEmailTemplateId, nextName = contactName, nextCompany = companyName) {
     const def = B2B_EMAIL_TEMPLATES[nextTemplateId];
@@ -69,13 +135,7 @@ export function AdminOutreachEmailStudio({ leads }: { leads: DemoLeadRow[] }) {
   async function handleProvisionPilot(lead: DemoLeadRow) {
     setProvisioningLeadId(lead.id);
     setLeadActionError(null);
-    const baseSlug = lead.company
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 36) || 'partner-firma';
+    const baseSlug = toSlug(lead.company);
 
     try {
       const response = await fetch('/api/admin/organizations', {
@@ -88,15 +148,23 @@ export function AdminOutreachEmailStudio({ leads }: { leads: DemoLeadRow[] }) {
           plan: 'BUSINESS',
           enableNetwork: true,
           enableNavigation: false,
+          simpleMenu: true,
         }),
       });
-      const result = (await response.json()) as { id?: string; slug?: string; error?: string };
-      if (!response.ok || !result.id) {
+      const result = (await response.json()) as {
+        id?: string;
+        slug?: string;
+        organization?: { id: string; slug: string };
+        error?: string;
+      };
+      const orgId = result.organization?.id || result.id;
+      const orgSlug = result.organization?.slug || result.slug || baseSlug;
+      if (!response.ok || !orgId) {
         throw new Error(result.error || 'Vytvoření organizace selhalo.');
       }
       setCreatedOrgsByLead((prev) => ({
         ...prev,
-        [lead.id]: { id: result.id!, slug: result.slug || baseSlug },
+        [lead.id]: { id: orgId, slug: orgSlug },
       }));
     } catch (err) {
       setLeadActionError(err instanceof Error ? err.message : 'Vytvoření organizace selhalo.');
@@ -154,6 +222,75 @@ export function AdminOutreachEmailStudio({ leads }: { leads: DemoLeadRow[] }) {
 
   return (
     <div className="space-y-8">
+      {/* Super-simple 2-field company creator */}
+      <div className="rounded-3xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/60 p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <span className="rounded-full bg-emerald-100 px-3 py-0.5 text-xs font-black text-emerald-800">
+              Nejrychlejší cesta (2 políčka)
+            </span>
+            <h2 className="mt-1.5 text-xl font-black text-slate-900">
+              Rychle založit účet nové firmě (30 dní zdarma)
+            </h2>
+            <p className="mt-1 text-xs text-slate-600">
+              Zadejte jen název firmy a e-mail majitele. Systém jí automaticky zapne <strong>zjednodušené menu</strong> (jen Plochy, Nabídky a Klienti), <strong>průvodce ve 3 krocích</strong> a pošle majiteli přihlašovací odkaz.
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleQuickCreateCompany} className="mt-4 grid gap-3 sm:grid-cols-3">
+          <label className="text-xs font-bold text-slate-700">
+            1. Název firmy *
+            <input
+              type="text"
+              required
+              placeholder="např. Morava Media s.r.o."
+              className="input mt-1 bg-white text-sm"
+              value={quickCompanyName}
+              onChange={(e) => setQuickCompanyName(e.target.value)}
+            />
+          </label>
+          <label className="text-xs font-bold text-slate-700">
+            2. E-mail majitele *
+            <input
+              type="email"
+              required
+              placeholder="např. novak@moravamedia.cz"
+              className="input mt-1 bg-white text-sm"
+              value={quickOwnerEmail}
+              onChange={(e) => setQuickOwnerEmail(e.target.value)}
+            />
+          </label>
+          <div className="flex items-end">
+            <button
+              type="submit"
+              disabled={quickCreating || !quickCompanyName.trim() || !quickOwnerEmail.trim()}
+              className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {quickCreating ? 'Zakládám účet…' : '✓ Založit účet a poslat přístup'}
+            </button>
+          </div>
+        </form>
+
+        {quickCreatedOrg ? (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-300 bg-emerald-100/80 px-4 py-2.5 text-xs font-bold text-emerald-900">
+            <span>✓ {quickCreatedOrg.message}</span>
+            <a
+              href={`/admin/organizations/${quickCreatedOrg.id}`}
+              className="rounded-lg bg-emerald-700 px-3 py-1 text-white hover:bg-emerald-800"
+            >
+              Otevřít detail firmy ({quickCreatedOrg.slug}) →
+            </a>
+          </div>
+        ) : null}
+
+        {quickCreateError ? (
+          <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700">
+            {quickCreateError}
+          </div>
+        ) : null}
+      </div>
+
       {/* Studio Card */}
       <div className="card space-y-6 border-slate-200 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
@@ -162,7 +299,7 @@ export function AdminOutreachEmailStudio({ leads }: { leads: DemoLeadRow[] }) {
               B2B E-mail Studio
             </span>
             <h2 className="mt-1.5 text-xl font-bold text-slate-900">
-              Profesionální HTML šablony pro oslovení firem a zájemců o demo
+              Poslat firmě pozvánku e-mailem (před založením účtu)
             </h2>
             <p className="text-xs text-slate-500">
               Vyberte obor firmy, doplňte jméno a odešlete značkový HTML e-mail s Vaší vizitkou přímo ze systému.

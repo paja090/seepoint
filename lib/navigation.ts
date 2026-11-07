@@ -144,6 +144,7 @@ export function getVisibleNavigation(user: {
   const management = hubs.find(hub => hub.id === 'management');
   if (user.role === 'ADMIN' && user.platformRole === 'SUPER_ADMIN') {
     management?.groups.push({ label: 'Platforma SeePoint', items: [
+      ['/admin/leads', 'Prodej & Poptávky', 'mail', 'settings'],
       ['/admin/organizations', 'Organizace', 'settings', 'settings'],
       ['/onboarding', 'Onboarding agentury', 'userRound', 'settings'],
     ] });

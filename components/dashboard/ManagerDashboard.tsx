@@ -3,8 +3,13 @@ import { BarChart3, Building2, CalendarClock, DollarSign, Layers, PieChart, Spar
 import { EmptyState, PageHeader, Table, TableCell, TableHead, TableHeaderCell } from '@/components/ui';
 import { StatusBadge } from '@/components/StatusBadge';
 import { AiInboxDashboardWidget, type AiInboxDashboardSummary } from './AiInboxDashboardWidget';
+import { QuickStartGuideCard } from './QuickStartGuideCard';
 
 interface ManagerDashboardProps {
+  organizationName?: string;
+  hasCompanyBranding?: boolean;
+  hasCreatedOffer?: boolean;
+  isSuperAdmin?: boolean;
   aiInboxSummary?: AiInboxDashboardSummary;
   totalSurfaces: number;
   availableSurfaces: number;
@@ -42,6 +47,10 @@ interface ManagerDashboardProps {
 }
 
 export function ManagerDashboard({
+  organizationName = 'Vaše firma',
+  hasCompanyBranding = false,
+  hasCreatedOffer = false,
+  isSuperAdmin = false,
   aiInboxSummary,
   totalSurfaces,
   availableSurfaces,
@@ -66,7 +75,15 @@ export function ManagerDashboard({
         title="Manažerský Dashboard & Provozní Analytika"
         description="Přehled kapacity, kampaní a explicitně evidovaného nájemného bez dopočítaných cenových odhadů."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {isSuperAdmin ? (
+              <Link
+                href="/admin/leads"
+                className="rounded-xl bg-purple-700 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-purple-800"
+              >
+                🚀 Prodej & Oslovení firem
+              </Link>
+            ) : null}
             <Link href="/occupancy" className="btn-primary">
               Obsazenost nosičů
             </Link>
@@ -75,6 +92,15 @@ export function ManagerDashboard({
             </Link>
           </div>
         }
+      />
+
+      {/* 👋 3-Step Quick Start Guide for new companies (and toggleable preview for existing) */}
+      <QuickStartGuideCard
+        organizationName={organizationName}
+        hasCompanyBranding={hasCompanyBranding}
+        totalSurfaces={totalSurfaces}
+        hasCreatedOffer={hasCreatedOffer || waitingOffers > 0}
+        isSuperAdmin={isSuperAdmin}
       />
 
       {/* 📬 AI Inbox Status Widget */}
