@@ -90,26 +90,45 @@ function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => entities[character]);
 }
 
+function linkifyEscapedText(escaped: string): string {
+  return escaped.replace(
+    /(https?:\/\/[^\s<]+)/g,
+    (url) => `<a href="${url}" style="color:#0284c7;text-decoration:underline;word-break:break-all">${url}</a>`
+  );
+}
+
 export async function sendTransactionalEmail(input: {
   to: string;
   subject: string;
   message: string;
   template: string;
+  customHtml?: string;
   attachments?: EmailAttachment[];
   idempotencyKey?: string;
   organizationId?: string;
   metadata?: Record<string, unknown>;
 }): Promise<EmailDeliveryResult> {
-
-  const html = input.message
+  const bodyHtml = input.message
     .split(/\r?\n/)
-    .map((line) => line ? `<p>${escapeHtml(line)}</p>` : '<br>')
+    .map((line) =>
+      line
+        ? `<p style="margin:0 0 12px;font-size:15px;line-height:1.65;color:#1e293b">${linkifyEscapedText(
+            escapeHtml(line)
+          )}</p>`
+        : '<div style="height:8px"></div>'
+    )
     .join('');
+
+  const defaultCardHtml = `<div style="margin:0;background:#f8fafc;padding:28px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0f172a">
+    <div style="max-width:640px;margin:0 auto;border-radius:16px;background:#ffffff;padding:28px 32px;border:1px solid #e2e8f0;box-shadow:0 1px 3px rgba(15,23,42,0.06)">
+      ${bodyHtml}
+    </div>
+  </div>`;
 
   return sendEmail({
     to: input.to,
     subject: input.subject,
-    html: `<div style="font-family:Arial,sans-serif;line-height:1.55;color:#1e293b;max-width:680px">${html}</div>`,
+    html: input.customHtml || defaultCardHtml,
     webhookBody: {
       template: input.template,
       subject: input.subject,
@@ -482,20 +501,44 @@ export async function sendActivationEmail(email: string, url: string): Promise<E
   const safeUrl = escapeHtml(url);
   return sendEmail({
     to: email,
-    subject: 'Aktivace účtu SeePoint',
+    subject: 'Aktivace účtu a pracovního prostoru SeePoint OS',
     html: `
-      <div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a;max-width:580px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px;background:#ffffff">
-        <h2 style="margin-top:0;color:#0f172a;font-size:20px;font-weight:800">Vítejte v SeePoint</h2>
-        <p style="color:#334155;font-size:14px">Byl pro Vás vytvořen uživatelský přístup. Pro nastavení Vašeho hesla a aktivaci účtu klikněte na tlačítko níže:</p>
-        <p style="margin:24px 0">
-          <a href="${safeUrl}" style="display:inline-block;border-radius:12px;background:#0284c7;padding:12px 24px;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px">Aktivovat účet & Nastavit heslo</a>
-        </p>
-        <p style="margin:0;font-size:12px;line-height:1.5;color:#64748b">
-          Pokud tlačítko nefunguje, zkopírujte tento odkaz do prohlížeče:<br>
-          <a href="${safeUrl}" style="color:#0284c7;word-break:break-all">${safeUrl}</a>
-        </p>
-        <hr style="border:none;border-top:1px solid #f1f5f9;margin:24px 0">
-        <p style="font-size:11px;color:#94a3b8;margin:0">Pokud jste tento přístup neočekávali, můžete tento e-mail bezpečně ignorovat.</p>
+      <div style="margin:0;background:#f1f5f9;padding:32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0f172a">
+        <div style="max-width:600px;margin:0 auto;border-radius:20px;background:#ffffff;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 4px 14px rgba(15,23,42,0.06)">
+          <div style="background:linear-gradient(135deg,#0f172a 0%,#3b0764 100%);padding:22px 28px;color:#ffffff">
+            <span style="font-size:18px;font-weight:900;color:#ffffff">SeePoint OS</span>
+            <span style="display:inline-block;margin-left:8px;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,0.12);font-size:11px;font-weight:700;color:#e2e8f0">
+              Pozvánka do systému
+            </span>
+          </div>
+          <div style="padding:28px">
+            <h2 style="margin:0 0 12px;color:#0f172a;font-size:22px;font-weight:800">Vítejte v SeePoint OS</h2>
+            <p style="margin:0 0 18px;color:#334155;font-size:14.5px;line-height:1.6">
+              Byl pro Vás připraven uživatelský přístup do platformy pro správu reklamních nosičů, interaktivních nabídek a terénní realizace. Pro nastavení hesla a aktivaci účtu klikněte na tlačítko níže:
+            </p>
+            <p style="margin:24px 0">
+              <a href="${safeUrl}" style="display:inline-block;border-radius:12px;background:#0284c7;padding:13px 26px;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px">
+                Aktivovat účet a nastavit heslo &rarr;
+              </a>
+            </p>
+            <div style="margin:22px 0;padding:16px 18px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0">
+              <p style="margin:0 0 8px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#475569">
+                Doporučené první kroky po přihlášení
+              </p>
+              <p style="margin:0 0 4px;font-size:13px;color:#334155">1. Doplňte logo a fakturační údaje firmy v <strong>Nastavení firmy</strong>.</p>
+              <p style="margin:0 0 4px;font-size:13px;color:#334155">2. Nahrajte nebo naimportujte první reklamní nosiče.</p>
+              <p style="margin:0;font-size:13px;color:#334155">3. Vytvořte první interaktivní nabídku s mapou a Street View.</p>
+            </div>
+            <p style="margin:0;font-size:12px;line-height:1.5;color:#64748b">
+              Pokud tlačítko nefunguje, zkopírujte tento odkaz do prohlížeče:<br>
+              <a href="${safeUrl}" style="color:#0284c7;word-break:break-all">${safeUrl}</a>
+            </p>
+            <hr style="border:none;border-top:1px solid #f1f5f9;margin:22px 0">
+            <p style="font-size:11.5px;color:#94a3b8;margin:0">
+              Potřebujete poradit se začátkem? Jsme Vám k dispozici na <a href="mailto:info@seepoint.cz" style="color:#64748b">info@seepoint.cz</a> nebo tel. <strong>+420 777 807 717</strong>.
+            </p>
+          </div>
+        </div>
       </div>
     `,
     webhookBody: { template: 'activation', activationUrl: url },
