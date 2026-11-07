@@ -3,14 +3,17 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { redirect } from 'next/navigation';
 import { ResponsiveAppShell } from './ResponsiveAppShell';
+import { SubscriptionStatusBanner } from './SubscriptionStatusBanner';
 import { getVisibleNavigation } from '@/lib/navigation';
 import { hasModuleAccess } from '@/lib/module-policy';
+import { evaluateSubscriptionState } from '@/lib/subscription';
 
 export async function AppShell({ children, allowPasswordChange = false }: { children: React.ReactNode; allowPasswordChange?: boolean }) {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
   if (user.mustChangePassword && !allowPasswordChange) redirect('/profile?firstLogin=1');
 
+  const subscription = user.organization ? evaluateSubscriptionState(user.organization) : null;
   const visibleHubs = getVisibleNavigation(user);
   const canUseTeamCamera = Boolean(
     user.organizationId &&
@@ -70,6 +73,9 @@ export async function AppShell({ children, allowPasswordChange = false }: { chil
       visibleHubs={visibleHubs}
       utilityAccess={utilityAccess}
     >
+      {subscription?.banner && ['ADMIN', 'MANAGER'].includes(user.role) ? (
+        <SubscriptionStatusBanner banner={subscription.banner} />
+      ) : null}
       {children}
     </ResponsiveAppShell>
   );
