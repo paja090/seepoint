@@ -25,12 +25,37 @@ export async function POST(request: Request) {
     const slug = typeof body?.slug === 'string' ? body.slug.trim().toLowerCase() : '';
     const ownerEmail = typeof body?.ownerEmail === 'string' ? normalizeAuthEmail(body.ownerEmail) : '';
     if (name.length < 2 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) return NextResponse.json({ error: 'Vyplňte název, bezpečný slug a e-mail vlastníka.' }, { status: 400 });
+    const allowedPlans = ['START', 'BUSINESS', 'PRO', 'ENTERPRISE'] as const;
+    type AllowedPlan = (typeof allowedPlans)[number];
+    const requestedPlan = typeof body?.plan === 'string' && allowedPlans.includes(body.plan as AllowedPlan)
+      ? (body.plan as AllowedPlan)
+      : 'BUSINESS';
+    const enableNavigation = body?.enableNavigation === true || body?.enableNavigation === 'on' || body?.enableNavigation === 'true';
+    const enableNetwork = body?.enableNetwork !== false && body?.enableNetwork !== 'false';
+    const enabledModules: Record<string, boolean> = {};
+    if (enableNavigation) enabledModules.navigation = true;
+    if (enableNetwork) enabledModules.network = true;
+
     const existingUser = await platformPrisma.user.findUnique({ where: { email: ownerEmail } });
     if (existingUser?.status === 'SUSPENDED') return NextResponse.json({ error: 'Účet vlastníka je pozastavený. Nejdříve jej obnovte.' }, { status: 409 });
     const needsActivation = !existingUser || existingUser.status !== 'ACTIVE';
     const token = newToken(); const tokenHash = hashToken(token); const expiresAt = new Date(Date.now() + 48 * 3600000);
     const result = await platformPrisma.$transaction(async (tx) => {
-      const organization = await tx.organization.create({ data: { name, slug, companyId: typeof body?.companyId === 'string' ? body.companyId.trim() || null : null, vatId: typeof body?.vatId === 'string' ? body.vatId.trim() || null : null, email: typeof body?.email === 'string' ? body.email.trim() || null : null, logoUrl: typeof body?.logoUrl === 'string' ? body.logoUrl.trim() || null : null, primaryColor: typeof body?.primaryColor === 'string' ? body.primaryColor.trim() || null : null, plan: 'BUSINESS', subscriptionStatus: 'TRIAL', trialEndsAt: new Date(Date.now() + 30 * 86400000) } });
+      const organization = await tx.organization.create({
+        data: {
+          name,
+          slug,
+          companyId: typeof body?.companyId === 'string' ? body.companyId.trim() || null : null,
+          vatId: typeof body?.vatId === 'string' ? body.vatId.trim() || null : null,
+          email: typeof body?.email === 'string' ? body.email.trim() || null : null,
+          logoUrl: typeof body?.logoUrl === 'string' ? body.logoUrl.trim() || null : null,
+          primaryColor: typeof body?.primaryColor === 'string' ? body.primaryColor.trim() || null : null,
+          plan: requestedPlan,
+          enabledModules: Object.keys(enabledModules).length > 0 ? enabledModules : undefined,
+          subscriptionStatus: 'TRIAL',
+          trialEndsAt: new Date(Date.now() + 30 * 86400000),
+        },
+      });
       const owner = existingUser ?? await tx.user.create({ data: { name: ownerEmail.split('@')[0], email: ownerEmail, role: 'ADMIN', roles: ['ADMIN'], status: 'INVITED' } });
       await tx.organizationMember.create({ data: { organizationId: organization.id, userId: owner.id, role: 'OWNER', roles: ['OWNER'], isActive: !needsActivation } });
       await tx.organizationInvitation.create({ data: { organizationId: organization.id, email: ownerEmail, role: 'OWNER', tokenHash, expiresAt, acceptedAt: needsActivation ? null : new Date() } });

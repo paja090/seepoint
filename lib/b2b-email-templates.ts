@@ -2,7 +2,8 @@ export type B2bEmailTemplateId =
   | 'NAVIGATION_VO'
   | 'OOH_AGENCY'
   | 'PRINT_FIELD'
-  | 'DEMO_FOLLOWUP';
+  | 'DEMO_FOLLOWUP'
+  | 'PARTNER_ALLIANCE';
 
 export interface B2bEmailTemplateDefinition {
   id: B2bEmailTemplateId;
@@ -145,6 +146,37 @@ export const B2B_EMAIL_TEMPLATES: Record<B2bEmailTemplateId, B2bEmailTemplateDef
       'Pomoc s prvotním importem Vašich nosičů z Excelu během několika minut',
     ],
     ctaLabel: 'Otevřít web SeePoint OS',
+    ctaUrl: 'https://seepoint.cz',
+  },
+  PARTNER_ALLIANCE: {
+    id: 'PARTNER_ALLIANCE',
+    label: '5. Krajská partnerská aliance (Sdílení zakázek a ploch)',
+    segmentBadge: 'Partnerská síť SeePoint OS',
+    defaultSubject: (company) =>
+      company
+        ? `Partnerská spolupráce pro ${company} – sdílení kampaní a montáží v kraji`
+        : 'Pozvánka do Krajské partnerské sítě SeePoint OS (poptávky na plochy a montáže)',
+    defaultMessage: ({ contactName, companyName }) => {
+      const greeting = contactName?.trim() ? `Dobrý den, ${contactName.trim()},` : 'Dobrý den,';
+      const firmRef = companyName?.trim() ? ` se společností ${companyName.trim()}` : '';
+      return [
+        greeting,
+        '',
+        `pro naše klienty pravidelně připravujeme celorepublikové i nadregionální kampaně a hledáme spolehlivého krajského partnera pro sdílení volných reklamních ploch a terénních montáží.`,
+        '',
+        `Propojujeme vybrané regionální provozovatele a realizační firmy v partnerské síti SeePoint OS. Rádi bychom navázali spolupráci i${firmRef} – založíme Vám v systému bezplatný partnerský účet, do kterého si můžete nahrát své volné nosiče, abychom je mohli rovnou zařazovat do nabídek našim klientům a zadávat Vám realizace ve Vašem regionu.`,
+        '',
+        `Současně získáte na 30 dní zdarma plný přístup k celému systému SeePoint OS (tvorba interaktivních mapových nabídek se Street View a mobilní fotodokumentace pod Vaším vlastním logem).`,
+        '',
+        `Můžeme si k tomu tento týden krátce zavolat na 10 minut?`,
+      ].join('\n');
+    },
+    highlights: [
+      'Bezplatné zařazení Vašich volných ploch do celorepublikové B2B sítě pro přeprodej kampaní',
+      'Předávání placených montážních a servisních výjezdů ve Vašem kraji',
+      'Bonus: 30 dní plného přístupu k SeePoint OS pro Vaše vlastní klienty zdarma',
+    ],
+    ctaLabel: 'Více o partnerské platformě SeePoint OS',
     ctaUrl: 'https://seepoint.cz',
   },
 };
