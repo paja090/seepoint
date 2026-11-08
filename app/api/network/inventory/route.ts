@@ -59,6 +59,7 @@ export async function GET(req: Request) {
             orientation: true,
             status: true,
             price: true,
+            visibility: true,
           },
         },
         photos: {
@@ -97,7 +98,7 @@ export async function GET(req: Request) {
           listPrice,
           b2bWholesalePrice,
           b2bDiscountPercent: b2bDiscount,
-          visibility: carrier.visibility,
+          visibility: surface.visibility || carrier.visibility,
           isOwn,
           ownerLabel,
           thumbnailUrl: carrier.photos[0]?.url || '/offer/hero-campaign.png',

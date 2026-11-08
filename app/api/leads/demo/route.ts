@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, email, company, phone, surfaceCount, analyticsEvents } = body || {};
+    const { name, email, company, phone, surfaceCount, ico, dic, partnerRole, city, source, analyticsEvents } = body || {};
 
     if (!name || typeof name !== 'string' || name.trim().length < 2) {
       return NextResponse.json({ error: 'Zadejte prosím své jméno.' }, { status: 400 });
@@ -21,6 +21,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Zadejte název vaší společnosti.' }, { status: 400 });
     }
 
+    const cleanIco = typeof ico === 'string' && /^\d{8}$/.test(ico.trim()) ? ico.trim() : null;
+    const cleanDic = typeof dic === 'string' && dic.trim() ? dic.trim() : null;
+    const cleanCity = typeof city === 'string' && city.trim() ? city.trim() : null;
+    const cleanRole = typeof partnerRole === 'string' && partnerRole.trim() ? partnerRole.trim() : null;
+    const cleanSource =
+      typeof source === 'string' && source.trim() === 'B2B_PARTNER_NETWORK'
+        ? 'B2B_PARTNER_NETWORK'
+        : 'WEBSITE_DEMO_MODAL';
+
+    const formattedCompany = cleanIco
+      ? `${company.trim()} (IČO: ${cleanIco}${cleanCity ? `, ${cleanCity}` : ''})`
+      : company.trim();
+
+    const formattedSurfaceCount = [
+      typeof surfaceCount === 'string' && surfaceCount.trim() ? surfaceCount.trim() : null,
+      cleanRole,
+    ]
+      .filter(Boolean)
+      .join(' · ') || null;
+
     // Save lead safely into Prisma database
     let leadId = `lead-${Date.now()}`;
     try {
@@ -30,10 +50,10 @@ export async function POST(req: Request) {
           data: {
             name: name.trim(),
             email: email.trim().toLowerCase(),
-            company: company.trim(),
+            company: formattedCompany,
             phone: typeof phone === 'string' ? phone.trim() : null,
-            surfaceCount: typeof surfaceCount === 'string' ? surfaceCount.trim() : null,
-            source: 'WEBSITE_DEMO_MODAL',
+            surfaceCount: formattedSurfaceCount,
+            source: cleanSource,
           },
         });
         leadId = lead.id;
@@ -44,7 +64,7 @@ export async function POST(req: Request) {
 
     // Log analytics event server-side
     if (Array.isArray(analyticsEvents)) {
-      console.log('[Analytics Event]', { type: 'demo_form_submitted', email: email.trim(), company: company.trim(), events: analyticsEvents });
+      console.log('[Analytics Event]', { type: 'demo_form_submitted', email: email.trim(), company: formattedCompany, events: analyticsEvents });
     }
 
     // Notify sales so the "we will contact you within 24 hours" promise can be kept
@@ -52,20 +72,28 @@ export async function POST(req: Request) {
       const notifyTo = process.env.LEAD_NOTIFICATION_EMAIL || 'info@seepoint.cz';
       await sendTransactionalEmail({
         to: notifyTo,
-        subject: `Nová poptávka dema: ${company.trim()}`,
+        subject: cleanSource === 'B2B_PARTNER_NETWORK'
+          ? `Nová B2B registrace do sítě: ${formattedCompany}`
+          : `Nová poptávka dema: ${company.trim()}`,
         template: 'demo-lead-notification',
         idempotencyKey: `demo-lead-${leadId}`,
         message: [
-          'Z webu přišla nová žádost o ukázku SeePoint OS.',
+          cleanSource === 'B2B_PARTNER_NETWORK'
+            ? 'Přišla nová B2B registrace partnerské firmy přes /join-network.'
+            : 'Z webu přišla nová žádost o ukázku SeePoint OS.',
           '',
           `Jméno: ${name.trim()}`,
-          `Firma: ${company.trim()}`,
+          `Firma: ${formattedCompany}`,
+          cleanDic ? `DIČ: ${cleanDic}` : null,
+          cleanRole ? `Role v B2B síti: ${cleanRole}` : null,
           `E-mail: ${email.trim()}`,
           `Telefon: ${typeof phone === 'string' && phone.trim() ? phone.trim() : '—'}`,
-          `Počet ploch: ${typeof surfaceCount === 'string' && surfaceCount.trim() ? surfaceCount.trim() : '—'}`,
+          `Počet ploch / kapacity: ${typeof surfaceCount === 'string' && surfaceCount.trim() ? surfaceCount.trim() : '—'}`,
           '',
-          'Ozvěte se prosím do 24 hodin. Všechny poptávky najdete v administraci na /admin/leads.',
-        ].join('\n'),
+          'Ozvěte se prosím do 24 hodin. Všechny poptávky a 1-klik založení účtu najdete v administraci na /admin/leads.',
+        ]
+          .filter((line): line is string => line !== null)
+          .join('\n'),
       });
     } catch (mailErr) {
       console.warn('Demo lead notification email failed:', mailErr);
@@ -74,7 +102,10 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       leadId,
-      message: 'Děkujeme! Vaše žádost o ukázku SeePoint OS byla přijata. Náš tým vás bude kontaktovat během 24 hodin.',
+      message:
+        cleanSource === 'B2B_PARTNER_NETWORK'
+          ? 'Děkujeme! Vaše B2B registrace do sítě SeePoint byla přijata. Připravíme váš partnerský účet a pošleme vám aktivační odkaz.'
+          : 'Děkujeme! Vaše žádost o ukázku SeePoint OS byla přijata. Náš tým vás bude kontaktovat během 24 hodin.',
     });
   } catch (error) {
     console.error('Error submitting demo lead:', error);

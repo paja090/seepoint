@@ -38,9 +38,18 @@ export function AdminOutreachEmailStudio({ leads }: { leads: DemoLeadRow[] }) {
   const [createdOrgsByLead, setCreatedOrgsByLead] = useState<Record<string, { id: string; slug: string }>>({});
   const [leadActionError, setLeadActionError] = useState<string | null>(null);
 
-  // Super-simple 2-field company creator
+  // Super-simple company creator with optional IČO ARES auto-fill
+  const [quickIco, setQuickIco] = useState('');
+  const [quickAresLoading, setQuickAresLoading] = useState(false);
   const [quickCompanyName, setQuickCompanyName] = useState('');
   const [quickOwnerEmail, setQuickOwnerEmail] = useState('');
+  const [quickAresMeta, setQuickAresMeta] = useState<{
+    companyId?: string;
+    vatId?: string | null;
+    street?: string;
+    city?: string;
+    postalCode?: string;
+  }>({});
   const [quickCreating, setQuickCreating] = useState(false);
   const [quickCreatedOrg, setQuickCreatedOrg] = useState<{ id: string; slug: string; message: string } | null>(null);
   const [quickCreateError, setQuickCreateError] = useState<string | null>(null);
@@ -59,6 +68,33 @@ export function AdminOutreachEmailStudio({ leads }: { leads: DemoLeadRow[] }) {
     );
   }
 
+  async function lookupQuickAres(rawIco: string) {
+    const clean = rawIco.replace(/\D/g, '').slice(0, 8);
+    if (clean.length !== 8) return;
+    setQuickAresLoading(true);
+    setQuickCreateError(null);
+    try {
+      const res = await fetch(`/api/client/catalog?aresIco=${encodeURIComponent(clean)}`);
+      const data = await res.json();
+      if (res.ok && data.success && data.company) {
+        if (data.company.companyName) {
+          setQuickCompanyName(data.company.companyName);
+        }
+        setQuickAresMeta({
+          companyId: data.company.companyId || clean,
+          vatId: data.company.dic || undefined,
+          street: data.company.street || undefined,
+          city: data.company.city || undefined,
+          postalCode: data.company.postalCode || undefined,
+        });
+      }
+    } catch {
+      // Ignore ARES error in quick lookup; user can still type name manually
+    } finally {
+      setQuickAresLoading(false);
+    }
+  }
+
   async function handleQuickCreateCompany(e: React.FormEvent) {
     e.preventDefault();
     setQuickCreating(true);
@@ -74,6 +110,11 @@ export function AdminOutreachEmailStudio({ leads }: { leads: DemoLeadRow[] }) {
           name: quickCompanyName.trim(),
           slug: baseSlug,
           ownerEmail: quickOwnerEmail.trim(),
+          companyId: quickAresMeta.companyId || (quickIco.length === 8 ? quickIco : undefined),
+          vatId: quickAresMeta.vatId || undefined,
+          street: quickAresMeta.street || undefined,
+          city: quickAresMeta.city || undefined,
+          postalCode: quickAresMeta.postalCode || undefined,
           plan: 'BUSINESS',
           enableNetwork: true,
           enableNavigation: false,
@@ -97,8 +138,10 @@ export function AdminOutreachEmailStudio({ leads }: { leads: DemoLeadRow[] }) {
         slug: orgSlug,
         message: result.message || 'Účet byl založen a majiteli odešel e-mail s odkazem pro přihlášení.',
       });
+      setQuickIco('');
       setQuickCompanyName('');
       setQuickOwnerEmail('');
+      setQuickAresMeta({});
     } catch (err) {
       setQuickCreateError(err instanceof Error ? err.message : 'Vytvoření účtu selhalo.');
     } finally {
@@ -135,16 +178,48 @@ export function AdminOutreachEmailStudio({ leads }: { leads: DemoLeadRow[] }) {
   async function handleProvisionPilot(lead: DemoLeadRow) {
     setProvisioningLeadId(lead.id);
     setLeadActionError(null);
-    const baseSlug = toSlug(lead.company);
+
+    const icoMatch = lead.company.match(/IČO:\s*(\d{8})/i);
+    const extractedIco = icoMatch ? icoMatch[1] : undefined;
+    const cleanLeadCompanyName = lead.company.replace(/\s*\(IČO:.*$/i, '').trim() || lead.company;
+    const baseSlug = toSlug(cleanLeadCompanyName);
+
+    let aresExtra: {
+      companyId?: string;
+      vatId?: string;
+      street?: string;
+      city?: string;
+      postalCode?: string;
+    } = extractedIco ? { companyId: extractedIco } : {};
+
+    if (extractedIco) {
+      try {
+        const aresRes = await fetch(`/api/client/catalog?aresIco=${encodeURIComponent(extractedIco)}`);
+        const aresData = await aresRes.json();
+        if (aresRes.ok && aresData.success && aresData.company) {
+          aresExtra = {
+            companyId: aresData.company.companyId || extractedIco,
+            vatId: aresData.company.dic || undefined,
+            street: aresData.company.street || undefined,
+            city: aresData.company.city || undefined,
+            postalCode: aresData.company.postalCode || undefined,
+          };
+        }
+      } catch {
+        // Proceed with extractedIco if ARES is unreachable
+      }
+    }
 
     try {
       const response = await fetch('/api/admin/organizations', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          name: lead.company,
+          name: cleanLeadCompanyName,
           slug: baseSlug,
           ownerEmail: lead.email,
+          phone: lead.phone || undefined,
+          ...aresExtra,
           plan: 'BUSINESS',
           enableNetwork: true,
           enableNavigation: false,
@@ -222,25 +297,51 @@ export function AdminOutreachEmailStudio({ leads }: { leads: DemoLeadRow[] }) {
 
   return (
     <div className="space-y-8">
-      {/* Super-simple 2-field company creator */}
+      {/* Super-simple company creator with ARES */}
       <div className="rounded-3xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/60 p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <span className="rounded-full bg-emerald-100 px-3 py-0.5 text-xs font-black text-emerald-800">
-              Nejrychlejší cesta (2 políčka)
+              Nejrychlejší cesta (IČO z ARES + e-mail)
             </span>
             <h2 className="mt-1.5 text-xl font-black text-slate-900">
               Rychle založit účet nové firmě (30 dní zdarma)
             </h2>
             <p className="mt-1 text-xs text-slate-600">
-              Zadejte jen název firmy a e-mail majitele. Systém jí automaticky zapne <strong>zjednodušené menu</strong> (jen Plochy, Nabídky a Klienti), <strong>průvodce ve 3 krocích</strong> a pošle majiteli přihlašovací odkaz.
+              Zadejte 8místné IČO (automaticky načte název, DIČ a sídlo z ARES) a e-mail majitele. Systém firmě zapne <strong>zjednodušené menu</strong>, <strong>B2B síť</strong> a pošle majiteli přihlašovací odkaz.
             </p>
           </div>
+          <a
+            href="/join-network"
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-xl border border-emerald-300 bg-white px-3.5 py-2 text-xs font-black text-emerald-800 hover:bg-emerald-50"
+          >
+            Veřejný registrační formulář pro partnery (/join-network) ↗
+          </a>
         </div>
 
-        <form onSubmit={handleQuickCreateCompany} className="mt-4 grid gap-3 sm:grid-cols-3">
+        <form onSubmit={handleQuickCreateCompany} className="mt-4 grid gap-3 sm:grid-cols-4">
           <label className="text-xs font-bold text-slate-700">
-            1. Název firmy *
+            1. IČO firmy (ARES)
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={8}
+              placeholder="např. 27082440"
+              className="input mt-1 bg-white font-mono text-sm"
+              value={quickIco}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, '').slice(0, 8);
+                setQuickIco(digits);
+                if (digits.length === 8) {
+                  void lookupQuickAres(digits);
+                }
+              }}
+            />
+          </label>
+          <label className="text-xs font-bold text-slate-700">
+            2. Název firmy * {quickAresLoading && <span className="text-emerald-600">(ARES…)</span>}
             <input
               type="text"
               required
@@ -251,7 +352,7 @@ export function AdminOutreachEmailStudio({ leads }: { leads: DemoLeadRow[] }) {
             />
           </label>
           <label className="text-xs font-bold text-slate-700">
-            2. E-mail majitele *
+            3. E-mail majitele *
             <input
               type="email"
               required

@@ -131,6 +131,34 @@ type DemandItem = {
   bids: Array<{ id: string; partnerName: string; offeredSurfacesCount: number; totalB2BPrice: number; note: string }>;
 };
 
+type VisibilityCounts = {
+  PRIVATE: number;
+  PARTNER: number;
+  SHARED: number;
+  MARKETPLACE: number;
+  totalActiveSurfaces: number;
+  totalAvailableSurfaces: number;
+  availablePrivateSurfaces: number;
+  availablePublishedSurfaces: number;
+};
+
+type OwnSurfaceVisibilityItem = {
+  id: string;
+  carrierId: string;
+  carrierCode: string;
+  carrierName: string;
+  city: string;
+  street?: string | null;
+  surfaceName: string;
+  mediaType: string;
+  size: string;
+  orientation: string;
+  status: string;
+  listPrice: number;
+  visibility: 'PRIVATE' | 'PARTNER' | 'SHARED' | 'MARKETPLACE';
+  carrierVisibility: string;
+};
+
 export function NetworkHubView() {
   const [activeTab, setActiveTab] = useState<'INVENTORY' | 'PARTNERS' | 'HOLDS' | 'PROOFS' | 'SETTLEMENTS' | 'DEMANDS' | 'PRIVACY'>('INVENTORY');
 
@@ -152,6 +180,24 @@ export function NetworkHubView() {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // B2B Visibility & 1-click Publishing State
+  const [visibilityCounts, setVisibilityCounts] = useState<VisibilityCounts>({
+    PRIVATE: 0,
+    PARTNER: 0,
+    SHARED: 0,
+    MARKETPLACE: 0,
+    totalActiveSurfaces: 0,
+    totalAvailableSurfaces: 0,
+    availablePrivateSurfaces: 0,
+    availablePublishedSurfaces: 0,
+  });
+  const [ownSurfaces, setOwnSurfaces] = useState<OwnSurfaceVisibilityItem[]>([]);
+  const [canManageVisibility, setCanManageVisibility] = useState(false);
+  const [visibilityLoading, setVisibilityLoading] = useState(false);
+  const [showOwnSurfacesDrawer, setShowOwnSurfacesDrawer] = useState(false);
+  const [selectedSurfaceIds, setSelectedSurfaceIds] = useState<string[]>([]);
+  const [organizationInfo, setOrganizationInfo] = useState<{ id: string; name: string; slug: string | null } | null>(null);
 
   const [notifications, setNotifications] = useState<Array<{ id: string; type: string; title: string; message: string; severity: string; createdAt: string; isRead: boolean }>>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -177,7 +223,7 @@ export function NetworkHubView() {
     let isMounted = true;
     const fetchNetworkData = async () => {
       try {
-        const [partnersRes, inventoryRes, holdsRes, notifRes, proofsRes, settlementsRes, demandsRes] = await Promise.all([
+        const [partnersRes, inventoryRes, holdsRes, notifRes, proofsRes, settlementsRes, demandsRes, visibilityRes] = await Promise.all([
           fetch('/api/network/partners'),
           fetch('/api/network/inventory'),
           fetch('/api/network/holds'),
@@ -185,6 +231,7 @@ export function NetworkHubView() {
           fetch('/api/network/proofs'),
           fetch('/api/network/settlements'),
           fetch('/api/network/demands'),
+          fetch('/api/network/visibility'),
         ]);
 
         if (isMounted) {
@@ -234,6 +281,13 @@ export function NetworkHubView() {
             const dData = await demandsRes.json();
             setDemands(dData.demands || []);
           }
+          if (visibilityRes.ok) {
+            const vData = await visibilityRes.json();
+            if (vData.counts) setVisibilityCounts(vData.counts);
+            if (Array.isArray(vData.ownSurfaces)) setOwnSurfaces(vData.ownSurfaces);
+            if (vData.organization) setOrganizationInfo(vData.organization);
+            setCanManageVisibility(Boolean(vData.canManage));
+          }
         }
       } catch (err) {
         console.error('Failed to load network data:', err);
@@ -248,6 +302,204 @@ export function NetworkHubView() {
       isMounted = false;
     };
   }, []);
+
+  const refreshVisibilityAndInventory = async () => {
+    const [inventoryRes, visibilityRes] = await Promise.all([
+      fetch('/api/network/inventory'),
+      fetch('/api/network/visibility'),
+    ]);
+    if (inventoryRes.ok) {
+      const iData = await inventoryRes.json();
+      setInventory(iData.items || []);
+    }
+    if (visibilityRes.ok) {
+      const vData = await visibilityRes.json();
+      if (vData.counts) setVisibilityCounts(vData.counts);
+      if (Array.isArray(vData.ownSurfaces)) setOwnSurfaces(vData.ownSurfaces);
+      if (vData.organization) setOrganizationInfo(vData.organization);
+      setCanManageVisibility(Boolean(vData.canManage));
+    }
+  };
+
+  const handleBulkVisibility = async (visibility: 'PRIVATE' | 'PARTNER' | 'MARKETPLACE') => {
+    setVisibilityLoading(true);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      const res = await fetch('/api/network/visibility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'BULK_SET_VISIBILITY',
+          visibility,
+          city: searchCity,
+          mediaType: searchMediaType,
+          onlyAvailable: true,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setActionSuccess(data.message);
+        await refreshVisibilityAndInventory();
+      } else {
+        setActionError(data.error || 'Nepodařilo se hromadně změnit viditelnost ploch.');
+      }
+    } catch (err) {
+      console.error(err);
+      setActionError('Spojení se serverem při změně viditelnosti selhalo.');
+    } finally {
+      setVisibilityLoading(false);
+    }
+  };
+
+  const handleSingleSurfaceVisibility = async (surfaceId: string, visibility: 'PRIVATE' | 'PARTNER' | 'MARKETPLACE') => {
+    setVisibilityLoading(true);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      const res = await fetch('/api/network/visibility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SET_SURFACE_VISIBILITY',
+          surfaceId,
+          visibility,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setActionSuccess(data.message);
+        await refreshVisibilityAndInventory();
+      } else {
+        setActionError(data.error || 'Nepodařilo se změnit viditelnost plochy.');
+      }
+    } catch (err) {
+      console.error(err);
+      setActionError('Spojení se serverem při změně viditelnosti selhalo.');
+    } finally {
+      setVisibilityLoading(false);
+    }
+  };
+
+  const toggleSelectSurface = (surfaceId: string) => {
+    setSelectedSurfaceIds((prev) =>
+      prev.includes(surfaceId) ? prev.filter((id) => id !== surfaceId) : [...prev, surfaceId]
+    );
+  };
+
+  const handleCopyOwnCatalogUrl = async () => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams();
+    if (organizationInfo?.slug) {
+      params.set('org', organizationInfo.slug);
+    }
+    const url = `${window.location.origin}/client/catalog${params.toString() ? `?${params.toString()}` : ''}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      const msg = `Veřejný odkaz na katalog vaší firmy (${organizationInfo?.name || 'vaše portfolio'}) byl zkopírován do schránky.`;
+      setActionSuccess(msg);
+    } catch {
+      setActionError('Nepodařilo se zkopírovat odkaz do schránky.');
+    }
+  };
+
+  const handleCopyWhiteLabelLink = async () => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams();
+    params.set('whitelabel', '1');
+    if (organizationInfo?.name) {
+      params.set('agency', organizationInfo.name);
+    }
+    if (selectedSurfaceIds.length > 0) {
+      params.set('vyber', selectedSurfaceIds.join(','));
+      params.set('onlySelected', '1');
+    } else {
+      if (searchCity !== 'ALL') params.set('mesto', searchCity);
+      if (searchMediaType !== 'ALL') params.set('typ', searchMediaType);
+      if (organizationInfo?.slug) params.set('org', organizationInfo.slug);
+    }
+    const url = `${window.location.origin}/client/catalog?${params.toString()}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      const countLabel =
+        selectedSurfaceIds.length > 0
+          ? `${selectedSurfaceIds.length} vybraných ploch`
+          : `${filteredInventory.length} ploch dle filtru`;
+      const msg = `White-label klientský odkaz (${countLabel}, bez kontaktů na subdodavatele) byl zkopírován do schránky.`;
+      setActionSuccess(msg);
+    } catch {
+      setActionError('Nepodařilo se zkopírovat white-label odkaz do schránky.');
+    }
+  };
+
+  const handleExportB2bCsv = () => {
+    const sourceItems =
+      selectedSurfaceIds.length > 0
+        ? inventory.filter((item) => selectedSurfaceIds.includes(item.id))
+        : filteredInventory;
+
+    if (sourceItems.length === 0) {
+      setActionError('Žádné plochy k exportu do CSV.');
+      return;
+    }
+
+    const headers = [
+      'Kód nosiče',
+      'Název nosiče',
+      'Plocha / strana',
+      'Město',
+      'Ulice / lokalita',
+      'Typ média',
+      'Rozměr',
+      'Orientace',
+      'Ceníková cena (Kč/měs bez DPH)',
+      'B2B velkoobchodní cena (Kč/měs bez DPH)',
+      'Agenturní sleva (%)',
+      'GPS šířka',
+      'GPS délka',
+      'Vlastník / režim',
+    ];
+
+    const escapeCsv = (val: string | number | null | undefined) => {
+      const str = val == null ? '' : String(val);
+      if (str.includes(';') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const rows = sourceItems.map((item) => [
+      escapeCsv(item.carrierCode),
+      escapeCsv(item.carrierName),
+      escapeCsv(item.surfaceName),
+      escapeCsv(item.city),
+      escapeCsv(item.street || item.locality || ''),
+      escapeCsv(item.mediaType),
+      escapeCsv(item.size),
+      escapeCsv(item.orientation),
+      escapeCsv(item.listPrice),
+      escapeCsv(item.b2bWholesalePrice),
+      escapeCsv(item.b2bDiscountPercent),
+      escapeCsv(item.latitude ?? ''),
+      escapeCsv(item.longitude ?? ''),
+      escapeCsv(item.ownerLabel),
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    link.download = `seepoint-b2b-media-plan-${dateStamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    const msg = `Exportováno ${sourceItems.length} ploch do CSV / Excelu (${link.download}).`;
+    setActionSuccess(msg);
+  };
 
   const handlePartnerAction = async (targetOrgId: string, action: string, discount = 20) => {
     if (!NETWORK_TRANSACTIONS_ENABLED) return setActionError(NETWORK_BETA_MESSAGE);
@@ -468,7 +720,15 @@ export function NetworkHubView() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <Link
+              href="/join-network"
+              className="inline-flex items-center gap-2 rounded-2xl bg-indigo-500/20 border border-indigo-400/40 px-4 py-3 text-xs font-black text-indigo-200 hover:bg-indigo-500/30 transition cursor-pointer"
+            >
+              <Handshake size={15} />
+              <span>Pozvat partnera (IČO)</span>
+            </Link>
+
             <button
               type="button"
               onClick={() => setShowNotifDrawer(!showNotifDrawer)}
@@ -483,11 +743,15 @@ export function NetworkHubView() {
             </button>
 
             <Link
-              href="/offers/new"
+              href={selectedSurfaceIds.length > 0 ? `/offers/new?surfaceIds=${selectedSurfaceIds.join(',')}` : '/offers/new'}
               className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-3 text-xs font-black text-slate-950 shadow-lg shadow-emerald-500/20 hover:brightness-110 active:scale-95 transition cursor-pointer"
             >
               <Plus size={16} />
-              <span>Sestavit B2B nabídku</span>
+              <span>
+                {selectedSurfaceIds.length > 0
+                  ? `Sestavit B2B nabídku (${selectedSurfaceIds.length} ploch)`
+                  : 'Sestavit B2B nabídku'}
+              </span>
             </Link>
           </div>
         </div>
@@ -685,7 +949,145 @@ export function NetworkHubView() {
       {/* Tab 1: Burza kapacit (Inventory) */}
       {activeTab === 'INVENTORY' && (
         <div className="space-y-4">
-          {/* Filters Bar */}
+          {/* 1-Click B2B Inventory Visibility & Publishing Bar */}
+          <div className="rounded-3xl border border-indigo-200 bg-gradient-to-r from-indigo-50/90 via-white to-emerald-50/70 p-5 shadow-xs space-y-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+                    Moje plochy v B2B síti
+                  </span>
+                  <span className="text-xs font-bold text-slate-500">
+                    Publikování vlastních volných kapacit 1 klikem
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600">
+                  Nově založené plochy jsou ve výchozím stavu <strong>PRIVATE</strong> (pouze pro vaši firmu). Zde je můžete jedním kliknutím uvolnit do B2B Burzy nebo skrýt.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 sm:gap-3 shrink-0">
+                <div className="rounded-2xl border border-emerald-200 bg-white px-3.5 py-2 text-center">
+                  <span className="block text-[10px] font-bold uppercase text-emerald-700">B2B Burza</span>
+                  <span className="text-base font-black text-emerald-900">{visibilityCounts.MARKETPLACE}</span>
+                </div>
+                <div className="rounded-2xl border border-indigo-200 bg-white px-3.5 py-2 text-center">
+                  <span className="block text-[10px] font-bold uppercase text-indigo-700">Pro partnery</span>
+                  <span className="text-base font-black text-indigo-900">{visibilityCounts.PARTNER}</span>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white px-3.5 py-2 text-center">
+                  <span className="block text-[10px] font-bold uppercase text-slate-500">Soukromé</span>
+                  <span className="text-base font-black text-slate-900">{visibilityCounts.PRIVATE}</span>
+                </div>
+              </div>
+            </div>
+
+            {canManageVisibility && (
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-indigo-100">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={visibilityLoading}
+                    onClick={() => handleBulkVisibility('MARKETPLACE')}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-3.5 py-2 text-xs font-black text-white shadow-xs transition cursor-pointer disabled:opacity-50"
+                  >
+                    <Globe size={14} />
+                    <span>Zveřejnit volné plochy do B2B Burzy ({visibilityCounts.totalAvailableSurfaces})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={visibilityLoading}
+                    onClick={() => handleBulkVisibility('PARTNER')}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-3.5 py-2 text-xs font-black text-white shadow-xs transition cursor-pointer disabled:opacity-50"
+                  >
+                    <Handshake size={14} />
+                    <span>Publikovat pouze pro partnery</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={visibilityLoading}
+                    onClick={() => handleBulkVisibility('PRIVATE')}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 px-3.5 py-2 text-xs font-bold text-slate-700 transition cursor-pointer disabled:opacity-50"
+                  >
+                    <Lock size={13} />
+                    <span>Skrýt vše do soukromého režimu</span>
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCopyOwnCatalogUrl}
+                    className="rounded-xl border border-slate-300 bg-white hover:bg-slate-100 px-3.5 py-2 text-xs font-bold text-slate-700 transition cursor-pointer"
+                  >
+                    🔗 Můj veřejný katalog
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowOwnSurfacesDrawer((prev) => !prev)}
+                    className="rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 px-3.5 py-2 text-xs font-black text-indigo-800 transition cursor-pointer"
+                  >
+                    {showOwnSurfacesDrawer
+                      ? 'Skrýt seznam mých ploch'
+                      : `Spravovat jednotlivé plochy (${ownSurfaces.length})`}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {showOwnSurfacesDrawer && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2 max-h-80 overflow-y-auto">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 pb-2 border-b border-slate-100">
+                  <span>Přehled vašich aktivních ploch a jejich režim v B2B síti</span>
+                  <span>Kliknutím okamžitě změníte viditelnost</span>
+                </div>
+                {ownSurfaces.map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-2 border-b border-slate-100 last:border-none text-xs"
+                  >
+                    <div>
+                      <span className="font-mono font-black text-indigo-600 mr-2">{s.carrierCode}</span>
+                      <span className="font-bold text-slate-900">{s.carrierName}</span>
+                      <span className="text-slate-500 ml-2">
+                        ({s.city} · {s.surfaceName} · {s.status})
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {(['PRIVATE', 'PARTNER', 'MARKETPLACE'] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          disabled={visibilityLoading || !canManageVisibility}
+                          onClick={() => handleSingleSurfaceVisibility(s.id, mode)}
+                          className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase transition cursor-pointer ${
+                            s.visibility === mode
+                              ? mode === 'MARKETPLACE'
+                                ? 'bg-emerald-600 text-white'
+                                : mode === 'PARTNER'
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-slate-800 text-white'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {mode === 'PRIVATE' ? 'Soukromá' : mode === 'PARTNER' ? 'Partner' : 'B2B Burza'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {ownSurfaces.length === 0 && (
+                  <p className="text-xs text-slate-500 py-3 text-center">
+                    Vaše organizace zatím nemá v inventáři žádné aktivní plochy.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Filters & Agency Tools Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-bold text-slate-500 flex items-center gap-1 mr-1">
@@ -716,103 +1118,176 @@ export function NetworkHubView() {
                 <option value="FACADE">Fasády & LED</option>
                 <option value="PROMO_TOWER">Promo věže</option>
               </select>
+
+              {selectedSurfaceIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedSurfaceIds([])}
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
+                >
+                  Vybráno {selectedSurfaceIds.length} ploch · Zrušit výběr
+                </button>
+              )}
             </div>
 
-            <span className="text-xs font-bold text-slate-500">
-              Nalezeno <strong className="text-slate-900">{filteredInventory.length}</strong> volných ploch k přeprodeji
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCopyWhiteLabelLink}
+                title="Zkopíruje odkaz na interaktivní mapu a katalog bez loga a kontaktů subdodavatelů (režim pro koncového klienta agentury)"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100 px-3 py-1.5 text-xs font-black text-indigo-900 transition cursor-pointer"
+              >
+                <ExternalLink size={13} />
+                <span>
+                  {selectedSurfaceIds.length > 0
+                    ? `White-label odkaz (${selectedSurfaceIds.length} ploch)`
+                    : 'White-label odkaz pro klienta'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExportB2bCsv}
+                title="Stáhne media-plán s ceníkovými i B2B cenami a GPS souřadnicemi pro Excel"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-800 transition cursor-pointer"
+              >
+                <span>
+                  {selectedSurfaceIds.length > 0
+                    ? `📥 Export CSV / Excel (${selectedSurfaceIds.length})`
+                    : `📥 Export CSV / Excel (${filteredInventory.length})`}
+                </span>
+              </button>
+
+              <span className="text-xs font-bold text-slate-500 ml-1">
+                Nalezeno <strong className="text-slate-900">{filteredInventory.length}</strong> volných ploch
+              </span>
+            </div>
           </div>
 
           {/* Cards Grid */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredInventory.map((item) => (
-              <div
-                key={item.id}
-                className="flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xs hover:border-indigo-400 hover:shadow-lg transition group"
-              >
-                <div>
-                  {/* Photo with B2B Tag */}
-                  <div className="relative h-44 w-full bg-slate-900">
-                    <Image
-                      src={item.thumbnailUrl}
-                      alt={item.carrierName}
-                      fill
-                      unoptimized
-                      className="object-cover group-hover:scale-105 transition duration-300"
-                    />
-                    <div className="absolute top-3 left-3 flex gap-1">
-                      <span className="rounded-full bg-slate-950/80 px-2.5 py-1 text-[10px] font-black uppercase text-white backdrop-blur border border-slate-700">
-                        {item.mediaType}
-                      </span>
-                    </div>
-
-                    <div className="absolute top-3 right-3">
-                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase border backdrop-blur ${
-                        item.isOwn
-                          ? 'bg-emerald-950/90 text-emerald-300 border-emerald-600'
-                          : 'bg-indigo-950/90 text-indigo-300 border-indigo-600'
-                      }`}>
-                        {item.ownerLabel}
-                      </span>
-                    </div>
-
-                    {item.b2bDiscountPercent > 0 && (
-                      <div className="absolute bottom-3 left-3">
-                        <span className="rounded-lg bg-emerald-500 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-md flex items-center gap-1">
-                          <Tag size={10} /> B2B Sleva -{item.b2bDiscountPercent} %
+            {filteredInventory.map((item) => {
+              const isSelected = selectedSurfaceIds.includes(item.id);
+              return (
+                <div
+                  key={item.id}
+                  className={`flex flex-col justify-between overflow-hidden rounded-3xl border bg-white shadow-xs hover:shadow-lg transition group ${
+                    isSelected ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-slate-200 hover:border-indigo-400'
+                  }`}
+                >
+                  <div>
+                    {/* Photo with B2B Tag */}
+                    <div className="relative h-44 w-full bg-slate-900">
+                      <Image
+                        src={item.thumbnailUrl}
+                        alt={item.carrierName}
+                        fill
+                        unoptimized
+                        className="object-cover group-hover:scale-105 transition duration-300"
+                      />
+                      <div className="absolute top-3 left-3 flex gap-1">
+                        <span className="rounded-full bg-slate-950/80 px-2.5 py-1 text-[10px] font-black uppercase text-white backdrop-blur border border-slate-700">
+                          {item.mediaType}
+                        </span>
+                        <span className="rounded-full bg-slate-900/80 px-2 py-1 text-[10px] font-bold uppercase text-slate-200 backdrop-blur border border-slate-700">
+                          {item.visibility}
                         </span>
                       </div>
-                    )}
+
+                      <div className="absolute top-3 right-3">
+                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase border backdrop-blur ${
+                          item.isOwn
+                            ? 'bg-emerald-950/90 text-emerald-300 border-emerald-600'
+                            : 'bg-indigo-950/90 text-indigo-300 border-indigo-600'
+                        }`}>
+                          {item.ownerLabel}
+                        </span>
+                      </div>
+
+                      {item.b2bDiscountPercent > 0 && (
+                        <div className="absolute bottom-3 left-3">
+                          <span className="rounded-lg bg-emerald-500 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-md flex items-center gap-1">
+                            <Tag size={10} /> B2B Sleva -{item.b2bDiscountPercent} %
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Body Content */}
+                    <div className="p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs font-black text-indigo-600">{item.carrierCode}</span>
+                        <span className="text-[11px] font-semibold text-slate-500">{item.size}</span>
+                      </div>
+
+                      <h3 className="font-black text-sm text-slate-900 line-clamp-1">{item.carrierName}</h3>
+
+                      <p className="text-xs text-slate-500 flex items-center gap-1 font-medium">
+                        <MapPin size={13} className="text-amber-500 shrink-0" />
+                        <span>{[item.city, item.street].filter(Boolean).join(' · ')}</span>
+                      </p>
+
+                      {/* Pricing Box */}
+                      <div className="mt-3 rounded-2xl bg-slate-50 p-3 border border-slate-100 flex items-center justify-between">
+                        <div>
+                          <span className="text-[9px] text-slate-400 font-bold block uppercase">Ceníková cena:</span>
+                          <span className="text-xs font-bold text-slate-500 line-through">
+                            {item.listPrice.toLocaleString('cs-CZ')} Kč
+                          </span>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-[9px] text-emerald-700 font-bold block uppercase">Vaše B2B nákupní cena:</span>
+                          <span className="text-sm font-black text-slate-950">
+                            {item.b2bWholesalePrice.toLocaleString('cs-CZ')} Kč / měsíc
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Body Content */}
-                  <div className="p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-black text-indigo-600">{item.carrierCode}</span>
-                      <span className="text-[11px] font-semibold text-slate-500">{item.size}</span>
+                  {/* Footer Action */}
+                  <div className="p-4 pt-0 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleSelectSurface(item.id)}
+                        className={`flex-1 rounded-xl py-2 px-3 text-xs font-black transition cursor-pointer border ${
+                          isSelected
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100'
+                        }`}
+                      >
+                        {isSelected ? '✓ Vybráno do nabídky' : '+ Vybrat do nabídky'}
+                      </button>
+
+                      {item.isOwn && canManageVisibility && (
+                        <button
+                          type="button"
+                          disabled={visibilityLoading}
+                          onClick={() => handleSingleSurfaceVisibility(item.id, 'PRIVATE')}
+                          title="Skrýt tuto plochu z B2B sítě zpět do soukromého režimu"
+                          className="rounded-xl border border-slate-200 bg-slate-100 hover:bg-rose-50 hover:text-rose-700 px-3 py-2 text-xs font-bold text-slate-600 transition cursor-pointer"
+                        >
+                          Skrýt
+                        </button>
+                      )}
                     </div>
 
-                    <h3 className="font-black text-sm text-slate-900 line-clamp-1">{item.carrierName}</h3>
-
-                    <p className="text-xs text-slate-500 flex items-center gap-1 font-medium">
-                      <MapPin size={13} className="text-amber-500 shrink-0" />
-                      <span>{[item.city, item.street].filter(Boolean).join(' · ')}</span>
-                    </p>
-
-                    {/* Pricing Box */}
-                    <div className="mt-3 rounded-2xl bg-slate-50 p-3 border border-slate-100 flex items-center justify-between">
-                      <div>
-                        <span className="text-[9px] text-slate-400 font-bold block uppercase">Ceníková cena:</span>
-                        <span className="text-xs font-bold text-slate-500 line-through">
-                          {item.listPrice.toLocaleString('cs-CZ')} Kč
-                        </span>
-                      </div>
-
-                      <div className="text-right">
-                        <span className="text-[9px] text-emerald-700 font-bold block uppercase">Vaše B2B nákupní cena:</span>
-                        <span className="text-sm font-black text-slate-950">
-                          {item.b2bWholesalePrice.toLocaleString('cs-CZ')} Kč / měsíc
-                        </span>
-                      </div>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCreateHold(item.id)}
+                      disabled={!NETWORK_TRANSACTIONS_ENABLED}
+                      title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 hover:bg-indigo-600 py-2.5 text-xs font-black text-white shadow-sm transition active:scale-98 cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-300"
+                    >
+                      <Clock size={14} />
+                      <span>Aktivovat B2B Hold (5 dní)</span>
+                    </button>
                   </div>
                 </div>
-
-                {/* Footer Action */}
-                <div className="p-4 pt-0">
-                  <button
-                    type="button"
-                    onClick={() => handleCreateHold(item.id)}
-                    disabled={!NETWORK_TRANSACTIONS_ENABLED}
-                    title={!NETWORK_TRANSACTIONS_ENABLED ? NETWORK_BETA_MESSAGE : undefined}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 hover:bg-indigo-600 py-2.5 text-xs font-black text-white shadow-sm transition active:scale-98 cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-300"
-                  >
-                    <Clock size={14} />
-                    <span>Aktivovat B2B Hold (5 dní)</span>
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {filteredInventory.length === 0 && (
               <p className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
                 Žádná plocha není pro zvolené filtry výslovně zveřejněna v B2B katalogu.
@@ -826,11 +1301,20 @@ export function NetworkHubView() {
       {activeTab === 'PARTNERS' && (
         <div className="space-y-4">
           <div className="bg-white p-5 rounded-3xl border border-slate-200 space-y-4 shadow-xs">
-            <div>
-              <h2 className="text-base font-black text-slate-900">Adresář organizací dostupných na platformě</h2>
-              <p className="text-xs text-slate-500">
-                Kontaktní údaje ani smluvní stav se nezpřístupňují, dokud není implementováno bezpečné perzistentní partnerství.
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-black text-slate-900">Adresář organizací dostupných na platformě</h2>
+                <p className="text-xs text-slate-500">
+                  Kontaktní údaje ani smluvní stav se nezpřístupňují, dokud není implementováno bezpečné perzistentní partnerství.
+                </p>
+              </div>
+              <Link
+                href="/join-network"
+                className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2.5 text-xs font-black text-white shadow-xs transition shrink-0"
+              >
+                <Plus size={14} />
+                <span>Pozvat novou firmu přes IČO</span>
+              </Link>
             </div>
 
             <div className="divide-y divide-slate-100">

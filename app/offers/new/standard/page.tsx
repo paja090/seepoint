@@ -7,10 +7,17 @@ export const dynamic = 'force-dynamic';
 export default async function NewStandardOfferPage({
   searchParams,
 }: {
-  searchParams: Promise<{ clientId?: string }>;
+  searchParams: Promise<{ clientId?: string; surfaceIds?: string }>;
 }) {
   await requirePageAccess('offers');
   const options = await getOfferFormOptions();
-  const { clientId } = await searchParams;
-  return <AppShell><OfferWizard {...options} initialClientId={clientId} /></AppShell>;
+  const { clientId, surfaceIds } = await searchParams;
+  const initialSurfaceIds = surfaceIds
+    ? surfaceIds.split(',').map((s) => s.trim()).filter(Boolean)
+    : undefined;
+  return (
+    <AppShell>
+      <OfferWizard {...options} initialClientId={clientId} initialSurfaceIds={initialSurfaceIds} />
+    </AppShell>
+  );
 }

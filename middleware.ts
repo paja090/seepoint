@@ -4,6 +4,7 @@ const SESSION_COOKIE = 'seepoint_session';
 const publicExactPaths = new Set([
   '/',
   '/os',
+  '/join-network',
   '/login',
   '/forgot-password',
   '/api/auth/login',

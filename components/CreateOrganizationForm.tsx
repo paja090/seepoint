@@ -15,8 +15,66 @@ function slugifyCompanyName(value: string): string {
 export function CreateOrganizationForm() {
   const [result, setResult] = useState<{ message: string; organizationId?: string; activationUrl?: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
+  const [companyId, setCompanyId] = useState('');
+  const [vatId, setVatId] = useState('');
+  const [street, setStreet] = useState('');
+  const [city, setCity] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [aresLoading, setAresLoading] = useState(false);
+  const [aresStatus, setAresStatus] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function lookupAres(icoInput?: string) {
+    const cleanIco = (icoInput ?? companyId).replace(/\s+/g, '').trim();
+    if (!/^\d{8}$/.test(cleanIco)) {
+      setAresStatus({ ok: false, text: 'Zadejte platné 8místné IČO pro načtení z ARES.' });
+      return;
+    }
+    setAresLoading(true);
+    setAresStatus(null);
+    try {
+      const res = await fetch(`/api/client/catalog?aresIco=${encodeURIComponent(cleanIco)}`);
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        company?: {
+          companyId?: string;
+          dic?: string;
+          companyName?: string;
+          city?: string;
+          street?: string;
+          postalCode?: string;
+          address?: string;
+        };
+      };
+      if (res.ok && data.ok && data.company) {
+        const c = data.company;
+        setCompanyId(c.companyId || cleanIco);
+        if (c.companyName) {
+          setName(c.companyName);
+          if (!slugTouched) {
+            setSlug(slugifyCompanyName(c.companyName));
+          }
+        }
+        if (c.dic) setVatId(c.dic);
+        if (c.street || c.address) setStreet(c.street || c.address || '');
+        if (c.city) setCity(c.city);
+        if (c.postalCode) setPostalCode(c.postalCode);
+        setAresStatus({
+          ok: true,
+          text: `✓ Ověřeno v ARES: ${c.companyName || cleanIco}${c.city ? ` (${c.city})` : ''}`,
+        });
+      } else {
+        setAresStatus({ ok: false, text: data.error || 'Subjekt s tímto IČO nebyl v ARES nalezen.' });
+      }
+    } catch {
+      setAresStatus({ ok: false, text: 'Nepodařilo se spojit s registrem ARES.' });
+    } finally {
+      setAresLoading(false);
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,8 +109,15 @@ export function CreateOrganizationForm() {
       );
       if (response.ok) {
         form.reset();
+        setName('');
         setSlug('');
         setSlugTouched(false);
+        setCompanyId('');
+        setVatId('');
+        setStreet('');
+        setCity('');
+        setPostalCode('');
+        setAresStatus(null);
       }
     } catch {
       setResult({ message: 'Založení selhalo.' });
@@ -63,6 +128,49 @@ export function CreateOrganizationForm() {
 
   return (
     <form className="card grid gap-4 md:grid-cols-2" onSubmit={submit}>
+      {/* ARES Quick Lookup Banner */}
+      <div className="md:col-span-2 rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex-1 min-w-[220px]">
+            <label className="text-xs font-extrabold uppercase tracking-wider text-indigo-900 block">
+              ⚡ Rychlé založení podle IČO (Registr ARES)
+            </label>
+            <p className="text-xs text-slate-600 mt-0.5">
+              Zadejte 8místné IČO firmy — název, slug, DIČ i sídlo se vyplní automaticky.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <input
+              className="input font-mono text-sm sm:w-44 bg-white"
+              name="companyId"
+              placeholder="např. 01234567"
+              value={companyId}
+              onChange={(e) => {
+                const val = e.target.value;
+                setCompanyId(val);
+                const digits = val.replace(/\s+/g, '');
+                if (/^\d{8}$/.test(digits)) {
+                  void lookupAres(digits);
+                }
+              }}
+            />
+            <button
+              type="button"
+              disabled={aresLoading}
+              onClick={() => void lookupAres()}
+              className="rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-black text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50 shrink-0 cursor-pointer"
+            >
+              {aresLoading ? 'Načítám ARES…' : 'Načíst z ARES'}
+            </button>
+          </div>
+        </div>
+        {aresStatus ? (
+          <p className={`mt-2 text-xs font-bold ${aresStatus.ok ? 'text-emerald-700' : 'text-rose-700'}`}>
+            {aresStatus.text}
+          </p>
+        ) : null}
+      </div>
+
       <label className="text-sm font-semibold">
         Název firmy *
         <input
@@ -70,7 +178,9 @@ export function CreateOrganizationForm() {
           name="name"
           placeholder="např. Outdoor Media Brno s.r.o."
           required
+          value={name}
           onChange={(e) => {
+            setName(e.target.value);
             if (!slugTouched) {
               setSlug(slugifyCompanyName(e.target.value));
             }
@@ -100,12 +210,44 @@ export function CreateOrganizationForm() {
         <input className="input mt-1" name="email" type="email" placeholder="info@firma.cz" />
       </label>
       <label className="text-sm font-semibold">
-        IČO
-        <input className="input mt-1" name="companyId" />
+        DIČ
+        <input
+          className="input mt-1"
+          name="vatId"
+          placeholder="CZ..."
+          value={vatId}
+          onChange={(e) => setVatId(e.target.value)}
+        />
       </label>
       <label className="text-sm font-semibold">
-        DIČ
-        <input className="input mt-1" name="vatId" />
+        Město
+        <input
+          className="input mt-1"
+          name="city"
+          placeholder="např. Brno"
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+        />
+      </label>
+      <label className="text-sm font-semibold">
+        Ulice a č.p.
+        <input
+          className="input mt-1"
+          name="street"
+          placeholder="např. Masarykova 12"
+          value={street}
+          onChange={(e) => setStreet(e.target.value)}
+        />
+      </label>
+      <label className="text-sm font-semibold">
+        PSČ
+        <input
+          className="input mt-1"
+          name="postalCode"
+          placeholder="např. 60200"
+          value={postalCode}
+          onChange={(e) => setPostalCode(e.target.value)}
+        />
       </label>
 
       {/* Plan & Partner Network Setup */}

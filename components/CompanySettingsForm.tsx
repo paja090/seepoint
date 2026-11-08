@@ -71,6 +71,7 @@ async function fileToOptimizedDataUri(file: File): Promise<string> {
 export function CompanySettingsForm({ organization }: { organization: Company }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
 
   const [logoUrl, setLogoUrl] = useState<string>(String(organization.logoUrl ?? ''));
   const [primaryColor, setPrimaryColor] = useState<string>(String(organization.primaryColor || '#2563eb'));
@@ -78,6 +79,61 @@ export function CompanySettingsForm({ organization }: { organization: Company })
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [feedback, setFeedback] = useState<{ text: string; ok: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [aresIcoInput, setAresIcoInput] = useState<string>(String(organization.companyId ?? ''));
+  const [aresLoading, setAresLoading] = useState(false);
+  const [aresStatus, setAresStatus] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function handleAresLookup(icoOverride?: string) {
+    const cleanIco = (icoOverride ?? aresIcoInput).replace(/\s+/g, '').trim();
+    if (!/^\d{8}$/.test(cleanIco)) {
+      setAresStatus({ ok: false, text: 'Zadejte platné 8místné IČO pro načtení z ARES.' });
+      return;
+    }
+    setAresLoading(true);
+    setAresStatus(null);
+    try {
+      const res = await fetch(`/api/client/catalog?aresIco=${encodeURIComponent(cleanIco)}`);
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        company?: {
+          companyId?: string;
+          dic?: string;
+          companyName?: string;
+          city?: string;
+          street?: string;
+          postalCode?: string;
+          address?: string;
+        };
+      };
+      if (res.ok && data.ok && data.company && formRef.current) {
+        const c = data.company;
+        const setField = (fieldName: string, value?: string) => {
+          if (!value || !formRef.current) return;
+          const el = formRef.current.elements.namedItem(fieldName) as HTMLInputElement | null;
+          if (el) el.value = value;
+        };
+        setField('companyId', c.companyId || cleanIco);
+        setField('name', c.companyName);
+        setField('vatId', c.dic);
+        setField('street', c.street || c.address);
+        setField('city', c.city);
+        setField('postalCode', c.postalCode);
+        setField('country', 'CZ');
+        setAresIcoInput(c.companyId || cleanIco);
+        setAresStatus({
+          ok: true,
+          text: `✓ Načteno z ARES: ${c.companyName || cleanIco}. Zkontrolujte údaje a klikněte dole na Uložit firemní údaje.`,
+        });
+      } else {
+        setAresStatus({ ok: false, text: data.error || 'Subjekt v ARES nebyl nalezen.' });
+      }
+    } catch {
+      setAresStatus({ ok: false, text: 'Nepodařilo se spojit s registrem ARES.' });
+    } finally {
+      setAresLoading(false);
+    }
+  }
 
   async function handleLogoFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -170,7 +226,7 @@ export function CompanySettingsForm({ organization }: { organization: Company })
   }
 
   return (
-    <form className="card space-y-6 p-6" onSubmit={submit}>
+    <form ref={formRef} className="card space-y-6 p-6" onSubmit={submit}>
       {/* 1. Firemní logo a barvy */}
       <div className="rounded-2xl border-2 border-indigo-100 bg-gradient-to-br from-indigo-50/60 via-white to-slate-50 p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -285,12 +341,52 @@ export function CompanySettingsForm({ organization }: { organization: Company })
       ) : null}
 
       {/* 2. Kontaktní a fakturační údaje */}
-      <div>
-        <h2 className="text-lg font-bold text-slate-950">Kontaktní a fakturační údaje firmy</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Telefon a e-mail se zobrazí klientům v patičce Vašich nabídek. Fakturační údaje se použijí na dokladech.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-bold text-slate-950">Kontaktní a fakturační údaje firmy</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Telefon a e-mail se zobrazí klientům v patičce Vašich nabídek. Fakturační údaje se použijí na dokladech.
+          </p>
+        </div>
+
+        {/* Rychlé načtení z ARES podle IČO */}
+        <div className="flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50/60 p-2.5 shrink-0">
+          <input
+            type="text"
+            placeholder="Zadejte IČO (8 číslic)"
+            value={aresIcoInput}
+            onChange={(e) => {
+              const val = e.target.value;
+              setAresIcoInput(val);
+              const digits = val.replace(/\s+/g, '');
+              if (/^\d{8}$/.test(digits)) {
+                void handleAresLookup(digits);
+              }
+            }}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 font-mono text-xs font-bold text-slate-900 w-40 focus:outline-none focus:border-indigo-500"
+          />
+          <button
+            type="button"
+            disabled={aresLoading}
+            onClick={() => void handleAresLookup()}
+            className="rounded-xl bg-indigo-600 px-3.5 py-1.5 text-xs font-black text-white hover:bg-indigo-700 disabled:opacity-50 cursor-pointer"
+          >
+            {aresLoading ? 'Načítám…' : '⚡ Doplnit z ARES'}
+          </button>
+        </div>
       </div>
+
+      {aresStatus ? (
+        <div
+          className={`rounded-xl border px-3.5 py-2.5 text-xs font-bold ${
+            aresStatus.ok
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+              : 'border-rose-200 bg-rose-50 text-rose-800'
+          }`}
+        >
+          {aresStatus.text}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         {contactAndBillingFields.map(([name, label]) => (
