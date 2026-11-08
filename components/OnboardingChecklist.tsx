@@ -56,6 +56,33 @@ export function OnboardingChecklist({ activeMemberCount, organizationName, progr
         })}
       </ol>
       <div aria-live="polite" className="mt-4 min-h-6 text-sm font-semibold text-slate-700">{message}</div>
+      <div className="mt-4 rounded-3xl border border-indigo-200 bg-gradient-to-r from-indigo-50/90 via-white to-emerald-50/80 p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <span className="inline-flex items-center rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+            B2B Síť ČR
+          </span>
+          <h3 className="text-base font-black text-slate-950">
+            Chcete nabídnout své volné kapacity partnerským agenturám?
+          </h3>
+          <p className="text-xs text-slate-600">
+            Vaše naimportované plochy ({surfaceCount}) jsou ve výchozím stavu soukromé (<strong>PRIVATE</strong>). V sekci B2B Síť je můžete jedním kliknutím zveřejnit do B2B Burzy.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <Link
+            href="/network"
+            className="rounded-xl bg-slate-950 px-4 py-2.5 text-xs font-black text-white hover:bg-slate-800 transition"
+          >
+            Otevřít B2B Síť a publikovat plochy →
+          </Link>
+          <Link
+            href="/join-network"
+            className="rounded-xl border border-indigo-200 bg-white px-3.5 py-2.5 text-xs font-bold text-indigo-800 hover:bg-indigo-50 transition"
+          >
+            Pozvat partnera přes IČO
+          </Link>
+        </div>
+      </div>
     </section>
   );
 }

@@ -306,7 +306,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
 
-    // Optional ARES lookup helper for self-service checkout
+    // Optional ARES lookup helper for self-service checkout and organization onboarding
     const aresIco = searchParams.get('aresIco')?.replace(/\s+/g, '').trim();
     if (aresIco && /^\d{8}$/.test(aresIco)) {
       try {
@@ -327,8 +327,26 @@ export async function GET(request: Request) {
               nazevObce?: string;
               nazevUlice?: string;
               cisloDomovni?: number;
+              cisloOrientacni?: number;
+              cisloOrientacniPismeno?: string;
+              psc?: number | string;
             };
           };
+          const houseNumber = [
+            data.sidlo?.cisloDomovni,
+            data.sidlo?.cisloOrientacni
+              ? `${data.sidlo.cisloOrientacni}${data.sidlo.cisloOrientacniPismeno || ''}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join('/');
+          const streetLine = data.sidlo?.nazevUlice
+            ? [data.sidlo.nazevUlice, houseNumber].filter(Boolean).join(' ')
+            : houseNumber && data.sidlo?.nazevObce
+              ? `${data.sidlo.nazevObce} ${houseNumber}`
+              : data.sidlo?.textovaAdresa || '';
+          const postalCode = data.sidlo?.psc ? String(data.sidlo.psc).replace(/\s+/g, '') : '';
+
           return NextResponse.json({
             ok: true,
             company: {
@@ -336,6 +354,8 @@ export async function GET(request: Request) {
               dic: data.dic || '',
               companyName: data.obchodniJmeno || '',
               city: data.sidlo?.nazevObce || '',
+              street: streetLine,
+              postalCode,
               address: data.sidlo?.textovaAdresa || '',
             },
           });

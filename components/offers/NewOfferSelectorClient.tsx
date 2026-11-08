@@ -8,14 +8,49 @@ import { AiOfferGeneratorModal } from '@/components/offers/AiOfferGeneratorModal
 export function NewOfferSelectorClient({
   clientId,
   clientOptions = [],
+  surfaceIds,
 }: {
   clientId?: string;
   clientOptions?: Array<{ id: string; name: string }>;
+  surfaceIds?: string;
 }) {
   const [aiModalOpen, setAiModalOpen] = useState(false);
+  const selectedIdsList = surfaceIds
+    ? surfaceIds.split(',').map((s) => s.trim()).filter(Boolean)
+    : [];
+
+  const standardHrefParams = new URLSearchParams();
+  if (clientId) standardHrefParams.set('clientId', clientId);
+  if (selectedIdsList.length > 0) standardHrefParams.set('surfaceIds', selectedIdsList.join(','));
+  const standardHref = standardHrefParams.toString()
+    ? `/offers/new/standard?${standardHrefParams.toString()}`
+    : '/offers/new/standard';
 
   return (
     <div className="space-y-6">
+      {selectedIdsList.length > 0 && (
+        <div className="rounded-3xl border-2 border-emerald-500 bg-emerald-950 p-6 text-white shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-0.5 text-[11px] font-black uppercase tracking-wider text-emerald-300 border border-emerald-500/40">
+              B2B Katalog ploch
+            </span>
+            <h2 className="text-xl font-black text-white">
+              Máte vybráno {selectedIdsList.length} ploch z B2B sítě k sestavení nabídky
+            </h2>
+            <p className="text-xs text-slate-300">
+              Pokračujte do průvodce standardní nabídkou, kde budou vybrané reklamní plochy automaticky předvyplněné.
+            </p>
+          </div>
+          <Link
+            href={standardHref}
+            className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 hover:bg-emerald-400 px-5 py-3 text-xs font-black text-slate-950 shadow-md transition shrink-0"
+          >
+            <span>Pokračovat s vybranými plochami ({selectedIdsList.length})</span>
+            <ArrowRight size={15} />
+          </Link>
+        </div>
+      )}
+
       {/* Featured AI Banner */}
       <div className="relative overflow-hidden rounded-3xl border border-purple-800/80 bg-gradient-to-r from-slate-950 via-purple-950 to-slate-950 p-6 sm:p-8 shadow-xl">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -103,7 +138,7 @@ export function NewOfferSelectorClient({
         {/* Standard Media */}
         <Link
           className="group flex min-h-64 flex-col rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg"
-          href={clientId ? `/offers/new/standard?clientId=${encodeURIComponent(clientId)}` : '/offers/new/standard'}
+          href={standardHref}
         >
           <span className="grid size-14 place-items-center rounded-2xl bg-sky-50 text-sky-700 ring-1 ring-sky-200">
             <PanelsTopLeft size={27} />

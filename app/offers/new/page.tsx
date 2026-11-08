@@ -4,9 +4,13 @@ import { PageHeader } from '@/components/ui';
 import { prisma } from '@/lib/db';
 import { requirePageAccess } from '@/lib/page-auth';
 
-export default async function NewOfferTypePage({ searchParams }: { searchParams: Promise<{ clientId?: string }> }) {
+export default async function NewOfferTypePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ clientId?: string; surfaceIds?: string }>;
+}) {
   await requirePageAccess('offers');
-  const { clientId } = await searchParams;
+  const { clientId, surfaceIds } = await searchParams;
 
   const clients = await prisma.client.findMany({
     select: { id: true, name: true },
@@ -20,7 +24,7 @@ export default async function NewOfferTypePage({ searchParams }: { searchParams:
         description="Vyberte způsob sestavení nabídky. Použijte AI Copilota pro rychlý automatický návrh nebo pokračujte manuálně."
         title="Jaký typ nabídky vytváříte?"
       />
-      <NewOfferSelectorClient clientId={clientId} clientOptions={clients} />
+      <NewOfferSelectorClient clientId={clientId} clientOptions={clients} surfaceIds={surfaceIds} />
     </AppShell>
   );
 }

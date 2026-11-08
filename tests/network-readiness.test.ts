@@ -54,3 +54,28 @@ test('B2B directory does not disclose tenant contact details before persistent p
   assert.doesNotMatch(partners, /email: true|phone: true/);
   assert.doesNotMatch(partners, /email: org\.email|phone: org\.phone/);
 });
+
+test('B2B 1-click visibility management and ARES self-service onboarding enforce tenant isolation', () => {
+  const visibility = read('app/api/network/visibility/route.ts');
+  const joinNetwork = read('app/join-network/page.tsx');
+  assert.match(visibility, /requireApiAccess\('offers', 'network'\)/);
+  assert.match(visibility, /auth\.organizationId/);
+  assert.doesNotMatch(visibility, /platformPrisma/);
+  assert.match(visibility, /SET_SURFACE_VISIBILITY/);
+  assert.match(visibility, /BULK_SET_VISIBILITY/);
+  assert.match(joinNetwork, /aresIco=/);
+  assert.match(joinNetwork, /B2B_PARTNER_NETWORK/);
+});
+
+test('B2B White-label agency mode and 1-click CSV/Excel media-plan export are wired in catalog and network hub', () => {
+  const catalogView = read('components/client-catalog/PublicInventoryCatalogView.tsx');
+  const networkView = read('components/network/NetworkHubView.tsx');
+  assert.match(catalogView, /whitelabel/);
+  assert.match(catalogView, /!isWhiteLabel && organization && \(organization\.phone \|\| organization\.email\)/);
+  assert.match(catalogView, /handleExportCatalogCsv/);
+  assert.match(networkView, /handleCopyWhiteLabelLink/);
+  assert.match(networkView, /handleExportB2bCsv/);
+});
+
+
+

@@ -135,6 +135,10 @@ export function PublicInventoryCatalogView() {
   const [copiedShare, setCopiedShare] = useState(false);
   // Share catalog link state
   const [copiedCatalogUrl, setCopiedCatalogUrl] = useState(false);
+  // White-label B2B agency mode (?whitelabel=1&agency=...)
+  const [isWhiteLabel, setIsWhiteLabel] = useState(false);
+  const [agencyTitle, setAgencyTitle] = useState<string>('');
+  const [onlySelectedMode, setOnlySelectedMode] = useState(false);
   // Impressions methodology tooltip
   const [showImpressionsInfo, setShowImpressionsInfo] = useState(false);
 
@@ -167,7 +171,7 @@ export function PublicInventoryCatalogView() {
     dateTo: string;
   } | null>(null);
 
-  // Initialize filters & selection from URL params (?city=...&mediaType=...&vyber=...&view=...)
+  // Initialize filters & selection from URL params (?city=...&mediaType=...&vyber=...&view=...&whitelabel=1)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
@@ -175,18 +179,28 @@ export function PublicInventoryCatalogView() {
     const mediaParam = params.get('mediaType');
     const orgQ = params.get('org');
     const viewParam = params.get('view');
-    const vyberParam = params.get('vyber') || params.get('ids');
+    const vyberParam = params.get('vyber') || params.get('ids') || params.get('surfaceIds');
+    const whitelabelParam = params.get('whitelabel');
+    const agencyParam = params.get('agency');
+    const onlySelectedParam = params.get('onlySelected');
 
     if (cityParam) setSelectedCity(cityParam);
     if (mediaParam) setSelectedMediaType(mediaParam);
     if (orgQ) setOrgParam(orgQ);
     if (viewParam === 'map') setViewMode('map');
+    if (whitelabelParam === '1' || whitelabelParam === 'true') setIsWhiteLabel(true);
+    if (agencyParam) setAgencyTitle(agencyParam.trim());
     if (vyberParam) {
       const ids = vyberParam
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
-      if (ids.length > 0) setSelectedIds(ids);
+      if (ids.length > 0) {
+        setSelectedIds(ids);
+        if (onlySelectedParam === '1' || onlySelectedParam === 'true') {
+          setOnlySelectedMode(true);
+        }
+      }
     }
   }, []);
 
@@ -212,13 +226,20 @@ export function PublicInventoryCatalogView() {
     }
   };
 
-  const handleCopyCatalogUrl = async () => {
+  const handleCopyCatalogUrl = async (whiteLabel = isWhiteLabel) => {
     if (typeof window === 'undefined') return;
     try {
       const url = new URL(window.location.origin + window.location.pathname);
       if (orgParam) url.searchParams.set('org', orgParam);
       if (selectedCity) url.searchParams.set('city', selectedCity);
       if (selectedMediaType) url.searchParams.set('mediaType', selectedMediaType);
+      if (selectedIds.length > 0) {
+        url.searchParams.set('vyber', selectedIds.join(','));
+      }
+      if (whiteLabel) {
+        url.searchParams.set('whitelabel', '1');
+        if (selectedIds.length > 0) url.searchParams.set('onlySelected', '1');
+      }
       await navigator.clipboard.writeText(url.toString());
       setCopiedCatalogUrl(true);
       setTimeout(() => setCopiedCatalogUrl(false), 2500);
@@ -265,7 +286,9 @@ export function PublicInventoryCatalogView() {
   }, [dateFrom, dateTo]);
 
   const filteredItems = useMemo(() => {
+    const selectedSet = new Set(selectedIds);
     return items.filter((item) => {
+      if (onlySelectedMode && selectedSet.size > 0 && !selectedSet.has(item.surfaceId)) return false;
       if (onlyAvailable && !item.isAvailable) return false;
       if (
         selectedCity &&
@@ -302,12 +325,71 @@ export function PublicInventoryCatalogView() {
 
       return true;
     });
-  }, [items, onlyAvailable, selectedCity, selectedMediaType, searchQuery, activePreset]);
+  }, [items, onlySelectedMode, selectedIds, onlyAvailable, selectedCity, selectedMediaType, searchQuery, activePreset]);
 
   const selectedSurfaces = useMemo(() => {
     const set = new Set(selectedIds);
     return items.filter((i) => set.has(i.surfaceId));
   }, [items, selectedIds]);
+
+  const handleExportCatalogCsv = () => {
+    const sourceRows = selectedSurfaces.length > 0 ? selectedSurfaces : filteredItems;
+    if (sourceRows.length === 0) return;
+
+    const escapeCsvCell = (val: string | number | null | undefined) => {
+      const str = String(val ?? '').replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const headers = [
+      'Kód nosiče',
+      'Název plochy',
+      'Město',
+      'Ulice / Lokalita',
+      'Typ média',
+      'Rozměr',
+      'Orientace',
+      'GPS Šířka',
+      'GPS Délka',
+      'Dostupnost',
+      'Měsíční nájem (Kč bez DPH)',
+      'Tisk a instalace (Kč bez DPH)',
+    ];
+
+    const lines = [
+      headers.map(escapeCsvCell).join(';'),
+      ...sourceRows.map((row) =>
+        [
+          row.carrierCode,
+          row.surfaceName,
+          row.city,
+          row.street || row.directionDescription || '',
+          MEDIA_TYPE_LABELS[row.mediaType]?.label || row.mediaType,
+          row.size,
+          row.orientation,
+          row.latitude ?? '',
+          row.longitude ?? '',
+          row.isAvailable ? 'Volná' : `Obsazeno do ${row.occupiedUntil || ''}`,
+          row.monthlyPrice,
+          row.printInstallPrice,
+        ]
+          .map(escapeCsvCell)
+          .join(';')
+      ),
+    ];
+
+    const csvContent = '\uFEFF' + lines.join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const prefix = isWhiteLabel ? 'prezentace-ploch' : (organization?.slug || 'katalog-ploch');
+    link.download = `${prefix}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const pricingSummary = useMemo(() => {
     const baseMonthlyRentSum = selectedSurfaces.reduce((acc, s) => acc + s.monthlyPrice, 0);
@@ -445,8 +527,7 @@ export function PublicInventoryCatalogView() {
               {new Date(createdOffer.dateFrom).toLocaleDateString('cs-CZ')} –{' '}
               {new Date(createdOffer.dateTo).toLocaleDateString('cs-CZ')}
             </strong>{' '}
-            byl automaticky zapsán do systému <strong>{organization?.name || 'SeePOINT'}</strong>. Náš
-            obchodní tým nyní zkontroluje harmonogram výlepů a pošle Vám finální potvrzení rezervace.
+            byl automaticky zapsán do systému{isWhiteLabel ? '' : <> <strong>{organization?.name || 'SeePOINT'}</strong></>}. Obchodní tým nyní zkontroluje harmonogram výlepů a pošle Vám finální potvrzení rezervace.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-2xl border border-slate-800 bg-slate-950/80 p-4 text-xs">
@@ -512,37 +593,78 @@ export function PublicInventoryCatalogView() {
             <div className="space-y-1">
               <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-1 text-xs font-bold text-emerald-300">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Online Katalog & Samoobslužný konfigurátor kampaně</span>
+                <span>
+                  {isWhiteLabel
+                    ? 'Klientská prezentace reklamních ploch & Konfigurátor kampaně'
+                    : 'Online Katalog & Samoobslužný konfigurátor kampaně'}
+                </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-                {organization?.name || 'SeePOINT'} — Katalog reklamních ploch
+                {isWhiteLabel
+                  ? agencyTitle
+                    ? `${agencyTitle} — Nabídka reklamních ploch`
+                    : 'Prezentace vybraných reklamních ploch'
+                  : `${organization?.name || 'SeePOINT'} — Katalog reklamních ploch`}
               </h1>
               <p className="text-xs sm:text-sm text-slate-400 max-w-2xl">
                 Vyberte si volné reklamní nosiče na mapě či v přehledu, zvolte termín kampaně a sestavte si okamžitou kalkulaci s nezávaznou rezervací.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2.5">
+              {selectedIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setOnlySelectedMode((prev) => !prev)}
+                  className={`inline-flex items-center gap-1.5 rounded-2xl px-3.5 py-3 text-xs font-extrabold transition cursor-pointer border ${
+                    onlySelectedMode
+                      ? 'bg-emerald-500 text-slate-950 border-emerald-400'
+                      : 'bg-slate-900 text-emerald-300 border-emerald-500/40 hover:bg-slate-800'
+                  }`}
+                >
+                  <Eye className="w-4 h-4" />
+                  <span>
+                    {onlySelectedMode
+                      ? `Zobrazen jen výběr (${selectedIds.length})`
+                      : `Zobrazit jen vybrané (${selectedIds.length})`}
+                  </span>
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={handleCopyCatalogUrl}
+                onClick={handleExportCatalogCsv}
+                className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-200 font-extrabold px-4 py-3 text-xs transition cursor-pointer shrink-0"
+                title="Stáhnout přehled ploch do Excelu (CSV s českou diakritikou)"
+              >
+                <Printer className="w-4 h-4 text-emerald-400" />
+                <span>
+                  {selectedSurfaces.length > 0
+                    ? `Export CSV / Excel (${selectedSurfaces.length})`
+                    : `Export CSV / Excel (${filteredItems.length})`}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void handleCopyCatalogUrl(isWhiteLabel)}
                 className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-extrabold px-4 py-3 text-xs shadow-md transition cursor-pointer shrink-0 border border-sky-400/30"
                 title="Zkopírovat přímý odkaz na tento katalog pro odeslání klientovi"
               >
                 {copiedCatalogUrl ? (
                   <>
                     <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                    <span>Odkaz na katalog zkopírován!</span>
+                    <span>Odkaz zkopírován!</span>
                   </>
                 ) : (
                   <>
                     <Share2 className="w-4 h-4 text-sky-200" />
-                    <span>Kopírovat odkaz na katalog</span>
+                    <span>{isWhiteLabel ? 'Kopírovat White-label odkaz' : 'Kopírovat odkaz na katalog'}</span>
                   </>
                 )}
               </button>
 
-              {organization && (organization.phone || organization.email) && (
+              {!isWhiteLabel && organization && (organization.phone || organization.email) && (
                 <div className="flex flex-wrap items-center gap-3 text-xs bg-slate-900/90 border border-slate-800 rounded-2xl px-4 py-3">
                   <div className="space-y-0.5">
                     <span className="text-[11px] font-bold text-slate-400 block">

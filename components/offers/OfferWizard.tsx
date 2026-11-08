@@ -63,7 +63,7 @@ function StepTitle({ title, subtitle }: { title: string; subtitle: string }) { r
 function Field({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) { return <label className={className}><span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>{children}</label>; }
 function SummaryRow({ label, value }: { label: string; value: string }) { return <div className="flex items-start justify-between gap-3"><dt className="text-slate-500">{label}</dt><dd className="text-right font-medium text-slate-900">{value}</dd></div>; }
 
-export function OfferWizard({ clients: initialClients, surfaces, priceRules, mediaPackages, priceListItems = [], initialOffer, initialClientId }: { clients: OfferClientOption[]; surfaces: OfferSurfaceOption[]; priceRules: OfferPriceRuleOption[]; mediaPackages: MediaPackageOption[]; priceListItems?: Array<{ id: string; name: string; mediaType: string | null; carrierType: string | null; rentalPrice: string }>; initialOffer?: OfferView; initialClientId?: string }) {
+export function OfferWizard({ clients: initialClients, surfaces, priceRules, mediaPackages, priceListItems = [], initialOffer, initialClientId, initialSurfaceIds }: { clients: OfferClientOption[]; surfaces: OfferSurfaceOption[]; priceRules: OfferPriceRuleOption[]; mediaPackages: MediaPackageOption[]; priceListItems?: Array<{ id: string; name: string; mediaType: string | null; carrierType: string | null; rentalPrice: string }>; initialOffer?: OfferView; initialClientId?: string; initialSurfaceIds?: string[] }) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients);
   const [step, setStep] = useState(0);
@@ -88,13 +88,31 @@ export function OfferWizard({ clients: initialClients, surfaces, priceRules, med
   const [pricingTier, setPricingTier] = useState<'komerce' | 'kultura'>(() => (initialOffer?.pricingTier === 'kultura' ? 'kultura' : 'komerce'));
   const [dateFrom, setDateFrom] = useState(initialOffer?.items[0]?.dateFrom ?? '');
   const [dateTo, setDateTo] = useState(initialOffer?.items[0]?.dateTo ?? '');
-  const [items, setItems] = useState<DraftItem[]>(() => initialOffer?.items.map((item) => ({ surfaceId: item.surfaceId!, dateFrom: item.dateFrom ?? '', dateTo: item.dateTo ?? '', quantity: item.quantity, unit: item.unit, unitPrice: item.unitPrice ?? '0', discountPercent: item.discountPercent ?? '0', discountAmount: item.fixedDiscountAmount ?? '0', note: item.note ?? '', groupLabel: item.groupLabel, customTitle: item.customTitle ?? '', clientDescription: item.clientDescription ?? '' })) ?? []);
+  const [items, setItems] = useState<DraftItem[]>(() => {
+    if (initialOffer?.items.length) {
+      return initialOffer.items.map((item) => ({ surfaceId: item.surfaceId!, dateFrom: item.dateFrom ?? '', dateTo: item.dateTo ?? '', quantity: item.quantity, unit: item.unit, unitPrice: item.unitPrice ?? '0', discountPercent: item.discountPercent ?? '0', discountAmount: item.fixedDiscountAmount ?? '0', note: item.note ?? '', groupLabel: item.groupLabel, customTitle: item.customTitle ?? '', clientDescription: item.clientDescription ?? '' }));
+    }
+    if (initialSurfaceIds?.length) {
+      const idSet = new Set(initialSurfaceIds);
+      return surfaces.filter((s) => idSet.has(s.id)).map((surface) => ({ surfaceId: surface.id, dateFrom: '', dateTo: '', quantity: '1', unit: 'plocha', unitPrice: surface.price || '0', discountPercent: '0', discountAmount: '0', note: '', groupLabel: surface.mediaType, customTitle: '', clientDescription: surface.carrier.description ?? '' }));
+    }
+    return [];
+  });
   const [query, setQuery] = useState('');
   const [bulkPrice, setBulkPrice] = useState('');
   const [bulkDiscount, setBulkDiscount] = useState('');
-  const [selectedCities, setSelectedCities] = useState<Set<string>>(() => new Set(initialOffer?.items.map((item) => item.surface.carrier.city) ?? []));
+  const [selectedCities, setSelectedCities] = useState<Set<string>>(() => {
+    if (initialOffer?.items.length) {
+      return new Set(initialOffer.items.map((item) => item.surface.carrier.city));
+    }
+    if (initialSurfaceIds?.length) {
+      const idSet = new Set(initialSurfaceIds);
+      return new Set(surfaces.filter((s) => idSet.has(s.id)).map((s) => s.carrier.city));
+    }
+    return new Set();
+  });
   const [selectedAudiences, setSelectedAudiences] = useState<Set<string>>(new Set());
-  const [mediaMode, setMediaMode] = useState<MediaMode>('package');
+  const [mediaMode, setMediaMode] = useState<MediaMode>(() => (initialSurfaceIds?.length ? 'list' : 'package'));
   const [selectedPackageId, setSelectedPackageId] = useState(initialOffer?.packageSelections?.[0]?.packageId ?? '');
   const setSelectedPackageLimit = (...args: [number | null]) => { void args; setSelectedPackageId(''); };
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
@@ -105,6 +123,7 @@ export function OfferWizard({ clients: initialClients, surfaces, priceRules, med
   const [message, setMessage] = useState('');
   const [showClientForm, setShowClientForm] = useState(false);
   const [newClient, setNewClient] = useState({ name: '', contactPerson: '', email: '', phone: '', companyId: '', note: '' });
+  const [newClientAresLoading, setNewClientAresLoading] = useState(false);
 
   const getCatalogPrice = useCallback((surface: OfferSurfaceOption, tier: 'komerce' | 'kultura') => {
     const candidates = priceListItems.filter(
@@ -281,6 +300,29 @@ export function OfferWizard({ clients: initialClients, surfaces, priceRules, med
     return () => { window.clearTimeout(timeout); controller.abort(); };
   }, [availabilityKey, draftPayload, items, step]);
 
+  async function lookupNewClientAres(rawIco: string) {
+    const clean = rawIco.replace(/\D/g, '').slice(0, 8);
+    if (clean.length !== 8) return;
+    setNewClientAresLoading(true);
+    try {
+      const res = await fetch(`/api/client/catalog?aresIco=${encodeURIComponent(clean)}`);
+      const data = await res.json();
+      if (res.ok && data.success && data.company) {
+        const c = data.company;
+        const noteParts = [c.dic ? `DIČ: ${c.dic}` : null, c.address || c.city || null].filter(Boolean);
+        setNewClient((prev) => ({
+          ...prev,
+          companyId: c.companyId || clean,
+          name: c.companyName || prev.name,
+          note: prev.note || noteParts.join(' · '),
+        }));
+      }
+    } catch {
+      // Ignore ARES network errors during inline client creation
+    } finally {
+      setNewClientAresLoading(false);
+    }
+  }
   async function createClient() { setMessage(''); const response = await fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newClient) }); const data = await response.json() as OfferClientOption & { error?: string }; if (!response.ok) return setMessage(data.error || 'Klienta se nepodařilo vytvořit.'); setClients((current) => [...current, data].sort((a, b) => a.name.localeCompare(b.name, 'cs'))); selectClient(data.id); setShowClientForm(false); setNewClient({ name: '', contactPerson: '', email: '', phone: '', companyId: '', note: '' }); }
   async function checkAvailability() { setMessage('Kontroluji dostupnost…'); setChecked(false); const response = await fetch('/api/offers/availability', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload()) }); const data = await response.json() as { conflicts?: Conflict[]; error?: string }; setConflicts(data.conflicts ?? []); if (!response.ok) return setMessage(data.error || 'Kontrolu se nepodařilo provést.'); setChecked(true); setMessage(data.conflicts?.length ? 'Kontrola našla kolize nebo varování.' : 'Všechny plochy jsou v termínu dostupné.'); }
   async function save(intent: 'draft' | 'send') { setSaving(true); setMessage(''); try { const response = await fetch(initialOffer?.id ? `/api/offers/${initialOffer.id}` : '/api/offers', { method: initialOffer?.id ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload(), intent }) }); const data = await response.json() as { offer?: OfferView; conflicts?: Conflict[]; error?: string }; setConflicts(data.conflicts ?? []); if (!response.ok) throw new Error(data.error || 'Nabídku se nepodařilo uložit.'); let offer = data.offer; if (initialOffer?.id && intent === 'send') { const sent = await fetch(`/api/offers/${initialOffer.id}/send`, { method: 'POST' }); const sentData = await sent.json() as OfferView & { error?: string }; if (!sent.ok) throw new Error(sentData.error || 'Nabídka je uložená, ale nepodařilo se ji odeslat.'); offer = sentData; } const offerId = offer?.id ?? initialOffer?.id; setDirty(false); router.push(intent === 'draft' ? `/offers/${offerId}/planner` : `/offers/${offerId}/preview`); router.refresh(); } catch (error) { setMessage(error instanceof Error ? error.message : 'Nabídku se nepodařilo uložit.'); } finally { setSaving(false); } }
@@ -331,10 +373,10 @@ export function OfferWizard({ clients: initialClients, surfaces, priceRules, med
             </div>
           </div>
           <button className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-700 hover:text-sky-900" onClick={() => setShowClientForm((open) => !open)} type="button">
-            <Plus size={15} /> Založit nového klienta
+            <Plus size={15} /> Založit nového klienta (vč. ARES podle IČO)
           </button>
         </div>
-        {showClientForm && <div className="mt-4 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">{Object.entries(newClient).map(([key, current]) => <Field key={key} label={{ name: 'Název', contactPerson: 'Kontaktní osoba', email: 'E-mail', phone: 'Telefon', companyId: 'IČO', note: 'Poznámka' }[key] ?? key}><input className="input" onChange={(event) => setNewClient((value) => ({ ...value, [key]: event.target.value }))} value={current} /></Field>)}<button className="btn-primary sm:col-span-2" onClick={() => void createClient()} type="button">Vytvořit klienta</button></div>}
+        {showClientForm && <div className="mt-4 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">{Object.entries(newClient).map(([key, current]) => <Field key={key} label={{ name: newClientAresLoading ? 'Název (načítám ARES…)' : 'Název', contactPerson: 'Kontaktní osoba', email: 'E-mail', phone: 'Telefon', companyId: 'IČO (8 číslic = auto ARES)', note: 'Poznámka / Sídlo' }[key] ?? key}><input className="input" onChange={(event) => { const nextVal = event.target.value; setNewClient((value) => ({ ...value, [key]: nextVal })); if (key === 'companyId') { const digits = nextVal.replace(/\D/g, ''); if (digits.length === 8) void lookupNewClientAres(digits); } }} value={current} /></Field>)}<button className="btn-primary sm:col-span-2" onClick={() => void createClient()} type="button">Vytvořit klienta</button></div>}
         <div className="mt-5 grid gap-3 sm:grid-cols-2"><Field label="Interní název nabídky"><input className="input" onChange={(event) => { setTitle(event.target.value); touch(); }} value={title} /></Field><Field label="Typ ceníku / kampaně"><select className="input" onChange={(event) => { setPricingTier(event.target.value as 'komerce' | 'kultura'); touch(); }} value={pricingTier}><option value="komerce">Komerční ceník (standardní ceny)</option><option value="kultura">Kulturní / sportovní ceník (zvýhodněné ceny)</option></select></Field><Field label="Kontaktní osoba"><input className="input" onChange={(event) => { setContactPerson(event.target.value); touch(); }} value={contactPerson} /></Field><Field label="E-mail"><input className="input" onChange={(event) => { setContactEmail(event.target.value); touch(); }} type="email" value={contactEmail} /></Field><Field label="Telefon"><input className="input" onChange={(event) => { setContactPhone(event.target.value); touch(); }} value={contactPhone} /></Field></div>
       </div>}
 
