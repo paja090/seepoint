@@ -65,7 +65,7 @@ test('detail navigační objednávky hydratuje se serverovým datem a pevnými �
 test('standardní nabídka zachová klienta předaného z CRM', () => {
   const page = source('app/offers/new/standard/page.tsx');
   const wizard = source('components/offers/OfferWizard.tsx');
-  assert.match(page, /searchParams: Promise<\{ clientId\?: string \}>/);
+  assert.match(page, /searchParams: Promise<\{ clientId\?: string(?:; surfaceIds\?: string)? \}>/);
   assert.match(page, /initialClientId=\{clientId\}/);
   assert.match(wizard, /initialClientId\?: string/);
   assert.match(wizard, /initialClients\.some\(\(client\) => client\.id === requestedClientId\)/);
