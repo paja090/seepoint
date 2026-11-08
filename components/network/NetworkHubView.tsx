@@ -23,8 +23,12 @@ import {
   Receipt,
   Megaphone,
   Send,
+  Map as MapIcon,
+  LayoutGrid,
+  Columns,
 } from 'lucide-react';
 import { NETWORK_BETA_MESSAGE, NETWORK_TRANSACTIONS_ENABLED } from '@/lib/network-capabilities';
+import { NetworkInteractiveMap, type NetworkMapSurfaceItem } from './NetworkInteractiveMap';
 
 type Partner = {
   id: string;
@@ -149,6 +153,8 @@ type OwnSurfaceVisibilityItem = {
   carrierName: string;
   city: string;
   street?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   surfaceName: string;
   mediaType: string;
   size: string;
@@ -177,6 +183,8 @@ export function NetworkHubView() {
   });
   const [searchCity, setSearchCity] = useState('ALL');
   const [searchMediaType, setSearchMediaType] = useState('ALL');
+  const [inventoryViewMode, setInventoryViewMode] = useState<'split' | 'map' | 'cards'>('split');
+  const [showPrivateOwnOnMap, setShowPrivateOwnOnMap] = useState(true);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -698,6 +706,39 @@ export function NetworkHubView() {
     return true;
   });
 
+  const existingInventoryIds = new Set(filteredInventory.map((i) => i.id));
+  const privateOwnMapItems: NetworkMapSurfaceItem[] = showPrivateOwnOnMap
+    ? ownSurfaces
+        .filter((s) => {
+          if (existingInventoryIds.has(s.id)) return false;
+          if (searchCity !== 'ALL' && !s.city.toLowerCase().includes(searchCity.toLowerCase())) return false;
+          if (searchMediaType !== 'ALL' && s.mediaType !== searchMediaType) return false;
+          return true;
+        })
+        .map((s) => ({
+          id: s.id,
+          carrierId: s.carrierId,
+          carrierCode: s.carrierCode,
+          carrierName: s.carrierName,
+          city: s.city,
+          street: s.street,
+          latitude: s.latitude ?? null,
+          longitude: s.longitude ?? null,
+          surfaceName: s.surfaceName,
+          mediaType: s.mediaType,
+          size: s.size,
+          orientation: s.orientation,
+          listPrice: s.listPrice,
+          b2bWholesalePrice: Math.round(s.listPrice * 0.8),
+          b2bDiscountPercent: 20,
+          visibility: s.visibility,
+          isOwn: true,
+          ownerLabel: `Moje plocha (${s.visibility})`,
+        }))
+    : [];
+
+  const mapItems: NetworkMapSurfaceItem[] = [...filteredInventory, ...privateOwnMapItems];
+
   const connectedPartnersCount = partners.filter((p) => p.status === 'CONNECTED').length;
   const partnerSurfacesCount = inventory.filter((i) => !i.isOwn).length;
   const activeHoldsCount = holds.length;
@@ -1119,6 +1160,58 @@ export function NetworkHubView() {
                 <option value="PROMO_TOWER">Promo věže</option>
               </select>
 
+              {/* View Mode Switcher: Split (Map + Cards) / Map / Cards */}
+              <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
+                <button
+                  type="button"
+                  onClick={() => setInventoryViewMode('split')}
+                  className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black transition cursor-pointer ${
+                    inventoryViewMode === 'split'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Columns size={13} />
+                  <span>Mapa + Karty</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInventoryViewMode('map')}
+                  className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black transition cursor-pointer ${
+                    inventoryViewMode === 'map'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <MapIcon size={13} />
+                  <span>Interaktivní mapa ({mapItems.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInventoryViewMode('cards')}
+                  className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black transition cursor-pointer ${
+                    inventoryViewMode === 'cards'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <LayoutGrid size={13} />
+                  <span>Karty ({filteredInventory.length})</span>
+                </button>
+              </div>
+
+              {ownSurfaces.some((s) => s.visibility === 'PRIVATE') && inventoryViewMode !== 'cards' && (
+                <label className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={showPrivateOwnOnMap}
+                    onChange={(e) => setShowPrivateOwnOnMap(e.target.checked)}
+                    className="rounded border-slate-300 text-indigo-600"
+                  />
+                  <span>Zobrazit na mapě i moje soukromé plochy</span>
+                </label>
+              )}
+
               {selectedSurfaceIds.length > 0 && (
                 <button
                   type="button"
@@ -1164,7 +1257,19 @@ export function NetworkHubView() {
             </div>
           </div>
 
+          {/* Interactive B2B Map */}
+          {inventoryViewMode !== 'cards' && (
+            <NetworkInteractiveMap
+              items={mapItems}
+              selectedIds={selectedSurfaceIds}
+              canManageVisibility={canManageVisibility}
+              onToggleSelect={toggleSelectSurface}
+              onChangeVisibility={handleSingleSurfaceVisibility}
+            />
+          )}
+
           {/* Cards Grid */}
+          {inventoryViewMode !== 'map' && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredInventory.map((item) => {
               const isSelected = selectedSurfaceIds.includes(item.id);
@@ -1294,6 +1399,7 @@ export function NetworkHubView() {
               </p>
             )}
           </div>
+          )}
         </div>
       )}
 

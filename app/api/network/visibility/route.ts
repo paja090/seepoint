@@ -113,6 +113,8 @@ export async function GET() {
         carrierName: carrier.name,
         city: carrier.city,
         street: carrier.street,
+        latitude: carrier.latitude !== null ? Number(carrier.latitude) : null,
+        longitude: carrier.longitude !== null ? Number(carrier.longitude) : null,
         surfaceName: surface.name,
         mediaType: surface.mediaType,
         size: surface.size || '5,1 × 2,4 m',

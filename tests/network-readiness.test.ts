@@ -67,15 +67,19 @@ test('B2B 1-click visibility management and ARES self-service onboarding enforce
   assert.match(joinNetwork, /B2B_PARTNER_NETWORK/);
 });
 
-test('B2B White-label agency mode and 1-click CSV/Excel media-plan export are wired in catalog and network hub', () => {
+test('B2B White-label agency mode, interactive map, and 1-click CSV/Excel media-plan export are wired in catalog and network hub', () => {
   const catalogView = read('components/client-catalog/PublicInventoryCatalogView.tsx');
   const networkView = read('components/network/NetworkHubView.tsx');
+  const networkMap = read('components/network/NetworkInteractiveMap.tsx');
   assert.match(catalogView, /whitelabel/);
   assert.match(catalogView, /!isWhiteLabel && organization && \(organization\.phone \|\| organization\.email\)/);
   assert.match(catalogView, /handleExportCatalogCsv/);
   assert.match(networkView, /handleCopyWhiteLabelLink/);
   assert.match(networkView, /handleExportB2bCsv/);
+  assert.match(networkView, /NetworkInteractiveMap/);
+  assert.match(networkMap, /__b2bToggleSurface/);
 });
+
 
 
 
