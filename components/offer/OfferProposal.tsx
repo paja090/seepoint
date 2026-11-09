@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useMemo } from 'react';
 import { Check, Copy, X } from 'lucide-react';
 import type { ProposalCarrier, ProposalOffer } from '@/lib/offers/presentation';
+import { formatCzk } from '@/lib/offers/presentation';
 import { BenefitsGrid } from './BenefitsGrid';
 import { CampaignStrategyPhases } from './CampaignStrategyPhases';
 import { CarrierShowcase } from './CarrierShowcase';
@@ -35,7 +36,41 @@ export function OfferProposal({
   const [copied, setCopied] = useState(false);
   const [selectedCarrierId, setSelectedCarrierId] = useState<string | null>(null);
   const [lightboxPhoto, setLightboxPhoto] = useState<{ url: string; title: string } | null>(null);
+  const [selectedCarrierIds, setSelectedCarrierIds] = useState<string[]>(() =>
+    offer.carriers.map((c) => c.id)
+  );
   const canRespond = true;
+
+  const handleToggleCarrier = useCallback((carrierId: string) => {
+    setSelectedCarrierIds((prev) =>
+      prev.includes(carrierId) ? prev.filter((id) => id !== carrierId) : [...prev, carrierId]
+    );
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    setSelectedCarrierIds(offer.carriers.map((c) => c.id));
+  }, [offer.carriers]);
+
+  const handleSelectNone = useCallback(() => {
+    setSelectedCarrierIds([]);
+  }, []);
+
+  const handleSelectRecommended = useCallback(() => {
+    const recCount = Math.min(3, offer.carriers.length);
+    setSelectedCarrierIds(offer.carriers.slice(0, recCount).map((c) => c.id));
+  }, [offer.carriers]);
+
+  const activeCarriers = useMemo(
+    () => offer.carriers.filter((c) => selectedCarrierIds.includes(c.id)),
+    [offer.carriers, selectedCarrierIds]
+  );
+
+  const activeMonthlyRate = useMemo(
+    () => activeCarriers.reduce((sum, c) => sum + (Number(c.unitPrice) || 0), 0),
+    [activeCarriers]
+  );
+  const activeDailyRate = Math.round(activeMonthlyRate / 30);
+
 
   const handleSelectCarrierFromMap = useCallback((carrierId: string) => {
     setSelectedCarrierId(carrierId);
@@ -121,7 +156,12 @@ export function OfferProposal({
         </div>
 
         {/* 5. Pricing & Financial Breakdown */}
-        <PricingSummary offer={offer} onRequestPricing={() => setAction('approve')} />
+        <PricingSummary
+          offer={offer}
+          activeCarriers={activeCarriers}
+          onRequestPricing={() => setAction('approve')}
+          onSelectAll={handleSelectAll}
+        />
 
         {/* 6. Media Mix Overview */}
         <MediaMix offer={offer} />
@@ -130,8 +170,13 @@ export function OfferProposal({
         <CarrierShowcase
           offer={offer}
           selectedCarrierId={selectedCarrierId}
+          selectedCarrierIds={selectedCarrierIds}
           onOpenCarrier={handleSelectCarrierFromShowcase}
           onOpenPhoto={(url, title) => setLightboxPhoto({ url, title })}
+          onToggleCarrier={handleToggleCarrier}
+          onSelectAll={handleSelectAll}
+          onSelectNone={handleSelectNone}
+          onSelectRecommended={handleSelectRecommended}
         />
 
         {/* 8. Benefits */}
@@ -169,7 +214,66 @@ export function OfferProposal({
         onReject={() => setAction('reject')}
         token={token}
         isNoPriceConcept={offer.isNoPriceConcept}
+        defaultMessage={
+          activeCarriers.length < offer.carriers.length
+            ? `Vybírám tyto plochy z nabídky (${activeCarriers.length} ks): ${activeCarriers.map((c) => `#${c.orderIndex} (${c.code})`).join(', ')}`
+            : undefined
+        }
       />
+
+      {/* Sticky floating bottom bar for live selection & approval */}
+      <aside aria-label="Rychlý přehled výběru kampaně" className="fixed bottom-4 inset-x-4 max-w-4xl mx-auto z-40 print:hidden transition-transform duration-300">
+        <div className="rounded-2xl border border-slate-900 bg-slate-950/95 backdrop-blur-md p-3.5 sm:px-5 sm:py-3 text-white shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 ring-1 ring-white/10">
+          <div className="flex items-center gap-3">
+            <span className={`flex size-9 shrink-0 items-center justify-center rounded-xl font-black text-sm border ${
+              activeCarriers.length > 0
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                : 'bg-slate-800 text-slate-400 border-slate-700'
+            }`}>
+              {activeCarriers.length}
+            </span>
+            <div>
+              <div className="text-xs sm:text-sm font-extrabold text-white flex items-center gap-2 flex-wrap">
+                <span>Výběr ploch do kampaně: {activeCarriers.length} z {offer.carriers.length}</span>
+                {activeCarriers.length > 0 && activeDailyRate > 0 && (
+                  <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-950/90 px-2.5 py-0.5 rounded-full border border-emerald-800/80">
+                    cca {formatCzk(activeDailyRate)} / den
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] text-slate-400">
+                {activeCarriers.length === 0 ? (
+                  <span>Zatím nemáte vybránu žádnou plochu (0 Kč) – klikněte na „+ Přidat do kampaně“</span>
+                ) : (
+                  <span>Měsíční mediální investice: <strong className="text-white font-bold">{formatCzk(activeMonthlyRate)} / měs.</strong> bez DPH</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            {activeCarriers.length === 0 ? (
+              <button
+                type="button"
+                onClick={handleSelectRecommended}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-sky-500 transition cursor-pointer"
+              >
+                🎯 Doporučený výběr
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAction('approve')}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-4 py-2 text-xs font-black shadow-lg transition active:scale-95 cursor-pointer"
+              >
+                <Check size={15} />
+                Schválit výběr ({activeCarriers.length} {activeCarriers.length === 1 ? 'plocha' : activeCarriers.length < 5 ? 'plochy' : 'ploch'})
+              </button>
+            )}
+          </div>
+        </div>
+      </aside>
+
 
       {/* Lightbox Photo Preview Modal */}
       {lightboxPhoto && (

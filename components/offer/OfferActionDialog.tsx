@@ -12,21 +12,22 @@ const config = {
   question: { title: 'Mám dotaz', description: 'Napište svůj dotaz, obchodník se vám ozve co nejdříve.', submitLabel: 'Odeslat dotaz', Icon: HelpCircle, accent: 'bg-sky-600 hover:bg-sky-700', placeholder: 'Váš dotaz k nabídce…' },
 } as const;
 
-export function OfferActionDialog({ action, offerStatus, onClose, onReject, token, isLocationSelection, isNoPriceConcept }: { action: OfferActionType | null; offerStatus: string; onClose: () => void; onReject: () => void; token?: string; isLocationSelection?: boolean; isNoPriceConcept?: boolean }) {
+export function OfferActionDialog({ action, offerStatus, onClose, onReject, token, isLocationSelection, isNoPriceConcept, defaultMessage }: { action: OfferActionType | null; offerStatus: string; onClose: () => void; onReject: () => void; token?: string; isLocationSelection?: boolean; isNoPriceConcept?: boolean; defaultMessage?: string }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState(defaultMessage ?? '');
   const [consent, setConsent] = useState(false);
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   useEffect(() => {
     if (action) {
-      setMessage('');
+      setMessage(defaultMessage ?? '');
       setConsent(false);
       setResult(null);
     }
-  }, [action]);
+  }, [action, defaultMessage]);
+
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
