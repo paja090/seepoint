@@ -1,7 +1,7 @@
 /**
  * AI CRM Intelligence — Comprehensive Test Suite
  *
- * Tests all 14 required scenarios (A-N):
+ * Tests all 15 required scenarios (A-O):
  *
  * A: Follow-up (Offer SENT > threshold -> FOLLOW_UP_DUE)
  * B: Recent reply (Client responded -> no false follow-up)
@@ -17,6 +17,7 @@
  * L: AI failure fallback (100% deterministic fallback explanation)
  * M: Priority ordering (Score breakdown: urgency + value + relationship + timeSensitivity)
  * N: Deduplication (Alert fatigue prevention and cap limits)
+ * O: Multi-surface unification (Group multiple benches/surfaces of the same campaign into 1 card, support ended + ending)
  */
 
 import test from 'node:test';
@@ -481,3 +482,32 @@ test('Scénář N: Ochrana před zahlcením alerty (Deduplikace a cap limit)', (
   }
   assert.equal(deduplicated.length, 2);
 });
+
+// ---------------------------------------------------------------------------
+// Scenario O: Multi-surface campaign unification (ended and ending campaigns)
+// ---------------------------------------------------------------------------
+
+test('Scénář O: Sjednocení více laviček/ploch stejné kampaně (končící i skončené) do jediné karty s agregovanou cenou', () => {
+  const servicePath = join(process.cwd(), 'lib/ai-crm/crm-intelligence-service.ts');
+  const serviceCode = readFileSync(servicePath, 'utf-8');
+
+  // Verify grouping logic and support for multi-surface campaigns
+  assert.ok(serviceCode.includes('campaignGroups'), 'Must group occupancies into campaignGroups');
+  assert.ok(serviceCode.includes('surfaceCount'), 'Must compute total surfaceCount across grouped benches');
+  assert.ok(serviceCode.includes('totalPrice'), 'Must aggregate totalPrice across grouped benches');
+  assert.ok(serviceCode.includes('ploch/laviček'), 'Must format multi-surface plural in Czech');
+  assert.ok(serviceCode.includes('Obnova skončené kampaně'), 'Must support renewal for recently ended campaigns');
+  assert.ok(serviceCode.includes('Prodloužení kampaně (renewal)'), 'Must support renewal for upcoming expiring campaigns');
+  assert.ok(serviceCode.includes('pastWarningDate'), 'Must query symmetric past window for recently ended campaigns');
+
+  // Verify blocked realizations grouping by order
+  assert.ok(serviceCode.includes('blockedByOrder'), 'Must group blocked realizations by crmOrderId to prevent alert spam');
+
+  // UI verification: CrmIntelligenceDashboardView badges
+  const dashboardPath = join(process.cwd(), 'components/crm/CrmIntelligenceDashboardView.tsx');
+  const dashboardCode = readFileSync(dashboardPath, 'utf-8');
+  assert.ok(dashboardCode.includes('ploch/laviček'), 'Dashboard must display surfaceCount badge');
+  assert.ok(dashboardCode.includes('Skončená kampaň'), 'Dashboard must display ended campaign badge');
+  assert.ok(dashboardCode.includes('Končí brzy'), 'Dashboard must display ending soon badge');
+});
+

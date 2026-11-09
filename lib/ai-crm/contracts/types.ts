@@ -167,6 +167,7 @@ export interface Client360Data {
     }>;
     upcomingCampaignsCount: number;
     expiringIn30DaysCount: number;
+    recentlyEndedCampaignsCount?: number;
   };
   realization: {
     activeRealizations: Array<{

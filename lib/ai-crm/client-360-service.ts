@@ -215,6 +215,10 @@ export async function getClient360(
 
   const upcomingCampaignsCount = occupancies.filter((o) => o.dateFrom > now).length;
   const expiringIn30DaysCount = activeCampaigns.filter((c) => c.daysRemaining <= profile.renewalWarningDays).length;
+  const pastWarningDate = new Date(now.getTime() - profile.renewalWarningDays * 86400000);
+  const recentlyEndedCampaignsCount = occupancies.filter(
+    (o) => o.dateTo < now && o.dateTo >= pastWarningDate && (o.status === 'OCCUPIED' || o.status === 'FINISHED')
+  ).length;
 
   // Realizations
   const allRealizations = crmOrders.flatMap((order) =>
@@ -588,6 +592,7 @@ export async function getClient360(
       activeCampaigns,
       upcomingCampaignsCount,
       expiringIn30DaysCount,
+      recentlyEndedCampaignsCount,
     },
     realization: {
       activeRealizations: allRealizations,
