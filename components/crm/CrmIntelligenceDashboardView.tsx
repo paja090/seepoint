@@ -142,7 +142,7 @@ export function CrmIntelligenceDashboardView({
           { id: 'ALL', label: 'Všechny úkoly', count: initialAttentionItems.length },
           { id: 'URGENT', label: '🚨 Kritické & Urgentní', count: initialAttentionItems.filter(i => i.priority === 'CRITICAL' || i.priority === 'URGENT').length },
           { id: 'FOLLOW_UP', label: '📬 Follow-up nabídek', count: initialAttentionItems.filter(i => i.insightType === 'FOLLOW_UP_DUE').length },
-          { id: 'RENEWAL', label: '🔄 Prodloužení (Renewal)', count: initialAttentionItems.filter(i => i.insightType === 'RENEWAL_OPPORTUNITY').length },
+          { id: 'RENEWAL', label: '🔄 Obnova & Prodloužení', count: initialAttentionItems.filter(i => i.insightType === 'RENEWAL_OPPORTUNITY').length },
           { id: 'UPSELL', label: '📈 Upsell & Expanze', count: initialAttentionItems.filter(i => i.insightType === 'UPSELL_OPPORTUNITY').length },
           { id: 'RISK', label: '⚠️ Rizika realizace', count: initialAttentionItems.filter(i => i.insightType === 'REALIZATION_RISK').length },
           { id: 'BILLING', label: '💶 K fakturaci', count: initialAttentionItems.filter(i => i.insightType === 'READY_FOR_BILLING').length },
@@ -210,6 +210,22 @@ export function CrmIntelligenceDashboardView({
                         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
                           {tConfig.label}
                         </span>
+                        {Boolean(item.metadata?.surfaceCount && (item.metadata.surfaceCount as number) > 1) && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[10px] font-extrabold text-indigo-700">
+                            <span>🪑</span>
+                            <span>{String(item.metadata?.surfaceCount)} ploch/laviček</span>
+                          </span>
+                        )}
+                        {item.insightType === 'RENEWAL_OPPORTUNITY' && Boolean(item.metadata?.isEnded) && (
+                          <span className="rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-extrabold text-rose-700">
+                            Skončená kampaň
+                          </span>
+                        )}
+                        {item.insightType === 'RENEWAL_OPPORTUNITY' && !Boolean(item.metadata?.isEnded) && (
+                          <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-extrabold text-amber-700">
+                            Končí brzy
+                          </span>
+                        )}
                       </div>
 
                       <h4 className="font-bold text-sm text-slate-800">{item.title}</h4>
