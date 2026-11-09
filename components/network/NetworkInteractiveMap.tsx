@@ -18,6 +18,8 @@ export type NetworkMapSurfaceItem = {
   mediaType: string;
   size: string;
   orientation: string;
+  localityDescription?: string;
+  localityHighlights?: string[];
   listPrice: number;
   b2bWholesalePrice: number;
   b2bDiscountPercent: number;
@@ -387,6 +389,26 @@ export function NetworkInteractiveMap({
             `
             : '';
 
+        const highlightsHtml =
+          item.localityHighlights && item.localityHighlights.length > 0
+            ? `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px;">
+                ${item.localityHighlights
+                  .map(
+                    (tag) =>
+                      `<span style="display:inline-block;padding:1px 6px;background:#1e1b4b;border:1px solid #3730a3;color:#c7d2fe;border-radius:6px;font-size:9px;font-weight:800;">${escapeHtml(
+                        tag
+                      )}</span>`
+                  )
+                  .join('')}
+              </div>`
+            : '';
+
+        const localityDescHtml = item.localityDescription
+          ? `<div style="background:#020617;border:1px solid #1e293b;border-radius:8px;padding:6px 8px;margin-bottom:7px;font-size:10px;line-height:1.4;color:#cbd5e1;">
+              ${escapeHtml(item.localityDescription)}
+            </div>`
+          : '';
+
         const popupHtml = `
           <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-width:245px;max-width:285px;color:#f8fafc;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px;">
@@ -405,6 +427,8 @@ export function NetworkInteractiveMap({
             </div>
 
             ${approxHtml}
+            ${highlightsHtml}
+            ${localityDescHtml}
 
             <div style="background:#020617;border:1px solid #1e293b;border-radius:10px;padding:8px;margin-bottom:8px;">
               <div style="display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-bottom:3px;">

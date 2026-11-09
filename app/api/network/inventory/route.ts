@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { MediaType } from '@prisma/client';
 import type { InventoryVisibility, Prisma } from '@prisma/client';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
+import { buildLocalityDescription, buildLocalityHighlights } from '@/lib/catalog/locality-description';
 import { platformPrisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -57,6 +58,7 @@ export async function GET(req: Request) {
             mediaType: true,
             size: true,
             orientation: true,
+            directionDescription: true,
             status: true,
             price: true,
             visibility: true,
@@ -80,6 +82,18 @@ export async function GET(req: Request) {
       return carrier.surfaces.map((surface) => {
         const listPrice = surface.price ? Number(surface.price) : 0;
         const b2bWholesalePrice = listPrice;
+        const localityPayload = {
+          name: carrier.name,
+          city: carrier.city,
+          street: carrier.street,
+          locality: carrier.locality,
+          address: carrier.address,
+          type: carrier.type,
+          mediaType: surface.mediaType,
+          description: carrier.description,
+          placementDescription: carrier.placementDescription,
+          directionDescription: surface.directionDescription,
+        };
 
         return {
           id: surface.id,
@@ -95,6 +109,8 @@ export async function GET(req: Request) {
           mediaType: surface.mediaType,
           size: surface.size || '5,1 × 2,4 m',
           orientation: surface.orientation || 'Strana A',
+          localityDescription: buildLocalityDescription(localityPayload),
+          localityHighlights: buildLocalityHighlights(localityPayload),
           listPrice,
           b2bWholesalePrice,
           b2bDiscountPercent: b2bDiscount,

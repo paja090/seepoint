@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { enterTenantContext } from '@/lib/tenant-context';
-import { buildLocalityDescription } from '@/lib/catalog/locality-description';
+import { buildLocalityDescription, buildLocalityHighlights } from '@/lib/catalog/locality-description';
 import { normalizeClientName } from '@/lib/crm/domain';
 import { createOffer } from '@/lib/offers/service';
 import type { CurrentUser } from '@/lib/rbac';
@@ -494,11 +494,13 @@ export async function GET(request: Request) {
           ? new Date(latestOccupancy.dateTo.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
           : null;
 
-        const aiOrStoredDescription =
-          s.directionDescription ||
-          s.carrier.placementDescription ||
-          s.carrier.description ||
-          buildLocalityAiDescription(s.carrier);
+        const localityPayload = {
+          ...s.carrier,
+          mediaType: pricing.effectiveMediaType,
+          directionDescription: s.directionDescription,
+        };
+        const aiOrStoredDescription = buildLocalityAiDescription(localityPayload);
+        const localityHighlights = buildLocalityHighlights(localityPayload);
 
         const defaultSizeLabel =
           pricing.effectiveMediaType === 'BILLBOARD'
@@ -525,6 +527,7 @@ export async function GET(request: Request) {
           carrierType: String(s.carrier.type),
           mediaType: pricing.effectiveMediaType,
           city: s.carrier.city.trim(),
+          locality: s.carrier.locality || '',
           street: s.carrier.street || s.carrier.locality || s.carrier.address || '',
           region: s.carrier.region || '',
           latitude: s.carrier.latitude,
@@ -532,6 +535,7 @@ export async function GET(request: Request) {
           size: s.size || defaultSizeLabel,
           orientation: s.orientation || s.sidePosition || '',
           directionDescription: aiOrStoredDescription,
+          localityHighlights,
           monthlyPrice: pricing.monthlyPrice,
           printInstallPrice: pricing.printInstallPrice,
           minQuantity: pricing.minQuantity,

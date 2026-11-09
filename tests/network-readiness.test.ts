@@ -78,7 +78,11 @@ test('B2B White-label agency mode, interactive map, and 1-click CSV/Excel media-
   assert.match(networkView, /handleExportB2bCsv/);
   assert.match(networkView, /NetworkInteractiveMap/);
   assert.match(networkMap, /__b2bToggleSurface/);
+  assert.match(catalogView, /localityHighlights/);
+  assert.match(networkView, /UPDATE_SURFACE_DETAILS/);
+  assert.match(networkMap, /localityHighlights/);
 });
+
 
 
 

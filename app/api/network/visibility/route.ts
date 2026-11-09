@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { InventoryVisibility, MediaType } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
+import { buildLocalityDescription, buildLocalityHighlights } from '@/lib/catalog/locality-description';
 import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +14,7 @@ const ALLOWED_VISIBILITIES: InventoryVisibility[] = [
   InventoryVisibility.MARKETPLACE,
 ];
 
-function isAllowedVisibility(value: unknown): value is InventoryVisibility {
+function isAllowedVisibility(value: unknown): boolean {
   return typeof value === 'string' && ALLOWED_VISIBILITIES.includes(value as InventoryVisibility);
 }
 
@@ -64,6 +65,7 @@ export async function GET() {
               mediaType: true,
               size: true,
               orientation: true,
+              directionDescription: true,
               status: true,
               price: true,
               visibility: true,
@@ -106,24 +108,42 @@ export async function GET() {
     const totalAvailableSurfaces = Object.values(availableByVisibility).reduce((sum, n) => sum + n, 0);
 
     const ownSurfaces = ownCarriers.flatMap((carrier) =>
-      carrier.surfaces.map((surface) => ({
-        id: surface.id,
-        carrierId: carrier.id,
-        carrierCode: carrier.code,
-        carrierName: carrier.name,
-        city: carrier.city,
-        street: carrier.street,
-        latitude: carrier.latitude !== null ? Number(carrier.latitude) : null,
-        longitude: carrier.longitude !== null ? Number(carrier.longitude) : null,
-        surfaceName: surface.name,
-        mediaType: surface.mediaType,
-        size: surface.size || '5,1 × 2,4 m',
-        orientation: surface.orientation || 'Strana A',
-        status: surface.status,
-        listPrice: surface.price ? Number(surface.price) : 0,
-        visibility: surface.visibility,
-        carrierVisibility: carrier.visibility,
-      }))
+      carrier.surfaces.map((surface) => {
+        const localityPayload = {
+          name: carrier.name,
+          city: carrier.city,
+          street: carrier.street,
+          locality: carrier.locality,
+          address: carrier.address,
+          type: carrier.type,
+          mediaType: surface.mediaType,
+          description: carrier.description,
+          placementDescription: carrier.placementDescription,
+          directionDescription: surface.directionDescription,
+        };
+
+        return {
+          id: surface.id,
+          carrierId: carrier.id,
+          carrierCode: carrier.code,
+          carrierName: carrier.name,
+          city: carrier.city,
+          street: carrier.street,
+          latitude: carrier.latitude !== null ? Number(carrier.latitude) : null,
+          longitude: carrier.longitude !== null ? Number(carrier.longitude) : null,
+          surfaceName: surface.name,
+          mediaType: surface.mediaType,
+          size: surface.size || '5,1 × 2,4 m',
+          orientation: surface.orientation || 'Strana A',
+          directionDescription: surface.directionDescription || '',
+          localityDescription: buildLocalityDescription(localityPayload),
+          localityHighlights: buildLocalityHighlights(localityPayload),
+          status: surface.status,
+          listPrice: surface.price ? Number(surface.price) : 0,
+          visibility: surface.visibility,
+          carrierVisibility: carrier.visibility,
+        };
+      })
     );
 
     return NextResponse.json({
@@ -168,7 +188,46 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const action = typeof body.action === 'string' ? body.action : '';
-    const visibility = body.visibility;
+
+    if (action === 'UPDATE_SURFACE_DETAILS') {
+      const surfaceId = typeof body.surfaceId === 'string' ? body.surfaceId.trim() : '';
+      if (!surfaceId) {
+        return NextResponse.json({ success: false, error: 'Chybí ID reklamní plochy.' }, { status: 400 });
+      }
+
+      const existingSurface = await prisma.advertisingSurface.findFirst({
+        where: { id: surfaceId, organizationId },
+        select: { id: true, carrierId: true },
+      });
+
+      if (!existingSurface) {
+        return NextResponse.json({ success: false, error: 'Plocha nebyla nalezena ve vaší organizaci.' }, { status: 404 });
+      }
+
+      const updateData: Prisma.AdvertisingSurfaceUpdateInput = {};
+      if (typeof body.directionDescription === 'string') {
+        updateData.directionDescription = body.directionDescription.trim() || null;
+      }
+      if (body.price !== undefined && body.price !== null && body.price !== '') {
+        const parsedPrice = Number(body.price);
+        if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+          return NextResponse.json({ success: false, error: 'Cena musí být nezáporné číslo.' }, { status: 400 });
+        }
+        updateData.price = parsedPrice;
+      }
+
+      await prisma.advertisingSurface.update({
+        where: { id: existingSurface.id },
+        data: updateData,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: 'Popis lokality a cena plochy byly uloženy.',
+      });
+    }
+
+    const visibility = body.visibility as InventoryVisibility;
 
     if (!isAllowedVisibility(visibility)) {
       return NextResponse.json(
