@@ -1,11 +1,24 @@
 'use client';
 
 import { Receipt, ShieldCheck, Calendar, CreditCard, Sparkles } from 'lucide-react';
-import type { ProposalOffer } from '@/lib/offers/presentation';
+import type { ProposalCarrier, ProposalOffer } from '@/lib/offers/presentation';
 import { formatCzk, formatCzkDecimal } from '@/lib/offers/presentation';
 
-export function PricingSummary({ offer, onRequestPricing }: { offer: ProposalOffer; onRequestPricing?: () => void }) {
+
+
+export function PricingSummary({
+  offer,
+  activeCarriers,
+  onRequestPricing,
+  onSelectAll,
+}: {
+  offer: ProposalOffer;
+  activeCarriers?: ProposalCarrier[];
+  onRequestPricing?: () => void;
+  onSelectAll?: () => void;
+}) {
   if (offer.isNoPriceConcept) {
+
     return (
       <section aria-labelledby="concept-pricing-heading" className="rounded-3xl border border-purple-200/80 bg-gradient-to-br from-white via-purple-50/20 to-sky-50/30 p-6 shadow-sm lg:p-8">
         <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-purple-100 pb-5">
@@ -129,6 +142,43 @@ export function PricingSummary({ offer, onRequestPricing }: { offer: ProposalOff
     );
   }
 
+  const hasZeroSelection = activeCarriers !== undefined && activeCarriers.length === 0;
+  const isFiltered = activeCarriers !== undefined && activeCarriers.length !== offer.carriers.length;
+
+  const currentCarriers = activeCarriers || offer.carriers;
+  const activeMonthly = currentCarriers.reduce((sum, c) => sum + (Number(c.unitPrice) || 0), 0);
+  const activeDaily = Math.round(activeMonthly / 30);
+  const activeDailyPerSurface = currentCarriers.length > 0 ? Math.round(activeDaily / currentCarriers.length) : 0;
+
+  if (hasZeroSelection) {
+    return (
+      <section aria-labelledby="pricing-heading" className="rounded-3xl border-2 border-dashed border-sky-300 bg-gradient-to-br from-sky-50/60 via-white to-emerald-50/40 p-8 sm:p-10 text-center shadow-xs space-y-4">
+        <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 font-black text-2xl shadow-inner">
+          📊
+        </div>
+        <div className="space-y-1.5 max-w-xl mx-auto">
+          <h2 className="text-xl sm:text-2xl font-black text-slate-950" id="pricing-heading">
+            Máte zvolený start od 0 ploch (rozpočet 0 Kč)
+          </h2>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            Tento režim vám umožňuje sestavit si kampaň přesně podle rozpočtu. Klikněte na <strong>„+ Přidat do kampaně“</strong> u ploch, které vám dávají největší smysl. Rozpočet se okamžitě živě spočítá.
+          </p>
+        </div>
+        {onSelectAll && (
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={onSelectAll}
+              className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-sky-500 transition cursor-pointer"
+            >
+              ✓ Označit všech {offer.carriers.length} ploch
+            </button>
+          </div>
+        )}
+      </section>
+    );
+  }
+
   const regularRows = offer.pricing.filter((r) => r.emphasis !== 'total');
   const totalRow = offer.pricing.find((r) => r.emphasis === 'total');
 
@@ -140,11 +190,23 @@ export function PricingSummary({ offer, onRequestPricing }: { offer: ProposalOff
             <Receipt aria-hidden size={22} />
           </div>
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-950" id="pricing-heading">
-              Cenová kalkulace kampaně
-            </h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-950" id="pricing-heading">
+                Cenová kalkulace kampaně
+              </h2>
+              {isFiltered && (
+                <span className="rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 font-extrabold text-xs px-2.5 py-0.5">
+                  Přizpůsobeno: {currentCarriers.length} z {offer.carriers.length} ploch
+                </span>
+              )}
+            </div>
             <p className="text-xs sm:text-sm text-slate-500">
               Přehledný rozpad nákladů na pronájem, výrobu, instalaci a platné slevy.
+              {activeDailyPerSurface > 0 && (
+                <span className="ml-1 text-emerald-700 font-bold hidden sm:inline">
+                  · Denní náklad na 1 plochu: cca {formatCzk(activeDailyPerSurface)} / den.
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -155,6 +217,7 @@ export function PricingSummary({ offer, onRequestPricing }: { offer: ProposalOff
           </span>
         </div>
       </div>
+
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
         {/* Left Column: Itemized Breakdown */}
@@ -217,14 +280,37 @@ export function PricingSummary({ offer, onRequestPricing }: { offer: ProposalOff
         {/* Right Column: Total Highlight Box */}
         <div className="flex flex-col gap-4 rounded-3xl border border-slate-900 bg-slate-950 p-6 sm:p-7 text-white shadow-xl">
           <div className="space-y-1">
-            <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">
-              Celková částka k úhradě
-            </span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+                Celková částka k úhradě
+              </span>
+              {isFiltered && (
+                <span className="text-[10px] font-black uppercase bg-emerald-950 text-emerald-300 border border-emerald-800/80 px-2 py-0.5 rounded-full">
+                  {currentCarriers.length} z {offer.carriers.length} ploch
+                </span>
+              )}
+            </div>
             <div className="text-3xl sm:text-4xl font-black tracking-tight text-white">
               {totalRow ? formatCzkDecimal(totalRow.amount) : '0,00 Kč'}
             </div>
             <p className="text-xs text-slate-400">včetně DPH 21 %</p>
+
+            {activeMonthly > 0 && (
+              <div className="mt-3 pt-3 border-t border-slate-800 space-y-1.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Měsíční investice:</span>
+                  <span className="font-extrabold text-white">{formatCzk(activeMonthly)} / měs.</span>
+                </div>
+                {activeDailyPerSurface > 0 && (
+                  <div className="flex items-center justify-between text-emerald-400 font-bold">
+                    <span className="text-slate-400 font-normal">Denní náklad na 1 plochu:</span>
+                    <span>jen cca {formatCzk(activeDailyPerSurface)} / den</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+
 
           <div className="space-y-2 border-t border-slate-800 pt-4 text-xs text-slate-300">
             <div className="flex items-center justify-between">

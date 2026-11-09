@@ -55,3 +55,27 @@ test('standard media OfferHero features Schvalit nabidku and explanatory note', 
   assert.match(heroCode, /Schválit nabídku/, 'OfferHero button must be "Schválit nabídku"');
   assert.match(heroCode, /Nabídku můžete jedním kliknutím schválit nebo požádat o úpravu/, 'OfferHero must have explanatory text');
 });
+
+test('both navigation and standard offers support start-from-0, live daily cost, and sticky floating summary', () => {
+  const navView = readFileSync(new URL('../components/offers/NavigationOfferPublicView.tsx', import.meta.url), 'utf8');
+  const standardProposal = readFileSync(new URL('../components/offer/OfferProposal.tsx', import.meta.url), 'utf8');
+  const showcase = readFileSync(new URL('../components/offer/CarrierShowcase.tsx', import.meta.url), 'utf8');
+  const card = readFileSync(new URL('../components/offer/CarrierPreviewCard.tsx', import.meta.url), 'utf8');
+  const pricing = readFileSync(new URL('../components/offer/PricingSummary.tsx', import.meta.url), 'utf8');
+
+  // Navigation offer
+  assert.match(navView, /Začít od 0 a naklikat si sám/);
+  assert.match(navView, /Rychlý přehled trasy/);
+  assert.match(navView, /Máte zvolený start od 0 bodů/);
+  assert.match(navView, /den/);
+
+  // Standard proposal & components
+  assert.match(showcase, /Začít od 0/);
+  assert.match(showcase, /Poskládejte si kampaň podle svých představ/);
+  assert.match(card, /Zahrnuto v kampani|\+ Přidat do kampaně/);
+  assert.match(card, /den/);
+  assert.match(pricing, /Máte zvolený start od 0 ploch/);
+  assert.match(standardProposal, /Rychlý přehled výběru kampaně/);
+  assert.match(standardProposal, /Schválit výběr/);
+});
+

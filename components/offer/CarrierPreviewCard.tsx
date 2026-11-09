@@ -15,14 +15,19 @@ const statusMeta: Record<string, { label: string; className: string }> = {
 export function CarrierPreviewCard({
   carrier,
   isSelected = false,
+  isIncluded = true,
   onOpen,
   onOpenPhoto,
+  onToggleInclude,
 }: {
   carrier: ProposalCarrier;
   isSelected?: boolean;
+  isIncluded?: boolean;
   onOpen: (carrier: ProposalCarrier) => void;
   onOpenPhoto?: (photoUrl: string, title: string) => void;
+  onToggleInclude?: (carrierId: string) => void;
 }) {
+
   const meta = MEDIA_TYPE_META[carrier.mediaType];
   const tone = TONE_CLASSES[meta.tone];
   const status = statusMeta[carrier.status] ?? { label: carrier.status, className: 'bg-slate-50 text-slate-700 ring-slate-200' };
@@ -49,9 +54,12 @@ export function CarrierPreviewCard({
       className={`flex w-[290px] shrink-0 flex-col overflow-hidden rounded-3xl border transition-all duration-300 sm:w-full ${
         isSelected
           ? 'border-amber-500 bg-amber-50/40 shadow-2xl ring-4 ring-amber-400/50 scale-[1.02]'
+          : !isIncluded
+          ? 'border-slate-200 bg-slate-50/70 opacity-60 hover:opacity-100 hover:border-slate-300'
           : 'border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:shadow-md'
       }`}
     >
+
       {/* Photo Header */}
       <div className="relative h-48 w-full overflow-hidden bg-slate-900 group">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -135,19 +143,26 @@ export function CarrierPreviewCard({
       {/* Content */}
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div>
-          <div className="flex items-baseline justify-between gap-2">
-            <p className="text-base font-extrabold text-slate-900 tracking-tight">
-              #{carrier.orderIndex} · {carrier.code}
-            </p>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-base font-extrabold text-slate-900 tracking-tight">
+                #{carrier.orderIndex} · {carrier.code}
+              </p>
+              {carrier.surfaceName && carrier.surfaceName !== carrier.code && (
+                <p className="text-xs font-bold text-sky-800 line-clamp-1">{carrier.surfaceName}</p>
+              )}
+            </div>
             {carrier.unitPrice && Number(carrier.unitPrice) > 0 && (
-              <span className="text-sm font-black text-slate-950">
-                {formatCzk(Number(carrier.unitPrice))}
-              </span>
+              <div className="text-right shrink-0">
+                <span className="text-sm font-black text-slate-950 tabular-nums">
+                  {formatCzk(Number(carrier.unitPrice))}
+                </span>
+                <p className="text-[10px] font-bold text-emerald-700">
+                  cca {formatCzk(Math.round(Number(carrier.unitPrice) / 30))} / den
+                </p>
+              </div>
             )}
           </div>
-          {carrier.surfaceName && carrier.surfaceName !== carrier.code && (
-            <p className="text-xs font-bold text-sky-800 line-clamp-1">{carrier.surfaceName}</p>
-          )}
           <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500 font-medium">
             <MapPin aria-hidden size={13} className="shrink-0 text-slate-400" />
             <span className="truncate">{carrier.city}, {carrier.locality}</span>
@@ -177,18 +192,34 @@ export function CarrierPreviewCard({
           <span className="text-[11px] text-slate-400 font-mono">{carrier.mediaType}</span>
         </div>
 
-        <button
-          className={`mt-auto inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border px-4 py-2 text-xs font-bold transition cursor-pointer print:hidden ${
-            isSelected
-              ? 'border-amber-500 bg-amber-500 text-slate-950 font-black shadow-md hover:bg-amber-400'
-              : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50'
-          }`}
-          onClick={() => onOpen(carrier)}
-          type="button"
-        >
-          <MapPin aria-hidden size={14} />
-          {isSelected ? 'Vycentrovat na mapě' : 'Zobrazit na mapě'}
-        </button>
+        <div className="mt-auto flex flex-col gap-2 pt-2 border-t border-slate-100 print:hidden">
+          {onToggleInclude && (
+            <button
+              type="button"
+              onClick={() => onToggleInclude(carrier.id)}
+              className={`inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition cursor-pointer ${
+                isIncluded
+                  ? 'bg-emerald-600 text-white shadow-xs hover:bg-emerald-700'
+                  : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+              }`}
+            >
+              {isIncluded ? '✓ Zahrnuto v kampani' : '+ Přidat do kampaně'}
+            </button>
+          )}
+
+          <button
+            className={`inline-flex min-h-[38px] items-center justify-center gap-2 rounded-xl border px-4 py-2 text-xs font-bold transition cursor-pointer ${
+              isSelected
+                ? 'border-amber-500 bg-amber-500 text-slate-950 font-black shadow-md hover:bg-amber-400'
+                : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50'
+            }`}
+            onClick={() => onOpen(carrier)}
+            type="button"
+          >
+            <MapPin aria-hidden size={14} />
+            {isSelected ? 'Vycentrovat na mapě' : 'Zobrazit na mapě'}
+          </button>
+        </div>
       </div>
     </article>
   );

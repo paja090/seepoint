@@ -511,9 +511,9 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
 
   const durationOption = getDurationOption(selectedDuration);
 
-  // Filter price rows dynamically for selected points (or all if none filtered)
+  // Filter price rows dynamically for selected points strictly by user selection
   const activePoints = navigation.points.filter((p) =>
-    selectedPointIds.length > 0 ? selectedPointIds.includes(p.id) : true
+    selectedPointIds.includes(p.id)
   );
 
   const priceRows = activePoints.map((point) => {
@@ -777,6 +777,27 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             <button
               type="button"
               disabled={selectionSubmitted}
+              onClick={() => setSelectedPointIds([])}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-black text-slate-800 hover:bg-slate-100 transition shadow-2xs cursor-pointer disabled:opacity-50"
+              title="Vynulovat a začít od 0 Kč – vyberete si jen to, co opravdu chcete"
+            >
+              0️⃣ Začít od 0 a naklikat si sám
+            </button>
+            <button
+              type="button"
+              disabled={selectionSubmitted}
+              onClick={() => {
+                const keyCount = Math.min(3, navigation.points.length);
+                setSelectedPointIds(navigation.points.slice(0, keyCount).map((p) => p.id));
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300 bg-sky-50 px-3.5 py-2 text-xs font-black text-sky-900 hover:bg-sky-100 transition shadow-2xs cursor-pointer disabled:opacity-50"
+              title="Předvybrat 3 klíčové příjezdové body"
+            >
+              🎯 Základní trasa (3 body)
+            </button>
+            <button
+              type="button"
+              disabled={selectionSubmitted}
               onClick={() => setSelectedPointIds(navigation.points.map((p) => p.id))}
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3.5 py-2 text-xs font-bold text-emerald-900 hover:bg-emerald-100/70 transition shadow-2xs cursor-pointer disabled:opacity-50"
             >
@@ -799,6 +820,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
           </div>
         </div>
       </div>
+
 
       {/* Branch Filter Tabs if multiple targets */}
       {targets.length > 1 && (
@@ -1046,22 +1068,41 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      disabled={selectionSubmitted}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        togglePointSelection(point.id);
-                      }}
-                      className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-70 w-full sm:w-auto ${
-                        isSelected
-                          ? 'bg-emerald-600 text-white shadow-xs hover:bg-emerald-700'
-                          : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                      }`}
-                    >
-                      {isSelected ? '✓ Vybráno v nabídce' : '+ Vybrat do nabídky'}
-                    </button>
+                    {(() => {
+                      const pointCalc = calculateNavigationPointPrice(point, selectedDuration);
+                      return (
+                        <div className="flex flex-col sm:items-end gap-1.5 shrink-0 w-full sm:w-auto">
+                          {pointCalc.monthlyRate > 0 && (
+                            <div className="text-left sm:text-right">
+                              <div className="text-xs font-black text-slate-900 tabular-nums">
+                                {money(pointCalc.monthlyRate)} <span className="text-[10px] font-medium text-slate-500">/ měs.</span>
+                              </div>
+                              <div className="text-[10px] font-bold text-emerald-700">
+                                jen cca {money(Math.round(pointCalc.monthlyRate / 30))} / den
+                              </div>
+                            </div>
+                          )}
+
+                          <button
+                            type="button"
+                            disabled={selectionSubmitted}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              togglePointSelection(point.id);
+                            }}
+                            className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-70 w-full sm:w-auto ${
+                              isSelected
+                                ? 'bg-emerald-600 text-white shadow-xs hover:bg-emerald-700'
+                                : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                            }`}
+                          >
+                            {isSelected ? '✓ Vybráno v nabídce' : '+ Vybrat do nabídky'}
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
+
 
                   {/* Metadata Row: Arrow + Distance + Pillar + Target Store */}
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
@@ -1154,6 +1195,40 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
       </div>
 
       {!isLocationSelectionPhase ? (
+        activePoints.length === 0 ? (
+          <section className="overflow-hidden rounded-3xl border-2 border-dashed border-sky-300 bg-gradient-to-br from-sky-50/60 via-white to-emerald-50/40 p-8 sm:p-10 text-center shadow-xs space-y-4" aria-labelledby="navigation-pricing-heading">
+            <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-sky-100 text-sky-700 font-black text-2xl shadow-inner">
+              🧭
+            </div>
+            <div className="space-y-1.5 max-w-xl mx-auto">
+              <h2 className="text-xl sm:text-2xl font-black text-slate-950" id="navigation-pricing-heading">
+                Máte zvolený start od 0 bodů (rozpočet 0 Kč)
+              </h2>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Tento režim vám dává plnou kontrolu. Vyberte si výše na mapě nebo v kartách navigační body, které chcete do trasy k provozovně zařadit. Cenová kalkulace se vám okamžitě živě spočítá.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const keyCount = Math.min(3, navigation.points.length);
+                  setSelectedPointIds(navigation.points.slice(0, keyCount).map((p) => p.id));
+                }}
+                className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-sky-500 transition cursor-pointer"
+              >
+                🎯 Zvolit základní trasu (3 body)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedPointIds(navigation.points.map((p) => p.id))}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-xs sm:text-sm font-bold text-slate-800 shadow-xs hover:bg-slate-50 transition cursor-pointer"
+              >
+                ✓ Označit všech {navigation.points.length} bodů
+              </button>
+            </div>
+          </section>
+        ) : (
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm" aria-labelledby="navigation-pricing-heading">
           <div className="border-b border-slate-200 bg-slate-950 px-6 py-5 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -1164,8 +1239,12 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             <div className="rounded-2xl bg-slate-900 border border-slate-800 px-4 py-2.5 sm:text-right shrink-0">
               <p className="text-[10px] text-slate-400 uppercase tracking-wider font-extrabold">Živý přepočet: {activePoints.length} z {navigation.points.length} bodů · {durationOption.shortLabel}</p>
               <p className="text-xl font-black text-emerald-400">{money(totalWithTax)} <span className="text-xs text-slate-300 font-normal">s DPH</span></p>
+              <p className="text-[11px] font-bold text-sky-400 mt-0.5">
+                jen cca {money(Math.round(priceTotals.monthlyRate / 30))} / den ({money(priceTotals.monthlyRate)}/měs.)
+              </p>
             </div>
           </div>
+
 
           {/* Duration Selector Bar */}
           <div className="bg-slate-900 border-b border-slate-800 px-6 py-3.5 flex flex-wrap items-center justify-between gap-3 text-white">
@@ -1332,7 +1411,9 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             </dl>
           </div>
         </section>
+        )
       ) : null}
+
 
       {isLocationSelectionPhase ? (
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -2487,6 +2568,63 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
           </div>
         </div>
       )}
+      {/* Sticky floating route summary bar */}
+      <aside aria-label="Rychlý přehled trasy" className="fixed bottom-4 inset-x-4 max-w-4xl mx-auto z-40 print:hidden transition-transform duration-300">
+        <div className="rounded-2xl border border-slate-900 bg-slate-950/95 backdrop-blur-md p-3.5 sm:px-5 sm:py-3 text-white shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 ring-1 ring-white/10">
+          <div className="flex items-center gap-3">
+            <span className={`flex size-9 shrink-0 items-center justify-center rounded-xl font-black text-sm border ${
+              activePoints.length > 0
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                : 'bg-slate-800 text-slate-400 border-slate-700'
+            }`}>
+              {activePoints.length}
+            </span>
+            <div>
+              <div className="text-xs sm:text-sm font-extrabold text-white flex items-center gap-2 flex-wrap">
+                <span>Navigační trasa: {activePoints.length} z {navigation.points.length} bodů</span>
+                {activePoints.length > 0 && priceTotals.monthlyRate > 0 && (
+                  <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-950/90 px-2.5 py-0.5 rounded-full border border-emerald-800/80">
+                    cca {money(Math.round(priceTotals.monthlyRate / 30))} / den
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] text-slate-400">
+                {activePoints.length === 0 ? (
+                  <span>Zatím nemáte vybrán žádný bod (0 Kč) – klikněte na „+ Vybrat do nabídky“</span>
+                ) : !isLocationSelectionPhase ? (
+                  <span>Měsíční paušál: <strong className="text-white font-bold">{money(priceTotals.monthlyRate)}/měs.</strong> · Celkem {durationOption.shortLabel}: <strong className="text-white font-bold">{money(totalWithTax)} s DPH</strong></span>
+                ) : (
+                  <span>Vybrané body pro přesnou cenovou kalkulaci k provozovně</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            {activePoints.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const keyCount = Math.min(3, navigation.points.length);
+                  setSelectedPointIds(navigation.points.slice(0, keyCount).map((p) => p.id));
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-sky-500 transition cursor-pointer"
+              >
+                🎯 Doporučená trasa (3 body)
+              </button>
+            ) : (
+              <a
+                href={isLocationSelectionPhase ? '#nav-points-section' : '#navigation-pricing-heading'}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-4 py-2 text-xs font-black shadow-lg transition active:scale-95 cursor-pointer"
+              >
+                <CheckCircle2 size={15} />
+                Potvrdit výběr ({activePoints.length} {activePoints.length === 1 ? 'bod' : activePoints.length < 5 ? 'body' : 'bodů'})
+              </a>
+            )}
+          </div>
+        </div>
+      </aside>
     </section>
   );
 }
+
