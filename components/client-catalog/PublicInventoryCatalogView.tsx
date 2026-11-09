@@ -40,6 +40,7 @@ export type CatalogSurfaceItem = {
   carrierType: string;
   mediaType: string;
   city: string;
+  locality?: string;
   street: string;
   region: string;
   latitude: number | null;
@@ -47,6 +48,7 @@ export type CatalogSurfaceItem = {
   size: string;
   orientation: string;
   directionDescription: string;
+  localityHighlights?: string[];
   monthlyPrice: number;
   printInstallPrice: number;
   minQuantity?: number;
@@ -1211,11 +1213,30 @@ export function PublicInventoryCatalogView() {
                           </div>
 
                           {item.directionDescription && (
-                            <div className="rounded-xl bg-slate-950/75 border border-slate-800/90 p-2.5 space-y-1">
-                              <div className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-purple-300">
-                                <Sparkles className="w-3 h-3 text-purple-400 shrink-0" />
-                                <span>Popis lokality & nosiče</span>
+                            <div className="rounded-xl bg-slate-950/75 border border-slate-800/90 p-2.5 space-y-1.5">
+                              <div className="flex flex-wrap items-center justify-between gap-1">
+                                <div className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-purple-300">
+                                  <Sparkles className="w-3 h-3 text-purple-400 shrink-0" />
+                                  <span>Popis lokality & okolí</span>
+                                </div>
+                                {item.locality && item.locality.toLowerCase() !== item.city.toLowerCase() && (
+                                  <span className="rounded-md bg-slate-900 border border-slate-700 px-1.5 py-0.5 text-[9px] font-bold text-sky-300">
+                                    Část: {item.locality}
+                                  </span>
+                                )}
                               </div>
+                              {item.localityHighlights && item.localityHighlights.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {item.localityHighlights.map((tag) => (
+                                    <span
+                                      key={tag}
+                                      className="inline-flex items-center rounded-md bg-indigo-950/70 border border-indigo-800/60 px-1.5 py-0.5 text-[10px] font-bold text-indigo-200"
+                                    >
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                               <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed">
                                 {item.directionDescription}
                               </p>

@@ -56,6 +56,8 @@ type InventoryItem = {
   mediaType: string;
   size: string;
   orientation: string;
+  localityDescription?: string;
+  localityHighlights?: string[];
   listPrice: number;
   b2bWholesalePrice: number;
   b2bDiscountPercent: number;
@@ -159,6 +161,9 @@ type OwnSurfaceVisibilityItem = {
   mediaType: string;
   size: string;
   orientation: string;
+  directionDescription?: string;
+  localityDescription?: string;
+  localityHighlights?: string[];
   status: string;
   listPrice: number;
   visibility: 'PRIVATE' | 'PARTNER' | 'SHARED' | 'MARKETPLACE';
@@ -206,6 +211,9 @@ export function NetworkHubView() {
   const [showOwnSurfacesDrawer, setShowOwnSurfacesDrawer] = useState(false);
   const [selectedSurfaceIds, setSelectedSurfaceIds] = useState<string[]>([]);
   const [organizationInfo, setOrganizationInfo] = useState<{ id: string; name: string; slug: string | null } | null>(null);
+  const [editingSurfaceId, setEditingSurfaceId] = useState<string | null>(null);
+  const [editPriceInput, setEditPriceInput] = useState<string>('');
+  const [editDescriptionInput, setEditDescriptionInput] = useState<string>('');
 
   const [notifications, setNotifications] = useState<Array<{ id: string; type: string; title: string; message: string; severity: string; createdAt: string; isRead: boolean }>>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -384,6 +392,47 @@ export function NetworkHubView() {
     } catch (err) {
       console.error(err);
       setActionError('Spojení se serverem při změně viditelnosti selhalo.');
+    } finally {
+      setVisibilityLoading(false);
+    }
+  };
+
+  const handleOpenEditSurface = (surfaceId: string, currentPrice: number, currentDescription?: string) => {
+    if (editingSurfaceId === surfaceId) {
+      setEditingSurfaceId(null);
+      return;
+    }
+    setEditingSurfaceId(surfaceId);
+    setEditPriceInput(String(currentPrice || 0));
+    setEditDescriptionInput(currentDescription || '');
+  };
+
+  const handleSaveSurfaceDetails = async (surfaceId: string) => {
+    setVisibilityLoading(true);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      const res = await fetch('/api/network/visibility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'UPDATE_SURFACE_DETAILS',
+          surfaceId,
+          price: Number(editPriceInput) || 0,
+          directionDescription: editDescriptionInput,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setActionSuccess(data.message);
+        setEditingSurfaceId(null);
+        await refreshVisibilityAndInventory();
+      } else {
+        setActionError(data.error || 'Nepodařilo se uložit popis lokality a cenu.');
+      }
+    } catch (err) {
+      console.error(err);
+      setActionError('Spojení se serverem při ukládání selhalo.');
     } finally {
       setVisibilityLoading(false);
     }
@@ -728,6 +777,8 @@ export function NetworkHubView() {
           mediaType: s.mediaType,
           size: s.size,
           orientation: s.orientation,
+          localityDescription: s.localityDescription,
+          localityHighlights: s.localityHighlights,
           listPrice: s.listPrice,
           b2bWholesalePrice: Math.round(s.listPrice * 0.8),
           b2bDiscountPercent: 20,
@@ -1079,44 +1130,108 @@ export function NetworkHubView() {
             )}
 
             {showOwnSurfacesDrawer && (
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2 max-h-80 overflow-y-auto">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2 max-h-96 overflow-y-auto">
                 <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 pb-2 border-b border-slate-100">
-                  <span>Přehled vašich aktivních ploch a jejich režim v B2B síti</span>
-                  <span>Kliknutím okamžitě změníte viditelnost</span>
+                  <span>Přehled vašich aktivních ploch, jejich režim v B2B síti, cena a popis lokality</span>
+                  <span>Kliknutím změníte viditelnost nebo upravíte popis místa</span>
                 </div>
                 {ownSurfaces.map((s) => (
                   <div
                     key={s.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-2 border-b border-slate-100 last:border-none text-xs"
+                    className="py-2.5 border-b border-slate-100 last:border-none text-xs space-y-2"
                   >
-                    <div>
-                      <span className="font-mono font-black text-indigo-600 mr-2">{s.carrierCode}</span>
-                      <span className="font-bold text-slate-900">{s.carrierName}</span>
-                      <span className="text-slate-500 ml-2">
-                        ({s.city} · {s.surfaceName} · {s.status})
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {(['PRIVATE', 'PARTNER', 'MARKETPLACE'] as const).map((mode) => (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <span className="font-mono font-black text-indigo-600 mr-2">{s.carrierCode}</span>
+                        <span className="font-bold text-slate-900">{s.carrierName}</span>
+                        <span className="text-slate-500 ml-2">
+                          ({s.city} · {s.surfaceName} · {s.listPrice.toLocaleString('cs-CZ')} Kč/měs)
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                         <button
-                          key={mode}
                           type="button"
-                          disabled={visibilityLoading || !canManageVisibility}
-                          onClick={() => handleSingleSurfaceVisibility(s.id, mode)}
-                          className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase transition cursor-pointer ${
-                            s.visibility === mode
-                              ? mode === 'MARKETPLACE'
-                                ? 'bg-emerald-600 text-white'
-                                : mode === 'PARTNER'
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-slate-800 text-white'
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                          }`}
+                          onClick={() => handleOpenEditSurface(s.id, s.listPrice, s.directionDescription || s.localityDescription)}
+                          className="rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 text-[10px] font-black text-indigo-800 transition cursor-pointer"
                         >
-                          {mode === 'PRIVATE' ? 'Soukromá' : mode === 'PARTNER' ? 'Partner' : 'B2B Burza'}
+                          {editingSurfaceId === s.id ? 'Zavřít úpravu' : '✏️ Popis lokality & cena'}
                         </button>
-                      ))}
+                        {(['PRIVATE', 'PARTNER', 'MARKETPLACE'] as const).map((mode) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            disabled={visibilityLoading || !canManageVisibility}
+                            onClick={() => handleSingleSurfaceVisibility(s.id, mode)}
+                            className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase transition cursor-pointer ${
+                              s.visibility === mode
+                                ? mode === 'MARKETPLACE'
+                                  ? 'bg-emerald-600 text-white'
+                                  : mode === 'PARTNER'
+                                  ? 'bg-indigo-600 text-white'
+                                  : 'bg-slate-800 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {mode === 'PRIVATE' ? 'Soukromá' : mode === 'PARTNER' ? 'Partner' : 'B2B Burza'}
+                          </button>
+                        ))}
+                      </div>
                     </div>
+
+                    {s.localityDescription && editingSurfaceId !== s.id && (
+                      <p className="text-[11px] text-slate-500 bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-100">
+                        📍 {s.localityDescription}
+                      </p>
+                    )}
+
+                    {editingSurfaceId === s.id && (
+                      <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-3 space-y-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                          <div>
+                            <label className="block text-[10px] font-black uppercase text-slate-600 mb-1">
+                              Měsíční nájem (Kč/měs bez DPH)
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={editPriceInput}
+                              onChange={(e) => setEditPriceInput(e.target.value)}
+                              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-900"
+                              placeholder="např. 4500"
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="block text-[10px] font-black uppercase text-slate-600 mb-1">
+                              Popis lokality, směru a okolí (zobrazí se v katalogu i na mapě)
+                            </label>
+                            <input
+                              type="text"
+                              value={editDescriptionInput}
+                              onChange={(e) => setEditDescriptionInput(e.target.value)}
+                              className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900"
+                              placeholder="Např. Hlavní tah u OC Kaufland, směr centrum, vysoký denní provoz…"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditingSurfaceId(null)}
+                            className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-bold text-slate-600 cursor-pointer"
+                          >
+                            Zrušit
+                          </button>
+                          <button
+                            type="button"
+                            disabled={visibilityLoading}
+                            onClick={() => handleSaveSurfaceDetails(s.id)}
+                            className="rounded-lg bg-indigo-600 hover:bg-indigo-500 px-3.5 py-1 text-xs font-black text-white cursor-pointer disabled:opacity-50"
+                          >
+                            Uložit popis & cenu
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
                 {ownSurfaces.length === 0 && (
@@ -1319,7 +1434,7 @@ export function NetworkHubView() {
                     </div>
 
                     {/* Body Content */}
-                    <div className="p-4 space-y-2">
+                    <div className="p-4 space-y-2.5">
                       <div className="flex items-center justify-between">
                         <span className="font-mono text-xs font-black text-indigo-600">{item.carrierCode}</span>
                         <span className="text-[11px] font-semibold text-slate-500">{item.size}</span>
@@ -1329,8 +1444,46 @@ export function NetworkHubView() {
 
                       <p className="text-xs text-slate-500 flex items-center gap-1 font-medium">
                         <MapPin size={13} className="text-amber-500 shrink-0" />
-                        <span>{[item.city, item.street].filter(Boolean).join(' · ')}</span>
+                        <span>{[item.city, item.locality, item.street].filter(Boolean).join(' · ')}</span>
                       </p>
+
+                      {/* Locality Description & Highlights Box */}
+                      {item.localityDescription && (
+                        <div className="rounded-2xl bg-indigo-50/50 border border-indigo-100 p-2.5 space-y-1.5">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700">
+                              📍 Popis lokality & okolí
+                            </span>
+                            {item.isOwn && canManageVisibility && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowOwnSurfacesDrawer(true);
+                                  handleOpenEditSurface(item.id, item.listPrice, item.localityDescription);
+                                }}
+                                className="text-[10px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                              >
+                                ✏️ Upravit popis
+                              </button>
+                            )}
+                          </div>
+                          {item.localityHighlights && item.localityHighlights.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {item.localityHighlights.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="inline-flex items-center rounded-md bg-white border border-indigo-200 px-1.5 py-0.5 text-[10px] font-bold text-indigo-900"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <p className="text-[11px] text-slate-600 line-clamp-3 leading-relaxed">
+                            {item.localityDescription}
+                          </p>
+                        </div>
+                      )}
 
                       {/* Pricing Box */}
                       <div className="mt-3 rounded-2xl bg-slate-50 p-3 border border-slate-100 flex items-center justify-between">

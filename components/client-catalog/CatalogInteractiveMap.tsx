@@ -288,8 +288,28 @@ export function CatalogInteractiveMap({
 
         const streetViewLink = `https://www.google.com/maps?q=&layer=c&cbll=${lat},${lng}`;
 
+        const highlightsHtml =
+          item.localityHighlights && item.localityHighlights.length > 0
+            ? `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:5px;">
+                ${item.localityHighlights
+                  .map(
+                    (tag) =>
+                      `<span style="display:inline-block;padding:1px 6px;background:#1e1b4b;border:1px solid #3730a3;color:#c7d2fe;border-radius:6px;font-size:9px;font-weight:800;">${escapeHtml(
+                        tag
+                      )}</span>`
+                  )
+                  .join('')}
+              </div>`
+            : '';
+
+        const localityDescHtml = item.directionDescription
+          ? `<div style="background:#020617;border:1px solid #1e293b;border-radius:8px;padding:6px 8px;margin-bottom:8px;font-size:10px;line-height:1.4;color:#cbd5e1;">
+              ${escapeHtml(item.directionDescription)}
+            </div>`
+          : '';
+
         const popupHtml = `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 230px; max-width: 270px; color: #f8fafc;">
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 240px; max-width: 280px; color: #f8fafc;">
             ${photoHtml}
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px;">
               <span style="font-size: 11px; font-weight: 800; color: #38bdf8;">
@@ -302,9 +322,12 @@ export function CatalogInteractiveMap({
               ${escapeHtml(item.surfaceName || item.carrierName)}
             </div>
 
-            <div style="font-size: 11px; color: #94a3b8; margin-bottom: 8px;">
+            <div style="font-size: 11px; color: #94a3b8; margin-bottom: 5px;">
               ${escapeHtml(item.city)}${item.street ? ` · ${escapeHtml(item.street)}` : ''}
             </div>
+
+            ${highlightsHtml}
+            ${localityDescHtml}
 
             <div style="display: flex; align-items: baseline; justify-content: space-between; border-top: 1px solid #334155; padding-top: 6px; margin-bottom: 8px;">
               <span style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Měsíční nájem:</span>
@@ -329,7 +352,7 @@ export function CatalogInteractiveMap({
         `;
 
         marker.bindPopup(popupHtml, {
-          maxWidth: 290,
+          maxWidth: 300,
           className: 'custom-dark-popup',
         });
 
