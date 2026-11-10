@@ -7,6 +7,7 @@ import { getOrganizationWorkCategories } from '@/lib/work-categories-server';
 import { extractOrderRouteMap } from '@/lib/field-planning/order-route-mapper';
 import { syncCrmOrderToWorkOrderInTransaction } from '@/lib/crm/crm-work-sync';
 import { syncUnlinkedDispatchPointsInTransaction } from '@/lib/dispatch/dispatch-work-sync';
+import { isSeePointOrganization } from '@/lib/work/google-sheets-sync';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,23 +54,56 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
     console.error('[work] dispatch work sync failed', error);
   }
 
-  const [orders, clients, carriers, employees, categories, plans, completedPoints, completedNavPoints] = await Promise.all([
+  const [
+    openOrdersList,
+    recentHistoryOrdersList,
+    clients,
+    carriers,
+    employees,
+    categories,
+    plans,
+    completedPoints,
+    completedNavPoints,
+    currentOrg,
+  ] = await Promise.all([
+    // 1. ALL open & active tasks requiring realization (never cut off by an arbitrary limit)
     prisma.workOrder.findMany({
+      where: {
+        organizationId: user.organizationId,
+        status: { notIn: ['DONE', 'CANCELLED'] },
+      },
       include: {
         assignments: true,
         workTasks: { include: { assignedTo: true } },
         items: { include: { carrier: true } },
       },
-      orderBy: { scheduledAt: 'asc' },
-      take: 250,
+      orderBy: [{ scheduledAt: 'asc' }, { createdAt: 'desc' }],
     }),
-    prisma.client.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+    // 2. Recent history / completed orders for reference, stats, and invoicing
+    prisma.workOrder.findMany({
+      where: {
+        organizationId: user.organizationId,
+        status: { in: ['DONE', 'CANCELLED'] },
+      },
+      include: {
+        assignments: true,
+        workTasks: { include: { assignedTo: true } },
+        items: { include: { carrier: true } },
+      },
+      orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }],
+      take: 800,
+    }),
+    prisma.client.findMany({
+      where: { organizationId: user.organizationId, active: true },
+      orderBy: { name: 'asc' },
+    }),
     prisma.advertisingCarrier.findMany({
+      where: { organizationId: user.organizationId },
       orderBy: [{ city: 'asc' }, { name: 'asc' }],
       select: { id: true, code: true, name: true, city: true },
     }),
     prisma.employee.findMany({
-      where: { isActive: true },
+      where: { organizationId: user.organizationId, isActive: true },
       orderBy: { firstName: 'asc' },
       select: { id: true, firstName: true, lastName: true },
     }),
@@ -97,7 +131,14 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
       where: { organizationId: user.organizationId, status: 'INSTALLED' },
       select: { id: true },
     }),
+    prisma.organization.findUnique({
+      where: { id: user.organizationId },
+      select: { id: true, name: true, slug: true },
+    }),
   ]);
+
+  const orders = [...openOrdersList, ...recentHistoryOrdersList];
+  const isSeePointOrg = isSeePointOrganization(currentOrg);
 
   const completedPointIds = new Set(completedPoints.map((p) => p.id));
   const completedNavPointIds = new Set(completedNavPoints.map((p) => p.id));
@@ -122,7 +163,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
   const canCreateWorkOrder = !['WORKER', 'TECHNICIAN'].includes(user.role);
   const assignedIds = [...new Set(orders.flatMap(order => order.workTasks.map(task => task.assignedToEmployeeId).filter((id): id is string => Boolean(id))))];
   const absences = canCreateWorkOrder && assignedIds.length ? await prisma.employeeAbsence.findMany({
-    where: { employeeId: { in: assignedIds }, status: 'APPROVED' },
+    where: { organizationId: user.organizationId, employeeId: { in: assignedIds }, status: 'APPROVED' },
     select: { employeeId: true, dateFrom: true, dateTo: true },
   }) : [];
   const absenceConflicts = orders.filter(order => !['DONE', 'CANCELLED'].includes(order.status)).flatMap(order =>
@@ -174,6 +215,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
           initialCampaignDateTo={initialCampaignDateTo}
           canCreateWorkOrder={canCreateWorkOrder}
           categories={categories}
+          isSeePointOrg={isSeePointOrg}
         />
       </div>
     </AppShell>

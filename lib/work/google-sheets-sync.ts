@@ -6,6 +6,18 @@ export const DEFAULT_GOOGLE_PLAN_SHEET_CSV_URL =
   process.env.GOOGLE_PLAN_SHEET_CSV_URL ||
   'https://docs.google.com/spreadsheets/d/1VcssEXqBmRSV0xBkzP23Miadt2zTTR8lHhgHPQlLt6o/export?format=csv&gid=1725001912';
 
+/**
+ * Checks whether an organization is SeePOINT s.r.o.
+ * The default Google Spreadsheet is strictly proprietary to SeePoint s.r.o.
+ */
+export function isSeePointOrganization(org?: { id: string; name?: string | null; slug?: string | null } | null): boolean {
+  if (!org) return false;
+  if (org.id === 'org_seepoint_default') return true;
+  if (org.slug?.trim().toLowerCase() === 'seepoint') return true;
+  if (org.name?.toLowerCase().includes('seepoint')) return true;
+  return false;
+}
+
 export type ParsedGooglePlanTask = {
   sheetRowIndex: number;
   sheetKey: string;
@@ -463,6 +475,19 @@ export async function syncGooglePlanToWorkOrders(
 ): Promise<SyncGooglePlanResult> {
   const { organizationId, csvUrl = DEFAULT_GOOGLE_PLAN_SHEET_CSV_URL, csvContent, defaultYear = 2026 } = options;
   const client = dependencies?.tx || prisma;
+
+  const isDefaultSheet = !options.csvUrl || options.csvUrl === DEFAULT_GOOGLE_PLAN_SHEET_CSV_URL;
+  if (isDefaultSheet && 'organization' in client && client.organization) {
+    const org = await client.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true, name: true, slug: true },
+    });
+    if (!org || !isSeePointOrganization(org)) {
+      throw new Error(
+        'Tato centrální Google Tabulka plánu práce je určena výhradně pro agenturu SeePOINT s.r.o. a nelze ji importovat do jiné agentury.'
+      );
+    }
+  }
 
   let content = csvContent;
   if (!content) {

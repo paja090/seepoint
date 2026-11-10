@@ -12,6 +12,7 @@ import {
   parseWorkersList,
   parseGooglePlanCsv,
   syncGooglePlanToWorkOrders,
+  isSeePointOrganization,
 } from '../lib/work/google-sheets-sync.ts';
 
 test('Google Sheets Sync: parseCsvRows handles commas and newlines in quoted cells', () => {
@@ -258,4 +259,45 @@ test('Google Sheets Sync: syncGooglePlanToWorkOrders creates new orders and upda
   assert.equal(mockDbOrders.length, 1); // No duplicates!
   assert.equal(mockDbOrders[0].ftdSent, true);
   assert.equal(mockDbOrders[0].status, 'DONE');
+});
+
+test('Google Sheets Sync: isSeePointOrganization accurately distinguishes SeePoint from other tenants', () => {
+  assert.equal(isSeePointOrganization({ id: 'org_seepoint_default', name: 'SeePoint', slug: 'seepoint' }), true);
+  assert.equal(isSeePointOrganization({ id: 'custom_id_1', name: 'SeePOINT s.r.o.', slug: 'sp-main' }), true);
+  assert.equal(isSeePointOrganization({ id: 'custom_id_2', name: 'Agentura XYZ', slug: 'seepoint' }), true);
+
+  assert.equal(isSeePointOrganization({ id: 'cmui330fi0005l404dx9noytp', name: 'QX promotion', slug: 'qx-promotion' }), false);
+  assert.equal(isSeePointOrganization({ id: 'cmt5os0640005jh0447xjz86r', name: 'Agentura B – izolace', slug: 'agentura-b-test' }), false);
+  assert.equal(isSeePointOrganization(null), false);
+  assert.equal(isSeePointOrganization(undefined), false);
+});
+
+test('Google Sheets Sync: syncGooglePlanToWorkOrders rejects non-SeePoint agency when syncing default sheet', async () => {
+  const mockTx = {
+    organization: {
+      findUnique: async () => ({
+        id: 'org-qx-promo',
+        name: 'QX promotion',
+        slug: 'qx-promotion',
+      }),
+    },
+    workOrder: {
+      findMany: async () => [],
+    },
+  };
+
+  await assert.rejects(
+    async () => {
+      await syncGooglePlanToWorkOrders(
+        {
+          organizationId: 'org-qx-promo',
+          csvContent: 'FTD odeslána,FAKT,Datum,Den,Zadal,Pracovník dílna,Předáno klukům,Klient,Zadání,Kontakt na klienta/ osobu na místě,Datum zahájení,Datum ukončení,Typ nosiče,KS,Práce,Odkaz,Odkaz na FTD\n,,10.11.,úterý,M,Sonik,FALSE,OVA JIH,Test zadání,,,,,,,,',
+        },
+        { tx: mockTx as any }
+      );
+    },
+    {
+      message: 'Tato centrální Google Tabulka plánu práce je určena výhradně pro agenturu SeePOINT s.r.o. a nelze ji importovat do jiné agentury.',
+    }
+  );
 });
