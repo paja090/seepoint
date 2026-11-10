@@ -2,7 +2,7 @@
 
 import type { WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   workPriorityLabels,
   workStatusLabels,
@@ -17,6 +17,7 @@ import {
   Check,
   Route,
   RotateCcw,
+  Clock,
 } from 'lucide-react';
 
 export type WeekOrder = {
@@ -40,7 +41,10 @@ export type WeekOrder = {
   locationNote?: string | null;
 };
 
-type WorkWeekViewProps = { initialOrders: WeekOrder[] };
+type WorkWeekViewProps = {
+  initialOrders: WeekOrder[];
+  onOpenReschedule?: (order: WeekOrder) => void;
+};
 type OrderPatch = Partial<Pick<WeekOrder, 'status' | 'ftdSent' | 'invoiced'>>;
 
 function startOfDay(value = new Date()) {
@@ -73,7 +77,7 @@ function isOrderOverdue(order: WeekOrder, now = new Date()) {
   return Boolean(order.deadlineAt && new Date(order.deadlineAt) < now && isOpen(order));
 }
 
-export function WorkWeekView({ initialOrders }: WorkWeekViewProps) {
+export function WorkWeekView({ initialOrders, onOpenReschedule }: WorkWeekViewProps) {
   const [orders, setOrders] = useState(initialOrders);
   const [weekOffset, setWeekOffset] = useState(0);
   const [workerFilter, setWorkerFilter] = useState('ALL');
@@ -81,6 +85,10 @@ export function WorkWeekView({ initialOrders }: WorkWeekViewProps) {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | 'DONE'>('ALL');
   const [savingId, setSavingId] = useState<string>();
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setOrders(initialOrders);
+  }, [initialOrders]);
 
   const workers = useMemo(
     () => [...new Set(orders.flatMap((order) => order.workers))].filter(Boolean).sort((a, b) => a.localeCompare(b, 'cs')),
@@ -395,25 +403,38 @@ export function WorkWeekView({ initialOrders }: WorkWeekViewProps) {
                               )}
                             </div>
 
-                            {/* 1-click status toggle button (Done / Re-open) */}
-                            <button
-                              type="button"
-                              disabled={savingId === order.id}
-                              onClick={() =>
-                                void updateOrder(order, {
-                                  status: isDone ? 'PLANNED' : 'DONE',
-                                  ftdSent: isDone ? false : order.ftdSent,
-                                })
-                              }
-                              title={isDone ? 'Vrátit zpět k řešení' : 'Označit jako hotovo'}
-                              className={`shrink-0 flex items-center justify-center size-6 rounded-md border text-xs font-black transition cursor-pointer ${
-                                isDone
-                                  ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
-                                  : 'bg-white text-slate-400 border-slate-200 hover:text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50'
-                              }`}
-                            >
-                              <Check size={13} strokeWidth={3} />
-                            </button>
+                            {/* Actions: Reschedule & 1-click status toggle */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              {onOpenReschedule && (
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenReschedule(order)}
+                                  title="Přeplánovat zakázku na jiný den"
+                                  className="flex items-center justify-center size-6 rounded-md border border-slate-200 bg-white text-slate-400 hover:text-sky-700 hover:border-sky-300 hover:bg-sky-50 text-xs transition cursor-pointer"
+                                >
+                                  <Clock size={12} />
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                disabled={savingId === order.id}
+                                onClick={() =>
+                                  void updateOrder(order, {
+                                    status: isDone ? 'PLANNED' : 'DONE',
+                                    ftdSent: isDone ? false : order.ftdSent,
+                                  })
+                                }
+                                title={isDone ? 'Vrátit zpět k řešení' : 'Označit jako hotovo'}
+                                className={`flex items-center justify-center size-6 rounded-md border text-xs font-black transition cursor-pointer ${
+                                  isDone
+                                    ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700'
+                                    : 'bg-white text-slate-400 border-slate-200 hover:text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50'
+                                }`}
+                              >
+                                <Check size={13} strokeWidth={3} />
+                              </button>
+                            </div>
                           </div>
 
                           {/* Order Title (Clickable link) */}
