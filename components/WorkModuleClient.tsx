@@ -19,8 +19,10 @@ import {
   ArrowRight,
   RefreshCw,
 } from 'lucide-react';
+import { WorkDayView } from './WorkDayView';
 import { WorkWeekView } from './WorkWeekView';
 import { WorkPlanListView, type WorkOrderData } from './WorkPlanListView';
+import { RescheduleOrderModal } from './RescheduleOrderModal';
 import { WorkOrderForm } from './WorkOrderForm';
 import type { WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
 import type { WorkCategory } from '@/lib/work-categories';
@@ -64,12 +66,25 @@ export function WorkModuleClient({
   // Open create modal automatically if redirected with initial carrier or client
   const autoOpenModal = Boolean(initialCarrierCode || initialClientName || initialCampaignDateFrom);
   const [createModalOpen, setCreateModalOpen] = useState(autoOpenModal);
-  const [activeTab, setActiveTab] = useState<'calendar' | 'list'>('calendar');
+  const [createTargetDate, setCreateTargetDate] = useState<string>('');
+  const [rescheduleOrder, setRescheduleOrder] = useState<WorkOrderData | null>(null);
+  const [activeTab, setActiveTab] = useState<'day' | 'calendar' | 'list'>('day');
+  const [ordersList, setOrdersList] = useState<WorkOrderData[]>(orders);
   const [selectedFilter, setSelectedFilter] = useState<'open' | 'today' | 'week' | 'urgent' | 'invoicing' | 'history' | 'all'>('open');
   const [scopeFilter, setScopeFilter] = useState<'ALL' | 'WORKSHOP' | 'FIELD' | 'ROUTED' | 'UNROUTED'>('ALL');
   const [syncingGoogle, setSyncingGoogle] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    setOrdersList(orders);
+  }, [orders]);
+
+  const handleOrderUpdated = (orderId: string, patch: Partial<WorkOrderData>) => {
+    setOrdersList((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, ...patch } : o))
+    );
+  };
 
   const handleSyncGoogleSheet = async () => {
     setSyncingGoogle(true);
@@ -117,8 +132,8 @@ export function WorkModuleClient({
   const weekEnd = new Date(dayStart);
   weekEnd.setDate(weekEnd.getDate() + 7);
 
-  const openOrders = orders.filter((o) => !['DONE', 'CANCELLED'].includes(o.status));
-  const completedOrders = orders.filter((o) => ['DONE', 'CANCELLED'].includes(o.status));
+  const openOrders = ordersList.filter((o) => !['DONE', 'CANCELLED'].includes(o.status));
+  const completedOrders = ordersList.filter((o) => ['DONE', 'CANCELLED'].includes(o.status));
 
   const openCount = openOrders.length;
   const historyCount = completedOrders.length;
@@ -134,15 +149,15 @@ export function WorkModuleClient({
   }).length;
 
   const urgentCount = openOrders.filter((o) => o.priority === 'URGENT').length;
-  const invoicingCount = orders.filter((o) => o.ftdSent && !o.invoiced && o.status !== 'CANCELLED').length;
+  const invoicingCount = ordersList.filter((o) => o.ftdSent && !o.invoiced && o.status !== 'CANCELLED').length;
 
-  const workshopCount = orders.filter(isWorkshopOrder).length;
-  const fieldCount = orders.filter(isFieldOrder).length;
+  const workshopCount = ordersList.filter(isWorkshopOrder).length;
+  const fieldCount = ordersList.filter(isFieldOrder).length;
   const routedCount = openOrders.filter(isRoutedOrder).length;
   const unroutedCount = openOrders.filter(isUnroutedOrder).length;
 
   // Filter orders based on active stat tile selection and scope filter
-  const filteredOrders = orders.filter((o) => {
+  const filteredOrders = ordersList.filter((o) => {
     if (scopeFilter === 'WORKSHOP' && !isWorkshopOrder(o)) return false;
     if (scopeFilter === 'FIELD' && !isFieldOrder(o)) return false;
     if (scopeFilter === 'ROUTED' && !isRoutedOrder(o)) return false;
@@ -539,31 +554,44 @@ export function WorkModuleClient({
 
       {/* MAIN VIEW CONTROLS & TABS */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-2 sm:pb-0">
-        <div className="flex gap-2">
+        <div className="flex gap-1.5 sm:gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab('day')}
+            className={`flex items-center gap-2 px-4 sm:px-5 py-3 font-black text-sm border-b-2 transition ${
+              activeTab === 'day'
+                ? 'border-sky-600 text-sky-600'
+                : 'border-transparent text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <Clock size={18} className={activeTab === 'day' ? 'text-sky-600' : 'text-slate-400'} />
+            <span>Denní přehled</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setActiveTab('calendar')}
-            className={`flex items-center gap-2 px-5 py-3 font-extrabold text-sm border-b-2 transition ${
+            className={`flex items-center gap-2 px-4 sm:px-5 py-3 font-black text-sm border-b-2 transition ${
               activeTab === 'calendar'
                 ? 'border-sky-600 text-sky-600'
                 : 'border-transparent text-slate-500 hover:text-slate-900'
             }`}
           >
-            <Calendar size={18} />
-            Týdenní kalendář
+            <Calendar size={18} className={activeTab === 'calendar' ? 'text-sky-600' : 'text-slate-400'} />
+            <span>Týdenní kalendář</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('list')}
-            className={`flex items-center gap-2 px-5 py-3 font-extrabold text-sm border-b-2 transition ${
+            className={`flex items-center gap-2 px-4 sm:px-5 py-3 font-black text-sm border-b-2 transition ${
               activeTab === 'list'
                 ? 'border-sky-600 text-sky-600'
                 : 'border-transparent text-slate-500 hover:text-slate-900'
             }`}
           >
-            <List size={18} />
-            Seznam zakázek ({filteredOrders.length})
+            <List size={18} className={activeTab === 'list' ? 'text-sky-600' : 'text-slate-400'} />
+            <span>Seznam zakázek ({filteredOrders.length})</span>
           </button>
         </div>
 
@@ -578,7 +606,7 @@ export function WorkModuleClient({
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Vše ({orders.length})
+            Vše ({ordersList.length})
           </button>
           <button
             type="button"
@@ -633,6 +661,20 @@ export function WorkModuleClient({
         </div>
       </div>
 
+      {/* VIEW TAB 0: DAILY OVERVIEW */}
+      {activeTab === 'day' && (
+        <WorkDayView
+          orders={filteredOrders}
+          todayRoutes={todayRoutes}
+          onOpenReschedule={(order) => setRescheduleOrder(order)}
+          onOpenCreateModal={(dateStr) => {
+            setCreateTargetDate(dateStr);
+            setCreateModalOpen(true);
+          }}
+          onOrderUpdated={handleOrderUpdated}
+        />
+      )}
+
       {/* VIEW TAB 1: WEEKLY CALENDAR */}
       {activeTab === 'calendar' && (
         <WorkWeekView
@@ -656,13 +698,30 @@ export function WorkModuleClient({
             mediaLabel: o.mediaLabel,
             locationNote: o.locationNote,
           }))}
+          onOpenReschedule={(weekOrder) => {
+            const found = ordersList.find((o) => o.id === weekOrder.id);
+            if (found) setRescheduleOrder(found);
+          }}
         />
       )}
 
       {/* VIEW TAB 2: DETAILED LIST */}
       {activeTab === 'list' && (
-        <WorkPlanListView orders={filteredOrders} canCleanup={canCreateWorkOrder} />
+        <WorkPlanListView
+          orders={filteredOrders}
+          canCleanup={canCreateWorkOrder}
+          onOpenReschedule={(order) => setRescheduleOrder(order)}
+        />
       )}
+
+      {/* RESCHEDULE MODAL */}
+      <RescheduleOrderModal
+        order={rescheduleOrder}
+        onClose={() => setRescheduleOrder(null)}
+        onSuccess={(orderId, newDate) => {
+          handleOrderUpdated(orderId, { scheduledAt: newDate });
+        }}
+      />
 
       {/* MODAL DIALOG: ADD NEW TASK (WorkOrderForm) */}
       {createModalOpen && canCreateWorkOrder && (
@@ -679,7 +738,10 @@ export function WorkModuleClient({
                 </p>
               </div>
               <button
-                onClick={() => setCreateModalOpen(false)}
+                onClick={() => {
+                  setCreateModalOpen(false);
+                  setCreateTargetDate('');
+                }}
                 className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
               >
                 <X size={20} />
@@ -693,8 +755,8 @@ export function WorkModuleClient({
               currentUserName={currentUserName}
               initialCarrierCode={initialCarrierCode}
               initialClientName={initialClientName}
-              initialCampaignDateFrom={initialCampaignDateFrom}
-              initialCampaignDateTo={initialCampaignDateTo}
+              initialCampaignDateFrom={createTargetDate || initialCampaignDateFrom}
+              initialCampaignDateTo={createTargetDate || initialCampaignDateTo}
               categories={categories}
             />
           </div>

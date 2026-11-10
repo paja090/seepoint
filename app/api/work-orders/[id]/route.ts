@@ -6,7 +6,15 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { syncWorkOrderTasks } from '@/lib/work-task-sync';
 
-type UpdateInput = { status?: unknown; priority?: unknown; price?: unknown; ftdSent?: unknown; invoiced?: unknown };
+type UpdateInput = {
+  status?: unknown;
+  priority?: unknown;
+  price?: unknown;
+  ftdSent?: unknown;
+  invoiced?: unknown;
+  scheduledAt?: unknown;
+  deadlineAt?: unknown;
+};
 type EditInput = Record<string, unknown>;
 
 function text(input: EditInput, key: string) {
@@ -61,6 +69,26 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const price = parsePrice(input.price);
   if (price === false) return NextResponse.json({ error: 'Cena musí být kladné číslo s nejvýše dvěma desetinnými místy.' }, { status: 400 });
 
+  let scheduledAt: Date | undefined;
+  if (input.scheduledAt !== undefined) {
+    if (typeof input.scheduledAt === 'string') {
+      const d = new Date(input.scheduledAt);
+      if (!Number.isNaN(d.getTime())) {
+        scheduledAt = d;
+      }
+    }
+  }
+
+  let deadlineAt: Date | undefined;
+  if (input.deadlineAt !== undefined) {
+    if (typeof input.deadlineAt === 'string') {
+      const d = new Date(input.deadlineAt);
+      if (!Number.isNaN(d.getTime())) {
+        deadlineAt = d;
+      }
+    }
+  }
+
   const { id } = await params;
   const existing = await prisma.workOrder.findUnique({ where: { id }, select: { id: true } });
   if (!existing) return NextResponse.json({ error: 'Pracovní úkol nebyl nalezen.' }, { status: 404 });
@@ -93,8 +121,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           price,
           ftdSent: typeof input.ftdSent === 'boolean' ? input.ftdSent : undefined,
           invoiced: typeof input.invoiced === 'boolean' ? input.invoiced : undefined,
+          scheduledAt: scheduledAt ?? undefined,
+          deadlineAt: deadlineAt ?? undefined,
         },
-        select: { id: true, status: true, priority: true, price: true, ftdSent: true, invoiced: true },
+        select: { id: true, status: true, priority: true, price: true, ftdSent: true, invoiced: true, scheduledAt: true, deadlineAt: true },
       });
       await syncWorkOrderTasks(id, tx);
       return updated;

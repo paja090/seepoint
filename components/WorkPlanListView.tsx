@@ -9,7 +9,9 @@ import {
   Zap,
   ArrowRight,
   CheckCircle2,
+  Calendar,
 } from 'lucide-react';
+import { RescheduleOrderModal } from './RescheduleOrderModal';
 import {
   formatWorkDate,
   formatWorkPrice,
@@ -50,9 +52,11 @@ export type WorkOrderData = {
 export function WorkPlanListView({
   orders: initialOrders,
   canCleanup = true,
+  onOpenReschedule,
 }: {
   orders: WorkOrderData[];
   canCleanup?: boolean;
+  onOpenReschedule?: (order: WorkOrderData) => void;
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'ACTIVE' | 'HISTORY'>('ACTIVE');
@@ -60,8 +64,13 @@ export function WorkPlanListView({
   const [cleaning, setCleaning] = useState(false);
   const [cleanupMessage, setCleanupMessage] = useState('');
   const [completingId, setCompletingId] = useState<string | null>(null);
+  const [rescheduleTarget, setRescheduleTarget] = useState<WorkOrderData | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [planTargetDate, setPlanTargetDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+
+  React.useEffect(() => {
+    setOrders(initialOrders);
+  }, [initialOrders]);
 
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -439,13 +448,31 @@ export function WorkPlanListView({
                           type="button"
                           onClick={(e) => handleCompleteOrder(e, order.id)}
                           disabled={completingId === order.id}
-                          className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-800 hover:bg-emerald-100 transition shadow-2xs disabled:opacity-50"
+                          className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-800 hover:bg-emerald-100 transition shadow-2xs disabled:opacity-50 cursor-pointer"
                           title="Označit zakázku jako dokončenou"
                         >
                           <CheckCircle2 size={12} className="text-emerald-600" />
                           <span>{completingId === order.id ? 'Ukládám…' : '✓ Hotovo'}</span>
                         </button>
                       )}
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (onOpenReschedule) {
+                            onOpenReschedule(order);
+                          } else {
+                            setRescheduleTarget(order);
+                          }
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-black text-sky-800 hover:bg-sky-100 transition shadow-2xs cursor-pointer"
+                        title="Přeplánovat zakázku na jiný den"
+                      >
+                        <Calendar size={12} className="text-sky-600" />
+                        <span>Přeplánovat</span>
+                      </button>
 
                       {canCleanup && (
                         <button
@@ -513,6 +540,18 @@ export function WorkPlanListView({
           </div>
         </div>
       )}
+
+      {/* RESCHEDULE MODAL */}
+      <RescheduleOrderModal
+        order={rescheduleTarget}
+        onClose={() => setRescheduleTarget(null)}
+        onSuccess={(orderId, newDate) => {
+          setOrders((prev) =>
+            prev.map((o) => (o.id === orderId ? { ...o, scheduledAt: newDate } : o))
+          );
+          router.refresh();
+        }}
+      />
     </section>
   );
 }
