@@ -91,7 +91,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
         items: { include: { carrier: true } },
       },
       orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }],
-      take: 800,
+      take: 120,
     }),
     prisma.client.findMany({
       where: { organizationId: user.organizationId, active: true },

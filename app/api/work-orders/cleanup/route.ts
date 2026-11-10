@@ -15,9 +15,9 @@ export async function POST() {
     // Find old completed or cancelled work orders
     const oldOrders = await prisma.workOrder.findMany({
       where: {
+        organizationId: auth.organizationId!,
         status: { in: ['DONE', 'CANCELLED'] },
         scheduledAt: { lt: cutoffDate },
-        items: { none: {} },
       },
       select: { id: true },
     });
