@@ -36,7 +36,7 @@ export type DiscoveryRunResult = {
 export async function runDiscoveryForOrganization(
   params: DiscoveryRunParams
 ): Promise<DiscoveryRunResult> {
-  const { organizationId, userId, triggerType, batchLimit = 15, timeBudgetMs = 75_000 } = params;
+  const { organizationId, userId, triggerType, batchLimit = 25, timeBudgetMs = 75_000 } = params;
 
   return runWithTenantContext(
     {
@@ -172,7 +172,7 @@ export async function runDiscoveryForOrganization(
           (s) => s.status === 'NEW' && !s.discoveredOpportunityId
         );
         const remainingSlots = Math.max(batchLimit - addedCount, 0);
-        const maxRssBatch = Math.min(remainingSlots, 6);
+        const maxRssBatch = Math.min(remainingSlots, 15);
         const signalsToProcess = unanalyzedSignals.slice(0, maxRssBatch);
 
         const shouldProcessRssAi =

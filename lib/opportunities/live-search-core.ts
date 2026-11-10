@@ -72,7 +72,7 @@ PŘÍSNÁ PRAVIDLA:
 - Vždy uveď skutečnou URL adresu článku nebo webu v poli "sourceUrl".
 - Pokud město v článku není jednoznačné, zadej "city": null.
 
-Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 8 až 12 nalezenými příležitostmi:
+Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 12 až 18 nalezenými příležitostmi:
 [
   {
     "companyName": "Přesný název firmy, značky, developera, pořadatele nebo akce",
@@ -90,6 +90,7 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 8 až 12 nalezenými př�
     "eventDate": "Datum YYYY-MM-DD (pouze pokud je >= ${todayISO}, jinak null)",
     "sourceUrl": "Skutečná URL zprávy / článku",
     "sourceTitle": "Titulek článku nebo název zdroje",
+    "sourcePublishedAt": "Datum vydání článku YYYY-MM-DD (pokud je známo, jinak ${todayISO})",
     "suggestedMediaTypes": ["BILLBOARD", "CITYLIGHT", "NAVIGATION_SIGN"]
   }
 ]`;
@@ -177,14 +178,19 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 8 až 12 nalezenými př�
         const title = String(item.title || `Příležitost ${companyName}`).trim().slice(0, 240);
         const summary = String(item.summary || 'Dohledaná obchodní příležitost.').trim().slice(0, 4000);
 
-        if (typeof item.sourceUrl !== 'string' || !/^https?:\/\//.test(item.sourceUrl)) continue;
-        const sourceUrl = typeof item.sourceUrl === 'string' && item.sourceUrl.startsWith('http')
-          ? item.sourceUrl.trim().slice(0, 2000)
-          : '';
+        let sourceUrl = typeof item.sourceUrl === 'string' ? item.sourceUrl.trim().slice(0, 2000) : '';
+        if (sourceUrl && !sourceUrl.startsWith('http://') && !sourceUrl.startsWith('https://')) {
+          sourceUrl = `https://${sourceUrl}`;
+        }
+        if (!/^https?:\/\//.test(sourceUrl)) continue;
 
         const evidenceFact = typeof item.evidenceFact === 'string' && item.evidenceFact.trim() ? item.evidenceFact.trim().slice(0, 4000) : undefined;
         const aiInterpretation = typeof item.aiInterpretation === 'string' && item.aiInterpretation.trim() ? item.aiInterpretation.trim().slice(0, 4000) : undefined;
         const aiRecommendation = typeof item.aiRecommendation === 'string' && item.aiRecommendation.trim() ? item.aiRecommendation.trim().slice(0, 4000) : undefined;
+
+        const sourcePublishedAt = typeof item.sourcePublishedAt === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(item.sourcePublishedAt)
+          ? item.sourcePublishedAt
+          : todayISO;
 
         const parsed = parseOpportunityCreateInput({
           semanticData: extractFacts(item.semanticData),
@@ -205,7 +211,7 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 8 až 12 nalezenými př�
           eventDate: validDate,
           sourceUrl,
           sourceTitle: typeof item.sourceTitle === 'string' && item.sourceTitle.trim() ? item.sourceTitle.trim().slice(0, 500) : 'AI Živý webový průzkum',
-          sourcePublishedAt: typeof item.sourcePublishedAt === 'string' ? item.sourcePublishedAt : undefined,
+          sourcePublishedAt,
           suggestedMediaTypes: suggestedMedia,
         });
 

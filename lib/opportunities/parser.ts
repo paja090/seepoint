@@ -33,25 +33,33 @@ export async function parseOpportunityFromAiInput(
   let pageTitle = urlHint ? rawInput.split('\n')[0]?.trim() || 'Externí článek' : 'Manuální vložení zprávy';
 
   // If a URL was provided, attempt to fetch its text content if it starts with http
-  if (urlHint) {
-    const article = await fetchPublicArticle(urlHint, deadline);
-    const titleMatch = article.text.match(/<title>(.*?)<\/title>/i);
-    const fetchedTitle = titleMatch?.[1]?.replace(/<[^>]+>/g, '').trim().slice(0, 500);
-    if (fetchedTitle && !/^google news$/i.test(fetchedTitle)) {
-      pageTitle = fetchedTitle;
+  if (urlHint && urlHint.startsWith('http')) {
+    const isGoogleRedirect = urlHint.includes('news.google.com') || urlHint.includes('consent.google.com');
+    if (!isGoogleRedirect) {
+      try {
+        const article = await fetchPublicArticle(urlHint, deadline);
+        const titleMatch = article.text.match(/<title>(.*?)<\/title>/i);
+        const fetchedTitle = titleMatch?.[1]?.replace(/<[^>]+>/g, '').trim().slice(0, 500);
+        if (fetchedTitle && !/^google news$/i.test(fetchedTitle)) {
+          pageTitle = fetchedTitle;
+        }
+        const bodyText = article.text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+          .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 4000);
+        if (bodyText.length > 200 && !/^google news/i.test(bodyText) && !/consent\.google/i.test(bodyText)) {
+          pageContent = rawInput.trim()
+            ? `${rawInput.trim()}\n\nObsah článku:\n${bodyText}`.slice(0, 4500)
+            : bodyText;
+        }
+        urlHint = article.finalUrl;
+      } catch (fetchErr) {
+        // Fallback gracefully to rawInput (RSS title and summary) without crashing the pipeline
+        console.warn('Could not fetch external article body, proceeding with RSS text:', fetchErr instanceof Error ? fetchErr.message : fetchErr);
+      }
     }
-    const bodyText = article.text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 4000);
-    if (bodyText.length > 200 && !/^google news/i.test(bodyText)) {
-      pageContent = rawInput.trim()
-        ? `${rawInput.trim()}\n\nObsah článku:\n${bodyText}`.slice(0, 4500)
-        : bodyText;
-    }
-    urlHint = article.finalUrl;
   }
 
   if (pageContent.length > 10_000) throw new OpportunityValidationError('Text podkladu je příliš dlouhý.', 413);

@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     },
     async () => {
       const body = await request.json().catch(() => ({}));
-      const batchLimit = Math.min(Math.max(Number(body?.limit) || 15, 5), 25);
+      const batchLimit = Math.min(Math.max(Number(body?.limit) || 25, 5), 35);
 
       // Discovery runner processes signals bounded by remaining slots: .slice(0, remainingSlots)
       const result = await runDiscoveryForOrganization({
