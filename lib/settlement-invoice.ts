@@ -794,7 +794,7 @@ export async function sendSettlementInvoiceEmail(
     actor: { id: string; email: string; role: string; organizationId?: string };
   },
   dependencies?: {
-    tx?: Prisma.TransactionClient | any;
+    tx?: Prisma.TransactionClient;
     sendEmailFn?: typeof sendTransactionalEmail;
   }
 ): Promise<{
