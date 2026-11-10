@@ -115,7 +115,7 @@ test('Google Sheets Sync: parseGooglePlanCsv parses real sample rows correctly a
     'ANO,ANO,10.11.,úterý,V,Sonik,TRUE,DPO,"Deinstalace 3 ks MT https://maps.google.com",,10.11.2026,10.11.2026,MT,3,deinstalace,,10 11 DPO',
   ].join('\n');
 
-  const tasks = parseGooglePlanCsv(sampleCsv, 2026);
+  const tasks = parseGooglePlanCsv(sampleCsv, 2026, new Date(Date.UTC(2026, 10, 10, 0, 0, 0)));
   assert.equal(tasks.length, 3); // skips "L E D E N" row
 
   // First task (Promed optic)
@@ -229,6 +229,7 @@ test('Google Sheets Sync: syncGooglePlanToWorkOrders creates new orders and upda
       organizationId: 'org-test-1',
       csvContent: sampleCsv,
       defaultYear: 2026,
+      referenceDate: new Date(Date.UTC(2026, 10, 10, 0, 0, 0)),
     },
     { tx: mockTx as any }
   );
@@ -250,6 +251,7 @@ test('Google Sheets Sync: syncGooglePlanToWorkOrders creates new orders and upda
       organizationId: 'org-test-1',
       csvContent: updatedCsv,
       defaultYear: 2026,
+      referenceDate: new Date(Date.UTC(2026, 10, 10, 0, 0, 0)),
     },
     { tx: mockTx as any }
   );
@@ -301,3 +303,39 @@ test('Google Sheets Sync: syncGooglePlanToWorkOrders rejects non-SeePoint agency
     }
   );
 });
+
+test('Google Sheets Sync: automatically sets status DONE for past historical or invoiced tasks', () => {
+  const sampleCsv = [
+    'FTD odeslána,FAKT,Datum,Den,Zadal,Pracovník dílna,Předáno klukům,Klient,Zadání,Kontakt na klienta/ osobu na místě,Datum zahájení,Datum ukončení,Typ nosiče,KS,Práce,Odkaz,Odkaz na FTD',
+    'BEZ,BEZ,15.1.,středa,V,Pavel,TRUE,Minulý klient,Oprava nosiče v lednu,,15.1.2026,15.1.2026,CG,1,oprava,,',
+    'BEZ,BEZ,15.1.,středa,V,Pavel,FALSE,Starý nezaškrtnutý,Starý úkol bez předání,,15.1.2026,15.1.2026,CG,1,oprava,,',
+    ',ANO,20.11.,pátek,M,Sonik,FALSE,Budoucí vyfakturovaný,Už vyfakturováno dopředu,,20.11.2026,20.11.2026,MT,2,montáž,,',
+    ',,20.11.,pátek,M,Sonik,TRUE,Budoucí předaný,Předáno posádce na příští týden,,20.11.2026,20.11.2026,MT,2,montáž,,',
+    ',,20.11.,pátek,M,Sonik,FALSE,Budoucí otevřený,Plánovaný úkol na příští týden,,20.11.2026,20.11.2026,MT,2,montáž,,',
+  ].join('\n');
+
+  // Reference date: 10.11.2026
+  const tasks = parseGooglePlanCsv(sampleCsv, 2026, new Date(Date.UTC(2026, 10, 10, 0, 0, 0)));
+  assert.equal(tasks.length, 5);
+
+  // 1. Past task (15.1.) with Predano=TRUE -> DONE
+  assert.equal(tasks[0].clientName, 'Minulý klient');
+  assert.equal(tasks[0].status, 'DONE');
+
+  // 2. Past task (15.1.) with Predano=FALSE -> DONE (historical past tasks are completed)
+  assert.equal(tasks[1].clientName, 'Starý nezaškrtnutý');
+  assert.equal(tasks[1].status, 'DONE');
+
+  // 3. Future task (20.11.) with FAKT=ANO -> DONE
+  assert.equal(tasks[2].clientName, 'Budoucí vyfakturovaný');
+  assert.equal(tasks[2].status, 'DONE');
+
+  // 4. Future task (20.11.) with Predano=TRUE -> HANDED_OVER
+  assert.equal(tasks[3].clientName, 'Budoucí předaný');
+  assert.equal(tasks[3].status, 'HANDED_OVER');
+
+  // 5. Future task (20.11.) with Predano=FALSE -> PLANNED
+  assert.equal(tasks[4].clientName, 'Budoucí otevřený');
+  assert.equal(tasks[4].status, 'PLANNED');
+});
+

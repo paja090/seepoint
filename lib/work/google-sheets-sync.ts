@@ -298,9 +298,18 @@ export function parseWorkersList(workerCell?: string | null): string[] {
 /**
  * Parses raw Google Sheet CSV and returns an array of structured ParsedGooglePlanTask items.
  */
-export function parseGooglePlanCsv(csvContent: string, defaultYear = 2026): ParsedGooglePlanTask[] {
+export function parseGooglePlanCsv(
+  csvContent: string,
+  defaultYear = 2026,
+  referenceDate: Date = new Date()
+): ParsedGooglePlanTask[] {
   const rows = parseCsvRows(csvContent);
   if (!rows.length) return [];
+
+  const refYear = referenceDate.getUTCFullYear();
+  const refMonth = referenceDate.getUTCMonth();
+  const refDate = referenceDate.getUTCDate();
+  const todayStart = new Date(Date.UTC(refYear, refMonth, refDate, 0, 0, 0));
 
   // Find header row
   const headerIdx = rows.findIndex(
@@ -395,11 +404,17 @@ export function parseGooglePlanCsv(csvContent: string, defaultYear = 2026): Pars
     const workers = parseWorkersList(rawWorker);
     const requestedBy = parseZadavatel(rawZadal);
 
-    const status: WorkOrderStatus = isFtdSent
-      ? 'DONE'
-      : isHandedOver
-        ? 'HANDED_OVER'
-        : 'PLANNED';
+    let status: WorkOrderStatus;
+    if (isFtdSent || isInvoiced) {
+      status = 'DONE';
+    } else if (scheduledDate.getTime() < todayStart.getTime()) {
+      // Historical past tasks prior to today have already been completed in reality
+      status = 'DONE';
+    } else if (isHandedOver) {
+      status = 'HANDED_OVER';
+    } else {
+      status = 'PLANNED';
+    }
 
     const zadaniFirstLine = rawZadani ? rawZadani.split('\n')[0].trim() : '';
     const title = zadaniFirstLine
@@ -460,6 +475,7 @@ export type SyncGooglePlanOptions = {
   csvUrl?: string;
   csvContent?: string;
   defaultYear?: number;
+  referenceDate?: Date;
 };
 
 /**
@@ -473,7 +489,7 @@ export async function syncGooglePlanToWorkOrders(
     fetchCsvFn?: (url: string) => Promise<string>;
   }
 ): Promise<SyncGooglePlanResult> {
-  const { organizationId, csvUrl = DEFAULT_GOOGLE_PLAN_SHEET_CSV_URL, csvContent, defaultYear = 2026 } = options;
+  const { organizationId, csvUrl = DEFAULT_GOOGLE_PLAN_SHEET_CSV_URL, csvContent, defaultYear = 2026, referenceDate } = options;
   const client = dependencies?.tx || prisma;
 
   const isDefaultSheet = !options.csvUrl || options.csvUrl === DEFAULT_GOOGLE_PLAN_SHEET_CSV_URL;
@@ -504,7 +520,7 @@ export async function syncGooglePlanToWorkOrders(
     content = await fetcher(csvUrl);
   }
 
-  const tasks = parseGooglePlanCsv(content, defaultYear);
+  const tasks = parseGooglePlanCsv(content, defaultYear, referenceDate);
   if (!tasks.length) {
     return {
       success: true,
@@ -538,6 +554,9 @@ export async function syncGooglePlanToWorkOrders(
     const pc = eo.planningConstraints as Record<string, unknown> | null;
     if (pc && typeof pc.sheetKey === 'string') {
       existingBySheetKey.set(pc.sheetKey, eo);
+      if (typeof pc.sheetRow === 'number') {
+        existingBySheetKey.set(`${pc.sheetKey}_r${pc.sheetRow}`, eo);
+      }
     }
     const sig = `${eo.scheduledAt.toISOString().slice(0, 10)}::${eo.clientName.trim().toLowerCase()}::${eo.title.trim().toLowerCase()}`;
     existingBySignature.set(sig, eo);
@@ -549,7 +568,10 @@ export async function syncGooglePlanToWorkOrders(
 
   for (const task of tasks) {
     const signature = `${task.scheduledAt.toISOString().slice(0, 10)}::${task.clientName.trim().toLowerCase()}::${task.title.trim().toLowerCase()}`;
-    const existing = existingBySheetKey.get(task.sheetKey) || existingBySignature.get(signature);
+    const existing =
+      existingBySheetKey.get(`${task.sheetKey}_r${task.sheetRowIndex}`) ||
+      existingBySheetKey.get(task.sheetKey) ||
+      existingBySignature.get(signature);
 
     if (existing) {
       // Update existing work order if status, FTD or invoice flag changed
@@ -560,7 +582,7 @@ export async function syncGooglePlanToWorkOrders(
           invoiced: task.isInvoiced,
           ftdUrl: task.ftdUrl || undefined,
           referenceUrl: task.referenceUrl || undefined,
-          status: task.status,
+          status: existing.status === 'CANCELLED' ? 'CANCELLED' : task.status,
           contactName: task.contactName,
           contactPhone: task.contactPhone,
           requestedBy: task.requestedBy,

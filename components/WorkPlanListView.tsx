@@ -8,6 +8,7 @@ import {
   Trash2,
   Zap,
   ArrowRight,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   formatWorkDate,
@@ -58,6 +59,7 @@ export function WorkPlanListView({
   const [orders, setOrders] = useState(initialOrders);
   const [cleaning, setCleaning] = useState(false);
   const [cleanupMessage, setCleanupMessage] = useState('');
+  const [completingId, setCompletingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [planTargetDate, setPlanTargetDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
 
@@ -131,6 +133,30 @@ export function WorkPlanListView({
       setCleanupMessage(err instanceof Error ? err.message : 'Vyčištění selhalo');
     } finally {
       setCleaning(false);
+    }
+  };
+
+  const handleCompleteOrder = async (e: React.MouseEvent, orderId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCompletingId(orderId);
+    try {
+      const res = await fetch(`/api/work-orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'DONE' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Uložení stavu selhalo');
+
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: 'DONE' } : o))
+      );
+      router.refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Chyba při označení zakázky jako hotové');
+    } finally {
+      setCompletingId(null);
     }
   };
 
@@ -407,15 +433,30 @@ export function WorkPlanListView({
                       </p>
                     )}
 
-                    {canCleanup && (
-                      <button
-                        type="button"
-                        onClick={(e) => handleDeleteOrder(e, order.id, order.title)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-extrabold text-red-700 hover:bg-red-100 transition"
-                      >
-                        <Trash2 size={12} /> Odebrat úkol
-                      </button>
-                    )}
+                    <div className="flex flex-wrap items-center gap-1.5 md:justify-end pt-1">
+                      {!['DONE', 'CANCELLED'].includes(order.status) && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleCompleteOrder(e, order.id)}
+                          disabled={completingId === order.id}
+                          className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-800 hover:bg-emerald-100 transition shadow-2xs disabled:opacity-50"
+                          title="Označit zakázku jako dokončenou"
+                        >
+                          <CheckCircle2 size={12} className="text-emerald-600" />
+                          <span>{completingId === order.id ? 'Ukládám…' : '✓ Hotovo'}</span>
+                        </button>
+                      )}
+
+                      {canCleanup && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteOrder(e, order.id, order.title)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-extrabold text-red-700 hover:bg-red-100 transition"
+                        >
+                          <Trash2 size={12} /> Odebrat
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
