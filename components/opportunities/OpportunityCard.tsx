@@ -316,9 +316,13 @@ export function OpportunityCard({
           ) : null}
         </div>
 
-        <span className="text-[11px] font-semibold text-slate-400">
-          Detekováno: {new Date(item.detectedAt).toLocaleDateString('cs-CZ')}
-        </span>
+        <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-400">
+          {item.sourcePublishedAt ? (
+            <span>Zveřejněno: {new Date(item.sourcePublishedAt).toLocaleDateString('cs-CZ')}</span>
+          ) : null}
+          {item.sourcePublishedAt ? <span>•</span> : null}
+          <span>Detekováno: {new Date(item.detectedAt).toLocaleDateString('cs-CZ')}</span>
+        </div>
       </div>
 
       {/* Main Title & Subtitle */}

@@ -83,6 +83,7 @@ export type OpportunityFilterParams = {
   minScore?: number;
   maxScore?: number;
   assignedToUserId?: string;
+  sortBy?: 'date_desc' | 'date_asc' | 'score_desc' | 'event_date';
   take?: number;
   skip?: number;
 };

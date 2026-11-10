@@ -17,6 +17,7 @@ const initialFilters: FilterState = {
   eventType: '',
   status: '',
   minScore: '',
+  sortBy: 'date_desc',
 };
 
 export function SalesOpportunitiesClientView({
@@ -88,6 +89,7 @@ export function SalesOpportunitiesClientView({
       if (filters.eventType) query.set('eventType', filters.eventType);
       if (filters.status) query.set('status', filters.status);
       if (filters.minScore) query.set('minScore', filters.minScore);
+      if (filters.sortBy) query.set('sortBy', filters.sortBy);
 
       const res = await fetch(`/api/sales/opportunities?${query.toString()}`);
       const data = await res.json().catch(() => ({}));

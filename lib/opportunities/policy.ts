@@ -123,6 +123,11 @@ export function parseOpportunityFilters(params: URLSearchParams): OpportunityFil
   const minScore = params.has('minScore') ? numberParam('minScore', 0, 0, 100) : undefined;
   const maxScore = params.has('maxScore') ? numberParam('maxScore', 100, 0, 100) : undefined;
   if (minScore !== undefined && maxScore !== undefined && minScore > maxScore) throw new OpportunityValidationError('Minimální skóre nesmí být vyšší než maximální.');
+  const rawSort = params.get('sortBy');
+  const allowedSorts = ['date_desc', 'date_asc', 'score_desc', 'event_date'];
+  if (rawSort && !allowedSorts.includes(rawSort)) throw new OpportunityValidationError('Neplatný parametr řazení.');
+  const sortBy = (rawSort as OpportunityFilterParams['sortBy']) || 'date_desc';
+
   return {
     search: clean(params.get('search'), 'Hledání', 200),
     city: clean(params.get('city'), 'Město', 120),
@@ -132,6 +137,7 @@ export function parseOpportunityFilters(params: URLSearchParams): OpportunityFil
     minScore,
     maxScore,
     assignedToUserId: clean(params.get('assignedToUserId'), 'Obchodník', 80),
+    sortBy,
     take: numberParam('take', 50, 1, 100),
     skip: numberParam('skip', 0, 0, 10_000),
   };

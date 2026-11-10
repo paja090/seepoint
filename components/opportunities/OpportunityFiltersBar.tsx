@@ -9,7 +9,15 @@ export type FilterState = {
   eventType: string;
   status: string;
   minScore: string;
+  sortBy: string;
 };
+
+const sortOptions = [
+  { value: 'date_desc', label: '📅 Nejnovější nálezy' },
+  { value: 'score_desc', label: '🔥 Nejvyšší skóre' },
+  { value: 'event_date', label: '📆 Termín události' },
+  { value: 'date_asc', label: '⏳ Nejstarší nálezy' },
+];
 
 const eventTypeOptions: Array<{ value: OpportunityEventType | ''; label: string }> = [
   { value: '', label: 'Všechny typy událostí' },
@@ -52,7 +60,7 @@ export function OpportunityFiltersBar({
       <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
           <Filter className="w-4 h-4 text-purple-400" />
-          <span>Filtrovat příležitosti</span>
+          <span>Filtrovat a řadit příležitosti</span>
         </div>
         <button
           type="button"
@@ -64,7 +72,7 @@ export function OpportunityFiltersBar({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         {/* Search input */}
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
@@ -125,10 +133,25 @@ export function OpportunityFiltersBar({
             value={filters.minScore}
             onChange={(e) => onChange('minScore', e.target.value)}
           >
-            <option value="">Všechny Opportunity Score</option>
+            <option value="">Všechna skóre</option>
             <option value="80">🔥 Silné (Score 80+)</option>
             <option value="60">⚡ Střední (Score 60+)</option>
             <option value="40">📍 Základní (Score 40+)</option>
+          </select>
+        </div>
+
+        {/* Sort Select */}
+        <div>
+          <select
+            className="input text-xs py-2 w-full font-medium text-purple-300 border-purple-800/60 bg-slate-900"
+            value={filters.sortBy || 'date_desc'}
+            onChange={(e) => onChange('sortBy', e.target.value)}
+          >
+            {sortOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
           </select>
         </div>
       </div>

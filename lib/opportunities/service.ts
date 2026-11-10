@@ -42,46 +42,74 @@ export async function getOpportunities(params: OpportunityFilterParams = {}, org
     ];
   }
 
-  const [items, total] = await Promise.all([
-    prisma.salesOpportunity.findMany({
-      where,
-      include: {
-        _count: { select: { sources: true } },
-        sources: { where: { organizationId, semanticDecision: 'SAME_OPPORTUNITY', semanticConfidence: { not: null } }, select: { semanticConfidence: true }, orderBy: { updatedAt: 'desc' }, take: 1 },
-        client: {
-          select: {
-            id: true,
-            name: true,
-            companyId: true,
-            status: true,
+    const sortBy = params.sortBy || 'date_desc';
+    let orderBy: Prisma.SalesOpportunityOrderByWithRelationInput[];
+    switch (sortBy) {
+      case 'score_desc':
+        orderBy = [
+          { opportunityScore: 'desc' },
+          { detectedAt: 'desc' },
+          { createdAt: 'desc' },
+        ];
+        break;
+      case 'date_asc':
+        orderBy = [
+          { detectedAt: 'asc' },
+          { createdAt: 'asc' },
+        ];
+        break;
+      case 'event_date':
+        orderBy = [
+          { eventDate: { sort: 'asc', nulls: 'last' } },
+          { detectedAt: 'desc' },
+        ];
+        break;
+      case 'date_desc':
+      default:
+        orderBy = [
+          { detectedAt: 'desc' },
+          { createdAt: 'desc' },
+        ];
+        break;
+    }
+
+    const [items, total] = await Promise.all([
+      prisma.salesOpportunity.findMany({
+        where,
+        include: {
+          _count: { select: { sources: true } },
+          sources: { where: { organizationId, semanticDecision: 'SAME_OPPORTUNITY', semanticConfidence: { not: null } }, select: { semanticConfidence: true }, orderBy: { updatedAt: 'desc' }, take: 1 },
+          client: {
+            select: {
+              id: true,
+              name: true,
+              companyId: true,
+              status: true,
+            },
+          },
+          createdOffer: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              isNoPriceConcept: true,
+              createdAt: true,
+            },
+          },
+          assignedTo: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
           },
         },
-        createdOffer: {
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            isNoPriceConcept: true,
-            createdAt: true,
-          },
-        },
-        assignedTo: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
-      orderBy: [
-        { opportunityScore: 'desc' },
-        { createdAt: 'desc' },
-      ],
-      take: params.take || 50,
-      skip: params.skip || 0,
-    }),
-    prisma.salesOpportunity.count({ where }),
-  ]);
+        orderBy,
+        take: params.take || 50,
+        skip: params.skip || 0,
+      }),
+      prisma.salesOpportunity.count({ where }),
+    ]);
 
   return { items, total };
 }
