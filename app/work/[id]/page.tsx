@@ -23,19 +23,13 @@ import {
   FileText,
   MapPin,
   Phone,
-  Clock,
   UserCheck,
   ArrowLeft,
-  Share2,
   Copy,
-  Briefcase,
-  AlertCircle,
   CheckCircle2,
   Car,
   Truck,
   Mail,
-  User,
-  Calendar,
   PlusCircle,
   Navigation,
 } from 'lucide-react';
@@ -96,14 +90,15 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
         },
       },
     }),
-    prisma.client.findMany({ where: { active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    prisma.client.findMany({ where: { organizationId: user.organizationId, active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
     prisma.advertisingCarrier.findMany({
+      where: { organizationId: user.organizationId },
       orderBy: [{ city: 'asc' }, { name: 'asc' }],
       select: { id: true, code: true, name: true, city: true, surfaces: { select: { id: true, name: true } } },
     }),
   ]);
 
-  if (!order) notFound();
+  if (!order || order.organizationId !== user.organizationId) notFound();
 
   const electionCampaignId = (order.planningConstraints as { electionCampaignId?: string } | null)?.electionCampaignId;
   const electionCampaign = electionCampaignId
@@ -127,6 +122,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
 
   const vehicleReservations = await prisma.vehicleReservation.findMany({
     where: {
+      organizationId: user.organizationId,
       status: { in: ['RESERVED', 'ACTIVE'] },
       dateFrom: { lte: endOfDay },
       dateTo: { gte: startOfDay },
