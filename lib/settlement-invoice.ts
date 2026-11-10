@@ -2,6 +2,8 @@ import { prisma } from './db';
 import { Prisma, Settlement, Invoice, InvoiceItem } from '@prisma/client';
 import pdfMake from 'pdfmake';
 import roboto from 'pdfmake/build/fonts/Roboto.js';
+import { sendTransactionalEmail } from '@/lib/email';
+import { isValidEmailAddress } from '@/lib/email-policy';
 
 let fontsReady = false;
 function configurePdfMake() {
@@ -773,3 +775,212 @@ export async function createSettlementInvoicePdf(data: SettlementInvoiceData): P
 
   return pdfMake.createPdf(definition).getBuffer();
 }
+
+function escapeHtml(value: string): string {
+  const entities: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  return value.replace(/[&<>"']/g, (character) => entities[character]);
+}
+
+/**
+ * Sends the generated settlement invoice PDF as an email attachment to a specified recipient.
+ * Logs the transmission in the settlement audit log.
+ */
+export async function sendSettlementInvoiceEmail(
+  params: {
+    settlementId: string;
+    recipientEmail: string;
+    customMessage?: string;
+    scope?: SettlementInvoiceScope;
+    actor: { id: string; email: string; role: string; organizationId?: string };
+  },
+  dependencies?: {
+    tx?: Prisma.TransactionClient;
+    sendEmailFn?: typeof sendTransactionalEmail;
+  }
+): Promise<{
+  success: boolean;
+  recipient: string;
+  invoiceNumber: string;
+  deliveryStatus: string;
+}> {
+  const { settlementId, recipientEmail, customMessage, scope, actor } = params;
+  const client = dependencies?.tx || prisma;
+  const emailSender = dependencies?.sendEmailFn || sendTransactionalEmail;
+
+  if (!recipientEmail || !isValidEmailAddress(recipientEmail.trim())) {
+    throw new Error('E-mail příjemce nemá platný formát.');
+  }
+  const cleanRecipient = recipientEmail.trim();
+
+  const settlement = await client.settlement.findUnique({
+    where: { id: settlementId },
+    include: {
+      employee: {
+        include: {
+          billingProfile: true,
+        },
+      },
+    },
+  });
+
+  if (!settlement) {
+    throw new Error(`Vyúčtování s ID ${settlementId} nebylo nalezeno.`);
+  }
+
+  if (actor.organizationId && settlement.organizationId !== actor.organizationId) {
+    throw new Error('Nemáte oprávnění k tomuto vyúčtování.');
+  }
+
+  const isPrivileged = actor.role === 'ADMIN' || actor.role === 'MANAGER' || actor.role === 'ACCOUNTANT';
+  const isOwner = settlement.employee?.userId === actor.id || settlement.employee?.email === actor.email;
+
+  if (!isPrivileged && !isOwner) {
+    throw new Error('Nemáte oprávnění odeslat toto vyúčtování.');
+  }
+
+  const invoiceData = await buildSettlementInvoiceData(settlementId, client, { scope });
+  const pdfBuffer = await createSettlementInvoicePdf(invoiceData);
+
+  const safeNum = invoiceData.invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const scopeSuffix = invoiceData.scope === 'WORK_ONLY' ? '-pouze-prace' : '';
+  const filename = `vyuctovani-${invoiceData.periodYear}-${String(invoiceData.periodMonth).padStart(2, '0')}-${safeNum}${scopeSuffix}.pdf`;
+
+  const subject = `Měsíční vyúčtování ${invoiceData.invoiceNumber} – ${invoiceData.periodTitle} (${invoiceData.supplier.name})`;
+
+  const textMessage = [
+    `Dobrý den,`,
+    '',
+    `v příloze Vám zasíláme měsíční vyúčtování a podklad k fakturaci za období ${invoiceData.periodTitle}.`,
+    '',
+    `Číslo dokladu: ${invoiceData.invoiceNumber}`,
+    `Variabilní symbol: ${invoiceData.variableSymbol}`,
+    `Dodavatel: ${invoiceData.supplier.name}`,
+    `Odběratel: ${invoiceData.customer.name}`,
+    `Rozsah dokladu: ${invoiceData.scopeLabel}`,
+    `Konečná částka k úhradě: ${csCurrencyFormatter.format(invoiceData.netPayableAmount)} Kč`,
+    `Datum splatnosti: ${csDateFormatter.format(invoiceData.dueDate)}`,
+    invoiceData.supplier.bankAccount ? `Bankovní účet: ${invoiceData.supplier.bankAccount}` : '',
+    '',
+    customMessage?.trim() ? `Poznámka:\n${customMessage.trim()}\n` : '',
+    'Kompletní položkový rozpis odvedené práce a položek naleznete v přiloženém PDF dokladu.',
+    '',
+    'S pozdravem,',
+    invoiceData.customer.name,
+  ].filter(Boolean).join('\n');
+
+  const customHtml = `
+    <div style="margin:0;background:#f8fafc;padding:32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0f172a">
+      <div style="max-width:620px;margin:0 auto;border-radius:16px;background:#ffffff;padding:32px;border:1px solid #e2e8f0;box-shadow:0 4px 6px -1px rgba(15,23,42,0.06)">
+        <div style="border-bottom:1px solid #e2e8f0;padding-bottom:20px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <span style="font-size:11px;font-weight:800;color:#0284c7;text-transform:uppercase;letter-spacing:1px">SeePoint OS</span>
+            <h1 style="margin:4px 0 0;font-size:20px;font-weight:800;color:#0f172a">Měsíční vyúčtování & podklad k fakturaci</h1>
+          </div>
+          <span style="display:inline-block;padding:4px 10px;border-radius:999px;background:#e0f2fe;color:#0369a1;font-size:11px;font-weight:700">
+            ${escapeHtml(invoiceData.periodTitle)}
+          </span>
+        </div>
+
+        <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#334155">
+          Dobrý den,
+        </p>
+        <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#334155">
+          v příloze Vám zasíláme měsíční vyúčtování č. <strong>${escapeHtml(invoiceData.invoiceNumber)}</strong> za období <strong>${escapeHtml(invoiceData.periodTitle)}</strong>.
+        </p>
+
+        ${customMessage?.trim() ? `
+          <div style="margin:0 0 24px;border-left:3px solid #0284c7;background:#f0f9ff;padding:12px 16px;border-radius:0 8px 8px 0;font-size:14px;color:#0369a1;line-height:1.5">
+            <strong>Poznámka od odesílatele:</strong><br />
+            ${escapeHtml(customMessage.trim()).replace(/\n/g, '<br />')}
+          </div>
+        ` : ''}
+
+        <div style="margin:0 0 24px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px">
+          <table role="presentation" style="width:100%;border-collapse:collapse;font-size:14px">
+            <tr>
+              <td style="padding:6px 0;color:#64748b">Pracovník / Dodavatel:</td>
+              <td style="padding:6px 0;font-weight:700;color:#0f172a;text-align:right">${escapeHtml(invoiceData.supplier.name)}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;color:#64748b">Odběratel:</td>
+              <td style="padding:6px 0;font-weight:600;color:#0f172a;text-align:right">${escapeHtml(invoiceData.customer.name)}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;color:#64748b">Rozsah dokladu:</td>
+              <td style="padding:6px 0;color:#0f172a;text-align:right">${escapeHtml(invoiceData.scopeLabel || '')}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;color:#64748b">Datum splatnosti:</td>
+              <td style="padding:6px 0;font-weight:600;color:#0f172a;text-align:right">${csDateFormatter.format(invoiceData.dueDate)}</td>
+            </tr>
+            ${invoiceData.supplier.bankAccount ? `
+            <tr>
+              <td style="padding:6px 0;color:#64748b">Číslo účtu:</td>
+              <td style="padding:6px 0;font-weight:700;color:#0f172a;text-align:right;font-family:monospace">${escapeHtml(invoiceData.supplier.bankAccount)}</td>
+            </tr>
+            ` : ''}
+            <tr style="border-top:1px solid #cbd5e1">
+              <td style="padding:12px 0 4px;font-weight:800;font-size:15px;color:#0f172a">Částka k výplatě:</td>
+              <td style="padding:12px 0 4px;font-weight:900;font-size:18px;color:#059669;text-align:right">
+                ${csCurrencyFormatter.format(invoiceData.netPayableAmount)} Kč
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="margin:0 0 24px;padding:12px 16px;background:#f1f5f9;border-radius:10px;font-size:12px;color:#64748b;line-height:1.5">
+          📎 <strong>Příloha PDF:</strong> V příloze tohoto e-mailu naleznete oficiální PDF dokument <em>${escapeHtml(filename)}</em> s položkovým rozpisem všech úkolů a prací.
+        </div>
+
+        <div style="border-top:1px solid #e2e8f0;padding-top:20px;font-size:12px;color:#94a3b8;line-height:1.5">
+          Odesláno prostřednictvím systému SeePoint OS · ${escapeHtml(invoiceData.customer.name)}
+        </div>
+      </div>
+    </div>
+  `;
+
+  const deliveryResult = await emailSender({
+    to: cleanRecipient,
+    subject,
+    message: textMessage,
+    customHtml,
+    template: 'settlement-invoice',
+    organizationId: settlement.organizationId,
+    attachments: [
+      {
+        filename,
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      },
+    ],
+    metadata: {
+      settlementId,
+      invoiceNumber: invoiceData.invoiceNumber,
+      scope: invoiceData.scope,
+      recipientEmail: cleanRecipient,
+      actorEmail: actor.email,
+    },
+  });
+
+  await client.settlementAuditLog.create({
+    data: {
+      organizationId: settlement.organizationId,
+      settlementId,
+      userId: actor.id,
+      userName: actor.email,
+      action: 'EMAIL_SENT',
+      fieldName: 'email',
+      oldValue: null,
+      newValue: cleanRecipient,
+      reason: `Vyúčtování ${invoiceData.invoiceNumber} odesláno na e-mail ${cleanRecipient} (${invoiceData.scopeLabel})`,
+    },
+  });
+
+  return {
+    success: true,
+    recipient: cleanRecipient,
+    invoiceNumber: invoiceData.invoiceNumber,
+    deliveryStatus: deliveryResult.status,
+  };
+}
+

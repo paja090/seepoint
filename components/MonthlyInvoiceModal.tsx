@@ -18,6 +18,13 @@ export function MonthlyInvoiceModal({ settlementId, onClose, onSettlementUpdated
   const [closing, setClosing] = useState(false);
   const [notice, setNotice] = useState('');
 
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [customMessage, setCustomMessage] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailNotice, setEmailNotice] = useState('');
+  const [emailError, setEmailError] = useState('');
+
   const loadData = async (targetScope?: 'ALL' | 'WORK_ONLY') => {
     const s = targetScope ?? scope;
     setLoading(true);
@@ -29,6 +36,9 @@ export function MonthlyInvoiceModal({ settlementId, onClose, onSettlementUpdated
       setData(json);
       if (json.scope && !targetScope) {
         setScope(json.scope);
+      }
+      if (json.supplier?.email) {
+        setRecipientEmail((prev) => prev || json.supplier.email);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Chyba při načítání vyúčtování.');
@@ -85,6 +95,37 @@ export function MonthlyInvoiceModal({ settlementId, onClose, onSettlementUpdated
     window.open(`/api/settlements/${settlementId}/pdf?scope=${scope}`, '_blank');
   };
 
+  const handleSendEmail = async () => {
+    if (!recipientEmail.trim()) {
+      setEmailError('Zadejte prosím e-mail příjemce.');
+      return;
+    }
+    setSendingEmail(true);
+    setEmailError('');
+    setEmailNotice('');
+    try {
+      const res = await fetch(`/api/settlements/${settlementId}/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipientEmail: recipientEmail.trim(),
+          customMessage: customMessage.trim(),
+          scope,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Odeslání se nezdařilo.');
+      setEmailNotice(`✓ Vyúčtování ${data?.invoiceNumber || ''} bylo úspěšně odesláno na ${recipientEmail.trim()} s PDF přílohou.`);
+      if (onSettlementUpdated) {
+        onSettlementUpdated();
+      }
+    } catch (err: unknown) {
+      setEmailError(err instanceof Error ? err.message : 'Chyba při odesílání e-mailu.');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="relative w-full max-w-4xl max-h-[92vh] overflow-y-auto rounded-2xl bg-white shadow-2xl border border-slate-200 flex flex-col">
@@ -133,14 +174,146 @@ export function MonthlyInvoiceModal({ settlementId, onClose, onSettlementUpdated
 
             <button
               type="button"
+              onClick={() => {
+                setShowEmailDialog(!showEmailDialog);
+                setEmailNotice('');
+                setEmailError('');
+                if (!recipientEmail && data?.supplier?.email) {
+                  setRecipientEmail(data.supplier.email);
+                }
+              }}
+              className={`rounded-xl px-3.5 py-2 text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer ${
+                showEmailDialog
+                  ? 'bg-sky-600 text-white'
+                  : 'border border-sky-300 bg-sky-50 text-sky-800 hover:bg-sky-100'
+              }`}
+              title="Odeslat vyúčtování s PDF přílohou na e-mail"
+            >
+              <span>✉️</span> Odeslat na e-mail
+            </button>
+
+            <button
+              type="button"
               onClick={onClose}
-              className="rounded-xl border border-slate-200 p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+              className="rounded-xl border border-slate-200 p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition cursor-pointer"
               title="Zavřít"
             >
               ✕
             </button>
           </div>
         </div>
+
+        {/* Expandable Email Sending Panel */}
+        {showEmailDialog && data && (
+          <div className="border-b border-sky-200 bg-sky-50/70 p-5 space-y-4 print:hidden transition-all">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">✉️</span>
+                <h4 className="font-extrabold text-sm text-sky-950">
+                  Odeslání vyúčtování e-mailem (s PDF přílohou)
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEmailDialog(false)}
+                className="text-xs text-sky-700 hover:text-sky-950 font-bold cursor-pointer"
+              >
+                Zavřít panel ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              Příjemci bude odeslán souhrnný e-mail a oficiální vygenerované PDF (doklad č. <strong>{data.invoiceNumber}</strong>, rozsah: <em>{data.scopeLabel}</em>).
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">
+                  E-mail příjemce: <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={recipientEmail}
+                  onChange={(e) => setRecipientEmail(e.target.value)}
+                  placeholder="např. ucetni@firma.cz nebo jmeno@email.cz"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 shadow-xs focus:border-sky-500 focus:outline-hidden"
+                />
+                <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-slate-500">
+                  <span>Doporučené:</span>
+                  {data.supplier?.email && (
+                    <button
+                      type="button"
+                      onClick={() => setRecipientEmail(data.supplier.email || '')}
+                      className="rounded-lg bg-white border border-slate-200 px-2 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                    >
+                      👤 Pracovník: {data.supplier.email}
+                    </button>
+                  )}
+                  {data.customer?.email && (
+                    <button
+                      type="button"
+                      onClick={() => setRecipientEmail(data.customer.email || '')}
+                      className="rounded-lg bg-white border border-slate-200 px-2 py-0.5 font-semibold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                    >
+                      🏢 Odběratel / Účetní: {data.customer.email}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">
+                  Volitelná průvodní zpráva:
+                </label>
+                <textarea
+                  rows={2}
+                  value={customMessage}
+                  onChange={(e) => setCustomMessage(e.target.value)}
+                  placeholder="Např. Dobrý den, posílám schválené vyúčtování k proplacení..."
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 shadow-xs focus:border-sky-500 focus:outline-hidden"
+                />
+              </div>
+            </div>
+
+            {emailNotice && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-800">
+                {emailNotice}
+              </div>
+            )}
+
+            {emailError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-800">
+                {emailError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowEmailDialog(false)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+              >
+                Zrušit
+              </button>
+              <button
+                type="button"
+                onClick={handleSendEmail}
+                disabled={sendingEmail || !recipientEmail.trim()}
+                className="rounded-xl bg-sky-600 hover:bg-sky-500 text-white px-5 py-2 text-xs font-black shadow-md transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+              >
+                {sendingEmail ? (
+                  <>
+                    <span className="animate-spin">⏳</span> Odesílám e-mail s PDF...
+                  </>
+                ) : (
+                  <>
+                    <span>🚀</span> Odeslat vyúčtování s PDF přílohou
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Invoice Scope Selector Bar */}
         <div className="border-b border-slate-200 bg-gradient-to-r from-blue-50/70 via-slate-50 to-indigo-50/70 px-6 py-3 flex flex-wrap items-center justify-between gap-3 print:hidden">
