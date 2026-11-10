@@ -4,17 +4,10 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  Calendar,
-  CheckCircle2,
-  Clock,
   History,
-  AlertTriangle,
   Trash2,
   Zap,
-  User,
-  MapPin,
   ArrowRight,
-  Sparkles,
 } from 'lucide-react';
 import {
   formatWorkDate,
@@ -69,16 +62,43 @@ export function WorkPlanListView({
   const [planTargetDate, setPlanTargetDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
 
   const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrowStart = new Date(todayStart);
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
 
   // Split into active and completed
   const activeOrders = orders
     .filter((order) => !['DONE', 'CANCELLED'].includes(order.status))
     .sort((a, b) => {
-      // Urgent priority comes first
-      if (a.priority === 'URGENT' && b.priority !== 'URGENT') return -1;
-      if (a.priority !== 'URGENT' && b.priority === 'URGENT') return 1;
-      // Nearest scheduledAt ASC
-      return new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime();
+      const aTime = new Date(a.scheduledAt).getTime();
+      const bTime = new Date(b.scheduledAt).getTime();
+      const aIsToday = aTime >= todayStart.getTime() && aTime < tomorrowStart.getTime() ? 1 : 0;
+      const bIsToday = bTime >= todayStart.getTime() && bTime < tomorrowStart.getTime() ? 1 : 0;
+
+      // 1. Dnešní úkoly jsou seřazeny na prvním místě
+      if (aIsToday !== bIsToday) return bIsToday - aIsToday;
+
+      // 2. Urgentní / vysoká priorita má přednost
+      const aUrgent = a.priority === 'URGENT' || a.priority === 'HIGH' ? 1 : 0;
+      const bUrgent = b.priority === 'URGENT' || b.priority === 'HIGH' ? 1 : 0;
+      if (aUrgent !== bUrgent) return bUrgent - aUrgent;
+
+      // 3. Probíhající úkoly před plánovanými
+      if (a.status === 'IN_PROGRESS' && b.status !== 'IN_PROGRESS') return -1;
+      if (a.status !== 'IN_PROGRESS' && b.status === 'IN_PROGRESS') return 1;
+
+      // 4. Zařazené ve výjezdu podle zastávky
+      if (a.routeInfo?.routeOrder && b.routeInfo?.routeOrder) {
+        return a.routeInfo.routeOrder - b.routeInfo.routeOrder;
+      }
+      if (a.routeInfo?.routeOrder) return -1;
+      if (b.routeInfo?.routeOrder) return 1;
+
+      // 5. Podle termínu ASC
+      if (aTime !== bTime) return aTime - bTime;
+
+      // 6. Abecedně podle klienta
+      return a.clientName.localeCompare(b.clientName, 'cs');
     });
 
   const completedOrders = orders

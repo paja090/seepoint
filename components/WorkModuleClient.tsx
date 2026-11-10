@@ -158,6 +158,38 @@ export function WorkModuleClient({
     if (selectedFilter === 'invoicing') return o.ftdSent && !o.invoiced && o.status !== 'CANCELLED';
     if (selectedFilter === 'history') return isCompleted;
     return true;
+  }).sort((a, b) => {
+    const aDate = new Date(a.scheduledAt);
+    const bDate = new Date(b.scheduledAt);
+
+    const aIsToday = aDate >= dayStart && aDate < tomorrow ? 1 : 0;
+    const bIsToday = bDate >= dayStart && bDate < tomorrow ? 1 : 0;
+
+    // 1. Dnešní úkoly jsou seřazeny na prvním místě
+    if (aIsToday !== bIsToday) return bIsToday - aIsToday;
+
+    // 2. Urgentní / vysoká priorita má přednost
+    const aUrgent = a.priority === 'URGENT' || a.priority === 'HIGH' ? 1 : 0;
+    const bUrgent = b.priority === 'URGENT' || b.priority === 'HIGH' ? 1 : 0;
+    if (aUrgent !== bUrgent) return bUrgent - aUrgent;
+
+    // 3. Probíhající práce před plánovanými
+    if (a.status === 'IN_PROGRESS' && b.status !== 'IN_PROGRESS') return -1;
+    if (a.status !== 'IN_PROGRESS' && b.status === 'IN_PROGRESS') return 1;
+
+    // 4. Zařazené ve výjezdu podle pořadí zastávky
+    if (a.routeInfo?.routeOrder && b.routeInfo?.routeOrder) {
+      return a.routeInfo.routeOrder - b.routeInfo.routeOrder;
+    }
+    if (a.routeInfo?.routeOrder) return -1;
+    if (b.routeInfo?.routeOrder) return 1;
+
+    // 5. Podle termínu ASC
+    const diff = aDate.getTime() - bDate.getTime();
+    if (diff !== 0) return diff;
+
+    // 6. Abecedně podle klienta
+    return a.clientName.localeCompare(b.clientName, 'cs');
   });
 
   return (
