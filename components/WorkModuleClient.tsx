@@ -16,8 +16,8 @@ import {
   Briefcase,
   History,
   Car,
-  MapPin,
   ArrowRight,
+  RefreshCw,
 } from 'lucide-react';
 import { WorkWeekView } from './WorkWeekView';
 import { WorkPlanListView, type WorkOrderData } from './WorkPlanListView';
@@ -65,6 +65,33 @@ export function WorkModuleClient({
   const [activeTab, setActiveTab] = useState<'calendar' | 'list'>('calendar');
   const [selectedFilter, setSelectedFilter] = useState<'open' | 'today' | 'week' | 'urgent' | 'invoicing' | 'history' | 'all'>('open');
   const [scopeFilter, setScopeFilter] = useState<'ALL' | 'WORKSHOP' | 'FIELD' | 'ROUTED' | 'UNROUTED'>('ALL');
+  const [syncingGoogle, setSyncingGoogle] = useState(false);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  const handleSyncGoogleSheet = async () => {
+    setSyncingGoogle(true);
+    setSyncNotice(null);
+    setSyncError(null);
+    try {
+      const res = await fetch('/api/work/google-sheets-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || 'Synchronizace selhala.');
+      }
+      setSyncNotice(`✓ Synchronizace dokončena: ${data.createdCount} nových zakázek, ${data.updatedCount} aktualizováno ze ${data.totalParsed} řádků.`);
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (err: unknown) {
+      setSyncError(err instanceof Error ? err.message : 'Chyba při synchronizaci plánu práce.');
+    } finally {
+      setSyncingGoogle(false);
+    }
+  };
 
   const isWorkshopOrder = (o: WorkOrderData) => {
     return Boolean(
@@ -163,6 +190,17 @@ export function WorkModuleClient({
             <span>📜 Historie ({historyCount})</span>
           </button>
 
+          <button
+            type="button"
+            onClick={handleSyncGoogleSheet}
+            disabled={syncingGoogle}
+            className="flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-xs font-black text-emerald-900 shadow-sm hover:bg-emerald-100 transition disabled:opacity-60 cursor-pointer"
+            title="Stáhnout a synchronizovat aktuální plán práce z Google Tabulky"
+          >
+            <RefreshCw size={15} className={`text-emerald-700 ${syncingGoogle ? 'animate-spin' : ''}`} />
+            <span>{syncingGoogle ? 'Synchronizuji...' : '🔄 Google Tabulka'}</span>
+          </button>
+
           <Link
             href="/work/dispatch"
             className="flex items-center gap-2 rounded-2xl border border-sky-300 bg-sky-50 px-4 py-2.5 text-xs font-black text-sky-900 shadow-sm hover:bg-sky-100 transition"
@@ -182,6 +220,32 @@ export function WorkModuleClient({
           )}
         </div>
       </div>
+
+      {syncNotice && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-bold text-emerald-800 shadow-sm flex items-center justify-between">
+          <span>{syncNotice}</span>
+          <button
+            type="button"
+            onClick={() => setSyncNotice(null)}
+            className="text-emerald-700 hover:text-emerald-950 font-bold ml-4"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {syncError && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-bold text-red-800 shadow-sm flex items-center justify-between">
+          <span>⚠️ {syncError}</span>
+          <button
+            type="button"
+            onClick={() => setSyncError(null)}
+            className="text-red-700 hover:text-red-950 font-bold ml-4"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* DISPATCH & MAP DIRECT ACCESS BANNER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-sky-200/90 bg-gradient-to-r from-sky-50 via-white to-sky-50/50 p-4 shadow-sm">

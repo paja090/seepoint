@@ -27,12 +27,21 @@ function workTaskPriority(priority: WorkPriority): TaskPriority {
 
 async function employeeByNames(workerNames: string[], client: Prisma.TransactionClient | typeof prisma = prisma) {
   const employees = await client.employee.findMany({ where: { isActive: true } });
-  const byName = new Map<string, Employee>();
+  const byFullName = new Map<string, Employee>();
+  const byFirstName = new Map<string, Employee>();
   for (const employee of employees) {
-    byName.set(normalizeName(`${employee.firstName} ${employee.lastName}`), employee);
-    if (employee.email) byName.set(normalizeName(employee.email), employee);
+    byFullName.set(normalizeName(`${employee.firstName} ${employee.lastName}`), employee);
+    if (!byFirstName.has(normalizeName(employee.firstName))) {
+      byFirstName.set(normalizeName(employee.firstName), employee);
+    }
+    if (employee.email) byFullName.set(normalizeName(employee.email), employee);
   }
-  return new Map(workerNames.map((workerName) => [workerName, byName.get(normalizeName(workerName))]));
+  return new Map(
+    workerNames.map((workerName) => {
+      const norm = normalizeName(workerName);
+      return [workerName, byFullName.get(norm) ?? byFirstName.get(norm)];
+    })
+  );
 }
 
 function taskTitle(order: WorkOrderForSync, workerName?: string) {
