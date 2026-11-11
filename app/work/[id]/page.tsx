@@ -127,6 +127,26 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
   );
   const routeInfo = orderRouteMap.get(order.id) || null;
 
+  const pc = (order.planningConstraints as Record<string, unknown> | null) || {};
+  const directLat =
+    typeof pc.latitude === 'number'
+      ? pc.latitude
+      : typeof (pc.location as { latitude?: unknown })?.latitude === 'number'
+        ? (pc.location as { latitude: number }).latitude
+        : null;
+  const directLng =
+    typeof pc.longitude === 'number'
+      ? pc.longitude
+      : typeof (pc.location as { longitude?: unknown })?.longitude === 'number'
+        ? (pc.location as { longitude: number }).longitude
+        : null;
+  const carrierLat = order.items[0]?.carrier?.latitude ?? null;
+  const carrierLng = order.items[0]?.carrier?.longitude ?? null;
+  const initialLatitude = directLat ?? carrierLat;
+  const initialLongitude = directLng ?? carrierLng;
+  const initialLocationAddress =
+    typeof pc.locationAddress === 'string' ? pc.locationAddress : null;
+
   const workshopText = `${order.locationNote || ''} ${order.mediaLabel || ''} ${order.title}`.toLowerCase();
   const isWorkshop = Boolean(
     workshopText.includes('díln') ||
@@ -136,7 +156,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
     workshopText.includes('faktur') ||
     workshopText.includes('kancelář') ||
     workshopText.includes('kancelar') ||
-    (!order.items[0]?.carrier && !order.locationNote)
+    (!order.items[0]?.carrier && !order.locationNote && initialLatitude === null)
   );
 
   const electionCampaignId = (order.planningConstraints as { electionCampaignId?: string } | null)?.electionCampaignId;
@@ -393,6 +413,9 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
               isWorkshop={isWorkshop}
               routeInfo={routeInfo}
               canManageDispatch={['ADMIN', 'MANAGER'].includes(user.role)}
+              initialLatitude={initialLatitude}
+              initialLongitude={initialLongitude}
+              initialLocationAddress={initialLocationAddress}
             />
 
             {/* Navigation Installation Points & Route */}
@@ -850,6 +873,8 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
             contactName: order.contactName ?? '',
             contactPhone: order.contactPhone ?? '',
             locationNote: order.locationNote ?? '',
+            latitude: initialLatitude,
+            longitude: initialLongitude,
             referenceUrl: order.referenceUrl ?? '',
             ftdUrl: order.ftdUrl ?? '',
           }}
