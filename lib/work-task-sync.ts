@@ -1,5 +1,6 @@
 import type { Employee, Prisma, WorkOrderStatus, WorkPriority } from '@prisma/client';
 import { prisma } from './db.ts';
+import { canonicalFirstName, normalizePersonToken } from './planner/work-projection.ts';
 
 type WorkOrderForSync = Prisma.WorkOrderGetPayload<{
   include: {
@@ -9,10 +10,6 @@ type WorkOrderForSync = Prisma.WorkOrderGetPayload<{
 }>;
 
 type TaskPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
-
-function normalizeName(value: string) {
-  return value.trim().toLocaleLowerCase('cs-CZ').replace(/\s+/g, ' ');
-}
 
 function workTaskStatus(status: WorkOrderStatus) {
   if (status === 'DONE') return 'DONE' as const;
@@ -25,21 +22,51 @@ function workTaskPriority(priority: WorkPriority): TaskPriority {
   return priority as TaskPriority;
 }
 
-async function employeeByNames(workerNames: string[], client: Prisma.TransactionClient | typeof prisma = prisma) {
-  const employees = await client.employee.findMany({ where: { isActive: true } });
-  const byFullName = new Map<string, Employee>();
-  const byFirstName = new Map<string, Employee>();
+async function employeeByNames(
+  organizationId: string,
+  workerNames: string[],
+  client: Prisma.TransactionClient | typeof prisma = prisma
+) {
+  const employees = await client.employee.findMany({ where: { organizationId, isActive: true } });
+  const byExactFull = new Map<string, Employee>();
+  const byFirstCanonical = new Map<string, Employee[]>();
+
   for (const employee of employees) {
-    byFullName.set(normalizeName(`${employee.firstName} ${employee.lastName}`), employee);
-    if (!byFirstName.has(normalizeName(employee.firstName))) {
-      byFirstName.set(normalizeName(employee.firstName), employee);
-    }
-    if (employee.email) byFullName.set(normalizeName(employee.email), employee);
+    byExactFull.set(normalizePersonToken(`${employee.firstName} ${employee.lastName}`), employee);
+    if (employee.email) byExactFull.set(normalizePersonToken(employee.email), employee);
+    const firstKey = canonicalFirstName(employee.firstName);
+    const bucket = byFirstCanonical.get(firstKey);
+    if (bucket) bucket.push(employee);
+    else byFirstCanonical.set(firstKey, [employee]);
   }
+
   return new Map(
     workerNames.map((workerName) => {
-      const norm = normalizeName(workerName);
-      return [workerName, byFullName.get(norm) ?? byFirstName.get(norm)];
+      const norm = normalizePersonToken(workerName);
+      if (!norm) return [workerName, undefined];
+
+      const direct = byExactFull.get(norm);
+      if (direct) return [workerName, direct];
+
+      const tokens = norm.split(' ');
+      const firstKey = canonicalFirstName(tokens[0]);
+      const candidates = byFirstCanonical.get(firstKey) ?? [];
+
+      if (tokens.length > 1 && candidates.length) {
+        const surnamePart = tokens.slice(1).join(' ');
+        const prefix = surnamePart.slice(0, 3);
+        const bySurname = candidates.find((e) => {
+          const lastNorm = normalizePersonToken(e.lastName);
+          return lastNorm === surnamePart || (prefix.length >= 2 && lastNorm.startsWith(prefix));
+        });
+        if (bySurname) return [workerName, bySurname];
+      }
+
+      if (candidates.length === 1) {
+        return [workerName, candidates[0]];
+      }
+
+      return [workerName, undefined];
     })
   );
 }
@@ -87,7 +114,7 @@ export async function syncWorkOrderTasks(
 
   const workerNames = [...new Set(order.assignments.map((assignment) => assignment.workerName.trim()).filter(Boolean))];
   const namesForTasks = workerNames.length ? workerNames : [''];
-  const employees = await employeeByNames(workerNames, client);
+  const employees = await employeeByNames(order.organizationId, workerNames, client);
   // Prefer stable user identity over legacy display-name matching (including duplicate names).
   for (const assignment of order.assignments) {
     if (!assignment.userId) continue;

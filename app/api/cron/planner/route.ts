@@ -12,17 +12,24 @@ export async function GET(request: Request) {
   const enabledIds = organizations.filter(o => o.isActive && isModuleEnabled(o, 'planner') && isModuleEnabled(o, 'googleCalendar')).map(o => o.id);
   const inactiveIds = organizations.filter(o => !o.isActive).map(o => o.id);
   const due = await platformPrisma.calendarConnection.findMany({ where: { credentialsEncrypted: { not: null }, AND: [{ OR: [{ status: 'REVOKED' }, { status: 'CONNECTED', organizationId: { in: enabledIds } }, { organizationId: { in: inactiveIds } }] }, { OR: [{ retryAt: null }, { retryAt: { lte: new Date() } }] }] }, select: { id: true, organizationId: true, userId: true, status: true }, orderBy: { updatedAt: 'asc' }, take: 50 });
-  let processed = 0; const started = Date.now();
+  let processed = 0; let okCount = 0; let errorCount = 0; const started = Date.now();
   for (const c of due) {
     if (Date.now() - started > 240000) break;
     await runWithTenantContext({ organizationId: c.organizationId, source: 'script' }, async () => {
         requireTenantContext();
         try {
-          if (c.status === 'REVOKED' || inactiveIds.includes(c.organizationId)) await disconnectConnection(c.organizationId, c.userId, c.id);
-          else await syncConnection(c.organizationId, c.userId, c.id);
+          if (c.status === 'REVOKED' || inactiveIds.includes(c.organizationId)) {
+            await disconnectConnection(c.organizationId, c.userId, c.id);
+            okCount++;
+          } else {
+            const syncRes = await syncConnection(c.organizationId, c.userId, c.id);
+            if (syncRes.status === 'OK') okCount++;
+            else if (syncRes.status === 'ERROR') errorCount++;
+          }
           processed++;
-        } catch { /* Each connection carries its own safe status; no credentials are logged. */ }
+        } catch { errorCount++; /* Each connection carries its own safe status; no credentials are logged. */ }
     });
   }
-  return NextResponse.json({ ok: true, processed });
+  console.log('[cron/planner]', JSON.stringify({ due: due.length, processed, okCount, errorCount, durationMs: Date.now() - started }));
+  return NextResponse.json({ ok: true, processed, okCount, errorCount });
 }

@@ -36,6 +36,11 @@ test('all-day end is exclusive in calendar timezone and duplicate tombstones win
   const deleted = googleEvent({ id: 'e', status: 'cancelled' }, 'Europe/Prague')!;
   assert.equal(uniqueProviderEvents([event, event, deleted]).length, 1);
   assert.equal(uniqueProviderEvents([event, deleted])[0].cancelled, true);
+
+  const point = googleEvent({ id: 'p', start: { dateTime: '2026-09-16T09:00:00Z' }, end: { dateTime: '2026-09-16T09:00:00Z' }, summary: 'Připomínka' }, 'Europe/Prague')!;
+  assert.equal(point.busy, false);
+  assert.equal(point.endAt?.toISOString(), '2026-09-16T09:15:00.000Z');
+  assert.equal(googleEvent({ id: 'bad', start: { dateTime: '2026-09-16T10:00:00Z' }, end: { dateTime: '2026-09-16T09:00:00Z' } }, 'Europe/Prague'), null);
 });
 test('preferences reject invalid hours and timezone', () => {
   assert.throws(() => validatePreferences({ ...defaultPreferences, workingStart: '18:00' }));
