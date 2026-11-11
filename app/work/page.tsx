@@ -149,7 +149,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
     }),
     prisma.organization.findUnique({
       where: { id: user.organizationId },
-      select: { id: true, name: true, slug: true },
+      select: { id: true, name: true, slug: true, plannerDefaults: true },
     }),
   ]);
 
@@ -161,6 +161,20 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
   }
   const orders = [...mergedOrdersMap.values()];
   const isSeePointOrg = isSeePointOrganization(currentOrg);
+  const orgDefaults =
+    currentOrg?.plannerDefaults &&
+    typeof currentOrg.plannerDefaults === 'object' &&
+    !Array.isArray(currentOrg.plannerDefaults)
+      ? (currentOrg.plannerDefaults as Record<string, unknown>)
+      : null;
+  const sheetSyncMeta =
+    orgDefaults?.googleSheetPlanSync &&
+    typeof orgDefaults.googleSheetPlanSync === 'object' &&
+    !Array.isArray(orgDefaults.googleSheetPlanSync)
+      ? (orgDefaults.googleSheetPlanSync as Record<string, unknown>)
+      : null;
+  const lastSheetSyncAt =
+    typeof sheetSyncMeta?.lastSyncAt === 'string' ? sheetSyncMeta.lastSyncAt : null;
 
   const completedPointIds = new Set(completedPoints.map((p) => p.id));
   const completedNavPointIds = new Set(completedNavPoints.map((p) => p.id));
@@ -249,6 +263,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
           canCreateWorkOrder={canCreateWorkOrder}
           categories={categories}
           isSeePointOrg={isSeePointOrg}
+          lastSheetSyncAt={lastSheetSyncAt}
         />
       </div>
     </AppShell>

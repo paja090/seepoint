@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Plus,
   Calendar,
@@ -49,6 +50,7 @@ export type WorkModuleClientProps = {
   canCreateWorkOrder: boolean;
   categories?: WorkCategory[];
   isSeePointOrg?: boolean;
+  lastSheetSyncAt?: string | null;
 };
 
 export function WorkModuleClient({
@@ -65,7 +67,9 @@ export function WorkModuleClient({
   canCreateWorkOrder,
   categories,
   isSeePointOrg = false,
+  lastSheetSyncAt = null,
 }: WorkModuleClientProps) {
+  const router = useRouter();
   // Open create modal automatically if redirected with initial carrier or client
   const autoOpenModal = Boolean(initialCarrierCode || initialClientName || initialCampaignDateFrom);
   const [createModalOpen, setCreateModalOpen] = useState(autoOpenModal);
@@ -78,15 +82,49 @@ export function WorkModuleClient({
   const [syncingGoogle, setSyncingGoogle] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [latestSyncAt, setLatestSyncAt] = useState<string | null>(lastSheetSyncAt);
+  const lastRefreshRef = useRef<number>(Date.now());
 
-  React.useEffect(() => {
+  useEffect(() => {
     setOrdersList(orders);
   }, [orders]);
+
+  useEffect(() => {
+    if (lastSheetSyncAt) {
+      setLatestSyncAt(lastSheetSyncAt);
+    }
+  }, [lastSheetSyncAt]);
+
+  // Keep KPI bubbles and task list synchronized automatically when cron runs in background or tab regains focus
+  useEffect(() => {
+    const refreshIfStale = (minAgeMs: number) => {
+      if (document.visibilityState !== 'visible') return;
+      const nowMs = Date.now();
+      if (nowMs - lastRefreshRef.current < minAgeMs) return;
+      lastRefreshRef.current = nowMs;
+      router.refresh();
+    };
+
+    const handleVisibility = () => refreshIfStale(45_000);
+    const interval = window.setInterval(() => refreshIfStale(180_000), 180_000);
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
+    };
+  }, [router]);
 
   const handleOrderUpdated = (orderId: string, patch: Partial<WorkOrderData>) => {
     setOrdersList((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, ...patch } : o))
     );
+  };
+
+  const handleOrderDeleted = (orderId: string) => {
+    setOrdersList((prev) => prev.filter((o) => o.id !== orderId));
   };
 
   const handleSyncGoogleSheet = async () => {
@@ -102,10 +140,15 @@ export function WorkModuleClient({
       if (!res.ok || !data.ok) {
         throw new Error(data.error || 'Synchronizace selhala.');
       }
-      setSyncNotice(`✓ Synchronizace dokončena: ${data.createdCount} nových zakázek, ${data.updatedCount} aktualizováno ze ${data.totalParsed} řádků.`);
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+      if (typeof data.lastSyncAt === 'string') {
+        setLatestSyncAt(data.lastSyncAt);
+      } else {
+        setLatestSyncAt(new Date().toISOString());
+      }
+      const cleanedInfo = data.cleanedCount > 0 ? `, ${data.cleanedCount} osiřelých vyčištěno` : '';
+      setSyncNotice(`✓ Synchronizace dokončena: ${data.createdCount} nových, ${data.updatedCount} aktualizováno${cleanedInfo} (z ${data.totalParsed} řádků).`);
+      lastRefreshRef.current = Date.now();
+      router.refresh();
     } catch (err: unknown) {
       setSyncError(err instanceof Error ? err.message : 'Chyba při synchronizaci plánu práce.');
     } finally {
@@ -135,32 +178,11 @@ export function WorkModuleClient({
   const weekEnd = new Date(dayStart);
   weekEnd.setDate(weekEnd.getDate() + 7);
 
-  const openOrders = ordersList.filter((o) => !['DONE', 'CANCELLED'].includes(o.status));
-  const completedOrders = ordersList.filter((o) => ['DONE', 'CANCELLED'].includes(o.status));
-
-  const openCount = openOrders.length;
-  const historyCount = completedOrders.length;
-
-  const todayCount = openOrders.filter((o) => {
-    const d = new Date(o.scheduledAt);
-    return d >= dayStart && d < tomorrow;
-  }).length;
-
-  const weekCount = openOrders.filter((o) => {
-    const d = new Date(o.scheduledAt);
-    return d >= dayStart && d < weekEnd;
-  }).length;
-
-  const urgentCount = openOrders.filter((o) => o.priority === 'URGENT').length;
-  const invoicingCount = ordersList.filter((o) => isOrderReadyForInvoicing(o)).length;
-  const doneWithFtdLinkCount = ordersList.filter(
-    (o) => isOrderDoneWithoutFtdFlag(o) && Boolean(o.ftdUrl)
-  ).length;
-
+  const allOpenOrders = ordersList.filter((o) => !['DONE', 'CANCELLED'].includes(o.status));
   const workshopCount = ordersList.filter(isWorkshopOrder).length;
   const fieldCount = ordersList.filter(isFieldOrder).length;
-  const routedCount = openOrders.filter(isRoutedOrder).length;
-  const unroutedCount = openOrders.filter(isUnroutedOrder).length;
+  const routedCount = allOpenOrders.filter(isRoutedOrder).length;
+  const unroutedCount = allOpenOrders.filter(isUnroutedOrder).length;
 
   const scopeFilteredOrders = ordersList.filter((o) => {
     if (scopeFilter === 'WORKSHOP' && !isWorkshopOrder(o)) return false;
@@ -170,6 +192,44 @@ export function WorkModuleClient({
     return true;
   });
 
+  // Compute all KPI bubbles on the active scope so bubble counts always match the list 1:1
+  const openOrders = scopeFilteredOrders.filter((o) => !['DONE', 'CANCELLED'].includes(o.status));
+  const completedOrders = scopeFilteredOrders.filter((o) => ['DONE', 'CANCELLED'].includes(o.status));
+
+  const openCount = openOrders.length;
+  const historyCount = completedOrders.length;
+
+  const todayCount = openOrders.filter((o) => {
+    const d = new Date(o.scheduledAt);
+    return d >= dayStart && d < tomorrow;
+  }).length;
+
+  const overdueOpenCount = openOrders.filter((o) => {
+    const d = new Date(o.scheduledAt);
+    return d < dayStart;
+  }).length;
+
+  const weekCount = openOrders.filter((o) => {
+    const d = new Date(o.scheduledAt);
+    return d >= dayStart && d < weekEnd;
+  }).length;
+
+  const urgentCount = openOrders.filter((o) => ['URGENT', 'HIGH'].includes(o.priority)).length;
+  const invoicingCount = scopeFilteredOrders.filter((o) => isOrderReadyForInvoicing(o)).length;
+  const doneWithFtdLinkCount = scopeFilteredOrders.filter(
+    (o) => isOrderDoneWithoutFtdFlag(o) && Boolean(o.ftdUrl)
+  ).length;
+
+  const formattedLastSync = latestSyncAt
+    ? new Date(latestSyncAt).toLocaleString('cs-CZ', {
+        day: 'numeric',
+        month: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Europe/Prague',
+      })
+    : null;
+
   // Filter orders based on active stat tile selection and scope filter
   const filteredOrders = scopeFilteredOrders.filter((o) => {
     const d = new Date(o.scheduledAt);
@@ -178,7 +238,7 @@ export function WorkModuleClient({
     if (selectedFilter === 'open') return !isCompleted;
     if (selectedFilter === 'today') return !isCompleted && d >= dayStart && d < tomorrow;
     if (selectedFilter === 'week') return !isCompleted && d >= dayStart && d < weekEnd;
-    if (selectedFilter === 'urgent') return !isCompleted && o.priority === 'URGENT';
+    if (selectedFilter === 'urgent') return !isCompleted && ['URGENT', 'HIGH'].includes(o.priority);
     if (selectedFilter === 'invoicing') return isOrderReadyForInvoicing(o);
     if (selectedFilter === 'history') return isCompleted;
     return true;
@@ -257,16 +317,23 @@ export function WorkModuleClient({
           </button>
 
           {isSeePointOrg && (
-            <button
-              type="button"
-              onClick={handleSyncGoogleSheet}
-              disabled={syncingGoogle}
-              className="flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-xs font-black text-emerald-900 shadow-sm hover:bg-emerald-100 transition disabled:opacity-60 cursor-pointer"
-              title="Synchronizuje Google Tabulku okamžitě (jinak běží automaticky každých 15 min, včetně zeleného označení hotových úkolů a odkazů na Disk)"
-            >
-              <RefreshCw size={15} className={`text-emerald-700 ${syncingGoogle ? 'animate-spin' : ''}`} />
-              <span>{syncingGoogle ? 'Synchronizuji...' : '🔄 Google Tabulka'}</span>
-            </button>
+            <div className="flex flex-col items-start gap-0.5">
+              <button
+                type="button"
+                onClick={handleSyncGoogleSheet}
+                disabled={syncingGoogle}
+                className="flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-xs font-black text-emerald-900 shadow-sm hover:bg-emerald-100 transition disabled:opacity-60 cursor-pointer"
+                title="Synchronizuje Google Tabulku okamžitě (jinak běží automaticky každých 15 min, včetně zeleného označení hotových úkolů a odkazů na Disk)"
+              >
+                <RefreshCw size={15} className={`text-emerald-700 ${syncingGoogle ? 'animate-spin' : ''}`} />
+                <span>{syncingGoogle ? 'Synchronizuji...' : '🔄 Google Tabulka'}</span>
+              </button>
+              {formattedLastSync && (
+                <span suppressHydrationWarning className="pl-2 text-[10px] font-semibold text-emerald-800/80">
+                  Auto-sync 15 min · Naposledy: {formattedLastSync}
+                </span>
+              )}
+            </div>
           )}
 
           <Link
@@ -490,14 +557,23 @@ export function WorkModuleClient({
             <Clock size={16} className="text-sky-600" />
           </div>
           <p className="mt-1 text-2xl font-black text-slate-900">{todayCount}</p>
-          <span className="text-[10px] font-semibold text-slate-400">zakázek na dnešek</span>
+          <span className="text-[10px] font-semibold text-slate-400">
+            {overdueOpenCount > 0
+              ? `na dnešek (+${overdueOpenCount} po termínu)`
+              : 'zakázek na dnešek'}
+          </span>
         </button>
 
         <button
           type="button"
           onClick={() => {
-            setSelectedFilter(selectedFilter === 'week' ? 'open' : 'week');
-            if (activeTab === 'invoicing') setActiveTab('list');
+            const next = selectedFilter === 'week' ? 'open' : 'week';
+            setSelectedFilter(next);
+            if (next === 'week' && (activeTab === 'day' || activeTab === 'invoicing')) {
+              setActiveTab('list');
+            } else if (activeTab === 'invoicing') {
+              setActiveTab('day');
+            }
           }}
           className={`rounded-2xl border p-4 text-left transition ${
             selectedFilter === 'week'
@@ -510,14 +586,19 @@ export function WorkModuleClient({
             <CalendarRange size={16} className="text-sky-600" />
           </div>
           <p className="mt-1 text-2xl font-black text-slate-900">{weekCount}</p>
-          <span className="text-[10px] font-semibold text-slate-400">plánované výjezdy</span>
+          <span className="text-[10px] font-semibold text-slate-400">plánované úkoly</span>
         </button>
 
         <button
           type="button"
           onClick={() => {
-            setSelectedFilter(selectedFilter === 'urgent' ? 'open' : 'urgent');
-            if (activeTab === 'invoicing') setActiveTab('list');
+            const next = selectedFilter === 'urgent' ? 'open' : 'urgent';
+            setSelectedFilter(next);
+            if (next === 'urgent' && (activeTab === 'day' || activeTab === 'invoicing')) {
+              setActiveTab('list');
+            } else if (activeTab === 'invoicing') {
+              setActiveTab('day');
+            }
           }}
           className={`rounded-2xl border p-4 text-left transition ${
             selectedFilter === 'urgent'
@@ -789,6 +870,7 @@ export function WorkModuleClient({
             const found = ordersList.find((o) => o.id === weekOrder.id);
             if (found) setRescheduleOrder(found);
           }}
+          onOrderUpdated={handleOrderUpdated}
         />
       )}
 
@@ -799,6 +881,8 @@ export function WorkModuleClient({
           canCleanup={canCreateWorkOrder}
           preferredTab={selectedFilter === 'history' ? 'HISTORY' : undefined}
           onOpenReschedule={(order) => setRescheduleOrder(order)}
+          onOrderUpdated={handleOrderUpdated}
+          onOrderDeleted={handleOrderDeleted}
         />
       )}
 

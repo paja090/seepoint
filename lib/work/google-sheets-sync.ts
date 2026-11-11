@@ -630,6 +630,8 @@ export type SyncGooglePlanResult = {
   createdCount: number;
   updatedCount: number;
   skippedCount: number;
+  cleanedCount?: number;
+  lastSyncAt?: string;
   orders: { id: string; title: string; clientName: string; scheduledAt: string; status: string }[];
 };
 
@@ -639,6 +641,7 @@ export type SyncGooglePlanOptions = {
   csvContent?: string;
   defaultYear?: number;
   referenceDate?: Date;
+  reconcileRemovedRows?: boolean;
 };
 
 /**
@@ -734,39 +737,72 @@ export async function syncGooglePlanToWorkOrders(
       invoiced: true,
       ftdUrl: true,
       referenceUrl: true,
+      crmOrderId: true,
+      navigationOrderId: true,
       planningConstraints: true,
-      assignments: { select: { workerName: true } },
+      assignments: { select: { workerName: true, acknowledgedAt: true } },
+      _count: { select: { workEntries: true, warehouseMovements: true } },
     },
   });
 
-  const existingBySheetKey = new Map<string, (typeof existingOrders)[0]>();
-  const existingBySignature = new Map<string, (typeof existingOrders)[0]>();
+  type ExistingOrderRow = (typeof existingOrders)[0];
+  const pushToList = (map: Map<string, ExistingOrderRow[]>, key: string, item: ExistingOrderRow) => {
+    const arr = map.get(key);
+    if (arr) arr.push(item);
+    else map.set(key, [item]);
+  };
+  const pickUnmatched = (
+    candidates: ExistingOrderRow[] | undefined,
+    matchedIds: Set<string>
+  ): ExistingOrderRow | undefined => {
+    if (!candidates?.length) return undefined;
+    return (
+      candidates.find((c) => !matchedIds.has(c.id) && c.status !== 'CANCELLED') ||
+      candidates.find((c) => !matchedIds.has(c.id))
+    );
+  };
+
+  const existingBySheetKeyRow = new Map<string, ExistingOrderRow[]>();
+  const existingBySheetKey = new Map<string, ExistingOrderRow[]>();
+  const existingBySignature = new Map<string, ExistingOrderRow[]>();
+  const existingByRowDateClient = new Map<string, ExistingOrderRow[]>();
 
   for (const eo of existingOrders) {
     const pc = eo.planningConstraints as Record<string, unknown> | null;
+    const eoDateIso = eo.scheduledAt.toISOString().slice(0, 10);
+    const eoClientNorm = eo.clientName.trim().toLowerCase();
     if (pc && typeof pc.sheetKey === 'string') {
-      existingBySheetKey.set(pc.sheetKey, eo);
+      pushToList(existingBySheetKey, pc.sheetKey, eo);
       if (typeof pc.sheetRow === 'number') {
-        existingBySheetKey.set(`${pc.sheetKey}_r${pc.sheetRow}`, eo);
+        pushToList(existingBySheetKeyRow, `${pc.sheetKey}_r${pc.sheetRow}`, eo);
       }
     }
-    const sig = `${eo.scheduledAt.toISOString().slice(0, 10)}::${eo.clientName.trim().toLowerCase()}::${eo.title.trim().toLowerCase()}`;
-    existingBySignature.set(sig, eo);
+    if (pc?.source === 'GOOGLE_SHEETS_PLAN' && typeof pc.sheetRow === 'number') {
+      pushToList(existingByRowDateClient, `${eoDateIso}::${pc.sheetRow}::${eoClientNorm}`, eo);
+    }
+    const sig = `${eoDateIso}::${eoClientNorm}::${eo.title.trim().toLowerCase()}`;
+    pushToList(existingBySignature, sig, eo);
   }
 
   let createdCount = 0;
   let updatedCount = 0;
   let skippedCount = 0;
+  let cleanedCount = 0;
+  const matchedOrderIds = new Set<string>();
   const syncedOrders: SyncGooglePlanResult['orders'] = [];
 
   for (const task of tasks) {
-    const signature = `${task.scheduledAt.toISOString().slice(0, 10)}::${task.clientName.trim().toLowerCase()}::${task.title.trim().toLowerCase()}`;
+    const taskDateIso = task.scheduledAt.toISOString().slice(0, 10);
+    const taskClientNorm = task.clientName.trim().toLowerCase();
+    const signature = `${taskDateIso}::${taskClientNorm}::${task.title.trim().toLowerCase()}`;
     const existing =
-      existingBySheetKey.get(`${task.sheetKey}_r${task.sheetRowIndex}`) ||
-      existingBySheetKey.get(task.sheetKey) ||
-      existingBySignature.get(signature);
+      pickUnmatched(existingBySheetKeyRow.get(`${task.sheetKey}_r${task.sheetRowIndex}`), matchedOrderIds) ||
+      pickUnmatched(existingBySheetKey.get(task.sheetKey), matchedOrderIds) ||
+      pickUnmatched(existingBySignature.get(signature), matchedOrderIds) ||
+      pickUnmatched(existingByRowDateClient.get(`${taskDateIso}::${task.sheetRowIndex}::${taskClientNorm}`), matchedOrderIds);
 
     if (existing) {
+      matchedOrderIds.add(existing.id);
       const prevPc = (existing.planningConstraints as Record<string, unknown> | null) || {};
       const nextStatus: WorkOrderStatus =
         existing.status === 'CANCELLED'
@@ -789,6 +825,8 @@ export async function syncGooglePlanToWorkOrders(
 
       const isUnchanged =
         existing.status === nextStatus &&
+        existing.priority === task.priority &&
+        existing.scheduledAt.toISOString().slice(0, 10) === taskDateIso &&
         Boolean(existing.ftdSent) === nextFtdSent &&
         Boolean(existing.invoiced) === nextInvoiced &&
         Boolean(prevPc.invoiceExempt) === nextInvoiceExempt &&
@@ -817,6 +855,7 @@ export async function syncGooglePlanToWorkOrders(
           title: task.title,
           description: task.description,
           clientName: task.clientName,
+          scheduledAt: task.scheduledAt,
           ftdSent: nextFtdSent,
           invoiced: nextInvoiced,
           ftdUrl: task.ftdUrl || undefined,
@@ -927,6 +966,7 @@ export async function syncGooglePlanToWorkOrders(
           },
         },
       });
+      matchedOrderIds.add(created.id);
 
       // Propagate to WorkTask items
       await syncWorkOrderTasks(created.id, client, { preserveLoggedTasks: true });
@@ -942,12 +982,103 @@ export async function syncGooglePlanToWorkOrders(
     }
   }
 
+  // Remove or archive stale open GOOGLE_SHEETS_PLAN orders (duplicates or rows deleted/moved in the sheet)
+  const shouldReconcileRemoved = options.reconcileRemovedRows ?? tasks.length >= 20;
+  if (shouldReconcileRemoved) {
+    for (const eo of existingOrders) {
+      if (matchedOrderIds.has(eo.id)) continue;
+      const pc = (eo.planningConstraints as Record<string, unknown> | null) || {};
+      if (pc.source !== 'GOOGLE_SHEETS_PLAN') continue;
+      if (['DONE', 'CANCELLED'].includes(eo.status)) continue;
+      if (eo.invoiced || eo.ftdSent) continue;
+      if (eo.crmOrderId || eo.navigationOrderId) continue;
+
+      const assignments = (eo as { assignments?: Array<{ acknowledgedAt?: Date | null }> }).assignments || [];
+      const hasAck = assignments.some((a) => Boolean(a.acknowledgedAt));
+      const counts = (eo as { _count?: { workEntries?: number; warehouseMovements?: number } })._count;
+      const hasChildActivity = (counts?.workEntries ?? 0) > 0 || (counts?.warehouseMovements ?? 0) > 0;
+
+      const canDelete =
+        !hasAck &&
+        !hasChildActivity &&
+        typeof (client.workOrder as { delete?: unknown }).delete === 'function';
+
+      if (canDelete) {
+        try {
+          await client.workAssignment.deleteMany({ where: { workOrderId: eo.id } });
+          if (typeof (client.workTask as { deleteMany?: unknown })?.deleteMany === 'function') {
+            await client.workTask.deleteMany({ where: { workOrderId: eo.id } });
+          }
+          if (typeof (client.workOrderItem as { deleteMany?: unknown })?.deleteMany === 'function') {
+            await client.workOrderItem.deleteMany({ where: { workOrderId: eo.id } });
+          }
+          if (typeof (client.workOrderRate as { deleteMany?: unknown })?.deleteMany === 'function') {
+            await client.workOrderRate.deleteMany({ where: { workOrderId: eo.id } });
+          }
+          await client.workOrder.delete({ where: { id: eo.id } });
+          cleanedCount++;
+          continue;
+        } catch {
+          // Fall through to non-destructive CANCELLED archival if foreign keys exist
+        }
+      }
+
+      await client.workOrder.update({
+        where: { id: eo.id },
+        data: {
+          status: 'CANCELLED',
+          planningConstraints: {
+            ...pc,
+            staleSheetArchived: true,
+          },
+        },
+      });
+      cleanedCount++;
+    }
+  }
+
+  const lastSyncAt = new Date().toISOString();
+  if (
+    'organization' in client &&
+    client.organization &&
+    typeof client.organization.findUnique === 'function' &&
+    typeof client.organization.update === 'function'
+  ) {
+    try {
+      const orgRow = await client.organization.findUnique({
+        where: { id: organizationId },
+        select: { plannerDefaults: true },
+      });
+      const existingDefaults = (orgRow?.plannerDefaults as Record<string, unknown> | null) || {};
+      await client.organization.update({
+        where: { id: organizationId },
+        data: {
+          plannerDefaults: {
+            ...existingDefaults,
+            googleSheetPlanSync: {
+              lastSyncAt,
+              totalParsed: tasks.length,
+              createdCount,
+              updatedCount,
+              skippedCount,
+              cleanedCount,
+            },
+          } as Prisma.InputJsonValue,
+        },
+      });
+    } catch (metaErr) {
+      console.warn('[google-sheets-sync] Could not persist lastSyncAt metadata:', metaErr);
+    }
+  }
+
   return {
     success: true,
     totalParsed: tasks.length,
     createdCount,
     updatedCount,
     skippedCount,
+    cleanedCount,
+    lastSyncAt,
     orders: syncedOrders.slice(0, 50),
   };
 }

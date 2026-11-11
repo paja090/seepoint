@@ -62,11 +62,15 @@ export function WorkPlanListView({
   orders: initialOrders,
   canCleanup = true,
   onOpenReschedule,
+  onOrderUpdated,
+  onOrderDeleted,
   preferredTab,
 }: {
   orders: WorkOrderData[];
   canCleanup?: boolean;
   onOpenReschedule?: (order: WorkOrderData) => void;
+  onOrderUpdated?: (orderId: string, patch: Partial<WorkOrderData>) => void;
+  onOrderDeleted?: (orderId: string) => void;
   preferredTab?: 'ACTIVE' | 'HISTORY';
 }) {
   const router = useRouter();
@@ -176,8 +180,9 @@ export function WorkPlanListView({
       if (!res.ok) throw new Error(data.error || 'Uložení stavu selhalo');
 
       setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: 'DONE' } : o))
+        prev.map((o) => (o.id === orderId ? { ...o, status: 'DONE', ftdSent: true } : o))
       );
+      onOrderUpdated?.(orderId, { status: 'DONE', ftdSent: true });
       router.refresh();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Chyba při označení zakázky jako hotové');
@@ -195,6 +200,8 @@ export function WorkPlanListView({
       const res = await fetch(`/api/work-orders/${orderId}`, { method: 'DELETE' });
       const out = (await res.json()) as { ok?: boolean; message?: string; error?: string };
       if (!res.ok) throw new Error(out.error || 'Odebrání selhalo');
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      onOrderDeleted?.(orderId);
       if (out.message) alert(out.message);
       router.refresh();
     } catch (err) {

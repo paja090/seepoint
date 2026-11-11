@@ -181,9 +181,9 @@ export function WorkDayView({
       if (!res.ok) throw new Error(data.error || 'Uložení stavu selhalo');
 
       setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: 'DONE' } : o))
+        prev.map((o) => (o.id === orderId ? { ...o, status: 'DONE', ftdSent: true } : o))
       );
-      if (onOrderUpdated) onOrderUpdated(orderId, { status: 'DONE' });
+      if (onOrderUpdated) onOrderUpdated(orderId, { status: 'DONE', ftdSent: true });
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Chyba při označení zakázky jako hotové');
     } finally {

@@ -44,6 +44,7 @@ export type WeekOrder = {
 type WorkWeekViewProps = {
   initialOrders: WeekOrder[];
   onOpenReschedule?: (order: WeekOrder) => void;
+  onOrderUpdated?: (orderId: string, patch: OrderPatch) => void;
 };
 type OrderPatch = Partial<Pick<WeekOrder, 'status' | 'ftdSent' | 'invoiced'>>;
 
@@ -77,7 +78,7 @@ function isOrderOverdue(order: WeekOrder, now = new Date()) {
   return Boolean(order.deadlineAt && new Date(order.deadlineAt) < now && isOpen(order));
 }
 
-export function WorkWeekView({ initialOrders, onOpenReschedule }: WorkWeekViewProps) {
+export function WorkWeekView({ initialOrders, onOpenReschedule, onOrderUpdated }: WorkWeekViewProps) {
   const [orders, setOrders] = useState(initialOrders);
   const [weekOffset, setWeekOffset] = useState(0);
   const [workerFilter, setWorkerFilter] = useState('ALL');
@@ -139,6 +140,7 @@ export function WorkWeekView({ initialOrders, onOpenReschedule }: WorkWeekViewPr
       return;
     }
     setOrders((current) => current.map((item) => (item.id === order.id ? next : item)));
+    onOrderUpdated?.(order.id, patch);
   }
 
   const weekEnd = days[6];
