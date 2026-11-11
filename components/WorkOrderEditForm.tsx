@@ -108,7 +108,7 @@ export function WorkOrderEditForm({ order, clients, carriers }: WorkOrderEditFor
           <input type="hidden" name="longitude" defaultValue={order.longitude ?? ''} />
         </div>
         <label className="lg:col-span-2">Podrobné zadání<textarea className="input mt-1 min-h-28" defaultValue={order.description} name="description" required /></label>
-        <label className="lg:col-span-2">Odkaz na fotodokumentaci<input className="input mt-1" defaultValue={order.ftdUrl} name="ftdUrl" type="url" placeholder="https://…" /></label>
+        <label className="lg:col-span-2">Odkaz na fotodokumentaci<input className="input mt-1" defaultValue={order.ftdUrl} name="ftdUrl" type="text" placeholder="https://drive.google.com/… nebo název složky na Disku" /></label>
         <label className="lg:col-span-2">Odkaz na podklady<input className="input mt-1" defaultValue={order.referenceUrl} name="referenceUrl" type="url" /></label>
         {error && <p className="lg:col-span-2 text-sm text-red-700" role="alert">{error}</p>}
         {saved && <p className="lg:col-span-2 text-sm font-medium text-emerald-700" role="status">Změny byly uloženy.</p>}
