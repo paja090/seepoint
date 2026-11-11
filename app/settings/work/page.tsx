@@ -1,10 +1,11 @@
 import { AppShell } from '@/components/AppShell';
+import { DailyBriefingSettingsCard } from '@/components/settings/DailyBriefingSettingsCard';
 import { WorkCategoriesSettings } from '@/components/settings/WorkCategoriesSettings';
 import { requirePageAccess } from '@/lib/page-auth';
 import Link from 'next/link';
 
 export default async function WorkSettingsPage() {
-  await requirePageAccess('settings');
+  const user = await requirePageAccess('settings');
 
   return (
     <AppShell>
@@ -13,7 +14,10 @@ export default async function WorkSettingsPage() {
           ← Zpět do Nastavení
         </Link>
       </div>
-      <WorkCategoriesSettings />
+      <div className="space-y-8">
+        <DailyBriefingSettingsCard currentUserEmail={user.email ?? undefined} />
+        <WorkCategoriesSettings />
+      </div>
     </AppShell>
   );
 }
