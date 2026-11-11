@@ -10,7 +10,9 @@ export function googleEvent(value: Record<string, unknown>, timezone: string): P
   if (!start || !end) return null;
   const allDay = Boolean(start.date);
   const startAt = start.date ? localInstant(start.date, '00:00', timezone) : new Date(start.dateTime || '');
-  const endAt = end.date ? localInstant(end.date, '00:00', timezone) : new Date(end.dateTime || '');
-  if (!Number.isFinite(+startAt) || !Number.isFinite(+endAt) || endAt <= startAt) return null;
-  return { ...base, startAt, endAt, allDay, cancelled: false };
+  const parsedEnd = end.date ? localInstant(end.date, '00:00', timezone) : new Date(end.dateTime || '');
+  if (!Number.isFinite(+startAt) || !Number.isFinite(+parsedEnd) || parsedEnd < startAt) return null;
+  const isPointEvent = +parsedEnd === +startAt;
+  const endAt = isPointEvent ? new Date(+startAt + 15 * 60000) : parsedEnd;
+  return { ...base, busy: isPointEvent ? false : base.busy, startAt, endAt, allDay, cancelled: false };
 }

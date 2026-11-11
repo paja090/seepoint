@@ -9,9 +9,24 @@ export function Timeline({ items, timezone, onEdit }: { items: PlannerItem[]; ti
       const isField = item.source === 'FIELD_TRIP';
       const isGoogle = item.source === 'GOOGLE';
       const isAbsence = item.source === 'ABSENCE';
-      const sourceLabel = isField ? 'Terénní výjezd' : isGoogle ? 'Google' : isAbsence ? 'Absence' : 'SeePoint';
+      const isWorkPlan = item.source === 'WORK_PLAN';
+      const sourceLabel = isField
+        ? item.isDraft
+          ? 'Návrh výjezdu'
+          : 'Terénní výjezd'
+        : isWorkPlan
+        ? 'Plán práce'
+        : isGoogle
+        ? 'Google'
+        : isAbsence
+        ? 'Absence'
+        : 'SeePoint';
       const colorClasses = isField
-        ? 'border-purple-500 bg-purple-50/90 text-purple-950'
+        ? item.isDraft
+          ? 'border-purple-300 bg-purple-50/50 text-purple-900'
+          : 'border-purple-500 bg-purple-50/90 text-purple-950'
+        : isWorkPlan
+        ? 'border-amber-500 bg-amber-50/80 text-slate-900'
         : isGoogle
         ? 'border-sky-400 bg-sky-50'
         : isAbsence
@@ -20,12 +35,12 @@ export function Timeline({ items, timezone, onEdit }: { items: PlannerItem[]; ti
 
       return <article key={`${item.source}:${item.id}`} className={`rounded-xl border-l-4 p-3 transition shadow-sm ${colorClasses}`}>
         <div className="flex items-center justify-between gap-2 text-xs font-medium text-slate-600">
-          <span>{item.allDay ? 'Celý den' : `${time(item.startAt)}–${time(item.endAt)}`}</span>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isField ? 'bg-purple-200/80 text-purple-800' : 'bg-white/80'}`}>{sourceLabel}</span>
+          <span>{item.allDay ? (isWorkPlan ? 'V plánu dne' : 'Celý den') : `${time(item.startAt)}–${time(item.endAt)}`}</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isField ? 'bg-purple-200/80 text-purple-800' : isWorkPlan ? 'bg-amber-200/80 text-amber-900' : 'bg-white/80'}`}>{sourceLabel}</span>
         </div>
         <p className="mt-1 break-words font-semibold text-slate-900">{item.title}</p>
         {item.location && <p className="mt-1 text-xs text-slate-600">{item.location}</p>}
-        {item.href && <Link href={item.href} className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-purple-700 hover:text-purple-900 hover:underline">Otevřít trasu →</Link>}
+        {item.href && <Link href={item.href} className={`mt-2 inline-flex items-center gap-1 text-xs font-bold hover:underline ${isWorkPlan ? 'text-amber-900 hover:text-amber-950' : 'text-purple-700 hover:text-purple-900'}`}>{isWorkPlan ? 'Otevřít zakázku →' : 'Otevřít trasu →'}</Link>}
         {item.editable && <button onClick={() => onEdit(item)} className="mt-2 min-h-9 text-xs font-bold text-emerald-800">Upravit čas →</button>}
       </article>;
     })}

@@ -5,6 +5,7 @@ import type { AuthenticatedPlannerActor } from './auth';
 import { PlannerError, type PlannerTask } from './domain';
 import { canSeeTeam } from './permissions';
 import { resolvePreferences } from './preferences';
+import { projectWorkTaskToPlannerTask } from './work-projection';
 
 export async function activeMembers(organizationId: string) {
   const rows = await prisma.organizationMember.findMany({ where: { organizationId, isActive: true, user: { status: 'ACTIVE' }, organization: { isActive: true } }, select: { userId: true, role: true, user: { select: { name: true, employees: { where: { organizationId }, select: { isActive: true } } } } }, orderBy: { userId: 'asc' } });
@@ -19,9 +20,26 @@ export async function tasksFor(actor: AuthenticatedPlannerActor, userId = actor.
   const organizationId = actor.organizationId;
   const employee = await prisma.employee.findFirst({ where: { organizationId, userId, isActive: true }, select: { id: true } });
   const canTasks = hasModuleAccess(actor, 'myTasks', 'myTasks') || hasModuleAccess(actor, 'tasks', 'tasks');
+  const canWork = hasModuleAccess(actor, 'work');
   const canField = hasModuleAccess(actor, 'electionRemoval', 'electionRemoval');
   const [work, quick, crm, field] = await Promise.all([
-    canTasks && employee ? prisma.workTask.findMany({ where: { organizationId, assignedToEmployeeId: employee.id, status: { in: ['TODO', 'IN_PROGRESS'] } }, select: { id: true, title: true, priority: true, dueDate: true, plannedTimeHours: true }, orderBy: { dueDate: 'asc' }, take: 100 }) : [],
+    canTasks && employee
+      ? prisma.workTask.findMany({
+          where: { organizationId, assignedToEmployeeId: employee.id, status: { in: ['TODO', 'IN_PROGRESS'] } },
+          select: {
+            id: true,
+            title: true,
+            priority: true,
+            dueDate: true,
+            scheduledDate: true,
+            plannedTimeHours: true,
+            workOrderId: true,
+            workOrder: { select: { id: true, scheduledAt: true } },
+          },
+          orderBy: [{ scheduledDate: 'asc' }, { dueDate: 'asc' }],
+          take: 150,
+        })
+      : [],
     canTasks && employee ? prisma.quickInternalTask.findMany({ where: { organizationId, assignedToEmployeeId: employee.id, status: { not: 'COMPLETED' } }, select: { id: true, title: true, priority: true, dueDate: true }, orderBy: { dueDate: 'asc' }, take: 100 }) : [],
     hasModuleAccess(actor, 'crm', 'clients') ? prisma.crmTask.findMany({ where: { organizationId, assignedUserId: userId, status: { in: ['TODO', 'IN_PROGRESS'] } }, select: { id: true, title: true, priority: true, dueDate: true, clientId: true }, orderBy: { dueDate: 'asc' }, take: 100 }) : [],
     canField ? (async () => {
@@ -51,7 +69,7 @@ export async function tasksFor(actor: AuthenticatedPlannerActor, userId = actor.
     })() : Promise.resolve([]),
   ]);
   return [
-    ...work.map(t => ({ id: t.id, sourceKind: 'WORK_TASK' as const, title: t.title, dueAt: t.dueDate?.toISOString() ?? null, priority: t.priority, href: `/my-tasks?taskId=${encodeURIComponent(t.id)}`, plannedMinutes: t.plannedTimeHours ? Number(t.plannedTimeHours) * 60 : null })),
+    ...work.map(t => projectWorkTaskToPlannerTask({ ...t, plannedTimeHours: t.plannedTimeHours ? Number(t.plannedTimeHours) : null }, canWork)),
     ...quick.map(t => ({ id: t.id, sourceKind: 'QUICK_TASK' as const, title: t.title, dueAt: t.dueDate?.toISOString() ?? null, priority: t.priority, href: '/my-tasks', plannedMinutes: null })),
     ...crm.map(t => ({ id: t.id, sourceKind: 'CRM_TASK' as const, title: t.title, dueAt: t.dueDate.toISOString(), priority: t.priority, href: `/clients/${encodeURIComponent(t.clientId)}`, plannedMinutes: null })),
     ...field.map(p => {

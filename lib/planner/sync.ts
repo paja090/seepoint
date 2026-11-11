@@ -9,11 +9,27 @@ import { ProviderError, type ProviderEvent } from './providers/types';
 import { uniqueProviderEvents } from './sync-core';
 import { disconnectConnection } from './connections';
 
-export async function syncConnection(organizationId: string, userId: string, id: string) {
+export async function syncConnection(
+  organizationId: string,
+  userId: string,
+  id: string,
+  options?: { forceFull?: boolean }
+) {
+  const forceFull = Boolean(options?.forceFull);
   const ownerActive = () => activeMembers(organizationId).then(members => members.some(m => m.userId === userId));
   if (!await ownerActive()) { await disconnectConnection(organizationId, userId, id); return { status: 'REVOKED' }; }
   const lease = randomUUID(), now = new Date();
-  const claimed = await prisma.calendarConnection.updateMany({ where: { id, organizationId, userId, status: 'CONNECTED', AND: [{ OR: [{ syncLeaseUntil: null }, { syncLeaseUntil: { lt: now } }] }, { OR: [{ retryAt: null }, { retryAt: { lte: now } }] }] }, data: { syncLeaseUntil: new Date(+now + 240000), syncLeaseId: lease, syncStatus: 'RUNNING' } });
+  const claimed = await prisma.calendarConnection.updateMany({
+    where: {
+      id,
+      organizationId,
+      userId,
+      status: 'CONNECTED',
+      OR: [{ syncLeaseUntil: null }, { syncLeaseUntil: { lt: now } }],
+      ...(forceFull ? {} : { AND: [{ OR: [{ retryAt: null }, { retryAt: { lte: now } }] }] }),
+    },
+    data: { syncLeaseUntil: new Date(+now + 240000), syncLeaseId: lease, syncStatus: 'RUNNING' },
+  });
   if (!claimed.count) return { status: 'BUSY_OR_RETRY_PENDING' };
   try {
     const connection = await prisma.calendarConnection.findFirstOrThrow({ where: { id, organizationId, userId, syncLeaseId: lease } });
@@ -33,7 +49,7 @@ export async function syncConnection(organizationId: string, userId: string, id:
     const selected = await prisma.externalCalendar.findMany({ where: { organizationId, connectionId: id, selected: true } });
     for (const c of selected) {
       if (Date.now() - +now > 150000) throw new ProviderError('PROVIDER_ERROR');
-      let syncToken = c.fullSyncedAt && +now - +c.fullSyncedAt < 7 * 86400000 ? c.syncToken || undefined : undefined;
+      let syncToken = !forceFull && c.fullSyncedAt && +now - +c.fullSyncedAt < 7 * 86400000 ? c.syncToken || undefined : undefined;
       let events: ProviderEvent[] = [], pageToken: string | undefined, nextSyncToken: string | undefined;
       let reset = false, pages = 0;
       do {
