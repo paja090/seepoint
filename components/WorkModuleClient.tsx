@@ -23,11 +23,13 @@ import {
 import { WorkDayView } from './WorkDayView';
 import { WorkWeekView } from './WorkWeekView';
 import { WorkPlanListView, type WorkOrderData } from './WorkPlanListView';
+import { WorkInvoicingView } from './WorkInvoicingView';
 import { RescheduleOrderModal } from './RescheduleOrderModal';
 import { WorkOrderForm } from './WorkOrderForm';
 import type { WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
 import type { WorkCategory } from '@/lib/work-categories';
 import type { TodayCrewRouteSummary } from '@/lib/field-planning/order-route-mapper';
+import { isOrderDoneWithoutFtdFlag, isOrderReadyForInvoicing } from '@/lib/work';
 
 type Option = { id: string; label: string };
 type CarrierOption = Option & { code: string };
@@ -69,7 +71,7 @@ export function WorkModuleClient({
   const [createModalOpen, setCreateModalOpen] = useState(autoOpenModal);
   const [createTargetDate, setCreateTargetDate] = useState<string>('');
   const [rescheduleOrder, setRescheduleOrder] = useState<WorkOrderData | null>(null);
-  const [activeTab, setActiveTab] = useState<'day' | 'calendar' | 'list'>('day');
+  const [activeTab, setActiveTab] = useState<'day' | 'calendar' | 'list' | 'invoicing'>('day');
   const [ordersList, setOrdersList] = useState<WorkOrderData[]>(orders);
   const [selectedFilter, setSelectedFilter] = useState<'open' | 'today' | 'week' | 'urgent' | 'invoicing' | 'history' | 'all'>('open');
   const [scopeFilter, setScopeFilter] = useState<'ALL' | 'WORKSHOP' | 'FIELD' | 'ROUTED' | 'UNROUTED'>('ALL');
@@ -150,20 +152,26 @@ export function WorkModuleClient({
   }).length;
 
   const urgentCount = openOrders.filter((o) => o.priority === 'URGENT').length;
-  const invoicingCount = ordersList.filter((o) => o.ftdSent && !o.invoiced && o.status !== 'CANCELLED').length;
+  const invoicingCount = ordersList.filter((o) => isOrderReadyForInvoicing(o)).length;
+  const doneWithFtdLinkCount = ordersList.filter(
+    (o) => isOrderDoneWithoutFtdFlag(o) && Boolean(o.ftdUrl)
+  ).length;
 
   const workshopCount = ordersList.filter(isWorkshopOrder).length;
   const fieldCount = ordersList.filter(isFieldOrder).length;
   const routedCount = openOrders.filter(isRoutedOrder).length;
   const unroutedCount = openOrders.filter(isUnroutedOrder).length;
 
-  // Filter orders based on active stat tile selection and scope filter
-  const filteredOrders = ordersList.filter((o) => {
+  const scopeFilteredOrders = ordersList.filter((o) => {
     if (scopeFilter === 'WORKSHOP' && !isWorkshopOrder(o)) return false;
     if (scopeFilter === 'FIELD' && !isFieldOrder(o)) return false;
     if (scopeFilter === 'ROUTED' && !isRoutedOrder(o)) return false;
     if (scopeFilter === 'UNROUTED' && !isUnroutedOrder(o)) return false;
+    return true;
+  });
 
+  // Filter orders based on active stat tile selection and scope filter
+  const filteredOrders = scopeFilteredOrders.filter((o) => {
     const d = new Date(o.scheduledAt);
     const isCompleted = ['DONE', 'CANCELLED'].includes(o.status);
 
@@ -171,7 +179,7 @@ export function WorkModuleClient({
     if (selectedFilter === 'today') return !isCompleted && d >= dayStart && d < tomorrow;
     if (selectedFilter === 'week') return !isCompleted && d >= dayStart && d < weekEnd;
     if (selectedFilter === 'urgent') return !isCompleted && o.priority === 'URGENT';
-    if (selectedFilter === 'invoicing') return o.ftdSent && !o.invoiced && o.status !== 'CANCELLED';
+    if (selectedFilter === 'invoicing') return isOrderReadyForInvoicing(o);
     if (selectedFilter === 'history') return isCompleted;
     return true;
   }).sort((a, b) => {
@@ -229,7 +237,15 @@ export function WorkModuleClient({
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
-            onClick={() => setSelectedFilter(selectedFilter === 'history' ? 'open' : 'history')}
+            onClick={() => {
+              if (selectedFilter === 'history') {
+                setSelectedFilter('open');
+                setActiveTab('day');
+              } else {
+                setSelectedFilter('history');
+                setActiveTab('list');
+              }
+            }}
             className={`flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-extrabold shadow-sm transition ${
               selectedFilter === 'history'
                 ? 'border-purple-600 bg-purple-600 text-white shadow-md ring-2 ring-purple-400/30'
@@ -439,7 +455,10 @@ export function WorkModuleClient({
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
         <button
           type="button"
-          onClick={() => setSelectedFilter(selectedFilter === 'open' ? 'all' : 'open')}
+          onClick={() => {
+            setSelectedFilter(selectedFilter === 'open' ? 'all' : 'open');
+            if (activeTab === 'invoicing') setActiveTab('day');
+          }}
           className={`rounded-2xl border p-4 text-left transition ${
             selectedFilter === 'open'
               ? 'border-emerald-500 bg-emerald-50/90 ring-2 ring-emerald-500/30'
@@ -456,7 +475,10 @@ export function WorkModuleClient({
 
         <button
           type="button"
-          onClick={() => setSelectedFilter(selectedFilter === 'today' ? 'open' : 'today')}
+          onClick={() => {
+            setSelectedFilter(selectedFilter === 'today' ? 'open' : 'today');
+            if (activeTab === 'invoicing') setActiveTab('day');
+          }}
           className={`rounded-2xl border p-4 text-left transition ${
             selectedFilter === 'today'
               ? 'border-sky-500 bg-sky-50/90 ring-2 ring-sky-500/30'
@@ -473,7 +495,10 @@ export function WorkModuleClient({
 
         <button
           type="button"
-          onClick={() => setSelectedFilter(selectedFilter === 'week' ? 'open' : 'week')}
+          onClick={() => {
+            setSelectedFilter(selectedFilter === 'week' ? 'open' : 'week');
+            if (activeTab === 'invoicing') setActiveTab('list');
+          }}
           className={`rounded-2xl border p-4 text-left transition ${
             selectedFilter === 'week'
               ? 'border-sky-500 bg-sky-50/90 ring-2 ring-sky-500/30'
@@ -490,7 +515,10 @@ export function WorkModuleClient({
 
         <button
           type="button"
-          onClick={() => setSelectedFilter(selectedFilter === 'urgent' ? 'open' : 'urgent')}
+          onClick={() => {
+            setSelectedFilter(selectedFilter === 'urgent' ? 'open' : 'urgent');
+            if (activeTab === 'invoicing') setActiveTab('list');
+          }}
           className={`rounded-2xl border p-4 text-left transition ${
             selectedFilter === 'urgent'
               ? 'border-rose-500 bg-rose-50/90 ring-2 ring-rose-500/30'
@@ -507,9 +535,17 @@ export function WorkModuleClient({
 
         <button
           type="button"
-          onClick={() => setSelectedFilter(selectedFilter === 'invoicing' ? 'open' : 'invoicing')}
+          onClick={() => {
+            if (selectedFilter === 'invoicing' && activeTab === 'invoicing') {
+              setSelectedFilter('open');
+              setActiveTab('day');
+            } else {
+              setSelectedFilter('invoicing');
+              setActiveTab('invoicing');
+            }
+          }}
           className={`rounded-2xl border p-4 text-left transition ${
-            selectedFilter === 'invoicing'
+            activeTab === 'invoicing' || selectedFilter === 'invoicing'
               ? 'border-purple-500 bg-purple-50/90 ring-2 ring-purple-500/30'
               : 'border-purple-200 bg-purple-50/50 hover:bg-purple-50 shadow-sm'
           }`}
@@ -519,12 +555,22 @@ export function WorkModuleClient({
             <FileCheck size={16} className="text-purple-600" />
           </div>
           <p className="mt-1 text-2xl font-black text-purple-950">{invoicingCount}</p>
-          <span className="text-[10px] font-semibold text-purple-700">fotky hotové</span>
+          <span className="text-[10px] font-semibold text-purple-700">
+            {doneWithFtdLinkCount > 0 ? `+ ${doneWithFtdLinkCount} s odkazem FTD` : 'fotky hotové'}
+          </span>
         </button>
 
         <button
           type="button"
-          onClick={() => setSelectedFilter(selectedFilter === 'history' ? 'open' : 'history')}
+          onClick={() => {
+            if (selectedFilter === 'history' && activeTab === 'list') {
+              setSelectedFilter('open');
+              setActiveTab('day');
+            } else {
+              setSelectedFilter('history');
+              setActiveTab('list');
+            }
+          }}
           className={`rounded-2xl border p-4 text-left transition ${
             selectedFilter === 'history'
               ? 'border-purple-600 bg-purple-50/90 ring-2 ring-purple-500/30'
@@ -541,7 +587,7 @@ export function WorkModuleClient({
       </div>
 
       {/* FILTER CLEAR BANNER IF ACTIVE */}
-      {selectedFilter !== 'open' && (
+      {selectedFilter !== 'open' && activeTab !== 'invoicing' && (
         <div className="flex items-center justify-between rounded-xl bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700">
           <span>
             Zobrazený filtr:{' '}
@@ -566,10 +612,15 @@ export function WorkModuleClient({
 
       {/* MAIN VIEW CONTROLS & TABS */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-2 sm:pb-0">
-        <div className="flex gap-1.5 sm:gap-2">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
           <button
             type="button"
-            onClick={() => setActiveTab('day')}
+            onClick={() => {
+              setActiveTab('day');
+              if (selectedFilter === 'invoicing' || selectedFilter === 'history') {
+                setSelectedFilter('open');
+              }
+            }}
             className={`flex items-center gap-2 px-4 sm:px-5 py-3 font-black text-sm border-b-2 transition ${
               activeTab === 'day'
                 ? 'border-sky-600 text-sky-600'
@@ -582,7 +633,12 @@ export function WorkModuleClient({
 
           <button
             type="button"
-            onClick={() => setActiveTab('calendar')}
+            onClick={() => {
+              setActiveTab('calendar');
+              if (selectedFilter === 'invoicing' || selectedFilter === 'history') {
+                setSelectedFilter('open');
+              }
+            }}
             className={`flex items-center gap-2 px-4 sm:px-5 py-3 font-black text-sm border-b-2 transition ${
               activeTab === 'calendar'
                 ? 'border-sky-600 text-sky-600'
@@ -595,7 +651,10 @@ export function WorkModuleClient({
 
           <button
             type="button"
-            onClick={() => setActiveTab('list')}
+            onClick={() => {
+              setActiveTab('list');
+              if (selectedFilter === 'invoicing') setSelectedFilter('open');
+            }}
             className={`flex items-center gap-2 px-4 sm:px-5 py-3 font-black text-sm border-b-2 transition ${
               activeTab === 'list'
                 ? 'border-sky-600 text-sky-600'
@@ -604,6 +663,22 @@ export function WorkModuleClient({
           >
             <List size={18} className={activeTab === 'list' ? 'text-sky-600' : 'text-slate-400'} />
             <span>Seznam zakázek ({filteredOrders.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('invoicing');
+              setSelectedFilter('invoicing');
+            }}
+            className={`flex items-center gap-2 px-4 sm:px-5 py-3 font-black text-sm border-b-2 transition ${
+              activeTab === 'invoicing'
+                ? 'border-purple-600 text-purple-700'
+                : 'border-transparent text-slate-500 hover:text-purple-700'
+            }`}
+          >
+            <FileCheck size={18} className={activeTab === 'invoicing' ? 'text-purple-600' : 'text-purple-400'} />
+            <span>K fakturaci ({invoicingCount})</span>
           </button>
         </div>
 
@@ -722,7 +797,16 @@ export function WorkModuleClient({
         <WorkPlanListView
           orders={filteredOrders}
           canCleanup={canCreateWorkOrder}
+          preferredTab={selectedFilter === 'history' ? 'HISTORY' : undefined}
           onOpenReschedule={(order) => setRescheduleOrder(order)}
+        />
+      )}
+
+      {/* VIEW TAB 3: INVOICING OVERVIEW */}
+      {activeTab === 'invoicing' && (
+        <WorkInvoicingView
+          orders={scopeFilteredOrders}
+          onOrderUpdated={handleOrderUpdated}
         />
       )}
 

@@ -12,12 +12,13 @@ export async function POST() {
     const cutoffDate = new Date();
     cutoffDate.setHours(0, 0, 0, 0);
 
-    // Find old completed or cancelled work orders
+    // Find old completed or cancelled work orders (never delete un-invoiced tasks with FTD sent)
     const oldOrders = await prisma.workOrder.findMany({
       where: {
         organizationId: auth.organizationId!,
         status: { in: ['DONE', 'CANCELLED'] },
         scheduledAt: { lt: cutoffDate },
+        NOT: { AND: [{ ftdSent: true }, { invoiced: false }] },
       },
       select: { id: true },
     });

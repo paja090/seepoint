@@ -8,6 +8,7 @@ import { extractOrderRouteMap } from '@/lib/field-planning/order-route-mapper';
 import { syncCrmOrderToWorkOrderInTransaction } from '@/lib/crm/crm-work-sync';
 import { syncUnlinkedDispatchPointsInTransaction } from '@/lib/dispatch/dispatch-work-sync';
 import { isSeePointOrganization } from '@/lib/work/google-sheets-sync';
+import { extractWorkOrderConstraintFlags } from '@/lib/work';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,6 +57,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
 
   const [
     openOrdersList,
+    uninvoicedDoneOrdersList,
     recentHistoryOrdersList,
     clients,
     carriers,
@@ -79,7 +81,21 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
       },
       orderBy: [{ scheduledAt: 'asc' }, { createdAt: 'desc' }],
     }),
-    // 2. Recent history / completed orders for reference, stats, and invoicing
+    // 2. ALL un-invoiced finished orders so invoicing overview never silently drops older jobs
+    prisma.workOrder.findMany({
+      where: {
+        organizationId: user.organizationId,
+        status: 'DONE',
+        invoiced: false,
+      },
+      include: {
+        assignments: true,
+        workTasks: { include: { assignedTo: true } },
+        items: { include: { carrier: true } },
+      },
+      orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }],
+    }),
+    // 3. Recent history / completed orders for reference & stats
     prisma.workOrder.findMany({
       where: {
         organizationId: user.organizationId,
@@ -137,7 +153,13 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
     }),
   ]);
 
-  const orders = [...openOrdersList, ...recentHistoryOrdersList];
+  const mergedOrdersMap = new Map<string, (typeof openOrdersList)[number]>();
+  for (const order of [...openOrdersList, ...uninvoicedDoneOrdersList, ...recentHistoryOrdersList]) {
+    if (!mergedOrdersMap.has(order.id)) {
+      mergedOrdersMap.set(order.id, order);
+    }
+  }
+  const orders = [...mergedOrdersMap.values()];
   const isSeePointOrg = isSeePointOrganization(currentOrg);
 
   const completedPointIds = new Set(completedPoints.map((p) => p.id));
@@ -170,32 +192,40 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
     order.workTasks.filter(task => task.assignedTo && absences.some(absence => absence.employeeId === task.assignedToEmployeeId && overlapsAbsence(order.scheduledAt, order.deadlineAt, absence)))
       .map(task => `${order.title}: ${task.assignedTo!.firstName} ${task.assignedTo!.lastName} má schválenou nepřítomnost v termínu práce.`));
 
-  const mappedOrders = orders.map((order) => ({
-    id: order.id,
-    title: order.title,
-    clientName: order.clientName,
-    requestedBy: order.requestedBy,
-    scheduledAt: order.scheduledAt.toISOString(),
-    deadlineAt: order.deadlineAt?.toISOString() ?? null,
-    status: order.status,
-    priority: order.priority,
-    price: order.price?.toString() ?? null,
-    workType: order.workType,
-    ftdSent: order.ftdSent,
-    invoiced: order.invoiced,
-    quantity: order.quantity,
-    mediaLabel: order.mediaLabel,
-    contactPhone: order.contactPhone,
-    locationNote: order.locationNote,
-    assignments: order.assignments.map((a) => ({
-      workerName: a.workerName,
-      acknowledgedAt: a.acknowledgedAt?.toISOString() ?? null,
-    })),
-    workTasksCount: order.workTasks.length,
-    carrierCode: order.items[0]?.carrier?.code,
-    carrierCity: order.items[0]?.carrier?.city,
-    routeInfo: orderRouteMap.get(order.id) || null,
-  }));
+  const mappedOrders = orders.map((order) => {
+    const flags = extractWorkOrderConstraintFlags(order.planningConstraints);
+    return {
+      id: order.id,
+      title: order.title,
+      clientName: order.clientName,
+      requestedBy: order.requestedBy,
+      scheduledAt: order.scheduledAt.toISOString(),
+      deadlineAt: order.deadlineAt?.toISOString() ?? null,
+      status: order.status,
+      priority: order.priority,
+      price: order.price?.toString() ?? null,
+      workType: order.workType,
+      ftdSent: order.ftdSent,
+      invoiced: order.invoiced,
+      invoiceExempt: flags.invoiceExempt,
+      ftdSkipped: flags.ftdSkipped,
+      completedBySheetColor: flags.completedBySheetColor,
+      ftdUrl: order.ftdUrl,
+      referenceUrl: order.referenceUrl,
+      quantity: order.quantity,
+      mediaLabel: order.mediaLabel,
+      contactPhone: order.contactPhone,
+      locationNote: order.locationNote,
+      assignments: order.assignments.map((a) => ({
+        workerName: a.workerName,
+        acknowledgedAt: a.acknowledgedAt?.toISOString() ?? null,
+      })),
+      workTasksCount: order.workTasks.length,
+      carrierCode: order.items[0]?.carrier?.code,
+      carrierCity: order.items[0]?.carrier?.city,
+      routeInfo: orderRouteMap.get(order.id) || null,
+    };
+  });
 
   return (
     <AppShell>

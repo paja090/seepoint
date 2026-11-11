@@ -109,3 +109,56 @@ export function formatGoogleDriveLabel(value?: string | null): string {
   }
   return `Otevřít složku na Disku („${trimmed}“) ↗`;
 }
+
+export type WorkOrderInvoicingShape = {
+  status: string;
+  ftdSent?: boolean;
+  invoiced?: boolean;
+  invoiceExempt?: boolean;
+  ftdSkipped?: boolean;
+  ftdUrl?: string | null;
+};
+
+/**
+ * Extracts normalized workflow flags from WorkOrder.planningConstraints JSON.
+ */
+export function extractWorkOrderConstraintFlags(planningConstraints: unknown): {
+  invoiceExempt: boolean;
+  ftdSkipped: boolean;
+  completedBySheetColor: boolean;
+} {
+  if (!planningConstraints || typeof planningConstraints !== 'object' || Array.isArray(planningConstraints)) {
+    return { invoiceExempt: false, ftdSkipped: false, completedBySheetColor: false };
+  }
+  const pc = planningConstraints as Record<string, unknown>;
+  return {
+    invoiceExempt: pc.invoiceExempt === true,
+    ftdSkipped: pc.ftdSkipped === true,
+    completedBySheetColor: pc.completedBySheetColor === true,
+  };
+}
+
+/**
+ * Completed/FTD-sent jobs awaiting invoice (excluding cancelled, invoiced, and FAKT = BEZ exempt jobs).
+ */
+export function isOrderReadyForInvoicing(order: WorkOrderInvoicingShape): boolean {
+  return Boolean(
+    order.ftdSent &&
+    !order.invoiced &&
+    !order.invoiceExempt &&
+    order.status !== 'CANCELLED'
+  );
+}
+
+/**
+ * Finished (DONE) jobs that are neither invoiced nor marked exempt (FAKT = BEZ) and don't yet have FTD = ANO.
+ */
+export function isOrderDoneWithoutFtdFlag(order: WorkOrderInvoicingShape): boolean {
+  return Boolean(
+    order.status === 'DONE' &&
+    !order.ftdSent &&
+    !order.invoiced &&
+    !order.invoiceExempt
+  );
+}
+
