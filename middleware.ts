@@ -12,8 +12,14 @@ const publicExactPaths = new Set([
   '/api/auth/set-password',
   // Provider callbacks authenticate with their Svix signature in the handler.
   '/api/webhooks/resend',
-  // Vercel cron has no browser session; the handler requires CRON_SECRET.
+  // Email 1-click task confirmation authenticates with HMAC-SHA256 token in the handler.
+  '/api/work-orders/ack-email',
+  // Vercel crons have no browser session; every handler requires Bearer CRON_SECRET.
   '/api/cron/planner',
+  '/api/cron/ai-inbox',
+  '/api/cron/sales-radar',
+  '/api/cron/daily-briefing',
+  '/api/cron/occupancy-intelligence',
 ]);
 
 const publicPathPrefixes = [

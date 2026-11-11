@@ -42,7 +42,7 @@ export type WorkOrderData = {
   mediaLabel?: string | null;
   contactPhone?: string | null;
   locationNote?: string | null;
-  assignments: Array<{ workerName: string }>;
+  assignments: Array<{ workerName: string; acknowledgedAt?: string | null }>;
   workTasksCount: number;
   carrierCode?: string;
   carrierCity?: string;

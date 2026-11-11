@@ -723,9 +723,36 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
                 <UserCheck size={18} className="text-emerald-600" />
                 Přiřazení pracovníci
               </h2>
-              <p className="text-xs font-bold text-slate-900 bg-slate-100 p-3 rounded-xl">
-                {order.assignments.map((assignment) => assignment.workerName).join(', ') || 'Zatím nepřiřazeni'}
-              </p>
+              {order.assignments.length === 0 ? (
+                <p className="text-xs font-bold text-slate-600 bg-slate-100 p-3 rounded-xl">
+                  Zatím nepřiřazeni
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  {order.assignments.map((assignment) => (
+                    <span
+                      key={assignment.id}
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${
+                        assignment.acknowledgedAt
+                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                          : 'bg-white text-slate-700 border border-slate-200'
+                      }`}
+                      title={
+                        assignment.acknowledgedAt
+                          ? `Potvrzeno: ${new Date(assignment.acknowledgedAt).toLocaleString('cs-CZ', { timeZone: 'Europe/Prague' })}`
+                          : 'Čeká na potvrzení'
+                      }
+                    >
+                      {assignment.acknowledgedAt ? (
+                        <span className="text-emerald-600">✓</span>
+                      ) : (
+                        <span className="text-slate-400">○</span>
+                      )}
+                      <span>{assignment.workerName}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
               <WorkOrderAcknowledgeButton
                 workOrderId={order.id}
                 initialAcknowledged={order.assignments.some((a) => Boolean(a.acknowledgedAt))}

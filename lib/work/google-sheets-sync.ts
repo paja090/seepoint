@@ -598,17 +598,36 @@ export async function syncGooglePlanToWorkOrders(
         },
       });
 
-      // Update worker assignments
+      // Update worker assignments (preserving acknowledgments and linked users)
       if (task.workers.length) {
+        const prevByNorm = new Map<
+          string,
+          { workerName: string; userId: string | null; acknowledgedAt: Date | null; note: string | null }
+        >();
+        if (typeof client.workAssignment.findMany === 'function') {
+          const previousAssignments = await client.workAssignment.findMany({
+            where: { workOrderId: existing.id },
+            select: { workerName: true, userId: true, acknowledgedAt: true, note: true },
+          });
+          for (const pa of previousAssignments) {
+            prevByNorm.set(pa.workerName.trim().toLowerCase(), pa);
+          }
+        }
         await client.workAssignment.deleteMany({
           where: { workOrderId: existing.id },
         });
         await client.workAssignment.createMany({
-          data: task.workers.map((workerName) => ({
-            organizationId,
-            workOrderId: existing.id,
-            workerName,
-          })),
+          data: task.workers.map((workerName) => {
+            const prev = prevByNorm.get(workerName.trim().toLowerCase());
+            return {
+              organizationId,
+              workOrderId: existing.id,
+              workerName,
+              ...(prev?.userId ? { userId: prev.userId } : {}),
+              ...(prev?.acknowledgedAt ? { acknowledgedAt: prev.acknowledgedAt } : {}),
+              ...(prev?.note ? { note: prev.note } : {}),
+            };
+          }),
         });
       }
 

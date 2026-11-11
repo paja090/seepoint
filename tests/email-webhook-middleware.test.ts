@@ -14,3 +14,21 @@ test('The webhook exemption does not expose other webhooks, child routes or emai
     assert.equal(response.status, 401, path);
   }
 });
+
+test('Vercel cron routes and signed ack-email reach handler auth without a session cookie', () => {
+  for (const path of [
+    '/api/cron/planner',
+    '/api/cron/ai-inbox',
+    '/api/cron/sales-radar',
+    '/api/cron/daily-briefing',
+    '/api/work-orders/ack-email?token=abc.def',
+  ]) {
+    const response = middleware(new NextRequest(`https://example.cz${path}`, { method: 'GET' }));
+    assert.equal(response.headers.get('x-middleware-next'), '1', path);
+  }
+
+  for (const blocked of ['/api/cron/other', '/api/work-orders', '/api/work-orders/ack-email/extra']) {
+    const response = middleware(new NextRequest(`https://example.cz${blocked}`, { method: 'GET' }));
+    assert.equal(response.status, 401, blocked);
+  }
+});

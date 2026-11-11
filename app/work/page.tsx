@@ -187,7 +187,10 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
     mediaLabel: order.mediaLabel,
     contactPhone: order.contactPhone,
     locationNote: order.locationNote,
-    assignments: order.assignments.map((a) => ({ workerName: a.workerName })),
+    assignments: order.assignments.map((a) => ({
+      workerName: a.workerName,
+      acknowledgedAt: a.acknowledgedAt?.toISOString() ?? null,
+    })),
     workTasksCount: order.workTasks.length,
     carrierCode: order.items[0]?.carrier?.code,
     carrierCity: order.items[0]?.carrier?.city,
