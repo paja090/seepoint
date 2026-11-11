@@ -15,6 +15,11 @@ import {
   renderWorkerDailyBriefingEmail,
   type WorkerRecipient,
 } from '../lib/work/daily-briefing';
+import {
+  czechFirstNameVocative,
+  createBriefingAckToken,
+  verifyBriefingAckToken,
+} from '../lib/work/briefing-ack';
 
 const DIRECTORY: WorkerRecipient[] = [
   {
@@ -168,6 +173,7 @@ test('matchWorkerAssignment resolves Czech diminutives, full names, initials, an
 
 test('assembleWorkerBriefings merges FieldPlan crew stops with standalone WorkOrders without duplicating', () => {
   const result = assembleWorkerBriefings({
+    organizationId: 'org_seepoint_default',
     targetDate: '2026-11-12',
     baseUrl: 'https://seepoint.cz',
     directory: DIRECTORY,
@@ -272,10 +278,68 @@ test('assembleWorkerBriefings merges FieldPlan crew stops with standalone WorkOr
   assert.equal(pavelBriefing.tasks.length, 1);
   assert.equal(pavelBriefing.tasks[0].scheduledTimeLabel, '9:00');
   assert.deepEqual(pavelBriefing.tasks[0].crewNames, ['Vlaďka', 'Karel']);
+  assert.match(pavelBriefing.tasks[0].ackUrl || '', /\/api\/work-orders\/ack-email\?token=/);
+  assert.match(pavelBriefing.ackAllUrl || '', /\/api\/work-orders\/ack-email\?token=/);
 
   const rendered = renderWorkerDailyBriefingEmail(pavelBriefing, 'SeePOINT s.r.o.');
   assert.match(rendered.subject, /Plán práce na zítra/);
+  assert.match(rendered.html, /Ahoj <strong[^>]*>Pavle<\/strong>/);
+  assert.match(rendered.html, /Vím o úkolu \(Potvrdit\)/);
   assert.match(rendered.html, /Porada nový systém SP/);
   assert.match(rendered.html, /&lt;test&gt;/); // Escaped HTML
   assert.doesNotMatch(rendered.html, /<test>/);
+});
+
+test('czechFirstNameVocative conjugates common Czech names and nicknames accurately', () => {
+  assert.equal(czechFirstNameVocative('Pavel'), 'Pavle');
+  assert.equal(czechFirstNameVocative('Marek'), 'Marku');
+  assert.equal(czechFirstNameVocative('Mirek'), 'Mirku');
+  assert.equal(czechFirstNameVocative('Miroslav'), 'Miroslave');
+  assert.equal(czechFirstNameVocative('Vladimíra'), 'Vladimíro');
+  assert.equal(czechFirstNameVocative('Vlaďka'), 'Vlaďko');
+  assert.equal(czechFirstNameVocative('Tomáš'), 'Tomáši');
+  assert.equal(czechFirstNameVocative('Ondřej'), 'Ondřeji');
+  assert.equal(czechFirstNameVocative('Jiří'), 'Jiří');
+  assert.equal(czechFirstNameVocative('Jirka'), 'Jirko');
+  assert.equal(czechFirstNameVocative('Petr'), 'Petře');
+  assert.equal(czechFirstNameVocative('Lenka'), 'Lenko');
+  assert.equal(czechFirstNameVocative(''), 'kolego');
+});
+
+test('HMAC briefing ack token verifies valid payloads and rejects tampered or expired tokens', () => {
+  const secret = 'test-signing-secret-xyz';
+  const token = createBriefingAckToken(
+    {
+      orgId: 'org_seepoint_default',
+      orderIds: ['wo-1', 'wo-2'],
+      userId: 'user-pavel',
+      employeeId: 'emp-pavel',
+      workerName: 'Pavel Šubert',
+      email: 'subert.pvel@gmail.com',
+      ttlDays: 7,
+    },
+    secret
+  );
+
+  const decoded = verifyBriefingAckToken(token, secret);
+  assert.ok(decoded);
+  assert.equal(decoded.orgId, 'org_seepoint_default');
+  assert.deepEqual(decoded.orderIds, ['wo-1', 'wo-2']);
+  assert.equal(decoded.workerName, 'Pavel Šubert');
+
+  // Wrong secret -> null
+  assert.equal(verifyBriefingAckToken(token, 'wrong-secret'), null);
+
+  // Tampered payload -> null
+  const [payloadB64, sigHex] = token.split('.');
+  const tamperedPayload = Buffer.from(
+    JSON.stringify({ ...decoded, orgId: 'org_other' }),
+    'utf8'
+  ).toString('base64url');
+  assert.equal(verifyBriefingAckToken(`${tamperedPayload}.${sigHex}`, secret), null);
+  assert.equal(verifyBriefingAckToken(`${payloadB64}.0000`, secret), null);
+
+  // Expired -> null
+  const futureCheck = Math.floor(Date.now() / 1000) + 10 * 24 * 60 * 60;
+  assert.equal(verifyBriefingAckToken(token, secret, futureCheck), null);
 });

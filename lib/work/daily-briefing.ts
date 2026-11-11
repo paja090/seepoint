@@ -10,6 +10,7 @@ import { dayInZone, zonedTime } from '../field-planning/profile';
 import type { PlanningResult } from '../field-planning/contracts';
 import { sendTransactionalEmail } from '../email';
 import { isValidEmailAddress } from '../email-policy';
+import { createBriefingAckToken, czechFirstNameVocative } from './briefing-ack';
 
 export const DEFAULT_BRIEFING_TIMEZONE = 'Europe/Prague';
 export const DEFAULT_BRIEFING_HOUR = 17;
@@ -84,6 +85,7 @@ export type BriefingTaskItem = {
   referenceUrl?: string | null;
   pdfUrl?: string | null;
   detailUrl: string;
+  ackUrl?: string;
   description?: string | null;
 };
 
@@ -93,6 +95,7 @@ export type WorkerDailyBriefing = {
   targetDateLabel: string;
   routeUrl?: string;
   myTasksUrl: string;
+  ackAllUrl?: string;
   vehicles: string[];
   crewMates: string[];
   tasks: BriefingTaskItem[];
@@ -422,7 +425,27 @@ export function resolvePublicAppUrl(): string {
   return 'https://seepoint.cz';
 }
 
+function buildAckLink(
+  organizationId: string | undefined,
+  orderIds: string[],
+  recipient: WorkerRecipient,
+  baseUrl: string
+): string | undefined {
+  const uniqueIds = [...new Set(orderIds.filter(Boolean))];
+  if (!organizationId || uniqueIds.length === 0) return undefined;
+  const token = createBriefingAckToken({
+    orgId: organizationId,
+    orderIds: uniqueIds,
+    userId: recipient.userId,
+    employeeId: recipient.employeeId,
+    workerName: recipient.fullName,
+    email: recipient.email,
+  });
+  return `${baseUrl}/api/work-orders/ack-email?token=${encodeURIComponent(token)}`;
+}
+
 export function assembleWorkerBriefings(input: {
+  organizationId?: string;
   targetDate: string;
   orders: BriefingOrderInput[];
   fieldPlans: BriefingFieldPlanInput[];
@@ -544,6 +567,9 @@ export function assembleWorkerBriefings(input: {
             detailUrl: linkedOrderId
               ? `${baseUrl}/work/${linkedOrderId}`
               : `${baseUrl}/my-route?date=${input.targetDate}`,
+            ackUrl: linkedOrderId
+              ? buildAckLink(input.organizationId, [linkedOrderId], recipient, baseUrl)
+              : undefined,
             description: order?.description ?? null,
           });
         }
@@ -612,6 +638,7 @@ export function assembleWorkerBriefings(input: {
           referenceUrl: order.referenceUrl,
           pdfUrl: order.pdfUrl,
           detailUrl: `${baseUrl}/work/${order.id}`,
+          ackUrl: buildAckLink(input.organizationId, [order.id], recipient, baseUrl),
           description: order.description,
         });
       }
@@ -638,12 +665,20 @@ export function assembleWorkerBriefings(input: {
         return a.title.localeCompare(bTask.title, 'cs');
       });
 
+      const allOrderIds = b.tasks
+        .map((t) => t.workOrderId)
+        .filter((id): id is string => Boolean(id));
+
       return {
         recipient: b.recipient,
         targetDate: input.targetDate,
         targetDateLabel,
         routeUrl: b.hasRoute ? `${baseUrl}/my-route?date=${input.targetDate}` : undefined,
         myTasksUrl: `${baseUrl}/my-tasks`,
+        ackAllUrl:
+          allOrderIds.length > 0
+            ? buildAckLink(input.organizationId, allOrderIds, b.recipient, baseUrl)
+            : undefined,
         vehicles: [...b.vehicles],
         crewMates: [...b.crewMates],
         tasks: b.tasks,
@@ -742,6 +777,11 @@ export function renderWorkerDailyBriefingEmail(
           : '';
 
       const actionButtons: string[] = [];
+      if (task.ackUrl) {
+        actionButtons.push(
+          `<a href="${escapeHtml(task.ackUrl)}" style="display:inline-block;margin:4px 6px 0 0;padding:8px 13px;border-radius:8px;background:#059669;color:#ffffff;font-size:12px;font-weight:800;text-decoration:none;">✅ Vím o úkolu (Potvrdit)</a>`
+        );
+      }
       if (task.mapsUrl) {
         actionButtons.push(
           `<a href="${escapeHtml(task.mapsUrl)}" style="display:inline-block;margin:4px 6px 0 0;padding:8px 12px;border-radius:8px;background:#f0f9ff;border:1px solid #bae6fd;color:#0369a1;font-size:12px;font-weight:700;text-decoration:none;">🗺️ Navigovat</a>`
@@ -783,6 +823,8 @@ export function renderWorkerDailyBriefingEmail(
     })
     .join('');
 
+  const vocativeName = czechFirstNameVocative(briefing.recipient.firstName);
+
   const html = `
     <div style="margin:0;background:#f1f5f9;padding:24px 12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0f172a;">
       <div style="max-width:640px;margin:0 auto;border-radius:18px;overflow:hidden;background:#f8fafc;border:1px solid #e2e8f0;box-shadow:0 4px 12px rgba(15,23,42,0.06);">
@@ -790,17 +832,18 @@ export function renderWorkerDailyBriefingEmail(
           <div style="font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#38bdf8;margin-bottom:6px;">
             ${escapeHtml(organizationName)} · Automatický plán práce${options?.isTest ? ' (TESTOVACÍ NÁHLED)' : ''}
           </div>
-          <h1 style="margin:0 0 6px;font-size:22px;line-height:1.25;font-weight:900;color:#ffffff;">
+          <h1 style="margin:0 0 8px;font-size:22px;line-height:1.25;font-weight:900;color:#ffffff;">
             Zítřejší plán: ${escapeHtml(briefing.targetDateLabel)}
           </h1>
-          <p style="margin:0 0 14px;font-size:14px;color:#cbd5e1;">
-            Dobrý den, <strong style="color:#ffffff;">${escapeHtml(briefing.recipient.fullName)}</strong>, zde máte přehled úkolů na zítřek, abyste se mohl/a předem připravit.
+          <p style="margin:0 0 14px;font-size:14.5px;line-height:1.5;color:#cbd5e1;">
+            Ahoj <strong style="color:#ffffff;">${escapeHtml(vocativeName)}</strong>, tady máš přehled svých úkolů na zítřek, ať si můžeš vše v klidu připravit:
           </p>
           <div style="padding:10px 14px;border-radius:10px;background:rgba(255,255,255,0.08);font-size:12.5px;color:#e2e8f0;font-weight:600;">
             ${escapeHtml(summaryParts.join('  ·  '))}
           </div>
-          <div style="margin-top:16px;">
-            <a href="${escapeHtml(primaryActionUrl)}" style="display:inline-block;padding:11px 18px;border-radius:10px;background:#0284c7;color:#ffffff;font-size:13px;font-weight:800;text-decoration:none;">
+          <div style="margin-top:12px;">
+            ${briefing.ackAllUrl ? `<a href="${escapeHtml(briefing.ackAllUrl)}" style="display:inline-block;margin:6px 8px 0 0;padding:11px 17px;border-radius:10px;background:#059669;color:#ffffff;font-size:13px;font-weight:800;text-decoration:none;">✅ Vím o všem – Potvrdit všechny (${briefing.tasks.length})</a>` : ''}
+            <a href="${escapeHtml(primaryActionUrl)}" style="display:inline-block;margin:6px 0 0 0;padding:11px 17px;border-radius:10px;background:#0284c7;color:#ffffff;font-size:13px;font-weight:800;text-decoration:none;">
               📱 ${escapeHtml(primaryActionLabel)} →
             </a>
           </div>
@@ -809,8 +852,8 @@ export function renderWorkerDailyBriefingEmail(
           ${taskCardsHtml}
         </div>
         <div style="padding:14px 24px 22px;font-size:11.5px;line-height:1.5;color:#64748b;text-align:center;">
-          Tento souhrn byl automaticky odeslán systémem SeePoint OS den předem.<br>
-          Případné ranní změny či doplnění vždy uvidíte aktuálně v aplikaci.
+          Kliknutím na zelené tlačítko <strong>„Vím o úkolu“</strong> potvrdíš převzetí přímo do SeePoint OS.<br>
+          Případné ranní změny vždy uvidíš aktuálně v aplikaci.
         </div>
       </div>
     </div>
@@ -818,8 +861,9 @@ export function renderWorkerDailyBriefingEmail(
 
   const textLines = [
     `${prefix}Plán práce na zítra (${briefing.targetDateLabel}) – ${organizationName}`,
-    `Pracovník: ${briefing.recipient.fullName}`,
+    `Ahoj ${vocativeName}, tady máš přehled úkolů na zítřek:`,
     summaryParts.join(' | '),
+    briefing.ackAllUrl ? `Potvrdit všechny úkoly jedním kliknutím: ${briefing.ackAllUrl}` : null,
     '',
     ...briefing.tasks.flatMap((task, idx) => [
       `${idx + 1}. ${task.title} (${task.clientName})`,
@@ -827,11 +871,12 @@ export function renderWorkerDailyBriefingEmail(
       task.contactPhone ? `   Kontakt: ${task.contactName || ''} ${task.contactPhone}` : null,
       task.mapsUrl ? `   Mapa: ${task.mapsUrl}` : null,
       task.driveUrl ? `   Disk: ${task.driveUrl}` : null,
+      task.ackUrl ? `   Potvrdit úkol: ${task.ackUrl}` : null,
       `   Detail: ${task.detailUrl}`,
       '',
-    ]).filter((l): l is string => l !== null),
+    ]),
     `Otevřít v aplikaci: ${primaryActionUrl}`,
-  ];
+  ].filter((l): l is string => l !== null);
 
   return {
     subject,
@@ -965,6 +1010,7 @@ export async function loadDailyBriefingsForOrganization(
   ]);
 
   return assembleWorkerBriefings({
+    organizationId,
     targetDate,
     orders,
     fieldPlans,
@@ -1025,13 +1071,18 @@ export async function sendDailyBriefingsForOrganization(
       throw new Error('Zadaný testovací e-mail nemá platný formát.');
     }
 
-    const matchingWorkerBriefing =
-      assembly.briefings.find((b) => b.recipient.email === testEmail) || assembly.briefings[0];
+    const ownBriefing = assembly.briefings.find((b) => b.recipient.email === testEmail);
+    const matchingWorkerBriefing = ownBriefing || assembly.briefings[0];
+    const isOwn = Boolean(ownBriefing);
 
     const baseUrl = (options.baseUrl || resolvePublicAppUrl()).replace(/\/+$/, '');
     const sampleBriefing: WorkerDailyBriefing = matchingWorkerBriefing
       ? {
           ...matchingWorkerBriefing,
+          ackAllUrl: isOwn ? matchingWorkerBriefing.ackAllUrl : undefined,
+          tasks: isOwn
+            ? matchingWorkerBriefing.tasks
+            : matchingWorkerBriefing.tasks.map((t) => ({ ...t, ackUrl: undefined })),
           recipient: {
             ...matchingWorkerBriefing.recipient,
             email: testEmail,

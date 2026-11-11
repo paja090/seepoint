@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { syncMailbox, processAiInboxMessage } from '@/lib/ai-inbox/service';
+import { isModuleEnabled } from '@/lib/organization-modules';
 import { hasModuleAccess } from '@/lib/module-policy';
-import { runWithTenantContext } from '@/lib/tenant-context';
+import { runWithTenantContext, requireTenantContext } from '@/lib/tenant-context';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -37,75 +38,87 @@ async function handleCronExecution(request: Request) {
   }
 
   try {
-    const connections = await prisma.integrationConnection.findMany({
+    const organizations = await prisma.organization.findMany({
       where: {
-        provider: 'GMAIL',
-        status: 'CONNECTED',
-        ...(isCronAuthorized ? {} : { organizationId: callerOrganizationId }),
+        isActive: true,
+        ...(isCronAuthorized ? {} : { id: callerOrganizationId }),
       },
-      select: {
-        id: true,
-        organizationId: true,
-        accountEmail: true,
-        settings: true,
-        lastCheckedAt: true,
-      },
+      select: { id: true, plan: true, enabledModules: true },
     });
 
     const now = Date.now();
-    const results = [];
+    const results: Array<{
+      connectionId: string;
+      accountEmail: string | null;
+      syncedCount?: number;
+      newMessagesCount?: number;
+      error?: string;
+    }> = [];
 
-    for (const conn of connections) {
-      const settings = (conn.settings && typeof conn.settings === 'object' ? conn.settings : {}) as Record<string, unknown>;
-      const intervalMinutes = typeof settings.autoSyncIntervalMinutes === 'number' ? settings.autoSyncIntervalMinutes : 15;
+    for (const org of organizations) {
+      if (!isModuleEnabled(org, 'aiInbox')) continue;
 
-      // Pokud má uživatel nastaveno 0, automatický cron pro tuto schránku je vypnut
-      if (intervalMinutes === 0 && isCronAuthorized) {
-        continue;
-      }
+      await runWithTenantContext({ organizationId: org.id, source: 'script' }, async () => {
+        requireTenantContext();
+        const connections = await prisma.integrationConnection.findMany({
+          where: {
+            organizationId: org.id,
+            provider: 'GMAIL',
+            status: 'CONNECTED',
+          },
+          select: {
+            id: true,
+            organizationId: true,
+            accountEmail: true,
+            settings: true,
+            lastCheckedAt: true,
+          },
+        });
 
-      // Kontrola intervalu od poslední kontroly
-      if (conn.lastCheckedAt && isCronAuthorized) {
-        const elapsedMinutes = (now - conn.lastCheckedAt.getTime()) / (1000 * 60);
-        if (elapsedMinutes < intervalMinutes - 1) {
-          continue;
-        }
-      }
+        for (const conn of connections) {
+          const settings = (conn.settings && typeof conn.settings === 'object' ? conn.settings : {}) as Record<string, unknown>;
+          const intervalMinutes = typeof settings.autoSyncIntervalMinutes === 'number' ? settings.autoSyncIntervalMinutes : 15;
 
-      try {
-        const syncResult = await runWithTenantContext(
-          { organizationId: conn.organizationId, source: 'session' },
-          () => syncMailbox(conn.organizationId, conn.id)
-        );
+          if (intervalMinutes === 0 && isCronAuthorized) {
+            continue;
+          }
 
-        // Zpracovat AI analýzu pro nově stažené e-maily
-        for (const item of syncResult.ingested) {
-          if (item.message.id && (!item.isDuplicate || item.message.processingStatus === 'INGESTED')) {
-            try {
-              await runWithTenantContext(
-                { organizationId: conn.organizationId, source: 'session' },
-                () => processAiInboxMessage(conn.organizationId, item.message.id)
-              );
-            } catch (pErr) {
-              console.warn(`[Cron AI Inbox] Chyba analýzy zprávy ${item.message.id}:`, pErr);
+          if (conn.lastCheckedAt && isCronAuthorized) {
+            const elapsedMinutes = (now - conn.lastCheckedAt.getTime()) / (1000 * 60);
+            if (elapsedMinutes < intervalMinutes - 1) {
+              continue;
             }
           }
-        }
 
-        results.push({
-          connectionId: conn.id,
-          accountEmail: conn.accountEmail,
-          syncedCount: syncResult.syncedCount,
-          newMessagesCount: syncResult.newMessagesCount,
-        });
-      } catch (connErr) {
-        console.error(`[Cron AI Inbox] Chyba synchronizace schránky ${conn.id}:`, connErr);
-        results.push({
-          connectionId: conn.id,
-          accountEmail: conn.accountEmail,
-          error: connErr instanceof Error ? connErr.message : 'Chyba synchronizace',
-        });
-      }
+          try {
+            const syncResult = await syncMailbox(conn.organizationId, conn.id);
+
+            for (const item of syncResult.ingested) {
+              if (item.message.id && (!item.isDuplicate || item.message.processingStatus === 'INGESTED')) {
+                try {
+                  await processAiInboxMessage(conn.organizationId, item.message.id);
+                } catch (pErr) {
+                  console.warn(`[Cron AI Inbox] Chyba analýzy zprávy ${item.message.id}:`, pErr);
+                }
+              }
+            }
+
+            results.push({
+              connectionId: conn.id,
+              accountEmail: conn.accountEmail,
+              syncedCount: syncResult.syncedCount,
+              newMessagesCount: syncResult.newMessagesCount,
+            });
+          } catch (connErr) {
+            console.error(`[Cron AI Inbox] Chyba synchronizace schránky ${conn.id}:`, connErr);
+            results.push({
+              connectionId: conn.id,
+              accountEmail: conn.accountEmail,
+              error: connErr instanceof Error ? connErr.message : 'Chyba synchronizace',
+            });
+          }
+        }
+      });
     }
 
     return NextResponse.json({

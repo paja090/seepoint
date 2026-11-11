@@ -648,9 +648,31 @@ export function WorkDayView({
                             {formatWorkPrice(order.price)}
                           </p>
                         )}
-                        <p className="font-extrabold text-slate-700">
-                          👥 {order.assignments.map((a) => a.workerName).join(', ') || 'Nepřiřazeno'}
-                        </p>
+                        <div className="flex flex-wrap items-center md:justify-end gap-1">
+                          <span className="font-bold text-slate-500">👥</span>
+                          {order.assignments.length === 0 ? (
+                            <span className="font-extrabold text-slate-600">Nepřiřazeno</span>
+                          ) : (
+                            order.assignments.map((a, idx) => (
+                              <span
+                                key={`${a.workerName}-${idx}`}
+                                className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                                  a.acknowledgedAt
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    : 'bg-slate-100 text-slate-700'
+                                }`}
+                                title={
+                                  a.acknowledgedAt
+                                    ? `Potvrzeno: ${new Date(a.acknowledgedAt).toLocaleString('cs-CZ', { timeZone: 'Europe/Prague' })}`
+                                    : 'Čeká na potvrzení pracovníkem'
+                                }
+                              >
+                                {a.acknowledgedAt && <span className="text-emerald-600">✓</span>}
+                                <span>{a.workerName}</span>
+                              </span>
+                            ))
+                          )}
+                        </div>
                         <p className="text-[11px] font-semibold text-slate-500">
                           Zadal/a: {order.requestedBy || 'Neuvedeno'}
                         </p>
