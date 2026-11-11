@@ -28,6 +28,8 @@ type EditableOrder = {
   contactName: string;
   contactPhone: string;
   locationNote: string;
+  latitude?: number | null;
+  longitude?: number | null;
   referenceUrl: string;
   ftdUrl: string;
 };
@@ -87,7 +89,24 @@ export function WorkOrderEditForm({ order, clients, carriers }: WorkOrderEditFor
         <label>Platnost kampaně do<input className="input mt-1" defaultValue={order.campaignDateTo} name="campaignDateTo" type="date" /></label>
         <label>Kontaktní osoba<input className="input mt-1" defaultValue={order.contactName} name="contactName" /></label>
         <label>Telefon<input className="input mt-1" defaultValue={order.contactPhone} name="contactPhone" type="tel" /></label>
-        <label className="lg:col-span-2">Místo a pokyny<input className="input mt-1" defaultValue={order.locationNote} name="locationNote" /></label>
+        <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="text-xs font-bold text-slate-700 block">Místo a pokyny k lokalitě</label>
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="font-semibold text-slate-500">GPS poloha:</span>
+              {order.latitude && order.longitude ? (
+                <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  📍 {order.latitude.toFixed(5)}, {order.longitude.toFixed(5)}
+                </span>
+              ) : (
+                <span className="text-amber-800 font-semibold italic">⚠️ Chybí GPS souřadnice</span>
+              )}
+            </div>
+          </div>
+          <input className="input w-full text-xs" defaultValue={order.locationNote} name="locationNote" placeholder="Adresa nebo specifikace místa" />
+          <input type="hidden" name="latitude" defaultValue={order.latitude ?? ''} />
+          <input type="hidden" name="longitude" defaultValue={order.longitude ?? ''} />
+        </div>
         <label className="lg:col-span-2">Podrobné zadání<textarea className="input mt-1 min-h-28" defaultValue={order.description} name="description" required /></label>
         <label className="lg:col-span-2">Odkaz na fotodokumentaci<input className="input mt-1" defaultValue={order.ftdUrl} name="ftdUrl" type="url" placeholder="https://…" /></label>
         <label className="lg:col-span-2">Odkaz na podklady<input className="input mt-1" defaultValue={order.referenceUrl} name="referenceUrl" type="url" /></label>

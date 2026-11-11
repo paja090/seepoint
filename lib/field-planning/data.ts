@@ -118,10 +118,10 @@ export async function loadPlanningData(date: string, options: {
         ? { latitude: pc.latitude, longitude: pc.longitude }
         : null;
 
-    if (points.length === 0 && directCoords) {
+    if ((points.length === 0 || distinct.size === 0) && directCoords) {
       distinct.set(`${directCoords.latitude},${directCoords.longitude}`, directCoords);
     }
-    const hasDirectCoords = points.length === 0 && Boolean(directCoords);
+    const hasDirectCoords = Boolean(directCoords) && distinct.size === 1;
 
     if (!isWorkshop && !o.navigationOrder && !usesItemExecution(o.items) && !hasDirectCoords && (points.length === 0 || points.some(p => !coordinates(p)) || distinct.size !== 1)) {
       if (!o.locationNote && !(pc?.locationAddress)) blockedReason = 'Zakázka nemá právě jednu jednoznačnou pracovní lokalitu.';
