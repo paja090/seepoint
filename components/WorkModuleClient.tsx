@@ -246,7 +246,7 @@ export function WorkModuleClient({
               onClick={handleSyncGoogleSheet}
               disabled={syncingGoogle}
               className="flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-xs font-black text-emerald-900 shadow-sm hover:bg-emerald-100 transition disabled:opacity-60 cursor-pointer"
-              title="Stáhnout a synchronizovat aktuální plán práce z Google Tabulky (pouze SeePOINT s.r.o.)"
+              title="Synchronizuje Google Tabulku okamžitě (jinak běží automaticky každých 15 min, včetně zeleného označení hotových úkolů a odkazů na Disk)"
             >
               <RefreshCw size={15} className={`text-emerald-700 ${syncingGoogle ? 'animate-spin' : ''}`} />
               <span>{syncingGoogle ? 'Synchronizuji...' : '🔄 Google Tabulka'}</span>

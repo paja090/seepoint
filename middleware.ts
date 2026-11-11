@@ -19,6 +19,7 @@ const publicExactPaths = new Set([
   '/api/cron/ai-inbox',
   '/api/cron/sales-radar',
   '/api/cron/daily-briefing',
+  '/api/cron/google-sheet-plan',
   '/api/cron/occupancy-intelligence',
 ]);
 

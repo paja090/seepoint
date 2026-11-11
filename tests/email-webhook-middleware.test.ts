@@ -21,6 +21,7 @@ test('Vercel cron routes and signed ack-email reach handler auth without a sessi
     '/api/cron/ai-inbox',
     '/api/cron/sales-radar',
     '/api/cron/daily-briefing',
+    '/api/cron/google-sheet-plan',
     '/api/work-orders/ack-email?token=abc.def',
   ]) {
     const response = middleware(new NextRequest(`https://example.cz${path}`, { method: 'GET' }));
