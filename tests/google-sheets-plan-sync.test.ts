@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import ExcelJS from 'exceljs';
 import {
   parseCsvRows,
   parseDateString,
@@ -11,8 +12,12 @@ import {
   parseContactDetails,
   parseWorkersList,
   parseGooglePlanCsv,
+  parseGooglePlanXlsx,
   syncGooglePlanToWorkOrders,
   isSeePointOrganization,
+  isGreenRgbHex,
+  unwrapExcelValueToString,
+  extractExcelCellHyperlink,
 } from '../lib/work/google-sheets-sync.ts';
 
 test('Google Sheets Sync: parseCsvRows handles commas and newlines in quoted cells', () => {
@@ -338,4 +343,147 @@ test('Google Sheets Sync: automatically sets status DONE for past historical or 
   assert.equal(tasks[4].clientName, 'Budoucí otevřený');
   assert.equal(tasks[4].status, 'PLANNED');
 });
+
+test('Google Sheets Sync: isGreenRgbHex identifies Sheet green fills and rejects white, gray, red, yellow, cyan', () => {
+  assert.equal(isGreenRgbHex('FF00FF00'), true);
+  assert.equal(isGreenRgbHex('FFD4EDBC'), true);
+  assert.equal(isGreenRgbHex('FFD9EAD3'), true);
+  assert.equal(isGreenRgbHex('#6AA84F'), true);
+  assert.equal(isGreenRgbHex('FF38761D'), true);
+
+  assert.equal(isGreenRgbHex('FFFFFFFF'), false);
+  assert.equal(isGreenRgbHex('FFEFEFEF'), false);
+  assert.equal(isGreenRgbHex('FF00FFFF'), false); // cyan
+  assert.equal(isGreenRgbHex('FFFFFF00'), false); // yellow
+  assert.equal(isGreenRgbHex('FFFF0000'), false); // red
+  assert.equal(isGreenRgbHex('FFF995D6'), false); // pink
+  assert.equal(isGreenRgbHex(null), false);
+});
+
+test('Google Sheets Sync: unwrapExcelValueToString and extractExcelCellHyperlink handle nested richText+hyperlink', () => {
+  const richHyperlinkVal = {
+    text: {
+      richText: [
+        { text: 'Deinstalace 3 ks MT  ' },
+        { text: 'https://maps.example/abc' },
+      ],
+    },
+    hyperlink: 'https://maps.example/abc',
+  };
+  assert.equal(
+    unwrapExcelValueToString(richHyperlinkVal),
+    'Deinstalace 3 ks MT  https://maps.example/abc'
+  );
+  assert.equal(extractExcelCellHyperlink(richHyperlinkVal), 'https://maps.example/abc');
+  assert.equal(
+    unwrapExcelValueToString(new Date(Date.UTC(2026, 10, 12, 0, 0, 0))),
+    '12.11.2026'
+  );
+});
+
+test('Google Sheets Sync: parseGooglePlanXlsx detects green worker cell as DONE and preserves Drive hyperlinks', async () => {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Plan práce 2026');
+
+  ws.addRow([
+    'FTD odeslána',
+    'FAKT',
+    'Datum',
+    'Den',
+    'Zadal',
+    'Pracovník dílna',
+    'Předáno klukům',
+    'Klient',
+    'Zadání',
+    'Kontakt na klienta/ osobu na místě',
+    'Datum zahájení',
+    'Datum ukončení',
+    'Typ nosiče',
+    'KS',
+    'Práce',
+    'Odkaz',
+    'Odkaz na FTD',
+  ]);
+
+  // Row 2: Green fill on worker cell for tomorrow -> DONE + embedded FTD Drive link
+  const r2 = ws.addRow([
+    'NE',
+    'NE',
+    new Date(Date.UTC(2026, 10, 12, 0, 0, 0)),
+    'čtvrtek',
+    'M',
+    'Mirek',
+    'TRUE',
+    'MOaP',
+    'CP - reinstalace 5 ks',
+    '',
+    new Date(Date.UTC(2026, 10, 12, 0, 0, 0)),
+    new Date(Date.UTC(2026, 10, 12, 0, 0, 0)),
+    'CP',
+    5,
+    'reinstalace',
+    'Podklady PDF',
+    '09 11 MOaP Andělé CP',
+  ]);
+  r2.getCell(6).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF00FF00' },
+  };
+  r2.getCell(16).value = {
+    text: 'Podklady PDF',
+    hyperlink: 'https://drive.google.com/drive/folders/ref123',
+  };
+  r2.getCell(17).value = {
+    text: '09 11 MOaP Andělé CP',
+    hyperlink: 'https://drive.google.com/drive/folders/ftd456',
+  };
+
+  // Row 3: White background on worker cell for future task -> PLANNED
+  const r3 = ws.addRow([
+    'NE',
+    'NE',
+    new Date(Date.UTC(2026, 10, 15, 0, 0, 0)),
+    'neděle',
+    'V',
+    'Pavel',
+    'FALSE',
+    'Aréna',
+    'Billboard - Megakoncert',
+    '',
+    new Date(Date.UTC(2026, 10, 15, 0, 0, 0)),
+    new Date(Date.UTC(2026, 10, 15, 0, 0, 0)),
+    'BB',
+    1,
+    'reinstalace',
+    '',
+    '15 11 Billboard Megakoncert',
+  ]);
+  r3.getCell(6).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFFFFFF' },
+  };
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const tasks = await parseGooglePlanXlsx(
+    buffer,
+    2026,
+    new Date(Date.UTC(2026, 10, 11, 0, 0, 0))
+  );
+
+  assert.equal(tasks.length, 2);
+
+  assert.equal(tasks[0].clientName, 'MOaP');
+  assert.equal(tasks[0].status, 'DONE');
+  assert.equal(tasks[0].isCompletedByColor, true);
+  assert.equal(tasks[0].ftdUrl, 'https://drive.google.com/drive/folders/ftd456');
+  assert.equal(tasks[0].referenceUrl, 'https://drive.google.com/drive/folders/ref123');
+
+  assert.equal(tasks[1].clientName, 'Aréna');
+  assert.equal(tasks[1].status, 'PLANNED');
+  assert.equal(tasks[1].isCompletedByColor, false);
+  assert.equal(tasks[1].ftdUrl, '15 11 Billboard Megakoncert');
+});
+
 

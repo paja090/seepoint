@@ -1,3 +1,4 @@
+import ExcelJS from 'exceljs';
 import { prisma } from '@/lib/db';
 import { Prisma, WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
 import { syncWorkOrderTasks } from '@/lib/work-task-sync';
@@ -5,6 +6,13 @@ import { syncWorkOrderTasks } from '@/lib/work-task-sync';
 export const DEFAULT_GOOGLE_PLAN_SHEET_CSV_URL =
   process.env.GOOGLE_PLAN_SHEET_CSV_URL ||
   'https://docs.google.com/spreadsheets/d/1VcssEXqBmRSV0xBkzP23Miadt2zTTR8lHhgHPQlLt6o/export?format=csv&gid=1725001912';
+
+export function toGoogleSheetsXlsxUrl(url: string): string | null {
+  if (!/docs\.google\.com\/spreadsheets/i.test(url)) return null;
+  if (/format=csv/i.test(url)) return url.replace(/format=csv/gi, 'format=xlsx');
+  if (/format=xlsx/i.test(url)) return url;
+  return null;
+}
 
 /**
  * Checks whether an organization is SeePOINT s.r.o.
@@ -16,6 +24,74 @@ export function isSeePointOrganization(org?: { id: string; name?: string | null;
   if (org.slug?.trim().toLowerCase() === 'seepoint') return true;
   if (org.name?.toLowerCase().includes('seepoint')) return true;
   return false;
+}
+
+/**
+ * Determines whether an ARGB/hex color represents a green highlight fill
+ * (e.g. #00FF00 bright green or Google Sheets light green #D4EDBC / #D9EAD3),
+ * while rejecting whites, grays, yellows (#FFFF00), reds (#FF0000), and cyans (#00FFFF).
+ */
+export function isGreenRgbHex(argb?: string | null): boolean {
+  if (!argb) return false;
+  const hex = argb.trim().toUpperCase().replace(/^#/, '');
+  const rgb = hex.length === 8 ? hex.slice(2) : hex;
+  if (!/^[0-9A-F]{6}$/.test(rgb)) return false;
+
+  const r = Number.parseInt(rgb.slice(0, 2), 16);
+  const g = Number.parseInt(rgb.slice(2, 4), 16);
+  const b = Number.parseInt(rgb.slice(4, 6), 16);
+
+  if (g < 80) return false;
+  if (g - r < 15) return false;
+  if (g - b < 15) return false;
+  return true;
+}
+
+export function isGreenExcelFill(fill: unknown): boolean {
+  if (!fill || typeof fill !== 'object') return false;
+  const f = fill as { type?: string; pattern?: string; fgColor?: { argb?: string } };
+  if (f.type === 'pattern' && f.pattern === 'none') return false;
+  return isGreenRgbHex(f.fgColor?.argb);
+}
+
+export function unwrapExcelValueToString(val: unknown): string {
+  if (val === null || val === undefined) return '';
+  if (val instanceof Date) {
+    if (Number.isNaN(val.getTime())) return '';
+    return `${val.getUTCDate()}.${val.getUTCMonth() + 1}.${val.getUTCFullYear()}`;
+  }
+  if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
+    return String(val);
+  }
+  if (typeof val === 'object') {
+    const obj = val as Record<string, unknown>;
+    if (Array.isArray(obj.richText)) {
+      return obj.richText
+        .map((part) =>
+          part && typeof part === 'object'
+            ? unwrapExcelValueToString((part as Record<string, unknown>).text)
+            : ''
+        )
+        .join('');
+    }
+    if ('result' in obj && obj.result !== undefined) {
+      return unwrapExcelValueToString(obj.result);
+    }
+    if ('text' in obj && obj.text !== undefined) {
+      return unwrapExcelValueToString(obj.text);
+    }
+    if ('error' in obj) return '';
+  }
+  return '';
+}
+
+export function extractExcelCellHyperlink(val: unknown): string | null {
+  if (!val || typeof val !== 'object') return null;
+  const obj = val as Record<string, unknown>;
+  if (typeof obj.hyperlink === 'string' && /^https?:\/\//i.test(obj.hyperlink.trim())) {
+    return obj.hyperlink.trim();
+  }
+  return null;
 }
 
 export type ParsedGooglePlanTask = {
@@ -32,6 +108,7 @@ export type ParsedGooglePlanTask = {
   isHandedOver: boolean;
   isFtdSent: boolean;
   isInvoiced: boolean;
+  isCompletedByColor?: boolean;
   contactName?: string | null;
   contactPhone?: string | null;
   campaignDateFrom?: Date | null;
@@ -295,35 +372,37 @@ export function parseWorkersList(workerCell?: string | null): string[] {
   return [...new Set(normalized)];
 }
 
-/**
- * Parses raw Google Sheet CSV and returns an array of structured ParsedGooglePlanTask items.
- */
-export function parseGooglePlanCsv(
-  csvContent: string,
+type RawPlanRow = {
+  rowNumber: number;
+  cells: string[];
+  hyperlinks?: Array<string | null>;
+  isWorkerCellGreen?: (workerColIdx: number) => boolean;
+};
+
+function parseGooglePlanRows(
+  rawRows: RawPlanRow[],
   defaultYear = 2026,
   referenceDate: Date = new Date()
 ): ParsedGooglePlanTask[] {
-  const rows = parseCsvRows(csvContent);
-  if (!rows.length) return [];
+  if (!rawRows.length) return [];
 
   const refYear = referenceDate.getUTCFullYear();
   const refMonth = referenceDate.getUTCMonth();
   const refDate = referenceDate.getUTCDate();
   const todayStart = new Date(Date.UTC(refYear, refMonth, refDate, 0, 0, 0));
 
-  // Find header row
-  const headerIdx = rows.findIndex(
+  const headerIdx = rawRows.findIndex(
     (r) =>
-      r.some((cell) => cell.includes('FTD')) ||
-      r.some((cell) => cell.includes('Klient')) ||
-      r.some((cell) => cell.includes('Zadání'))
+      r.cells.some((cell) => cell.includes('FTD')) ||
+      r.cells.some((cell) => cell.includes('Klient')) ||
+      r.cells.some((cell) => cell.includes('Zadání'))
   );
 
   if (headerIdx === -1) {
     throw new Error('Hlavička tabulky plánu práce nebyla nalezena (očekávány sloupce Klient / Zadání / FTD).');
   }
 
-  const header = rows[headerIdx].map((h) => h.toLowerCase());
+  const header = rawRows[headerIdx].cells.map((h) => h.toLowerCase());
   const colIdx = {
     ftdOdeslana: header.findIndex((h) => h.includes('ftd odesl') || h.includes('ftd')),
     fakt: header.findIndex((h) => h.includes('fakt')),
@@ -346,20 +425,20 @@ export function parseGooglePlanCsv(
 
   const tasks: ParsedGooglePlanTask[] = [];
 
-  for (let i = headerIdx + 1; i < rows.length; i++) {
-    const row = rows[i];
+  for (let i = headerIdx + 1; i < rawRows.length; i++) {
+    const rawRow = rawRows[i];
+    const row = rawRow.cells;
+    const hyperlinks = rawRow.hyperlinks;
     const rawDatum = (colIdx.datum !== -1 ? row[colIdx.datum] : '') || '';
     const rawZadani = (colIdx.zadani !== -1 ? row[colIdx.zadani] : '') || '';
     const rawKlient = (colIdx.klient !== -1 ? row[colIdx.klient] : '') || '';
 
-    // Ignore month headers (e.g. "L E D E N", "Ú N O R" or empty rows)
     const isMonthHeader =
       !rawKlient &&
       rawZadani &&
       Object.keys(MONTH_NAMES).some((m) => rawZadani.toLowerCase().replace(/\s+/g, '') === m);
     if (isMonthHeader) continue;
 
-    // Filter out rows without task info
     if (!rawZadani && (!rawKlient || !rawDatum)) {
       continue;
     }
@@ -386,6 +465,11 @@ export function parseGooglePlanCsv(
     const faktRaw = ((colIdx.fakt !== -1 ? row[colIdx.fakt] : '') || '').toUpperCase();
     const isInvoiced = faktRaw === 'ANO';
 
+    const isCompletedByColor =
+      colIdx.pracovnik !== -1 && rawRow.isWorkerCellGreen
+        ? rawRow.isWorkerCellGreen(colIdx.pracovnik)
+        : false;
+
     const rawPrace = (colIdx.prace !== -1 ? row[colIdx.prace] : '') || '';
     const rawCarrier = (colIdx.typNosice !== -1 ? row[colIdx.typNosice] : '') || '';
     const rawWorker = (colIdx.pracovnik !== -1 ? row[colIdx.pracovnik] : '') || '';
@@ -394,6 +478,9 @@ export function parseGooglePlanCsv(
     const rawOdkaz = (colIdx.odkaz !== -1 ? row[colIdx.odkaz] : '') || '';
     const rawOdkazFtd = (colIdx.odkazFtd !== -1 ? row[colIdx.odkazFtd] : '') || '';
     const rawKs = (colIdx.ks !== -1 ? row[colIdx.ks] : '') || '';
+
+    const odkazHyperlink = colIdx.odkaz !== -1 ? hyperlinks?.[colIdx.odkaz] || null : null;
+    const ftdHyperlink = colIdx.odkazFtd !== -1 ? hyperlinks?.[colIdx.odkazFtd] || null : null;
 
     const clientName = rawKlient.trim() || 'Interní / SeePoint';
     const workType = parseWorkType(rawPrace, rawZadani);
@@ -405,10 +492,9 @@ export function parseGooglePlanCsv(
     const requestedBy = parseZadavatel(rawZadal);
 
     let status: WorkOrderStatus;
-    if (isFtdSent || isInvoiced) {
+    if (isFtdSent || isInvoiced || isCompletedByColor) {
       status = 'DONE';
     } else if (scheduledDate.getTime() < todayStart.getTime()) {
-      // Historical past tasks prior to today have already been completed in reality
       status = 'DONE';
     } else if (isHandedOver) {
       status = 'HANDED_OVER';
@@ -431,7 +517,7 @@ export function parseGooglePlanCsv(
     const sheetKey = `gsheet_${dateIsoShort}_${clientName.toLowerCase().replace(/[^a-z0-9]/gi, '_')}_${cleanZadaniSnippet}`;
 
     tasks.push({
-      sheetRowIndex: i + 1,
+      sheetRowIndex: rawRow.rowNumber,
       sheetKey,
       scheduledAt: scheduledDate,
       dateStr: rawDatum,
@@ -444,6 +530,7 @@ export function parseGooglePlanCsv(
       isHandedOver,
       isFtdSent,
       isInvoiced,
+      isCompletedByColor,
       contactName: contact.name,
       contactPhone: contact.phone,
       campaignDateFrom,
@@ -453,12 +540,82 @@ export function parseGooglePlanCsv(
       workType,
       status,
       priority,
-      referenceUrl: rawOdkaz.startsWith('http') ? rawOdkaz : null,
-      ftdUrl: rawOdkazFtd || null,
+      referenceUrl: odkazHyperlink || (rawOdkaz.startsWith('http') ? rawOdkaz : null),
+      ftdUrl: ftdHyperlink || rawOdkazFtd || null,
     });
   }
 
   return tasks;
+}
+
+/**
+ * Parses raw Google Sheet CSV and returns an array of structured ParsedGooglePlanTask items.
+ */
+export function parseGooglePlanCsv(
+  csvContent: string,
+  defaultYear = 2026,
+  referenceDate: Date = new Date()
+): ParsedGooglePlanTask[] {
+  const rows = parseCsvRows(csvContent);
+  return parseGooglePlanRows(
+    rows.map((cells, idx) => ({ rowNumber: idx + 1, cells })),
+    defaultYear,
+    referenceDate
+  );
+}
+
+/**
+ * Parses Google Sheet XLSX export, preserving green cell fills on worker column
+ * (marking tasks DONE) as well as embedded Drive folder hyperlinks.
+ */
+export async function parseGooglePlanXlsx(
+  buffer: ArrayBuffer | Uint8Array | Buffer,
+  defaultYear = 2026,
+  referenceDate: Date = new Date()
+): Promise<ParsedGooglePlanTask[]> {
+  const wb = new ExcelJS.Workbook();
+  const nodeBuf = Buffer.isBuffer(buffer)
+    ? buffer
+    : buffer instanceof Uint8Array
+    ? Buffer.from(buffer)
+    : Buffer.from(new Uint8Array(buffer));
+
+  await wb.xlsx.load(nodeBuf as unknown as ArrayBuffer);
+
+  const ws =
+    wb.worksheets.find((sheet) => sheet.name.toLowerCase().includes('plan')) ||
+    wb.worksheets[0];
+  if (!ws) return [];
+
+  const maxCol = Math.max(ws.columnCount || 0, 20);
+  const rawRows: RawPlanRow[] = [];
+
+  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    const cells: string[] = [];
+    const hyperlinks: Array<string | null> = [];
+    for (let c = 1; c <= maxCol; c++) {
+      const val = row.getCell(c).value;
+      cells.push(unwrapExcelValueToString(val));
+      hyperlinks.push(extractExcelCellHyperlink(val));
+    }
+
+    rawRows.push({
+      rowNumber,
+      cells,
+      hyperlinks,
+      isWorkerCellGreen: (workerColIdx: number) =>
+        isGreenExcelFill(row.getCell(workerColIdx + 1).fill),
+    });
+  });
+
+  return parseGooglePlanRows(rawRows, defaultYear, referenceDate);
+}
+
+function sameWorkersList(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const setA = a.map((w) => w.trim()).sort();
+  const setB = b.map((w) => w.trim()).sort();
+  return setA.every((val, idx) => val === setB[idx]);
 }
 
 export type SyncGooglePlanResult = {
@@ -479,14 +636,16 @@ export type SyncGooglePlanOptions = {
 };
 
 /**
- * Fetches the Google Sheet CSV and synchronizes tasks into SeePoint OS WorkOrders and WorkTasks.
- * Idempotent: Can be run repeatedly without duplicating existing orders.
+ * Fetches the Google Sheet (preferring XLSX export for cell colors and hyperlinks,
+ * with fallback to CSV) and synchronizes tasks into SeePoint OS WorkOrders and WorkTasks.
+ * Idempotent: Skips unchanged existing orders cleanly.
  */
 export async function syncGooglePlanToWorkOrders(
   options: SyncGooglePlanOptions,
   dependencies?: {
     tx?: Prisma.TransactionClient;
     fetchCsvFn?: (url: string) => Promise<string>;
+    fetchXlsxFn?: (url: string) => Promise<ArrayBuffer>;
   }
 ): Promise<SyncGooglePlanResult> {
   const { organizationId, csvUrl = DEFAULT_GOOGLE_PLAN_SHEET_CSV_URL, csvContent, defaultYear = 2026, referenceDate } = options;
@@ -505,22 +664,44 @@ export async function syncGooglePlanToWorkOrders(
     }
   }
 
-  let content = csvContent;
-  if (!content) {
-    const fetcher =
-      dependencies?.fetchCsvFn ||
-      (async (url: string) => {
-        const res = await fetch(url, { headers: { 'User-Agent': 'SeePoint-OS-Sync/1.0' } });
-        if (!res.ok) {
-          throw new Error(`Stažení Google tabulky selhalo se stavovým kódem ${res.status}. Ověřte přístup.`);
-        }
-        return await res.text();
-      });
+  let tasks: ParsedGooglePlanTask[] | null = null;
 
-    content = await fetcher(csvUrl);
+  if (csvContent || dependencies?.fetchCsvFn) {
+    let content = csvContent;
+    if (!content && dependencies?.fetchCsvFn) {
+      content = await dependencies.fetchCsvFn(csvUrl);
+    }
+    tasks = content ? parseGooglePlanCsv(content, defaultYear, referenceDate) : [];
+  } else {
+    const xlsxUrl = toGoogleSheetsXlsxUrl(csvUrl);
+    if (dependencies?.fetchXlsxFn || xlsxUrl) {
+      try {
+        const fetchXlsx =
+          dependencies?.fetchXlsxFn ||
+          (async (url: string) => {
+            const res = await fetch(url, { headers: { 'User-Agent': 'SeePoint-OS-Sync/1.0' } });
+            if (!res.ok) {
+              throw new Error(`XLSX fetch failed: ${res.status}`);
+            }
+            return await res.arrayBuffer();
+          });
+        const buffer = await fetchXlsx(xlsxUrl || csvUrl);
+        tasks = await parseGooglePlanXlsx(buffer, defaultYear, referenceDate);
+      } catch (xlsxErr) {
+        console.warn('[google-sheets-sync] XLSX parse fallback to CSV:', xlsxErr);
+      }
+    }
+
+    if (!tasks) {
+      const res = await fetch(csvUrl, { headers: { 'User-Agent': 'SeePoint-OS-Sync/1.0' } });
+      if (!res.ok) {
+        throw new Error(`Stažení Google tabulky selhalo se stavovým kódem ${res.status}. Ověřte přístup.`);
+      }
+      const content = await res.text();
+      tasks = parseGooglePlanCsv(content, defaultYear, referenceDate);
+    }
   }
 
-  const tasks = parseGooglePlanCsv(content, defaultYear, referenceDate);
   if (!tasks.length) {
     return {
       success: true,
@@ -532,18 +713,23 @@ export async function syncGooglePlanToWorkOrders(
     };
   }
 
-  // Load existing orders in this organization to prevent duplicate creation
+  // Load existing orders in this organization to prevent duplicate creation and skip unchanged rows
   const existingOrders = await client.workOrder.findMany({
     where: { organizationId },
     select: {
       id: true,
       title: true,
+      description: true,
       clientName: true,
       scheduledAt: true,
       status: true,
+      priority: true,
       ftdSent: true,
       invoiced: true,
+      ftdUrl: true,
+      referenceUrl: true,
       planningConstraints: true,
+      assignments: { select: { workerName: true } },
     },
   });
 
@@ -564,6 +750,7 @@ export async function syncGooglePlanToWorkOrders(
 
   let createdCount = 0;
   let updatedCount = 0;
+  let skippedCount = 0;
   const syncedOrders: SyncGooglePlanResult['orders'] = [];
 
   for (const task of tasks) {
@@ -574,15 +761,52 @@ export async function syncGooglePlanToWorkOrders(
       existingBySignature.get(signature);
 
     if (existing) {
-      // Update existing work order if status, FTD or invoice flag changed
+      const prevPc = (existing.planningConstraints as Record<string, unknown> | null) || {};
+      const nextStatus: WorkOrderStatus =
+        existing.status === 'CANCELLED'
+          ? 'CANCELLED'
+          : existing.status === 'DONE' && !prevPc.completedBySheetColor
+          ? 'DONE'
+          : task.status;
+
+      const existingAssignments = (
+        existing as { assignments?: Array<{ workerName: string }> }
+      ).assignments;
+
+      const isUnchanged =
+        existing.status === nextStatus &&
+        Boolean(existing.ftdSent) === task.isFtdSent &&
+        Boolean(existing.invoiced) === task.isInvoiced &&
+        (existing.title ?? '') === task.title &&
+        (existing.description ?? '') === task.description &&
+        (existing.ftdUrl ?? null) === (task.ftdUrl ?? null) &&
+        (existing.referenceUrl ?? null) === (task.referenceUrl ?? null) &&
+        prevPc.sheetKey === task.sheetKey &&
+        prevPc.sheetRow === task.sheetRowIndex &&
+        Boolean(prevPc.completedBySheetColor) === Boolean(task.isCompletedByColor) &&
+        Array.isArray(existingAssignments) &&
+        sameWorkersList(
+          existingAssignments.map((a) => a.workerName),
+          task.workers
+        );
+
+      if (isUnchanged) {
+        skippedCount++;
+        continue;
+      }
+
       const updated = await client.workOrder.update({
         where: { id: existing.id },
         data: {
+          title: task.title,
+          description: task.description,
+          clientName: task.clientName,
           ftdSent: task.isFtdSent,
           invoiced: task.isInvoiced,
           ftdUrl: task.ftdUrl || undefined,
           referenceUrl: task.referenceUrl || undefined,
-          status: existing.status === 'CANCELLED' ? 'CANCELLED' : task.status,
+          status: nextStatus,
+          priority: task.priority,
           contactName: task.contactName,
           contactPhone: task.contactPhone,
           requestedBy: task.requestedBy,
@@ -590,10 +814,11 @@ export async function syncGooglePlanToWorkOrders(
           mediaLabel: task.mediaLabel,
           workType: task.workType,
           planningConstraints: {
-            ...((existing.planningConstraints as Record<string, unknown> | null) || {}),
+            ...prevPc,
             source: 'GOOGLE_SHEETS_PLAN',
             sheetKey: task.sheetKey,
             sheetRow: task.sheetRowIndex,
+            completedBySheetColor: Boolean(task.isCompletedByColor),
           },
         },
       });
@@ -669,6 +894,7 @@ export async function syncGooglePlanToWorkOrders(
             source: 'GOOGLE_SHEETS_PLAN',
             sheetKey: task.sheetKey,
             sheetRow: task.sheetRowIndex,
+            completedBySheetColor: Boolean(task.isCompletedByColor),
           },
           assignments: {
             create: task.workers.map((workerName) => ({
@@ -698,7 +924,7 @@ export async function syncGooglePlanToWorkOrders(
     totalParsed: tasks.length,
     createdCount,
     updatedCount,
-    skippedCount: 0,
+    skippedCount,
     orders: syncedOrders.slice(0, 50),
   };
 }
