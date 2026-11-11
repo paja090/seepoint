@@ -99,6 +99,7 @@ function linkifyEscapedText(escaped: string): string {
 
 export async function sendTransactionalEmail(input: {
   to: string;
+  bcc?: string | string[];
   subject: string;
   message: string;
   template: string;
@@ -107,6 +108,7 @@ export async function sendTransactionalEmail(input: {
   idempotencyKey?: string;
   organizationId?: string;
   metadata?: Record<string, unknown>;
+  allowPlatformFallback?: boolean;
 }): Promise<EmailDeliveryResult> {
   const bodyHtml = input.message
     .split(/\r?\n/)
@@ -127,6 +129,7 @@ export async function sendTransactionalEmail(input: {
 
   return sendEmail({
     to: input.to,
+    bcc: input.bcc,
     subject: input.subject,
     html: input.customHtml || defaultCardHtml,
     webhookBody: {
@@ -138,6 +141,7 @@ export async function sendTransactionalEmail(input: {
     idempotencyKey: input.idempotencyKey,
     organizationId: input.organizationId,
     metadata: input.metadata,
+    allowPlatformFallback: input.allowPlatformFallback,
   });
 }
 
@@ -271,6 +275,7 @@ async function sendEmail(input: {
   organizationId?: string;
   metadata?: Record<string, unknown>;
   requireTenantSender?: boolean;
+  allowPlatformFallback?: boolean;
 }): Promise<EmailDeliveryResult> {
   const attachments = input.attachments ?? [];
   const attachmentBytes = attachments.reduce((sum, attachment) => sum + attachment.content.byteLength, 0);
@@ -347,7 +352,7 @@ async function sendEmail(input: {
     console.info(`[email] Delivery skipped in ${skippedProvider} environment`, { template: input.webhookBody.template });
     return { status: 'skipped', provider: skippedProvider };
   }
-  if (input.organizationId && input.organizationId !== 'org_seepoint_default' && (!tenantSenderVerified || !resendApiKey)) {
+  if (!input.allowPlatformFallback && input.organizationId && input.organizationId !== 'org_seepoint_default' && (!tenantSenderVerified || !resendApiKey)) {
     throw new Error('Nejprve nastavte a ověřte odesílatele e-mailů vaší organizace.');
   }
   ensureEmailConfigured();
@@ -383,7 +388,7 @@ async function sendEmail(input: {
     const messageId = result?.id;
 
     if (input.organizationId) {
-      void prisma.emailLog.create({
+      await prisma.emailLog.create({
         data: {
           organizationId: input.organizationId,
           providerMessageId: messageId || null,

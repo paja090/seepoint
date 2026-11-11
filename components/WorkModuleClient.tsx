@@ -18,6 +18,7 @@ import {
   Car,
   ArrowRight,
   RefreshCw,
+  Mail,
 } from 'lucide-react';
 import { WorkDayView } from './WorkDayView';
 import { WorkWeekView } from './WorkWeekView';
@@ -259,6 +260,17 @@ export function WorkModuleClient({
             <Route size={16} className="text-sky-700" />
             <span>🚗 Dispečink práce, Mapa & Sklady</span>
           </Link>
+
+          {canCreateWorkOrder && (
+            <Link
+              href="/settings/work#daily-briefing"
+              className="flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition"
+              title="Nastavení automatického rozesílání zítřejšího plánu práce pracovníkům e-mailem"
+            >
+              <Mail size={15} className="text-sky-600" />
+              <span>Automatický e-mail plán</span>
+            </Link>
+          )}
 
           {canCreateWorkOrder && (
             <button
