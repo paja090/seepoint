@@ -56,8 +56,13 @@ export const workStatusStyles: Record<WorkOrderStatus, string> = {
   CANCELLED: 'bg-red-100 text-red-700',
 };
 
-export function formatWorkDate(value: Date) {
-  return new Intl.DateTimeFormat('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric', year: 'numeric' }).format(value);
+export function formatWorkDate(value: Date | string) {
+  const date =
+    typeof value === 'string'
+      ? new Date(value.includes('T') ? value : `${value}T12:00:00`)
+      : value;
+  if (Number.isNaN(date.getTime())) return typeof value === 'string' ? value : '';
+  return new Intl.DateTimeFormat('cs-CZ', { weekday: 'short', day: 'numeric', month: 'numeric', year: 'numeric' }).format(date);
 }
 
 export function formatWorkPrice(value?: string | number | null) {
