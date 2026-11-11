@@ -105,3 +105,20 @@ export type OrganizationRadarProfileData = {
   scoringWeights?: Record<string, unknown> | null;
 };
 
+export type RadarRunSummary = {
+  id: string;
+  triggerType: string;
+  status: string;
+  startedAt: string;
+  finishedAt: string | null;
+  opportunitiesCreated: number;
+  signalsProcessed: number;
+  errorsCount: number;
+};
+
+export type RadarStatusSummary = {
+  enabled: boolean;
+  lastCronRun: RadarRunSummary | null;
+  lastRun: RadarRunSummary | null;
+};
+

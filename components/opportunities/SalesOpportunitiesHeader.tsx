@@ -1,6 +1,7 @@
 'use client';
 
-import { Radar, Sparkles, Flame, CalendarClock, FileText, CheckCircle2, Plus } from 'lucide-react';
+import { Radar, Sparkles, Flame, CalendarClock, FileText, CheckCircle2, Plus, Clock, PauseCircle } from 'lucide-react';
+import type { RadarRunSummary, RadarStatusSummary } from '@/lib/opportunities/types';
 
 type Stats = {
   totalNew: number;
@@ -10,8 +11,32 @@ type Stats = {
   totalConverted: number;
 };
 
+function formatRadarRunTimestamp(iso: string) {
+  return new Date(iso).toLocaleString('cs-CZ', {
+    day: 'numeric',
+    month: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Prague',
+  });
+}
+
+function describeRadarRunOutcome(run: RadarRunSummary): { label: string; toneClass: string } {
+  if (run.status === 'RUNNING') {
+    return { label: 'probíhá', toneClass: 'text-amber-300' };
+  }
+  if (run.status === 'FAILED') {
+    return { label: 'chyba', toneClass: 'text-rose-300' };
+  }
+  if (run.opportunitiesCreated > 0) {
+    return { label: `+${run.opportunitiesCreated} nových`, toneClass: 'text-emerald-300' };
+  }
+  return { label: '0 nových', toneClass: 'text-slate-300' };
+}
+
 export function SalesOpportunitiesHeader({
   stats,
+  radarStatus,
   onOpenManualModal,
   onAutoDiscover,
   onOpenSettings,
@@ -19,12 +44,19 @@ export function SalesOpportunitiesHeader({
   canAutoDiscover,
 }: {
   stats: Stats;
+  radarStatus?: RadarStatusSummary;
   onOpenManualModal: () => void;
   onAutoDiscover: () => void;
   onOpenSettings?: () => void;
   isAutoDiscovering?: boolean;
   canAutoDiscover: boolean;
 }) {
+  const cronRun = radarStatus?.lastCronRun ?? null;
+  const lastRun = radarStatus?.lastRun ?? null;
+  const cronOutcome = cronRun ? describeRadarRunOutcome(cronRun) : null;
+  const manualDiffRun = lastRun && lastRun.id !== cronRun?.id ? lastRun : null;
+  const manualOutcome = manualDiffRun ? describeRadarRunOutcome(manualDiffRun) : null;
+
   return (
     <div className="space-y-6">
       {/* Title Bar */}
@@ -40,6 +72,58 @@ export function SalesOpportunitiesHeader({
           <p className="text-xs sm:text-sm text-slate-400 font-medium mt-1">
             „Firmy a události s vysokým potenciálem pro venkovní reklamu (OOH).“
           </p>
+
+          {radarStatus ? (
+            <div className="mt-2.5 inline-flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-xl border border-slate-800/80 bg-slate-900/70 px-3 py-1.5 text-[11px] font-medium text-slate-300">
+              {radarStatus.enabled ? (
+                <>
+                  <span className="inline-flex items-center gap-1.5 text-emerald-300 font-semibold">
+                    <Clock className="w-3.5 h-3.5 shrink-0" />
+                    <span>Automat Po–Pá 7:00 (v létě 8:00)</span>
+                  </span>
+                  <span className="text-slate-600">·</span>
+                  <span suppressHydrationWarning>
+                    Poslední cron:{' '}
+                    {cronRun && cronOutcome ? (
+                      <>
+                        <strong className="text-white">{formatRadarRunTimestamp(cronRun.finishedAt || cronRun.startedAt)}</strong>{' '}
+                        <span className={cronOutcome.toneClass}>({cronOutcome.label})</span>
+                      </>
+                    ) : (
+                      <strong className="text-slate-400">zatím neproběhl</strong>
+                    )}
+                  </span>
+                  {manualDiffRun && manualOutcome ? (
+                    <>
+                      <span className="text-slate-600">·</span>
+                      <span suppressHydrationWarning>
+                        Poslední ruční:{' '}
+                        <strong className="text-white">{formatRadarRunTimestamp(manualDiffRun.finishedAt || manualDiffRun.startedAt)}</strong>{' '}
+                        <span className={manualOutcome.toneClass}>({manualOutcome.label})</span>
+                      </span>
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <span className="inline-flex items-center gap-1.5 text-amber-300 font-semibold">
+                    <PauseCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Automatické skenování vypnuto</span>
+                  </span>
+                  {lastRun ? (
+                    <>
+                      <span className="text-slate-600">·</span>
+                      <span suppressHydrationWarning>
+                        Poslední běh:{' '}
+                        <strong className="text-white">{formatRadarRunTimestamp(lastRun.finishedAt || lastRun.startedAt)}</strong>{' '}
+                        <span className={describeRadarRunOutcome(lastRun).toneClass}>({describeRadarRunOutcome(lastRun).label})</span>
+                      </span>
+                    </>
+                  ) : null}
+                </>
+              )}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-3 shrink-0">

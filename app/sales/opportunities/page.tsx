@@ -1,7 +1,7 @@
 import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
 import { prisma } from '@/lib/db';
-import { getOpportunities, getOpportunityStats } from '@/lib/opportunities/service';
+import { getOpportunities, getOpportunityStats, getRadarStatusSummary } from '@/lib/opportunities/service';
 import { SalesOpportunitiesClientView } from '@/components/opportunities/SalesOpportunitiesClientView';
 
 export const dynamic = 'force-dynamic';
@@ -9,9 +9,10 @@ export const dynamic = 'force-dynamic';
 export default async function SalesOpportunitiesPage() {
   const user = await requirePageAccess('clients', 'salesRadar');
 
-  const [opportunitiesData, stats, clients] = await Promise.all([
+  const [opportunitiesData, stats, radarStatus, clients] = await Promise.all([
     getOpportunities({ take: 50 }, user.organizationId),
     getOpportunityStats(user.organizationId),
+    getRadarStatusSummary(user.organizationId),
     prisma.client.findMany({
       where: { organizationId: user.organizationId, active: true },
       select: { id: true, name: true, pricingSegment: true },
@@ -30,6 +31,7 @@ export default async function SalesOpportunitiesPage() {
             items: JSON.parse(JSON.stringify(opportunitiesData.items)),
             total: opportunitiesData.total,
             stats,
+            radarStatus,
           }}
         />
       </div>

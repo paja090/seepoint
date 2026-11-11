@@ -137,7 +137,10 @@ Text: "${pageContent.slice(0, 3000)}"`;
         const resp = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-goog-api-key': effectiveGeminiKey },
-          body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] }),
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }] }],
+            generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
+          }),
           signal: radarRequestSignal(deadline, 20_000),
         });
         if (resp.ok) {

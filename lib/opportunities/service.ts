@@ -1,7 +1,12 @@
 import { prisma } from '@/lib/db';
 import type { OpportunityStatus, Prisma } from '@prisma/client';
 import { calculateOpportunityScore } from './scoring';
-import type { CreateOpportunityInput, OpportunityFilterParams } from './types';
+import type {
+  CreateOpportunityInput,
+  OpportunityFilterParams,
+  RadarRunSummary,
+  RadarStatusSummary,
+} from './types';
 import { normalizeClientName } from '@/lib/crm/domain';
 import { assertOpportunityTransition, OpportunityValidationError } from './policy';
 
@@ -385,3 +390,64 @@ export async function getOpportunityStats(organizationId: string) {
     totalConverted,
   };
 }
+
+const radarRunSummarySelect = {
+  id: true,
+  triggerType: true,
+  status: true,
+  startedAt: true,
+  finishedAt: true,
+  opportunitiesCreated: true,
+  signalsProcessed: true,
+  errorsCount: true,
+} as const;
+
+type RawRadarRunSummary = {
+  id: string;
+  triggerType: string;
+  status: string;
+  startedAt: Date;
+  finishedAt: Date | null;
+  opportunitiesCreated: number;
+  signalsProcessed: number;
+  errorsCount: number;
+};
+
+function serializeRadarRun(run: RawRadarRunSummary | null): RadarRunSummary | null {
+  if (!run) return null;
+  return {
+    ...run,
+    startedAt: run.startedAt.toISOString(),
+    finishedAt: run.finishedAt ? run.finishedAt.toISOString() : null,
+  };
+}
+
+/**
+ * Returns whether scheduled discovery is enabled for this tenant along with its
+ * most recent automatic CRON run and most recent overall discovery run.
+ */
+export async function getRadarStatusSummary(organizationId: string): Promise<RadarStatusSummary> {
+  const [profile, lastCronRun, lastRun] = await Promise.all([
+    prisma.organizationRadarProfile.findUnique({
+      where: { organizationId },
+      select: { enabled: true },
+    }),
+    prisma.radarRun.findFirst({
+      where: { organizationId, triggerType: 'CRON' },
+      orderBy: { startedAt: 'desc' },
+      select: radarRunSummarySelect,
+    }),
+    prisma.radarRun.findFirst({
+      where: { organizationId, triggerType: { in: ['CRON', 'MANUAL'] } },
+      orderBy: { startedAt: 'desc' },
+      select: radarRunSummarySelect,
+    }),
+  ]);
+
+  return {
+    enabled: profile?.enabled ?? true,
+    lastCronRun: serializeRadarRun(lastCronRun),
+    lastRun: serializeRadarRun(lastRun),
+  };
+}
+

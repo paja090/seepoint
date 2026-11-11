@@ -7,6 +7,7 @@ const source = (path: string) => readFileSync(new URL(`../${path}`, import.meta.
 test('no application logic refers to deprecated gemini-2.5-flash', () => {
   const filesToCheck = [
     'lib/ai-gemini.ts',
+    'lib/ai-inbox/extraction.ts',
     'lib/opportunities/parser.ts',
     'lib/notifications-service.ts',
     'lib/ai-offers/service.ts',

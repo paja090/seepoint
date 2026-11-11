@@ -72,7 +72,7 @@ PŘÍSNÁ PRAVIDLA:
 - Vždy uveď skutečnou URL adresu článku nebo webu v poli "sourceUrl".
 - Pokud město v článku není jednoznačné, zadej "city": null.
 
-Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 12 až 18 nalezenými příležitostmi:
+Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 6 až 8 nalezenými příležitostmi (raději méně, ale ověřených a čerstvých):
 [
   {
     "companyName": "Přesný název firmy, značky, developera, pořadatele nebo akce",
@@ -104,7 +104,8 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 12 až 18 nalezenými př
   let failure = 'Gemini nevrátil použitelnou odpověď.';
 
   for (const model of models) {
-    if (Date.now() >= deadline) break;
+    // A fallback only makes sense with enough time left for a full grounded search (~25 s).
+    if (deadline - Date.now() < 20_000) break;
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
       const resp = await fetch(url, {
@@ -116,8 +117,10 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 12 až 18 nalezenými př
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           tools: [{ googleSearch: {} }],
+          // Disabling internal reasoning halves grounded-search latency (measured ~46 s -> ~25 s).
+          generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
         }),
-        signal: radarRequestSignal(deadline, 60_000),
+        signal: radarRequestSignal(deadline, 70_000),
       });
 
       if (!resp.ok) { failure = `Gemini ${model}: HTTP ${resp.status}.`; continue; }
@@ -136,9 +139,13 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 12 až 18 nalezenými př
         }
       }
     } catch (e) {
-      failure = `Gemini ${model}: požadavek selhal nebo překročil časový limit.`;
-      // All retries share the same deadline.
+      const isTimeout = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError');
+      failure = isTimeout
+        ? 'Živé webové hledání Gemini nestihlo odpovědět v časovém limitu.'
+        : `Gemini ${model}: požadavek selhal.`;
       console.warn(`Model ${model} live search attempt failed:`, e instanceof Error ? e.message : e);
+      // All retries share the same deadline; after a timeout there is no budget left for another grounded search.
+      if (isTimeout) break;
     }
   }
 

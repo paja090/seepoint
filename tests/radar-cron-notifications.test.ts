@@ -43,3 +43,28 @@ test('radar settings modal clearly shows automated morning cron status and notif
   assert.match(modalSrc, /Notifikace: Upozornění nad/);
   assert.match(modalSrc, /Automatické skenování i notifikace jsou pozastaveny/);
 });
+
+test('AI Radar page and header expose last cron run status and schedule', () => {
+  const pageSrc = source('app/sales/opportunities/page.tsx');
+  const routeSrc = source('app/api/sales/opportunities/route.ts');
+  const headerSrc = source('components/opportunities/SalesOpportunitiesHeader.tsx');
+  assert.match(pageSrc, /getRadarStatusSummary/);
+  assert.match(routeSrc, /getRadarStatusSummary/);
+  assert.match(headerSrc, /Poslední cron:/);
+  assert.match(headerSrc, /Automat Po–Pá 7:00/);
+});
+
+test('AI Radar discovery runs live search and RSS concurrently with zero thinking budget and relevance scoring', async () => {
+  const { scoreSignalRelevance } = await import('../lib/opportunities/discovery-runner');
+  assert.ok(scoreSignalRelevance('Lidl otevírá novou prodejnu v Ostravě') > 0);
+  assert.equal(scoreSignalRelevance('Dopravní nehoda na dálnici D1 zastavila provoz'), -1);
+
+  const liveSearchSrc = source('lib/opportunities/live-search-core.ts');
+  const parserSrc = source('lib/opportunities/parser.ts');
+  const runnerSrc = source('lib/opportunities/discovery-runner.ts');
+  assert.match(liveSearchSrc, /thinkingBudget:\s*0/);
+  assert.match(parserSrc, /thinkingBudget:\s*0/);
+  assert.match(runnerSrc, /Promise\.all\(\[livePhase,\s*rssPhase\]\)/);
+  assert.match(runnerSrc, /RSS_PARSE_CONCURRENCY\s*=\s*5/);
+});
+
