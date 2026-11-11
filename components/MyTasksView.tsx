@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import {
   Phone,
   Calendar,
@@ -9,17 +8,13 @@ import {
   Folder,
   CheckCircle2,
   Play,
-  Clock,
-  UserCheck,
   AlertTriangle,
-  Camera,
-  ExternalLink,
   ChevronDown,
   ChevronUp,
   History,
-  ShieldCheck,
 } from 'lucide-react';
 import { WorkOrderAcknowledgeButton } from './WorkOrderAcknowledgeButton';
+import { resolveGoogleDriveUrl, formatGoogleDriveLabel } from '@/lib/work';
 
 export type MyTaskItem = {
   id: string;
@@ -276,13 +271,14 @@ export function MyTasksView({
                   {t.ftdUrl && (
                     <div className="pt-1">
                       <a
-                        href={t.ftdUrl}
+                        href={resolveGoogleDriveUrl(t.ftdUrl) || '#'}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl hover:bg-emerald-100 transition"
+                        title={t.ftdUrl}
                       >
                         <Folder size={15} />
-                        <span>Otevřít složku fotek na Google Disku ↗</span>
+                        <span>{formatGoogleDriveLabel(t.ftdUrl)}</span>
                       </a>
                     </div>
                   )}

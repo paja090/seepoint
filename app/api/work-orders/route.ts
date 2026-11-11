@@ -92,11 +92,17 @@ export async function POST(request: Request) {
   const workerNames = (text(input, 'workerNames') || '').split(',').map((name) => name.trim()).filter(Boolean);
   const ftdUrl = text(input, 'ftdUrl');
   if (ftdUrl) {
-    try {
-      const url = new URL(ftdUrl);
-      if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('invalid');
-    } catch {
-      return NextResponse.json({ error: 'Odkaz na fotodokumentaci musí být platná webová adresa (URL).' }, { status: 400 });
+    const trimmedFtd = ftdUrl.trim();
+    if (trimmedFtd.length > 300 || /[\r\n]/.test(trimmedFtd)) {
+      return NextResponse.json({ error: 'Odkaz nebo název složky na Disku je neplatný.' }, { status: 400 });
+    }
+    if (/^https?:\/\//i.test(trimmedFtd)) {
+      try {
+        const url = new URL(trimmedFtd);
+        if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('invalid');
+      } catch {
+        return NextResponse.json({ error: 'Odkaz na fotodokumentaci musí být platná webová adresa (URL) nebo název složky.' }, { status: 400 });
+      }
     }
   }
 

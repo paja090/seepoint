@@ -47,12 +47,19 @@ function nullableDate(input: EditInput, key: string) {
 
 function validDriveUrl(value?: string) {
   if (!value) return true;
-  try {
-    const url = new URL(value);
-    return url.protocol === 'https:' || url.protocol === 'http:';
-  } catch {
-    return false;
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+  if (trimmed.length > 300) return false;
+  if (/[\r\n]/.test(trimmed)) return false;
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const url = new URL(trimmed);
+      return url.protocol === 'https:' || url.protocol === 'http:';
+    } catch {
+      return false;
+    }
   }
+  return true;
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {

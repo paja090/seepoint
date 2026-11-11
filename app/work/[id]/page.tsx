@@ -14,6 +14,8 @@ import { prisma, ensureWorkOrderSchema } from '@/lib/db';
 import {
   formatWorkDate,
   formatWorkPrice,
+  resolveGoogleDriveUrl,
+  formatGoogleDriveLabel,
   workPriorityLabels,
   workPriorityStyles,
   workStatusLabels,
@@ -35,6 +37,7 @@ import {
   PlusCircle,
   Navigation,
   Route,
+  ExternalLink,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -354,22 +357,36 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
           <div className="space-y-6">
             {/* Action Buttons for Field Workers & Managers */}
             <div className="flex flex-wrap gap-3">
-              {order.ftdUrl ? (
-                <a
-                  href={order.ftdUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-xs font-black text-white shadow-md hover:bg-emerald-500 transition transform hover:-translate-y-0.5"
-                >
-                  <FolderPlus size={18} />
-                  <span>Otevřít složku s fotkami na Google Disku ↗</span>
-                </a>
-              ) : (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-bold text-slate-600 flex items-center gap-2">
-                  <FolderPlus size={16} className="text-slate-400" />
-                  <span>Fotodokumentace není vyžadována (porada / vnitřní úkol)</span>
-                </div>
-              )}
+              {(() => {
+                const resolvedFtd = resolveGoogleDriveUrl(order.ftdUrl);
+                if (resolvedFtd) {
+                  return (
+                    <a
+                      href={resolvedFtd}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-xs font-black text-white shadow-md hover:bg-emerald-500 transition transform hover:-translate-y-0.5"
+                      title={order.ftdUrl || 'Google Disk'}
+                    >
+                      <FolderPlus size={18} />
+                      <span>{formatGoogleDriveLabel(order.ftdUrl)}</span>
+                    </a>
+                  );
+                }
+
+                return (
+                  <a
+                    href={`https://drive.google.com/drive/search?q=${encodeURIComponent(order.title || order.clientName)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
+                    title="Vyhledat soubory a složky k této zakázce na Google Disku"
+                  >
+                    <FolderPlus size={16} className="text-slate-500" />
+                    <span>Dohledat složku na Google Disku ↗</span>
+                  </a>
+                );
+              })()}
 
               {order.pdfUrl && (
                 <a
@@ -380,6 +397,18 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
                 >
                   <FileText size={18} />
                   <span>Stáhnout PDF podklady / přílohu ↗</span>
+                </a>
+              )}
+
+              {order.referenceUrl && (
+                <a
+                  href={order.referenceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-xs font-bold text-slate-800 shadow-2xs hover:bg-slate-50 transition"
+                >
+                  <ExternalLink size={16} className="text-slate-600" />
+                  <span>Otevřít referenční podklady ↗</span>
                 </a>
               )}
             </div>

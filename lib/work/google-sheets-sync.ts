@@ -590,6 +590,7 @@ export async function syncGooglePlanToWorkOrders(
           mediaLabel: task.mediaLabel,
           workType: task.workType,
           planningConstraints: {
+            ...((existing.planningConstraints as Record<string, unknown> | null) || {}),
             source: 'GOOGLE_SHEETS_PLAN',
             sheetKey: task.sheetKey,
             sheetRow: task.sheetRowIndex,

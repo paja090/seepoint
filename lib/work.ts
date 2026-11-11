@@ -69,3 +69,43 @@ export function formatWorkPrice(value?: string | number | null) {
   if (value === undefined || value === null || value === '') return 'Cena neuvedena';
   return new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 2 }).format(Number(value));
 }
+
+/**
+ * Resolves Google Drive link from either a full URL, raw drive ID, or folder name.
+ * Handles Czech folder naming conventions from Google Sheets (e.g. "04 01 Promed optic 1 ks deinstalace").
+ */
+export function resolveGoogleDriveUrl(value?: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  // 1. Full HTTP/HTTPS URL
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  // 2. Starts with drive.google.com or docs.google.com (missing scheme)
+  if (/^(drive|docs)\.google\.com/i.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+
+  // 3. Raw Google Drive folder/file ID (25-50 characters alphanumeric, dashes, underscores)
+  if (/^[a-zA-Z0-9_-]{25,50}$/.test(trimmed)) {
+    return `https://drive.google.com/drive/folders/${trimmed}`;
+  }
+
+  // 4. Folder name / search query (e.g. "04 01 Promed optic 1 ks deinstalace")
+  return `https://drive.google.com/drive/search?q=${encodeURIComponent(trimmed)}`;
+}
+
+/**
+ * Returns human-friendly label for Google Drive folder link.
+ */
+export function formatGoogleDriveLabel(value?: string | null): string {
+  if (!value) return 'Otevřít Google Disk ↗';
+  const trimmed = value.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    return 'Otevřít složku na Google Disku ↗';
+  }
+  return `Otevřít složku na Disku („${trimmed}“) ↗`;
+}
