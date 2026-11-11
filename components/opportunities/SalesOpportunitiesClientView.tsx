@@ -9,6 +9,7 @@ import { RadarDuplicateReview } from './RadarDuplicateReview';
 import { RadarSettingsModal } from './RadarSettingsModal';
 import { AiCrmRetentionBar } from './AiCrmRetentionBar';
 import { AiOfferGeneratorModal, ClientOption } from '@/components/offers/AiOfferGeneratorModal';
+import type { RadarStatusSummary } from '@/lib/opportunities/types';
 import { RefreshCw, Radar } from 'lucide-react';
 
 const initialFilters: FilterState = {
@@ -37,6 +38,7 @@ export function SalesOpportunitiesClientView({
       totalProposals: number;
       totalConverted: number;
     };
+    radarStatus?: RadarStatusSummary;
   };
 }) {
   const [items, setItems] = useState<OpportunityItem[]>(initialOpportunityData?.items || []);
@@ -49,6 +51,7 @@ export function SalesOpportunitiesClientView({
       totalConverted: 0,
     }
   );
+  const [radarStatus, setRadarStatus] = useState<RadarStatusSummary | undefined>(initialOpportunityData?.radarStatus);
   const [filters, setFilters] = useState<FilterState>(initialFilters);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -96,6 +99,7 @@ export function SalesOpportunitiesClientView({
       if (!res.ok) throw new Error(data.error || 'Příležitosti se nepodařilo načíst.');
       setItems(data.items || []);
       if (data.stats) setStats(data.stats);
+      if (data.radarStatus) setRadarStatus(data.radarStatus);
     } catch (err) {
       console.error('Failed to reload opportunities', err);
       setFeedback({ kind: 'error', message: err instanceof Error ? err.message : 'Příležitosti se nepodařilo načíst.' });
@@ -187,9 +191,10 @@ export function SalesOpportunitiesClientView({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Automatické vyhledávání selhalo.');
       await fetchOpportunities();
+      const summary = `AI Radar prošel ${data.foundArticles || 0} článků, AI vyhodnotila ${data.processed || 0} nejslibnějších, vytvořila ${data.addedCount || 0} nových příležitostí a zachytila ${data.duplicateCount || 0} duplicit (${data.ignoredCount || 0} nerelevantních vyřazeno).`;
       setFeedback({
-        kind: data.warning ? 'error' : 'success',
-        message: `${data.warning ? data.warning + ' ' : ''}AI Radar vyhodnotil ${data.processed || 0} zdrojů a signálů, vytvořil ${data.addedCount || 0} nových obchodních příležitostí a zachytil ${data.duplicateCount || 0} duplicit.`,
+        kind: data.warning && !data.addedCount ? 'error' : 'success',
+        message: data.warning ? `${summary} Poznámka: ${data.warning}` : summary,
       });
     } catch (err) {
       console.error('Auto discover failed', err);
@@ -204,6 +209,7 @@ export function SalesOpportunitiesClientView({
       {/* Header & KPI Stats */}
       <SalesOpportunitiesHeader
         stats={stats}
+        radarStatus={radarStatus}
         onOpenManualModal={() => setManualModalOpen(true)}
         onAutoDiscover={handleAutoDiscover}
         onOpenSettings={() => setSettingsModalOpen(true)}

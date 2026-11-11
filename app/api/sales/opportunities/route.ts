@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
-import { createOpportunity, getOpportunities, getOpportunityStats } from '@/lib/opportunities/service';
+import { createOpportunity, getOpportunities, getOpportunityStats, getRadarStatusSummary } from '@/lib/opportunities/service';
 import { OpportunityValidationError, parseOpportunityCreateInput, parseOpportunityFilters } from '@/lib/opportunities/policy';
 
 export const runtime = 'nodejs';
@@ -13,12 +13,13 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const filters = parseOpportunityFilters(searchParams);
 
-    const [data, stats] = await Promise.all([
+    const [data, stats, radarStatus] = await Promise.all([
       getOpportunities(filters, user.organizationId),
       getOpportunityStats(user.organizationId),
+      getRadarStatusSummary(user.organizationId),
     ]);
 
-    return NextResponse.json({ ...data, stats });
+    return NextResponse.json({ ...data, stats, radarStatus });
   } catch (error) {
     if (error instanceof OpportunityValidationError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error('Failed to fetch sales opportunities', error);

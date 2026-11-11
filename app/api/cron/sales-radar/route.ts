@@ -107,7 +107,7 @@ async function handleCronExecution(request: Request) {
       }
     }
 
-    return NextResponse.json({
+    const payload = {
       success: deferredCount === 0 && executionResults.every((result) => result.status === 'COMPLETED' || result.status === 'SKIPPED_DISABLED'),
       mode: 'cron',
       caller: callerInfo,
@@ -119,7 +119,9 @@ async function handleCronExecution(request: Request) {
       totalOpportunitiesCreated: totalAdded,
       totalDuplicatesCaught: totalDuplicates,
       results: executionResults,
-    });
+    };
+    console.log('[cron/sales-radar]', JSON.stringify(payload));
+    return NextResponse.json(payload);
   } catch (error) {
     console.error('Fatal cron radar execution error:', error);
     return NextResponse.json(

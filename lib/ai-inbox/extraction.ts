@@ -370,7 +370,7 @@ export async function analyzeInboundMessageWithGemini(input: {
   }
 
   const prompt = buildAnalysisPrompt(input);
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-3.6-flash', 'gemini-1.5-flash'];
+  const modelsToTry = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.5-flash'];
 
   let lastError: Error | null = null;
 
