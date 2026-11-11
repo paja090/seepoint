@@ -612,5 +612,132 @@ test('Google Sheets Sync: preserves manual invoicing and invoiceExempt state acr
   assert.equal(existingOrder.invoiced, true);
 });
 
+test('Google Sheets Sync: edits on same row/date/client update in place and clean stale open sheet duplicates without touching manual orders', async () => {
+  const sampleCsv = [
+    'FTD odeslána,FAKT,Datum,Den,Zadal,Pracovník dílna,Předáno klukům,Klient,Zadání,Kontakt na klienta/ osobu na místě,Datum zahájení,Datum ukončení,Typ nosiče,KS,Práce,Odkaz,Odkaz na FTD',
+    ',,13.11.,pátek,Z,Mirek,FALSE,MAPPA,bannery přiveze NORD - instalace,,13.11.2026,13.11.2026,MT,2,instalace,,',
+  ].join('\n');
+
+  const existingOrders: any[] = [
+    {
+      id: 'wo-edited-same-row',
+      title: 'MAPPA – PODLE TISKU - instalace',
+      description: 'PODLE TISKU - instalace',
+      clientName: 'MAPPA',
+      scheduledAt: new Date(Date.UTC(2026, 10, 13, 7, 0, 0)),
+      status: 'PLANNED',
+      priority: 'NORMAL',
+      ftdSent: false,
+      invoiced: false,
+      ftdUrl: null,
+      referenceUrl: null,
+      crmOrderId: null,
+      navigationOrderId: null,
+      planningConstraints: {
+        source: 'GOOGLE_SHEETS_PLAN',
+        sheetKey: 'gsheet_2026-11-13_mappa_podletiskuinstalace',
+        sheetRow: 2,
+        completedBySheetColor: false,
+      },
+      assignments: [{ workerName: 'Mirek', acknowledgedAt: null }],
+      _count: { workEntries: 0, warehouseMovements: 0 },
+    },
+    {
+      id: 'wo-orphan-dup',
+      title: 'Kultura Jih – smazaný řádek',
+      description: 'smazaný řádek',
+      clientName: 'Kultura Jih',
+      scheduledAt: new Date(Date.UTC(2026, 10, 13, 7, 0, 0)),
+      status: 'PLANNED',
+      priority: 'NORMAL',
+      ftdSent: false,
+      invoiced: false,
+      ftdUrl: null,
+      referenceUrl: null,
+      crmOrderId: null,
+      navigationOrderId: null,
+      planningConstraints: {
+        source: 'GOOGLE_SHEETS_PLAN',
+        sheetKey: 'gsheet_2026-11-13_kultura_smazany',
+        sheetRow: 853,
+      },
+      assignments: [{ workerName: 'Mirek', acknowledgedAt: null }],
+      _count: { workEntries: 0, warehouseMovements: 0 },
+    },
+    {
+      id: 'wo-manual-keep',
+      title: 'Ruční zakázka mimo tabulku',
+      description: 'Ručně vytvořeno',
+      clientName: 'Klient X',
+      scheduledAt: new Date(Date.UTC(2026, 10, 13, 7, 0, 0)),
+      status: 'PLANNED',
+      priority: 'HIGH',
+      ftdSent: false,
+      invoiced: false,
+      ftdUrl: null,
+      referenceUrl: null,
+      crmOrderId: null,
+      navigationOrderId: null,
+      planningConstraints: null,
+      assignments: [],
+      _count: { workEntries: 0, warehouseMovements: 0 },
+    },
+  ];
+
+  const deletedIds: string[] = [];
+  let createdCount = 0;
+
+  const mockTx = {
+    workOrder: {
+      findMany: async () => existingOrders,
+      findUnique: async ({ where }: any) => {
+        const found = existingOrders.find((o) => o.id === where.id);
+        return found ? { ...found, assignments: [], items: [] } : null;
+      },
+      create: async () => {
+        createdCount++;
+        return { id: 'created-unexpected', scheduledAt: new Date(), status: 'PLANNED', title: '', clientName: '' };
+      },
+      update: async ({ where, data }: any) => {
+        const idx = existingOrders.findIndex((o) => o.id === where.id);
+        if (idx !== -1) existingOrders[idx] = { ...existingOrders[idx], ...data };
+        return existingOrders[idx];
+      },
+      delete: async ({ where }: any) => {
+        deletedIds.push(where.id);
+        return { id: where.id };
+      },
+    },
+    workAssignment: { findMany: async () => [], deleteMany: async () => {}, createMany: async () => {} },
+    workTask: { findMany: async () => [], create: async () => ({}), update: async () => ({}), delete: async () => {}, deleteMany: async () => {} },
+    workOrderItem: { deleteMany: async () => {} },
+    workOrderRate: { deleteMany: async () => {} },
+    employee: { findMany: async () => [], findFirst: async () => null },
+  };
+
+  const res = await syncGooglePlanToWorkOrders(
+    {
+      organizationId: 'org-1',
+      csvContent: sampleCsv,
+      defaultYear: 2026,
+      referenceDate: new Date(Date.UTC(2026, 10, 11, 0, 0, 0)),
+      reconcileRemovedRows: true,
+    },
+    { tx: mockTx as any }
+  );
+
+  // Updated edited MAPPA row in place instead of creating duplicate
+  assert.equal(createdCount, 0);
+  assert.equal(res.createdCount, 0);
+  assert.equal(res.updatedCount, 1);
+  assert.match(existingOrders[0].title, /bannery přiveze NORD/);
+
+  // Removed stale orphan from Google Sheet, kept manual order untouched
+  assert.deepEqual(deletedIds, ['wo-orphan-dup']);
+  assert.equal(res.cleanedCount, 1);
+  assert.equal(existingOrders[2].status, 'PLANNED');
+});
+
+
 
 

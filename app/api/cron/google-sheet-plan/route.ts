@@ -59,6 +59,7 @@ async function handleCronExecution(request: Request) {
     createdCount?: number;
     updatedCount?: number;
     skippedCount?: number;
+    cleanedCount?: number;
     status: string;
     error?: string;
   }> = [];
@@ -78,6 +79,9 @@ async function handleCronExecution(request: Request) {
         requireTenantContext();
         try {
           const syncResult = await syncGooglePlanToWorkOrders({ organizationId: org.id });
+          console.log(
+            `[cron/google-sheet-plan] org=${org.id} parsed=${syncResult.totalParsed} created=${syncResult.createdCount} updated=${syncResult.updatedCount} cleaned=${syncResult.cleanedCount ?? 0} skipped=${syncResult.skippedCount}`
+          );
           return {
             organizationId: org.id,
             status: 'synced',
@@ -85,6 +89,7 @@ async function handleCronExecution(request: Request) {
             createdCount: syncResult.createdCount,
             updatedCount: syncResult.updatedCount,
             skippedCount: syncResult.skippedCount,
+            cleanedCount: syncResult.cleanedCount ?? 0,
           };
         } catch (err) {
           console.error(`[cron/google-sheet-plan] Sync failed for ${org.id}:`, err);
