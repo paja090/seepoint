@@ -1,5 +1,7 @@
 import { hasModuleAccess } from '@/lib/module-policy';
 import { WorkItemsEditor } from '@/components/field-planning/WorkItemsEditor';
+import { WorkOrderDispatchCard } from '@/components/field-planning/WorkOrderDispatchCard';
+import { extractOrderRouteMap } from '@/lib/field-planning/order-route-mapper';
 import { itemStatus } from '@/lib/field-planning/item-jobs';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -32,6 +34,7 @@ import {
   Mail,
   PlusCircle,
   Navigation,
+  Route,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -66,7 +69,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
   const { id } = await params;
   await ensureWorkOrderSchema();
 
-  const [order, clients, carriers] = await Promise.all([
+  const [order, clients, carriers, fieldPlans] = await Promise.all([
     prisma.workOrder.findUnique({
       where: { id },
       include: {
@@ -96,9 +99,45 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
       orderBy: [{ city: 'asc' }, { name: 'asc' }],
       select: { id: true, code: true, name: true, city: true, surfaces: { select: { id: true, name: true } } },
     }),
+    prisma.fieldPlan.findMany({
+      where: {
+        organizationId: user.organizationId,
+        status: { in: ['APPROVED', 'ACTIVE', 'COMPLETED', 'DRAFT'] },
+      },
+      select: {
+        id: true,
+        date: true,
+        status: true,
+        version: true,
+        planningSummary: true,
+      },
+      orderBy: { date: 'desc' },
+      take: 60,
+    }),
   ]);
 
   if (!order || order.organizationId !== user.organizationId) notFound();
+
+  const scheduledDate = order.scheduledAt || order.createdAt;
+  const scheduledDateStr = dateInput(scheduledDate);
+  const { orderRouteMap } = extractOrderRouteMap(
+    fieldPlans,
+    [{ id: order.id, status: order.status, planningConstraints: order.planningConstraints }],
+    scheduledDateStr
+  );
+  const routeInfo = orderRouteMap.get(order.id) || null;
+
+  const workshopText = `${order.locationNote || ''} ${order.mediaLabel || ''} ${order.title}`.toLowerCase();
+  const isWorkshop = Boolean(
+    workshopText.includes('díln') ||
+    workshopText.includes('diln') ||
+    workshopText.includes('tisk') ||
+    workshopText.includes('grafik') ||
+    workshopText.includes('faktur') ||
+    workshopText.includes('kancelář') ||
+    workshopText.includes('kancelar') ||
+    (!order.items[0]?.carrier && !order.locationNote)
+  );
 
   const electionCampaignId = (order.planningConstraints as { electionCampaignId?: string } | null)?.electionCampaignId;
   const electionCampaign = electionCampaignId
@@ -114,7 +153,6 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
     : null;
 
   const realizations = order.crmOrderId && ['ADMIN', 'MANAGER'].includes(user.role) ? await prisma.crmRealization.findMany({ where: { organizationId: user.organizationId!, crmOrderId: order.crmOrderId }, select: { id: true, carrierId: true, surfaceId: true } }) : [];
-  const scheduledDate = order.scheduledAt || order.createdAt;
   const startOfDay = new Date(scheduledDate);
   startOfDay.setHours(0, 0, 0, 0);
   const endOfDay = new Date(scheduledDate);
@@ -192,6 +230,26 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
           </Link>
 
           <div className="flex items-center gap-2">
+            {routeInfo ? (
+              <Link
+                href={`/work/route?date=${routeInfo.planDate}&id=${routeInfo.planId}`}
+                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-500 transition shadow-2xs"
+                title={`Zastávka #${routeInfo.routeOrder} v trase: ${routeInfo.crewName}`}
+              >
+                <Route size={14} />
+                <span>Trasa výjezdu (#{routeInfo.routeOrder}) ↗</span>
+              </Link>
+            ) : !isWorkshop ? (
+              <Link
+                href={`/work/dispatch?date=${scheduledDateStr}&planner=work&jobs=${order.id}#planner`}
+                className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-950 hover:bg-amber-100 transition shadow-2xs"
+                title="Naplánovat výjezd v dispečinku"
+              >
+                <Route size={14} className="text-amber-600" />
+                <span>Dispečink výjezdů ↗</span>
+              </Link>
+            ) : null}
+
             <Link
               href={`/work?carrierCode=${order.items[0]?.carrier?.code || ''}&clientName=${encodeURIComponent(order.clientName)}`}
               className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
@@ -322,6 +380,20 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
                 </div>
               )}
             </section>
+
+            {/* Field Dispatch & Route Integration */}
+            <WorkOrderDispatchCard
+              orderId={order.id}
+              orderTitle={order.title}
+              scheduledAt={scheduledDate.toISOString()}
+              locationNote={order.locationNote}
+              clientName={order.client?.name || order.clientName}
+              carrierCode={order.items[0]?.carrier?.code || null}
+              carrierCity={order.items[0]?.carrier?.city || null}
+              isWorkshop={isWorkshop}
+              routeInfo={routeInfo}
+              canManageDispatch={['ADMIN', 'MANAGER'].includes(user.role)}
+            />
 
             {/* Navigation Installation Points & Route */}
             {order.navigationOrder && navPoints.length > 0 && (
