@@ -1,10 +1,11 @@
 import { enterTenantContext } from '@/lib/tenant-context';
 import { usesItemExecution } from '@/lib/field-planning/item-jobs';
-import { WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
+import { Prisma, WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { syncWorkOrderTasks } from '@/lib/work-task-sync';
+import { extractWorkOrderConstraintFlags } from '@/lib/work';
 
 type UpdateInput = {
   status?: unknown;
@@ -12,6 +13,7 @@ type UpdateInput = {
   price?: unknown;
   ftdSent?: unknown;
   invoiced?: unknown;
+  invoiceExempt?: unknown;
   scheduledAt?: unknown;
   deadlineAt?: unknown;
 };
@@ -120,6 +122,38 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           data: { status: 'DONE' },
         });
       }
+      const hasFtdChange = typeof input.ftdSent === 'boolean';
+      const hasInvoicedChange = typeof input.invoiced === 'boolean';
+      const hasExemptChange = typeof input.invoiceExempt === 'boolean';
+      const prevPc =
+        current.planningConstraints &&
+        typeof current.planningConstraints === 'object' &&
+        !Array.isArray(current.planningConstraints)
+          ? { ...(current.planningConstraints as Record<string, unknown>) }
+          : {};
+      const nextPc: Record<string, unknown> = { ...prevPc };
+      let effectiveInvoiced = typeof input.invoiced === 'boolean' ? input.invoiced : undefined;
+
+      if (hasFtdChange) {
+        nextPc.manualFtdSent = input.ftdSent;
+        if (input.ftdSent === true) nextPc.ftdSkipped = false;
+      }
+      if (hasInvoicedChange) {
+        nextPc.manualInvoiced = input.invoiced;
+        if (input.invoiced === true) {
+          nextPc.invoiceExempt = false;
+          nextPc.manualInvoiceExempt = false;
+        }
+      }
+      if (hasExemptChange) {
+        nextPc.invoiceExempt = input.invoiceExempt;
+        nextPc.manualInvoiceExempt = input.invoiceExempt;
+        if (input.invoiceExempt === true) {
+          effectiveInvoiced = false;
+          nextPc.manualInvoiced = false;
+        }
+      }
+
       const updated = await tx.workOrder.update({
         where: { id },
         data: {
@@ -127,16 +161,30 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           priority: input.priority as WorkPriority | undefined,
           price,
           ftdSent: typeof input.ftdSent === 'boolean' ? input.ftdSent : undefined,
-          invoiced: typeof input.invoiced === 'boolean' ? input.invoiced : undefined,
+          invoiced: effectiveInvoiced,
           scheduledAt: scheduledAt ?? undefined,
           deadlineAt: deadlineAt ?? undefined,
+          ...(hasFtdChange || hasInvoicedChange || hasExemptChange
+            ? { planningConstraints: nextPc as Prisma.InputJsonValue }
+            : {}),
         },
-        select: { id: true, status: true, priority: true, price: true, ftdSent: true, invoiced: true, scheduledAt: true, deadlineAt: true },
+        select: { id: true, status: true, priority: true, price: true, ftdSent: true, invoiced: true, scheduledAt: true, deadlineAt: true, planningConstraints: true },
       });
       await syncWorkOrderTasks(id, tx);
       return updated;
     });
-    return NextResponse.json({ ...saved, price: saved.price?.toString() ?? null });
+    const flags = extractWorkOrderConstraintFlags(saved.planningConstraints);
+    return NextResponse.json({
+      id: saved.id,
+      status: saved.status,
+      priority: saved.priority,
+      price: saved.price?.toString() ?? null,
+      ftdSent: saved.ftdSent,
+      invoiced: saved.invoiced,
+      invoiceExempt: flags.invoiceExempt,
+      scheduledAt: saved.scheduledAt,
+      deadlineAt: saved.deadlineAt,
+    });
   } catch (err) {
     if (err instanceof Error && err.message.startsWith('FIELD_ITEM_STATE:')) return NextResponse.json({ error: err.message.slice(18).trim() }, { status: 409 });
     if (err instanceof Error && err.message.startsWith('NELZE_ODEBRAT_PRACOVNIKA:')) {

@@ -19,6 +19,11 @@ import {
   unwrapExcelValueToString,
   extractExcelCellHyperlink,
 } from '../lib/work/google-sheets-sync.ts';
+import {
+  extractWorkOrderConstraintFlags,
+  isOrderDoneWithoutFtdFlag,
+  isOrderReadyForInvoicing,
+} from '../lib/work.ts';
 
 test('Google Sheets Sync: parseCsvRows handles commas and newlines in quoted cells', () => {
   const csv = [
@@ -485,5 +490,127 @@ test('Google Sheets Sync: parseGooglePlanXlsx detects green worker cell as DONE 
   assert.equal(tasks[1].isCompletedByColor, false);
   assert.equal(tasks[1].ftdUrl, '15 11 Billboard Megakoncert');
 });
+
+test('Google Sheets Sync: recognizes FAKT=BEZ and FTD=BEZ and excludes BEZ from invoicing queue', () => {
+  const sampleCsv = [
+    'FTD odeslána,FAKT,Datum,Den,Zadal,Pracovník dílna,Předáno klukům,Klient,Zadání,Kontakt na klienta/ osobu na místě,Datum zahájení,Datum ukončení,Typ nosiče,KS,Práce,Odkaz,Odkaz na FTD',
+    'ANO,BEZ,5.11.,čtvrtek,Z,Mirek,TRUE,GV,Nafotit náměstí,,5.11.2026,5.11.2026,MT,1,kontrola,,https://drive.google.com/drive/folders/gv1',
+    'ANO,,11.11.,středa,Z,Mirek,TRUE,Kultura Jih,Instalace Jih,,11.11.2026,11.11.2026,MT,2,instalace,,https://drive.google.com/drive/folders/kj1',
+    'BEZ,BEZ,18.11.,středa,V,Pavel,FALSE,Kamery,Servis kamer,,18.11.2026,18.11.2026,,,jiné,,',
+  ].join('\n');
+
+  const tasks = parseGooglePlanCsv(sampleCsv, 2026, new Date(Date.UTC(2026, 10, 11, 0, 0, 0)));
+  assert.equal(tasks.length, 3);
+
+  // 1. GV: FTD=ANO, FAKT=BEZ -> DONE & invoiceExempt, NOT ready for invoicing
+  assert.equal(tasks[0].isFtdSent, true);
+  assert.equal(tasks[0].isInvoiced, false);
+  assert.equal(tasks[0].isInvoiceExempt, true);
+  assert.equal(tasks[0].status, 'DONE');
+  assert.equal(
+    isOrderReadyForInvoicing({
+      status: tasks[0].status,
+      ftdSent: tasks[0].isFtdSent,
+      invoiced: tasks[0].isInvoiced,
+      invoiceExempt: tasks[0].isInvoiceExempt,
+    }),
+    false
+  );
+
+  // 2. Kultura Jih: FTD=ANO, FAKT blank -> ready for invoicing
+  assert.equal(tasks[1].isFtdSent, true);
+  assert.equal(tasks[1].isInvoiced, false);
+  assert.equal(tasks[1].isInvoiceExempt, false);
+  assert.equal(
+    isOrderReadyForInvoicing({
+      status: tasks[1].status,
+      ftdSent: tasks[1].isFtdSent,
+      invoiced: tasks[1].isInvoiced,
+      invoiceExempt: tasks[1].isInvoiceExempt,
+    }),
+    true
+  );
+
+  // 3. Future Kamery: FTD=BEZ, FAKT=BEZ -> remains PLANNED (not auto-closed early)
+  assert.equal(tasks[2].isFtdSkipped, true);
+  assert.equal(tasks[2].isInvoiceExempt, true);
+  assert.equal(tasks[2].status, 'PLANNED');
+
+  // Helper checks
+  assert.deepEqual(extractWorkOrderConstraintFlags({ invoiceExempt: true, ftdSkipped: true }), {
+    invoiceExempt: true,
+    ftdSkipped: true,
+    completedBySheetColor: false,
+  });
+  assert.equal(
+    isOrderDoneWithoutFtdFlag({ status: 'DONE', ftdSent: false, invoiced: false, invoiceExempt: false }),
+    true
+  );
+  assert.equal(
+    isOrderDoneWithoutFtdFlag({ status: 'DONE', ftdSent: false, invoiced: false, invoiceExempt: true }),
+    false
+  );
+});
+
+test('Google Sheets Sync: preserves manual invoicing and invoiceExempt state across subsequent cron runs', async () => {
+  const sampleCsv = [
+    'FTD odeslána,FAKT,Datum,Den,Zadal,Pracovník dílna,Předáno klukům,Klient,Zadání,Kontakt na klienta/ osobu na místě,Datum zahájení,Datum ukončení,Typ nosiče,KS,Práce,Odkaz,Odkaz na FTD',
+    'ANO,,11.11.,středa,Z,Mirek,TRUE,Kultura Jih,Instalace Jih,,11.11.2026,11.11.2026,MT,2,instalace,,https://drive.google.com/drive/folders/kj1',
+  ].join('\n');
+
+  const existingOrder: any = {
+    id: 'wo-1',
+    title: 'Kultura Jih – Instalace Jih',
+    description: 'Instalace Jih',
+    clientName: 'Kultura Jih',
+    scheduledAt: new Date(Date.UTC(2026, 10, 11, 0, 0, 0)),
+    status: 'DONE',
+    priority: 'NORMAL',
+    ftdSent: true,
+    invoiced: true,
+    ftdUrl: 'https://drive.google.com/drive/folders/kj1',
+    referenceUrl: null,
+    planningConstraints: {
+      source: 'GOOGLE_SHEETS_PLAN',
+      sheetKey: 'gsheet_2026-11-11_kultura_jih_instalacejih',
+      sheetRow: 2,
+      completedBySheetColor: false,
+      manualInvoiced: true,
+      invoiceExempt: false,
+      ftdSkipped: false,
+    },
+    assignments: [{ workerName: 'Mirek' }],
+  };
+
+  let updateCalls = 0;
+  const mockTx = {
+    workOrder: {
+      findMany: async () => [existingOrder],
+      update: async () => {
+        updateCalls++;
+        return existingOrder;
+      },
+    },
+    workAssignment: { findMany: async () => [], deleteMany: async () => {}, createMany: async () => {} },
+    workTask: { findMany: async () => [], create: async () => ({}), update: async () => ({}), delete: async () => {} },
+    employee: { findMany: async () => [], findFirst: async () => null },
+  };
+
+  const res = await syncGooglePlanToWorkOrders(
+    {
+      organizationId: 'org-1',
+      csvContent: sampleCsv,
+      defaultYear: 2026,
+      referenceDate: new Date(Date.UTC(2026, 10, 11, 0, 0, 0)),
+    },
+    { tx: mockTx as any }
+  );
+
+  // Even though Google Sheet still has blank FAKT, manual invoiced=true is preserved and row is skipped cleanly!
+  assert.equal(updateCalls, 0);
+  assert.equal(res.skippedCount, 1);
+  assert.equal(existingOrder.invoiced, true);
+});
+
 
 

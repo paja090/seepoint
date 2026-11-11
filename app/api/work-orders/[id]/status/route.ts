@@ -3,6 +3,7 @@ import { usesItemExecution } from '@/lib/field-planning/item-jobs';
 import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { Prisma } from '@prisma/client';
 import { logCarrierHistoryEvent } from '@/lib/navigation/carrier-history-service';
 
 export async function PATCH(
@@ -67,12 +68,28 @@ export async function PATCH(
       return NextResponse.json({ error: 'Dokončete jednotlivé položky přes Moje trasa dnes.' }, { status: 409 });
     }
 
+    const prevPc =
+      existing.planningConstraints &&
+      typeof existing.planningConstraints === 'object' &&
+      !Array.isArray(existing.planningConstraints)
+        ? (existing.planningConstraints as Record<string, unknown>)
+        : {};
+
     // Update WorkOrder status & FTD status if DONE
     const updated = await prisma.workOrder.update({
       where: { id: workOrderId },
       data: {
         status,
         ftdSent: status === 'DONE' ? true : existing.ftdSent,
+        ...(status === 'DONE'
+          ? {
+              planningConstraints: {
+                ...prevPc,
+                manualFtdSent: true,
+                ftdSkipped: false,
+              } as Prisma.InputJsonValue,
+            }
+          : {}),
       },
     });
 

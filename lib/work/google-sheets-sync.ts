@@ -107,7 +107,9 @@ export type ParsedGooglePlanTask = {
   workers: string[];
   isHandedOver: boolean;
   isFtdSent: boolean;
+  isFtdSkipped?: boolean;
   isInvoiced: boolean;
+  isInvoiceExempt?: boolean;
   isCompletedByColor?: boolean;
   contactName?: string | null;
   contactPhone?: string | null;
@@ -456,14 +458,16 @@ function parseGooglePlanRows(
     const campaignDateFrom = zahajeniDate;
     const campaignDateTo = parseDateString(rawUkonceni, taskYear);
 
-    const ftdRaw = ((colIdx.ftdOdeslana !== -1 ? row[colIdx.ftdOdeslana] : '') || '').toUpperCase();
+    const ftdRaw = ((colIdx.ftdOdeslana !== -1 ? row[colIdx.ftdOdeslana] : '') || '').toUpperCase().trim();
     const isFtdSent = ftdRaw === 'ANO';
+    const isFtdSkipped = ftdRaw === 'BEZ';
 
-    const predanoRaw = ((colIdx.predano !== -1 ? row[colIdx.predano] : '') || '').toUpperCase();
+    const predanoRaw = ((colIdx.predano !== -1 ? row[colIdx.predano] : '') || '').toUpperCase().trim();
     const isHandedOver = predanoRaw === 'TRUE' || predanoRaw === 'ANO';
 
-    const faktRaw = ((colIdx.fakt !== -1 ? row[colIdx.fakt] : '') || '').toUpperCase();
+    const faktRaw = ((colIdx.fakt !== -1 ? row[colIdx.fakt] : '') || '').toUpperCase().trim();
     const isInvoiced = faktRaw === 'ANO';
+    const isInvoiceExempt = faktRaw === 'BEZ';
 
     const isCompletedByColor =
       colIdx.pracovnik !== -1 && rawRow.isWorkerCellGreen
@@ -529,7 +533,9 @@ function parseGooglePlanRows(
       workers,
       isHandedOver,
       isFtdSent,
+      isFtdSkipped,
       isInvoiced,
+      isInvoiceExempt,
       isCompletedByColor,
       contactName: contact.name,
       contactPhone: contact.phone,
@@ -769,14 +775,24 @@ export async function syncGooglePlanToWorkOrders(
           ? 'DONE'
           : task.status;
 
+      const nextFtdSent =
+        Boolean(task.isFtdSent) || (Boolean(prevPc.manualFtdSent) && !task.isFtdSkipped);
+      const nextInvoiced =
+        Boolean(task.isInvoiced) || (Boolean(prevPc.manualInvoiced) && !task.isInvoiceExempt);
+      const nextInvoiceExempt =
+        !nextInvoiced && (Boolean(task.isInvoiceExempt) || Boolean(prevPc.manualInvoiceExempt));
+      const nextFtdSkipped = Boolean(task.isFtdSkipped) && !nextFtdSent;
+
       const existingAssignments = (
         existing as { assignments?: Array<{ workerName: string }> }
       ).assignments;
 
       const isUnchanged =
         existing.status === nextStatus &&
-        Boolean(existing.ftdSent) === task.isFtdSent &&
-        Boolean(existing.invoiced) === task.isInvoiced &&
+        Boolean(existing.ftdSent) === nextFtdSent &&
+        Boolean(existing.invoiced) === nextInvoiced &&
+        Boolean(prevPc.invoiceExempt) === nextInvoiceExempt &&
+        Boolean(prevPc.ftdSkipped) === nextFtdSkipped &&
         (existing.title ?? '') === task.title &&
         (existing.description ?? '') === task.description &&
         (existing.ftdUrl ?? null) === (task.ftdUrl ?? null) &&
@@ -801,8 +817,8 @@ export async function syncGooglePlanToWorkOrders(
           title: task.title,
           description: task.description,
           clientName: task.clientName,
-          ftdSent: task.isFtdSent,
-          invoiced: task.isInvoiced,
+          ftdSent: nextFtdSent,
+          invoiced: nextInvoiced,
           ftdUrl: task.ftdUrl || undefined,
           referenceUrl: task.referenceUrl || undefined,
           status: nextStatus,
@@ -819,6 +835,11 @@ export async function syncGooglePlanToWorkOrders(
             sheetKey: task.sheetKey,
             sheetRow: task.sheetRowIndex,
             completedBySheetColor: Boolean(task.isCompletedByColor),
+            invoiceExempt: nextInvoiceExempt,
+            ftdSkipped: nextFtdSkipped,
+            ...(task.isFtdSent || task.isFtdSkipped ? { manualFtdSent: false } : {}),
+            ...(task.isInvoiced || task.isInvoiceExempt ? { manualInvoiced: false } : {}),
+            ...(task.isInvoiced || task.isInvoiceExempt ? { manualInvoiceExempt: false } : {}),
           },
         },
       });
@@ -895,6 +916,8 @@ export async function syncGooglePlanToWorkOrders(
             sheetKey: task.sheetKey,
             sheetRow: task.sheetRowIndex,
             completedBySheetColor: Boolean(task.isCompletedByColor),
+            invoiceExempt: Boolean(task.isInvoiceExempt),
+            ftdSkipped: Boolean(task.isFtdSkipped),
           },
           assignments: {
             create: task.workers.map((workerName) => ({

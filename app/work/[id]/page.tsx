@@ -12,8 +12,10 @@ import { WorkOrderEditForm } from '@/components/WorkOrderEditForm';
 import { WorkOrderAcknowledgeButton } from '@/components/WorkOrderAcknowledgeButton';
 import { prisma, ensureWorkOrderSchema } from '@/lib/db';
 import {
+  extractWorkOrderConstraintFlags,
   formatWorkDate,
   formatWorkPrice,
+  isOrderReadyForInvoicing,
   resolveGoogleDriveUrl,
   formatGoogleDriveLabel,
   workPriorityLabels,
@@ -211,7 +213,13 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
   const isOverdue = Boolean(
     order.deadlineAt && order.deadlineAt < new Date() && !['DONE', 'CANCELLED'].includes(order.status)
   );
-  const awaitsInvoice = order.ftdSent && !order.invoiced && order.status !== 'CANCELLED';
+  const flags = extractWorkOrderConstraintFlags(order.planningConstraints);
+  const awaitsInvoice = isOrderReadyForInvoicing({
+    status: order.status,
+    ftdSent: order.ftdSent,
+    invoiced: order.invoiced,
+    invoiceExempt: flags.invoiceExempt,
+  });
 
   const navPoints = order.navigationOrder?.points || [];
   const primaryTarget = order.navigationOrder?.targets?.[0];
@@ -714,6 +722,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
               price={order.price?.toString() ?? null}
               ftdSent={order.ftdSent}
               invoiced={order.invoiced}
+              invoiceExempt={flags.invoiceExempt}
               requestedBy={order.requestedBy}
             />
 

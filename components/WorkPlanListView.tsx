@@ -10,11 +10,15 @@ import {
   ArrowRight,
   CheckCircle2,
   Calendar,
+  Camera,
+  ExternalLink,
 } from 'lucide-react';
 import { RescheduleOrderModal } from './RescheduleOrderModal';
 import {
   formatWorkDate,
   formatWorkPrice,
+  isOrderReadyForInvoicing,
+  resolveGoogleDriveUrl,
   workPriorityLabels,
   workPriorityStyles,
   workStatusLabels,
@@ -38,6 +42,11 @@ export type WorkOrderData = {
   workType: string;
   ftdSent?: boolean;
   invoiced?: boolean;
+  invoiceExempt?: boolean;
+  ftdSkipped?: boolean;
+  completedBySheetColor?: boolean;
+  ftdUrl?: string | null;
+  referenceUrl?: string | null;
   quantity?: number | null;
   mediaLabel?: string | null;
   contactPhone?: string | null;
@@ -53,13 +62,15 @@ export function WorkPlanListView({
   orders: initialOrders,
   canCleanup = true,
   onOpenReschedule,
+  preferredTab,
 }: {
   orders: WorkOrderData[];
   canCleanup?: boolean;
   onOpenReschedule?: (order: WorkOrderData) => void;
+  preferredTab?: 'ACTIVE' | 'HISTORY';
 }) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'ACTIVE' | 'HISTORY'>('ACTIVE');
+  const [activeTab, setActiveTab] = useState<'ACTIVE' | 'HISTORY'>(preferredTab || 'ACTIVE');
   const [orders, setOrders] = useState(initialOrders);
   const [cleaning, setCleaning] = useState(false);
   const [cleanupMessage, setCleanupMessage] = useState('');
@@ -71,6 +82,12 @@ export function WorkPlanListView({
   React.useEffect(() => {
     setOrders(initialOrders);
   }, [initialOrders]);
+
+  React.useEffect(() => {
+    if (preferredTab) {
+      setActiveTab(preferredTab);
+    }
+  }, [preferredTab]);
 
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -398,6 +415,22 @@ export function WorkPlanListView({
                           </span>
                         ) : null}
 
+                        {isOrderReadyForInvoicing(order) && (
+                          <span className="rounded-full bg-purple-100 text-purple-900 border border-purple-200 px-2.5 py-0.5 text-xs font-black">
+                            💶 K fakturaci
+                          </span>
+                        )}
+                        {order.invoiced && (
+                          <span className="rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200 px-2.5 py-0.5 text-xs font-black">
+                            ✓ Vyfakturováno
+                          </span>
+                        )}
+                        {!order.invoiced && order.invoiceExempt && (
+                          <span className="rounded-full bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-0.5 text-[11px] font-bold">
+                            🚫 Bez fakturace
+                          </span>
+                        )}
+
                         <span className="text-xs font-extrabold text-slate-600">
                           {workTypeLabels[order.workType as keyof typeof workTypeLabels] || order.workType}
                         </span>
@@ -443,6 +476,20 @@ export function WorkPlanListView({
                     )}
 
                     <div className="flex flex-wrap items-center gap-1.5 md:justify-end pt-1">
+                      {order.ftdUrl && resolveGoogleDriveUrl(order.ftdUrl) && (
+                        <a
+                          href={resolveGoogleDriveUrl(order.ftdUrl)!}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1 text-[11px] font-black text-purple-900 hover:bg-purple-100 transition shadow-2xs"
+                          title="Otevřít složku FTD na Google Disku"
+                        >
+                          <Camera size={12} className="text-purple-700" />
+                          <span>FTD Disk</span>
+                          <ExternalLink size={10} />
+                        </a>
+                      )}
                       {!['DONE', 'CANCELLED'].includes(order.status) && (
                         <button
                           type="button"

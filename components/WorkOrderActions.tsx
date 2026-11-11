@@ -4,7 +4,7 @@ import type { WorkOrderStatus, WorkPriority } from '@prisma/client';
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { workPriorityLabels, workStatusLabels } from '@/lib/work';
-import { Trash2, Copy } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 
 type WorkOrderActionsProps = {
   id: string;
@@ -14,6 +14,7 @@ type WorkOrderActionsProps = {
   price?: string | null;
   ftdSent: boolean;
   invoiced: boolean;
+  invoiceExempt?: boolean;
   requestedBy?: string | null;
 };
 
@@ -25,6 +26,7 @@ export function WorkOrderActions({
   price,
   ftdSent,
   invoiced,
+  invoiceExempt = false,
   requestedBy,
 }: WorkOrderActionsProps) {
   const router = useRouter();
@@ -47,6 +49,7 @@ export function WorkOrderActions({
         price: form.get('price'),
         ftdSent: form.get('ftdSent') === 'on',
         invoiced: form.get('invoiced') === 'on',
+        invoiceExempt: form.get('invoiceExempt') === 'on',
       }),
     });
     const result = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -126,6 +129,16 @@ export function WorkOrderActions({
             className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
           />
           Faktura vystavena
+        </label>
+
+        <label className="flex items-center gap-3 text-xs font-semibold text-slate-700 cursor-pointer">
+          <input
+            defaultChecked={invoiceExempt}
+            name="invoiceExempt"
+            type="checkbox"
+            className="rounded border-slate-300 text-slate-600 focus:ring-slate-500 h-4 w-4"
+          />
+          Bez fakturace (interní / neúčtuje se)
         </label>
       </div>
 
