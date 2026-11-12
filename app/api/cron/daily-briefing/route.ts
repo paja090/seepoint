@@ -4,12 +4,15 @@ import { getCurrentUser } from '@/lib/auth';
 import { hasModuleAccess } from '@/lib/module-policy';
 import { isModuleEnabled } from '@/lib/organization-modules';
 import { runWithTenantContext, requireTenantContext } from '@/lib/tenant-context';
+import { dayInZone } from '@/lib/field-planning/profile';
 import {
   getDailyBriefingSettings,
+  getManagerDigestSettings,
   getLocalHour,
   getTomorrowDateStr,
   isWeekendDate,
   sendDailyBriefingsForOrganization,
+  sendManagerMorningDigestForOrganization,
 } from '@/lib/work/daily-briefing';
 import {
   isSeePointOrganization,
@@ -20,11 +23,11 @@ export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 /**
- * Automated Cron Endpoint for Next-Day Worker Daily Plan E-mails.
+ * Automated Cron Endpoint for:
+ * 1) Combined Next-Day Worker Daily Plan + Today Check-out E-mails (default 17:00 Prague)
+ * 2) Morning Manager Recap Digest of yesterday's open/rescheduled/completed tasks (default 07:00 Prague)
  *
- * Scheduled hourly in vercel.json ("0 * * * *").
- * Each active organization fires only during its configured local send hour
- * (default 17:00 Europe/Prague) and stays idempotent via EmailLog.
+ * Scheduled hourly in vercel.json ("0 * * * *") and stays idempotent via EmailLog.
  */
 async function handleCronExecution(request: Request) {
   const cronSecret = process.env.CRON_SECRET?.trim();
@@ -51,6 +54,7 @@ async function handleCronExecution(request: Request) {
   const url = new URL(request.url);
   const forceParam = url.searchParams.get('force') === 'true';
   const targetDateParam = url.searchParams.get('targetDate') || undefined;
+  const typeParam = url.searchParams.get('type') || undefined;
   const isForceRun = !isCronAuthorized && forceParam;
 
   const organizations = await prisma.organization.findMany({
@@ -77,6 +81,12 @@ async function handleCronExecution(request: Request) {
     skippedAlreadySentCount?: number;
     recipientsCount?: number;
     targetDate?: string;
+    managerDigest?: {
+      auditedDate: string;
+      sentCount: number;
+      skippedAlreadySentCount: number;
+      skippedEmpty: boolean;
+    };
   }> = [];
 
   for (const org of organizations) {
@@ -98,42 +108,40 @@ async function handleCronExecution(request: Request) {
       },
       async () => {
         requireTenantContext();
-        const settings = await getDailyBriefingSettings(org.id);
-
-        if (!isForceRun) {
-          if (!settings.enabled) {
-            return {
-              organizationId: org.id,
-              organizationName: org.name,
-              status: 'skipped',
-              reason: 'briefing_disabled',
-            };
-          }
-
-          const localHour = getLocalHour(now, settings.timezone);
-          if (localHour !== settings.sendHourLocal) {
-            return {
-              organizationId: org.id,
-              organizationName: org.name,
-              status: 'skipped',
-              reason: `outside_hour_${localHour}_expected_${settings.sendHourLocal}`,
-            };
-          }
-        }
+        const [settings, managerSettings] = await Promise.all([
+          getDailyBriefingSettings(org.id),
+          getManagerDigestSettings(org.id),
+        ]);
 
         const targetDate = targetDateParam || getTomorrowDateStr(now, settings.timezone);
+        const workerLocalHour = getLocalHour(now, settings.timezone);
+        const managerLocalHour = getLocalHour(now, managerSettings.timezone);
+        const managerTodayDate = dayInZone(now, managerSettings.timezone);
 
-        if (!isForceRun && settings.skipWeekends && isWeekendDate(targetDate)) {
+        const shouldRunWorkers = isForceRun
+          ? typeParam !== 'manager'
+          : settings.enabled &&
+            workerLocalHour === settings.sendHourLocal &&
+            !(settings.skipWeekends && isWeekendDate(targetDate));
+
+        const shouldRunManager = isForceRun
+          ? typeParam === 'manager'
+          : managerSettings.enabled &&
+            managerLocalHour === managerSettings.sendHourLocal &&
+            !(managerSettings.skipWeekends && isWeekendDate(managerTodayDate));
+
+        if (!shouldRunWorkers && !shouldRunManager) {
           return {
             organizationId: org.id,
             organizationName: org.name,
             status: 'skipped',
-            reason: 'weekend_skipped',
-            targetDate,
+            reason: !settings.enabled && !managerSettings.enabled
+              ? 'briefing_disabled'
+              : `outside_hour_${workerLocalHour}_expected_${settings.sendHourLocal}`,
           };
         }
 
-        // Keep SeePoint Google Sheets plan fresh right before dispatching tomorrow's plan
+        // Keep SeePoint Google Sheets plan fresh right before dispatching briefings or manager recap
         if (isSeePointOrganization(org)) {
           try {
             await syncGooglePlanToWorkOrders({ organizationId: org.id });
@@ -142,19 +150,41 @@ async function handleCronExecution(request: Request) {
           }
         }
 
-        const summary = await sendDailyBriefingsForOrganization(org.id, {
-          targetDate,
-          force: isForceRun,
-        });
+        const workerSummary = shouldRunWorkers
+          ? await sendDailyBriefingsForOrganization(org.id, {
+              targetDate,
+              force: isForceRun,
+            })
+          : null;
+
+        const managerSummary = shouldRunManager
+          ? await sendManagerMorningDigestForOrganization(org.id, {
+              force: isForceRun,
+            })
+          : undefined;
 
         return {
           organizationId: org.id,
           organizationName: org.name,
           status: 'processed',
-          targetDate: summary.targetDate,
-          recipientsCount: summary.recipientsCount,
-          sentCount: summary.sentCount,
-          skippedAlreadySentCount: summary.skippedAlreadySentCount,
+          ...(workerSummary
+            ? {
+                targetDate: workerSummary.targetDate,
+                recipientsCount: workerSummary.recipientsCount,
+                sentCount: workerSummary.sentCount,
+                skippedAlreadySentCount: workerSummary.skippedAlreadySentCount,
+              }
+            : {}),
+          ...(managerSummary
+            ? {
+                managerDigest: {
+                  auditedDate: managerSummary.auditedDate,
+                  sentCount: managerSummary.sentCount,
+                  skippedAlreadySentCount: managerSummary.skippedAlreadySentCount,
+                  skippedEmpty: managerSummary.skippedEmpty,
+                },
+              }
+            : {}),
         };
       }
     );

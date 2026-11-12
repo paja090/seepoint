@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   sanitizeDailyBriefingSettings,
+  sanitizeManagerDigestSettings,
   normalizeCzechName,
   isDeliverableWorkerEmail,
   getLocalHour,
@@ -13,6 +14,8 @@ import {
   matchWorkerAssignment,
   assembleWorkerBriefings,
   renderWorkerDailyBriefingEmail,
+  assembleManagerMorningDigest,
+  renderManagerMorningDigestEmail,
   type WorkerRecipient,
 } from '../lib/work/daily-briefing';
 import {
@@ -342,4 +345,224 @@ test('HMAC briefing ack token verifies valid payloads and rejects tampered or ex
   // Expired -> null
   const futureCheck = Math.floor(Date.now() / 1000) + 10 * 24 * 60 * 60;
   assert.equal(verifyBriefingAckToken(token, secret, futureCheck), null);
+});
+
+test('action tokens distinguish complete and reschedule intents and reject unknown actions', () => {
+  const secret = 'test-signing-secret-xyz';
+  const completeToken = createBriefingAckToken(
+    {
+      orgId: 'org_seepoint_default',
+      orderIds: ['wo-done-1'],
+      action: 'complete',
+      workerName: 'Miroslav Mec',
+      email: 'mirek.mec@seepoint.cz',
+      ttlDays: 7,
+    },
+    secret
+  );
+  const rescheduleToken = createBriefingAckToken(
+    {
+      orgId: 'org_seepoint_default',
+      orderIds: ['wo-move-1'],
+      action: 'reschedule',
+      workerName: 'Miroslav Mec',
+      email: 'mirek.mec@seepoint.cz',
+      ttlDays: 7,
+    },
+    secret
+  );
+
+  assert.equal(verifyBriefingAckToken(completeToken, secret)?.action, 'complete');
+  assert.equal(verifyBriefingAckToken(rescheduleToken, secret)?.action, 'reschedule');
+
+  const [payloadB64, sigHex] = completeToken.split('.');
+  const decoded = verifyBriefingAckToken(completeToken, secret)!;
+  const bogusPayload = Buffer.from(
+    JSON.stringify({ ...decoded, action: 'delete_all' }),
+    'utf8'
+  ).toString('base64url');
+  assert.equal(verifyBriefingAckToken(`${bogusPayload}.${sigHex}`, secret), null);
+  assert.ok(payloadB64);
+});
+
+test('assembleWorkerBriefings combines today unfinished tasks with tomorrow plan in one email even when tomorrow is empty', () => {
+  const result = assembleWorkerBriefings({
+    organizationId: 'org_seepoint_default',
+    todayDate: '2026-11-11',
+    targetDate: '2026-11-12',
+    baseUrl: 'https://seepoint.cz',
+    directory: DIRECTORY,
+    todayOrders: [
+      {
+        id: 'wo-today-mirek',
+        title: 'Instalace banneru Ostrava – 10:00',
+        description: null,
+        workType: 'INSTALLATION',
+        priority: 'HIGH',
+        status: 'PLANNED',
+        scheduledAt: new Date('2026-11-11T09:00:00.000Z'),
+        clientName: 'Klient Dnes s.r.o.',
+        contactName: null,
+        contactPhone: null,
+        locationNote: 'Stodolní 1, Ostrava',
+        quantity: 2,
+        mediaLabel: null,
+        ftdUrl: null,
+        referenceUrl: null,
+        pdfUrl: null,
+        planningConstraints: null,
+        assignments: [{ userId: null, workerName: 'Mirek' }],
+      },
+      {
+        id: 'wo-today-pavel',
+        title: 'Revize podkladů',
+        description: null,
+        workType: 'OTHER',
+        priority: 'NORMAL',
+        status: 'IN_PROGRESS',
+        scheduledAt: new Date('2026-11-11T12:00:00.000Z'),
+        clientName: 'Interní',
+        contactName: null,
+        contactPhone: null,
+        locationNote: null,
+        quantity: null,
+        mediaLabel: null,
+        ftdUrl: null,
+        referenceUrl: null,
+        pdfUrl: null,
+        planningConstraints: null,
+        assignments: [{ userId: null, workerName: 'Pavel' }],
+      },
+    ],
+    orders: [
+      {
+        id: 'wo-tomorrow-mirek',
+        title: 'Polep CLV Brno',
+        description: null,
+        workType: 'INSTALLATION',
+        priority: 'NORMAL',
+        status: 'PLANNED',
+        scheduledAt: new Date('2026-11-12T07:00:00.000Z'),
+        clientName: 'Brno Klient',
+        contactName: null,
+        contactPhone: null,
+        locationNote: 'Brno střed',
+        quantity: 3,
+        mediaLabel: null,
+        ftdUrl: null,
+        referenceUrl: null,
+        pdfUrl: null,
+        planningConstraints: null,
+        assignments: [{ userId: null, workerName: 'Mirek' }],
+      },
+    ],
+    fieldPlans: [],
+  });
+
+  // Both Mirek (today + tomorrow) and Pavel (today only) receive a briefing
+  assert.equal(result.briefings.length, 2);
+
+  const mirek = result.briefings.find((b) => b.recipient.email === 'mirek.mec@seepoint.cz')!;
+  assert.equal(mirek.todayOpenTasks?.length, 1);
+  assert.equal(mirek.tasks.length, 1);
+  assert.match(mirek.todayOpenTasks![0].completeUrl || '', /\/api\/work-orders\/email-action\?token=/);
+  assert.match(mirek.todayOpenTasks![0].rescheduleUrl || '', /\/api\/work-orders\/email-action\?token=/);
+
+  const renderedMirek = renderWorkerDailyBriefingEmail(mirek, 'SeePOINT s.r.o.');
+  assert.match(renderedMirek.subject, /Uzavření dneška \(1\) & plán na zítra/);
+  assert.match(renderedMirek.html, /Kontrola dneška/);
+  assert.match(renderedMirek.html, /✅ Hotovo/);
+  assert.match(renderedMirek.html, /⏳ Nestihl jsem \/ Přesunout/);
+  assert.match(renderedMirek.html, /Plán práce na zítřek/);
+
+  const pavel = result.briefings.find((b) => b.recipient.email === 'subert.pvel@gmail.com')!;
+  assert.equal(pavel.todayOpenTasks?.length, 1);
+  assert.equal(pavel.tasks.length, 0);
+  const renderedPavel = renderWorkerDailyBriefingEmail(pavel, 'SeePOINT s.r.o.');
+  assert.match(renderedPavel.subject, /Uzavření dnešních úkolů/);
+  assert.match(renderedPavel.html, /zatím nemáš v systému přiřazené žádné další úkoly/);
+});
+
+test('sanitizeManagerDigestSettings and assembleManagerMorningDigest track unfinished, worker-rescheduled, and completed orders for audited day only', () => {
+  const defaultManager = sanitizeManagerDigestSettings(undefined, 'org_seepoint_default');
+  assert.deepEqual(defaultManager, {
+    enabled: true,
+    sendHourLocal: 7,
+    timezone: 'Europe/Prague',
+    skipWeekends: false,
+  });
+
+  const digest = assembleManagerMorningDigest({
+    auditedDate: '2026-11-11',
+    baseUrl: 'https://seepoint.cz',
+    yesterdayOrders: [
+      {
+        id: 'wo-open',
+        title: 'Nedodělaný polep',
+        clientName: 'Klient A',
+        status: 'PLANNED',
+        scheduledAt: new Date('2026-11-11T07:00:00.000Z'),
+        updatedAt: new Date('2026-11-11T07:00:00.000Z'),
+        planningConstraints: null,
+        assignments: [{ workerName: 'Jirka' }],
+      },
+      {
+        id: 'wo-done',
+        title: 'Dokončený výlep',
+        clientName: 'Klient B',
+        status: 'DONE',
+        scheduledAt: new Date('2026-11-11T07:00:00.000Z'),
+        updatedAt: new Date('2026-11-11T16:10:00.000Z'),
+        planningConstraints: { lastWorkerNote: 'Předáno bez vad' },
+        assignments: [{ workerName: 'Mirek' }],
+      },
+    ],
+    recentRescheduledOrders: [
+      {
+        id: 'wo-moved-from-yesterday',
+        title: 'Odložená montáž',
+        clientName: 'Klient C',
+        status: 'PLANNED',
+        scheduledAt: new Date('2026-11-12T07:00:00.000Z'),
+        updatedAt: new Date('2026-11-11T16:30:00.000Z'),
+        planningConstraints: {
+          sheetScheduledDateAtReschedule: '2026-11-11',
+          manualScheduledDateIso: '2026-11-12',
+          lastEmailAction: 'RESCHEDULED',
+          lastWorkerReason: 'Počasí / déšť – Pršelo',
+          lastWorkerReportBy: 'Mirek',
+          lastWorkerReportAt: '2026-11-11T16:30:00.000Z',
+        },
+        assignments: [{ workerName: 'Mirek' }],
+      },
+      {
+        id: 'wo-stale-from-earlier-week',
+        title: 'Starší přesun z minulého týdne',
+        clientName: 'Klient Old',
+        status: 'PLANNED',
+        scheduledAt: new Date('2026-11-14T07:00:00.000Z'),
+        updatedAt: new Date('2026-11-08T16:00:00.000Z'),
+        planningConstraints: {
+          sheetScheduledDateAtReschedule: '2026-11-08',
+          lastEmailAction: 'RESCHEDULED',
+          lastWorkerReason: 'Starý důvod',
+          lastWorkerReportAt: '2026-11-08T16:00:00.000Z',
+        },
+        assignments: [{ workerName: 'Jirka' }],
+      },
+    ],
+  });
+
+  assert.equal(digest.unfinishedItems.length, 1);
+  assert.equal(digest.completedItems.length, 1);
+  assert.equal(digest.rescheduledItems.length, 1);
+  assert.equal(digest.rescheduledItems[0].workOrderId, 'wo-moved-from-yesterday');
+  assert.equal(digest.rescheduledItems[0].workerReason, 'Počasí / déšť – Pršelo');
+
+  const rendered = renderManagerMorningDigestEmail(digest, 'SeePOINT s.r.o.');
+  assert.match(rendered.subject, /1 neuzavřeno, 1 přesunuto/);
+  assert.match(rendered.html, /Odložená montáž/);
+  assert.match(rendered.html, /Počasí \/ déšť – Pršelo/);
+  assert.match(rendered.html, /Nedodělaný polep/);
+  assert.doesNotMatch(rendered.html, /Starší přesun z minulého týdne/);
 });

@@ -645,6 +645,34 @@ export type SyncGooglePlanOptions = {
 };
 
 /**
+ * Resolves whether Google Sheets sync should keep a manually/email-rescheduled
+ * date or apply the sheet's scheduledAt (e.g. when dispatcher edits the sheet date).
+ */
+export function resolveSyncedScheduledAt(
+  existingScheduledAt: Date,
+  existingConstraints: unknown,
+  sheetScheduledAt: Date
+): { scheduledAt: Date; preservedManualReschedule: boolean } {
+  const prevPc =
+    existingConstraints &&
+    typeof existingConstraints === 'object' &&
+    !Array.isArray(existingConstraints)
+      ? (existingConstraints as Record<string, unknown>)
+      : {};
+  const sheetDateIso = sheetScheduledAt.toISOString().slice(0, 10);
+  const manualLocked =
+    typeof prevPc.manualScheduledDateIso === 'string' &&
+    prevPc.manualScheduledDateIso.length >= 10 &&
+    typeof prevPc.sheetScheduledDateAtReschedule === 'string' &&
+    prevPc.sheetScheduledDateAtReschedule === sheetDateIso;
+
+  if (manualLocked) {
+    return { scheduledAt: existingScheduledAt, preservedManualReschedule: true };
+  }
+  return { scheduledAt: sheetScheduledAt, preservedManualReschedule: false };
+}
+
+/**
  * Fetches the Google Sheet (preferring XLSX export for cell colors and hyperlinks,
  * with fallback to CSV) and synchronizes tasks into SeePoint OS WorkOrders and WorkTasks.
  * Idempotent: Skips unchanged existing orders cleanly.
@@ -804,6 +832,12 @@ export async function syncGooglePlanToWorkOrders(
     if (existing) {
       matchedOrderIds.add(existing.id);
       const prevPc = (existing.planningConstraints as Record<string, unknown> | null) || {};
+      const { scheduledAt: nextScheduledAt, preservedManualReschedule } = resolveSyncedScheduledAt(
+        existing.scheduledAt,
+        prevPc,
+        task.scheduledAt
+      );
+      const nextDateIso = nextScheduledAt.toISOString().slice(0, 10);
       const nextStatus: WorkOrderStatus =
         existing.status === 'CANCELLED'
           ? 'CANCELLED'
@@ -826,7 +860,7 @@ export async function syncGooglePlanToWorkOrders(
       const isUnchanged =
         existing.status === nextStatus &&
         existing.priority === task.priority &&
-        existing.scheduledAt.toISOString().slice(0, 10) === taskDateIso &&
+        existing.scheduledAt.toISOString().slice(0, 10) === nextDateIso &&
         Boolean(existing.ftdSent) === nextFtdSent &&
         Boolean(existing.invoiced) === nextInvoiced &&
         Boolean(prevPc.invoiceExempt) === nextInvoiceExempt &&
@@ -855,7 +889,7 @@ export async function syncGooglePlanToWorkOrders(
           title: task.title,
           description: task.description,
           clientName: task.clientName,
-          scheduledAt: task.scheduledAt,
+          scheduledAt: nextScheduledAt,
           ftdSent: nextFtdSent,
           invoiced: nextInvoiced,
           ftdUrl: task.ftdUrl || undefined,
@@ -876,6 +910,9 @@ export async function syncGooglePlanToWorkOrders(
             completedBySheetColor: Boolean(task.isCompletedByColor),
             invoiceExempt: nextInvoiceExempt,
             ftdSkipped: nextFtdSkipped,
+            ...(!preservedManualReschedule
+              ? { manualScheduledDateIso: null, sheetScheduledDateAtReschedule: null }
+              : {}),
             ...(task.isFtdSent || task.isFtdSkipped ? { manualFtdSent: false } : {}),
             ...(task.isInvoiced || task.isInvoiceExempt ? { manualInvoiced: false } : {}),
             ...(task.isInvoiced || task.isInvoiceExempt ? { manualInvoiceExempt: false } : {}),

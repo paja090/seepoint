@@ -5,8 +5,12 @@ import { getAppOrigin } from '@/lib/app-url';
 import {
   getDailyBriefingSettings,
   saveDailyBriefingSettings,
+  getManagerDigestSettings,
+  saveManagerDigestSettings,
   loadDailyBriefingsForOrganization,
+  loadManagerMorningDigestForOrganization,
   sendDailyBriefingsForOrganization,
+  sendManagerMorningDigestForOrganization,
 } from '@/lib/work/daily-briefing';
 import {
   isSeePointOrganization,
@@ -19,14 +23,18 @@ export async function GET(request: Request) {
   try {
     const { organizationId } = await requireOrganizationRole('ADMIN', 'MANAGER');
     const baseUrl = getAppOrigin(request);
-    const settings = await getDailyBriefingSettings(organizationId);
+    const [settings, managerSettings] = await Promise.all([
+      getDailyBriefingSettings(organizationId),
+      getManagerDigestSettings(organizationId),
+    ]);
 
-    const [preview, recentLogs] = await Promise.all([
+    const [preview, managerPreview, recentLogs] = await Promise.all([
       loadDailyBriefingsForOrganization(organizationId, { baseUrl }),
+      loadManagerMorningDigestForOrganization(organizationId, { baseUrl }),
       prisma.emailLog.findMany({
         where: {
           organizationId,
-          template: 'worker-daily-briefing',
+          template: { in: ['worker-daily-briefing', 'manager-morning-digest'] },
         },
         orderBy: { sentAt: 'desc' },
         take: 25,
@@ -43,14 +51,25 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       settings,
+      managerSettings,
+      managerPreview: {
+        auditedDate: managerPreview.auditedDate,
+        auditedDateLabel: managerPreview.auditedDateLabel,
+        unfinishedCount: managerPreview.unfinishedItems.length,
+        rescheduledCount: managerPreview.rescheduledItems.length,
+        completedCount: managerPreview.completedItems.length,
+      },
       preview: {
         targetDate: preview.targetDate,
         targetDateLabel: preview.targetDateLabel,
+        todayDate: preview.todayDate,
+        todayDateLabel: preview.todayDateLabel,
         unmatchedWorkerNames: preview.unmatchedWorkerNames,
         briefings: preview.briefings.map((b) => ({
           recipientName: b.recipient.fullName,
           recipientEmail: b.recipient.email,
           taskCount: b.tasks.length,
+          todayOpenCount: b.todayOpenTasks?.length ?? 0,
           vehicles: b.vehicles,
           crewMates: b.crewMates,
           tasks: b.tasks.slice(0, 6).map((t) => ({
@@ -84,14 +103,26 @@ export async function PUT(request: Request) {
       sendHourLocal?: number;
       timezone?: string;
       skipWeekends?: boolean;
+      managerSettings?: {
+        enabled?: boolean;
+        sendHourLocal?: number;
+        timezone?: string;
+        skipWeekends?: boolean;
+      };
     } | null;
 
     if (!body) {
       return NextResponse.json({ error: 'Neplatný formát požadavku.' }, { status: 400 });
     }
 
-    const settings = await saveDailyBriefingSettings(organizationId, body);
-    return NextResponse.json({ ok: true, settings });
+    const { managerSettings: managerInput, ...workerInput } = body;
+    const [settings, managerSettings] = await Promise.all([
+      saveDailyBriefingSettings(organizationId, workerInput),
+      managerInput
+        ? saveManagerDigestSettings(organizationId, managerInput)
+        : getManagerDigestSettings(organizationId),
+    ]);
+    return NextResponse.json({ ok: true, settings, managerSettings });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Změnu se nepodařilo uložit.';
     return NextResponse.json({ error: message }, { status: 403 });
@@ -103,7 +134,7 @@ export async function POST(request: Request) {
     const { organizationId, user } = await requireOrganizationRole('ADMIN', 'MANAGER');
     const baseUrl = getAppOrigin(request);
     const body = (await request.json().catch(() => null)) as {
-      action?: 'send_test' | 'send_now' | 'sync_and_preview';
+      action?: 'send_test' | 'send_now' | 'sync_and_preview' | 'send_test_manager_digest';
       testEmail?: string;
       targetDate?: string;
       force?: boolean;
@@ -139,6 +170,15 @@ export async function POST(request: Request) {
         baseUrl,
       });
       return NextResponse.json({ ok: true, summary });
+    }
+
+    if (body.action === 'send_test_manager_digest') {
+      const targetEmail = (body.testEmail || user.email || '').trim();
+      const digestSummary = await sendManagerMorningDigestForOrganization(organizationId, {
+        testRecipientEmail: targetEmail,
+        baseUrl,
+      });
+      return NextResponse.json({ ok: true, digestSummary });
     }
 
     if (body.action === 'send_now') {

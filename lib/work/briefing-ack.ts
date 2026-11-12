@@ -1,8 +1,11 @@
 import crypto from 'node:crypto';
 
+export type BriefingEmailAction = 'ack' | 'complete' | 'reschedule';
+
 export type BriefingAckPayload = {
   orgId: string;
   orderIds: string[];
+  action?: BriefingEmailAction;
   userId?: string | null;
   employeeId?: string | null;
   workerName: string;
@@ -133,6 +136,8 @@ function getSigningSecret(secretOverride?: string): string {
   return 'seepoint-dev-local-briefing-ack-secret';
 }
 
+const ALLOWED_BRIEFING_ACTIONS = new Set<BriefingEmailAction>(['ack', 'complete', 'reschedule']);
+
 export function createBriefingAckToken(
   input: Omit<BriefingAckPayload, 'exp'> & { ttlDays?: number },
   secretOverride?: string
@@ -141,6 +146,7 @@ export function createBriefingAckToken(
   const payload: BriefingAckPayload = {
     orgId: input.orgId,
     orderIds: [...new Set(input.orderIds.filter(Boolean))],
+    ...(input.action && input.action !== 'ack' ? { action: input.action } : {}),
     ...(input.userId ? { userId: input.userId } : {}),
     ...(input.employeeId ? { employeeId: input.employeeId } : {}),
     workerName: input.workerName,
@@ -192,6 +198,10 @@ export function verifyBriefingAckToken(
       typeof parsed.email !== 'string' ||
       typeof parsed.exp !== 'number'
     ) {
+      return null;
+    }
+
+    if (parsed.action !== undefined && !ALLOWED_BRIEFING_ACTIONS.has(parsed.action)) {
       return null;
     }
 
