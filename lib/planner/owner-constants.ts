@@ -8,3 +8,12 @@ export const APPROVAL_CATEGORY_LABELS: Record<ApprovalCategory, string> = {
   COMMERCIAL: 'Obchodní podmínky / Smlouva',
   OTHER: 'Jiné rozhodnutí',
 };
+
+export type OwnerEmailDigestSettings = {
+  enabled: boolean;
+  sendHourLocal: number;
+  timezone: string;
+  skipWeekends: boolean;
+  includeAllAdminsAndOwners: boolean;
+  customRecipients: string[];
+};

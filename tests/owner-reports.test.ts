@@ -6,8 +6,10 @@ import {
   buildUserAutoDaySummary,
   renderApprovalDecisionEmail,
   renderApprovalNotificationEmail,
+  renderOwnerExecutiveDigestEmail,
   sanitizeApprovalRequests,
   sanitizeCheckouts,
+  sanitizeOwnerEmailDigestSettings,
 } from '../lib/planner/owner-reports';
 import type { PulseMemberRef } from '../lib/planner/team-pulse';
 
@@ -176,4 +178,82 @@ test('sanitize helpers and approval email templates handle records cleanly', () 
   );
   assert.match(decided.subject, /SCHVÁLENO/);
   assert.match(decided.html, /Souhlasím/);
+});
+
+test('sanitizeOwnerEmailDigestSettings normalizes settings, bounds hours, and deduplicates custom emails', () => {
+  const clean = sanitizeOwnerEmailDigestSettings({
+    enabled: true,
+    sendHourLocal: 25,
+    skipWeekends: false,
+    includeAllAdminsAndOwners: true,
+    customRecipients: ['Majitel@Firma.CZ ', 'invalid-email', 'majitel@firma.cz', 'partner@firma.cz'],
+  });
+
+  assert.equal(clean.enabled, true);
+  assert.equal(clean.sendHourLocal, 23);
+  assert.equal(clean.skipWeekends, false);
+  assert.deepEqual(clean.customRecipients, ['majitel@firma.cz', 'partner@firma.cz']);
+});
+
+test('renderOwnerExecutiveDigestEmail includes sales, team checkouts, approvals, and headline', () => {
+  const email = renderOwnerExecutiveDigestEmail({
+    organizationName: 'SeePoint s.r.o.',
+    date: '2026-11-12',
+    digest: {
+      headline: 'Silný den: 2 nabídky odeslány a 1 čekající schválení.',
+      highlights: ['Vladimíra odeslala nabídku za 120 000 Kč'],
+      attentionPoints: ['Miroslav Novák neodevzdal report'],
+    },
+    sales: {
+      offersCreatedToday: 1,
+      offersSentToday: 2,
+      offersAcceptedToday: 1,
+      offersSentValueCzk: 120000,
+      offersAcceptedValueCzk: 60000,
+      crmTasksDoneToday: 3,
+      byUserId: {},
+    },
+    companyPulse: {
+      date: '2026-11-12',
+      activeCount: 1,
+      acknowledgedCount: 1,
+      completedCount: 4,
+      rescheduledCount: 0,
+      loggedHoursTotal: 15,
+      recentFeed: [],
+    },
+    members,
+    checkoutsByUserId: {
+      'u-vladka': {
+        id: 'c1',
+        date: '2026-11-12',
+        userId: 'u-vladka',
+        userName: 'Vladimíra Dvořáková',
+        submittedAt: '2026-11-12T16:30:00Z',
+        autoSummary: '2 odesl. nabídky',
+        manualSummary: 'Jednání s KFC úspěšné',
+      },
+    },
+    pendingApprovals: [
+      {
+        id: 'appr-1',
+        date: '2026-11-12',
+        requesterUserId: 'u-vladka',
+        requesterName: 'Vladimíra Dvořáková',
+        category: 'DISCOUNT',
+        title: 'Sleva 10 % pro KFC',
+        detail: 'Roční smlouva',
+        amountLabel: '-12 000 Kč',
+        status: 'PENDING',
+        createdAt: '2026-11-12T15:00:00Z',
+      },
+    ],
+  });
+
+  assert.match(email.subject, /Report majitele \(2026-11-12\): 1 ke schválení/);
+  assert.match(email.html, /SeePoint s\.r\.o\./);
+  assert.match(email.html, /Jednání s KFC úspěšné/);
+  assert.match(email.html, /Sleva 10 % pro KFC/);
+  assert.match(email.html, /120\s*000\s*Kč/);
+  assert.match(email.text, /HLAVNÍ POSUNY/);
 });

@@ -6,9 +6,15 @@ import {
   APPROVAL_CATEGORY_LABELS,
   type ApprovalCategory,
   type ApprovalStatus,
+  type OwnerEmailDigestSettings,
 } from './owner-constants';
 
-export { APPROVAL_CATEGORY_LABELS, type ApprovalCategory, type ApprovalStatus };
+export {
+  APPROVAL_CATEGORY_LABELS,
+  type ApprovalCategory,
+  type ApprovalStatus,
+  type OwnerEmailDigestSettings,
+};
 
 export type ApprovalRequestRecord = {
   id: string;
@@ -562,5 +568,204 @@ export function renderApprovalDecisionEmail(
   `;
 
   const text = `${subject}\nRozhodl(a): ${req.decidedByName || 'Vedení'}\nPoznámka: ${req.decisionNote || 'bez poznámky'}\n\nPlanner: ${cleanBase}/planner`;
+  return { subject, html, text };
+}
+
+export function sanitizeOwnerEmailDigestSettings(raw: unknown): OwnerEmailDigestSettings {
+  const o = asObject(raw);
+  const enabled = typeof o.enabled === 'boolean' ? o.enabled : false;
+  let sendHourLocal = 18;
+  if (typeof o.sendHourLocal === 'number' && Number.isFinite(o.sendHourLocal)) {
+    sendHourLocal = Math.min(23, Math.max(0, Math.round(o.sendHourLocal)));
+  }
+
+  let timezone = 'Europe/Prague';
+  if (typeof o.timezone === 'string' && o.timezone.trim()) {
+    try {
+      new Intl.DateTimeFormat('en', { timeZone: o.timezone.trim() }).format();
+      timezone = o.timezone.trim();
+    } catch {
+      timezone = 'Europe/Prague';
+    }
+  }
+
+  const skipWeekends = typeof o.skipWeekends === 'boolean' ? o.skipWeekends : true;
+  const includeAllAdminsAndOwners =
+    typeof o.includeAllAdminsAndOwners === 'boolean' ? o.includeAllAdminsAndOwners : true;
+
+  const customRecipients = Array.isArray(o.customRecipients)
+    ? [
+        ...new Set(
+          o.customRecipients
+            .filter((r): r is string => typeof r === 'string')
+            .map((r) => r.trim().toLowerCase())
+            .filter((r) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r))
+        ),
+      ].slice(0, 15)
+    : [];
+
+  return {
+    enabled,
+    sendHourLocal,
+    timezone,
+    skipWeekends,
+    includeAllAdminsAndOwners,
+    customRecipients,
+  };
+}
+
+export function renderOwnerExecutiveDigestEmail(params: {
+  organizationName: string;
+  date: string;
+  digest: {
+    headline: string;
+    highlights: string[];
+    attentionPoints: string[];
+  };
+  sales: SalesDailySummary;
+  companyPulse: CompanyDailyPulse | null;
+  members: PulseMemberRef[];
+  checkoutsByUserId: Record<string, DailyCheckoutRecord>;
+  pendingApprovals: ApprovalRequestRecord[];
+  baseUrl?: string;
+}): { subject: string; html: string; text: string } {
+  const cleanBase = (params.baseUrl || 'https://seepoint.vercel.app').replace(/\/+$/, '');
+  const submittedCount = params.members.filter((m) => Boolean(params.checkoutsByUserId[m.userId])).length;
+  const subject =
+    params.pendingApprovals.length > 0
+      ? `📊 Report majitele (${params.date}): ${params.pendingApprovals.length} ke schválení · ${params.sales.offersSentToday} nab.`
+      : `📊 Report majitele (${params.date}): ${params.companyPulse?.completedCount ?? 0} hotovo · ${params.sales.offersSentToday} nab.`;
+
+  const highlightsHtml = params.digest.highlights.length
+    ? `<ul style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.6;color:#1e293b;">
+        ${params.digest.highlights.map((h) => `<li>${escapeHtml(h)}</li>`).join('')}
+       </ul>`
+    : '';
+
+  const attentionHtml = params.digest.attentionPoints.length
+    ? `<div style="margin-top:14px;padding:12px 14px;border-radius:12px;background:#fffbeb;border:1px solid #fde68a;">
+        <div style="font-size:11px;font-weight:900;text-transform:uppercase;color:#b45309;margin-bottom:6px;">
+          ⚠️ Záseky a disciplína reportů
+        </div>
+        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.55;color:#78350f;">
+          ${params.digest.attentionPoints.map((a) => `<li>${escapeHtml(a)}</li>`).join('')}
+        </ul>
+       </div>`
+    : '';
+
+  const approvalsHtml = params.pendingApprovals.length
+    ? `<div style="margin-top:16px;">
+        <h2 style="margin:0 0 8px;font-size:13px;font-weight:900;text-transform:uppercase;color:#c2410c;">
+          ✋ Čeká na vaše schválení (${params.pendingApprovals.length})
+        </h2>
+        ${params.pendingApprovals
+          .slice(0, 8)
+          .map(
+            (a) => `
+          <div style="margin:0 0 8px;padding:10px 12px;border-radius:10px;border:1px solid #fed7aa;background:#fff7ed;">
+            <div style="font-size:11px;font-weight:800;color:#9a3412;">
+              ${escapeHtml(APPROVAL_CATEGORY_LABELS[a.category])} · ${escapeHtml(a.requesterName)}${
+                a.amountLabel ? ` · <strong>${escapeHtml(a.amountLabel)}</strong>` : ''
+              }
+            </div>
+            <div style="font-size:13.5px;font-weight:800;color:#0f172a;margin-top:2px;">${escapeHtml(a.title)}</div>
+            ${a.detail ? `<div style="font-size:12.5px;color:#334155;margin-top:3px;">${escapeHtml(a.detail)}</div>` : ''}
+          </div>`
+          )
+          .join('')}
+       </div>`
+    : '';
+
+  const teamRowsHtml = params.members
+    .map((m) => {
+      const chk = params.checkoutsByUserId[m.userId];
+      const s = params.sales.byUserId[m.userId];
+      const hasSales = s && (s.offersSentCount > 0 || s.crmTasksDoneCount > 0 || s.offersAcceptedCount > 0);
+      return `
+        <div style="margin:0 0 8px;padding:10px 12px;border-radius:10px;border:1px solid #e2e8f0;background:${
+          chk ? '#ffffff' : '#f8fafc'
+        };">
+          <div style="font-size:13.5px;font-weight:800;color:#0f172a;">
+            ${escapeHtml(m.name)}
+            <span style="font-size:11px;font-weight:700;margin-left:6px;color:${chk ? '#047857' : '#94a3b8'};">
+              ${chk ? '✓ Report odevzdán' : '○ Bez reportu'}
+            </span>
+          </div>
+          ${
+            chk?.manualSummary
+              ? `<div style="margin-top:4px;font-size:12.5px;color:#334155;">${escapeHtml(chk.manualSummary)}</div>`
+              : ''
+          }
+          ${
+            chk?.blockers
+              ? `<div style="margin-top:3px;font-size:12px;font-weight:700;color:#b45309;">⚠️ Zásek: ${escapeHtml(chk.blockers)}</div>`
+              : ''
+          }
+          ${
+            hasSales
+              ? `<div style="margin-top:3px;font-size:11.5px;color:#475569;">Obchod: ${s.offersSentCount} nab. (${s.offersSentValueCzk.toLocaleString('cs-CZ')} Kč), ${s.crmTasksDoneCount} CRM úkolů</div>`
+              : ''
+          }
+        </div>`;
+    })
+    .join('');
+
+  const html = `
+    <div style="margin:0;background:#f1f5f9;padding:24px 12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0f172a;">
+      <div style="max-width:660px;margin:0 auto;border-radius:18px;overflow:hidden;background:#ffffff;border:1px solid #e2e8f0;">
+        <div style="background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%);padding:22px 24px;color:#ffffff;">
+          <div style="font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#a5b4fc;margin-bottom:6px;">
+            ${escapeHtml(params.organizationName)} · Jedna stránka pravdy pro majitele (${escapeHtml(params.date)})
+          </div>
+          <h1 style="margin:0 0 10px;font-size:19px;line-height:1.3;font-weight:900;color:#ffffff;">
+            ${escapeHtml(params.digest.headline)}
+          </h1>
+          <div style="padding:10px 12px;border-radius:10px;background:rgba(255,255,255,0.08);font-size:12.5px;font-weight:700;color:#e2e8f0;">
+            💼 Obchod: ${params.sales.offersSentToday} nab. (${params.sales.offersSentValueCzk.toLocaleString('cs-CZ')} Kč) ·
+            ✅ Realizace: ${params.companyPulse?.completedCount ?? 0} hotovo ·
+            📝 Reporty: ${submittedCount}/${params.members.length}
+          </div>
+        </div>
+        <div style="padding:20px 24px;">
+          <h2 style="margin:0 0 8px;font-size:13px;font-weight:900;text-transform:uppercase;color:#047857;">
+            🔥 Co se dnes posunulo
+          </h2>
+          ${highlightsHtml}
+          ${attentionHtml}
+          ${approvalsHtml}
+          <h2 style="margin:18px 0 8px;font-size:13px;font-weight:900;text-transform:uppercase;color:#0f172a;">
+            👥 Přehled týmu a reportů
+          </h2>
+          ${teamRowsHtml}
+          <div style="margin-top:18px;padding-top:14px;border-top:1px solid #e2e8f0;">
+            <a href="${escapeHtml(`${cleanBase}/planner`)}" style="display:inline-block;padding:11px 18px;border-radius:10px;background:#4f46e5;color:#ffffff;font-size:13px;font-weight:800;text-decoration:none;">
+              Otevřít Kokpit majitele v Planneru →
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const text = [
+    subject,
+    '',
+    params.digest.headline,
+    `Obchod: ${params.sales.offersSentToday} nab. (${params.sales.offersSentValueCzk} Kč), ${params.sales.offersAcceptedToday} podepsáno`,
+    `Provoz: ${params.companyPulse?.completedCount ?? 0} hotovo, ${params.companyPulse?.loggedHoursTotal ?? 0} h`,
+    `Reporty týmu: ${submittedCount}/${params.members.length}`,
+    '',
+    'HLAVNÍ POSUNY:',
+    ...params.digest.highlights.map((h) => `- ${h}`),
+    ...(params.digest.attentionPoints.length
+      ? ['', 'POZORNOST:', ...params.digest.attentionPoints.map((a) => `- ${a}`)]
+      : []),
+    ...(params.pendingApprovals.length
+      ? ['', 'ČEKÁ NA SCHVÁLENÍ:', ...params.pendingApprovals.map((a) => `- ${a.title} (${a.requesterName})`)]
+      : []),
+    '',
+    `Planner: ${cleanBase}/planner`,
+  ].join('\n');
+
   return { subject, html, text };
 }

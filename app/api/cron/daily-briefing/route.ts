@@ -18,6 +18,8 @@ import {
   isSeePointOrganization,
   syncGooglePlanToWorkOrders,
 } from '@/lib/work/google-sheets-sync';
+import { sanitizeOwnerEmailDigestSettings } from '@/lib/planner/owner-reports';
+import { sendOwnerExecutiveDigestForOrganization } from '@/lib/planner/owner-digest-delivery';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -68,6 +70,7 @@ async function handleCronExecution(request: Request) {
       slug: true,
       plan: true,
       enabledModules: true,
+      plannerDefaults: true,
     },
   });
 
@@ -87,10 +90,17 @@ async function handleCronExecution(request: Request) {
       skippedAlreadySentCount: number;
       skippedEmpty: boolean;
     };
+    ownerDigest?: {
+      date: string;
+      sentCount: number;
+      skippedAlreadySentCount: number;
+      recipientsCount: number;
+    };
   }> = [];
 
   for (const org of organizations) {
-    if (!isModuleEnabled(org, 'work')) {
+    const hasWorkOrPlanner = isModuleEnabled(org, 'work') || isModuleEnabled(org, 'planner');
+    if (!hasWorkOrPlanner) {
       results.push({
         organizationId: org.id,
         organizationName: org.name,
@@ -112,37 +122,55 @@ async function handleCronExecution(request: Request) {
           getDailyBriefingSettings(org.id),
           getManagerDigestSettings(org.id),
         ]);
+        const ownerDefaults =
+          org.plannerDefaults && typeof org.plannerDefaults === 'object' && !Array.isArray(org.plannerDefaults)
+            ? (org.plannerDefaults as Record<string, unknown>)
+            : {};
+        const ownerEmailSettings = sanitizeOwnerEmailDigestSettings(ownerDefaults.ownerEmailDigest);
 
         const targetDate = targetDateParam || getTomorrowDateStr(now, settings.timezone);
         const workerLocalHour = getLocalHour(now, settings.timezone);
         const managerLocalHour = getLocalHour(now, managerSettings.timezone);
         const managerTodayDate = dayInZone(now, managerSettings.timezone);
+        const ownerLocalHour = getLocalHour(now, ownerEmailSettings.timezone);
+        const ownerTodayDate = dayInZone(now, ownerEmailSettings.timezone);
 
-        const shouldRunWorkers = isForceRun
-          ? typeParam !== 'manager'
-          : settings.enabled &&
-            workerLocalHour === settings.sendHourLocal &&
-            !(settings.skipWeekends && isWeekendDate(targetDate));
+        const canWork = isModuleEnabled(org, 'work');
+        const shouldRunWorkers =
+          canWork &&
+          (isForceRun
+            ? typeParam !== 'manager' && typeParam !== 'owner'
+            : settings.enabled &&
+              workerLocalHour === settings.sendHourLocal &&
+              !(settings.skipWeekends && isWeekendDate(targetDate)));
 
-        const shouldRunManager = isForceRun
-          ? typeParam === 'manager'
-          : managerSettings.enabled &&
-            managerLocalHour === managerSettings.sendHourLocal &&
-            !(managerSettings.skipWeekends && isWeekendDate(managerTodayDate));
+        const shouldRunManager =
+          canWork &&
+          (isForceRun
+            ? typeParam === 'manager'
+            : managerSettings.enabled &&
+              managerLocalHour === managerSettings.sendHourLocal &&
+              !(managerSettings.skipWeekends && isWeekendDate(managerTodayDate)));
 
-        if (!shouldRunWorkers && !shouldRunManager) {
+        const shouldRunOwner = isForceRun
+          ? typeParam === 'owner'
+          : ownerEmailSettings.enabled &&
+            ownerLocalHour === ownerEmailSettings.sendHourLocal &&
+            !(ownerEmailSettings.skipWeekends && isWeekendDate(ownerTodayDate));
+
+        if (!shouldRunWorkers && !shouldRunManager && !shouldRunOwner) {
           return {
             organizationId: org.id,
             organizationName: org.name,
             status: 'skipped',
-            reason: !settings.enabled && !managerSettings.enabled
+            reason: !settings.enabled && !managerSettings.enabled && !ownerEmailSettings.enabled
               ? 'briefing_disabled'
               : `outside_hour_${workerLocalHour}_expected_${settings.sendHourLocal}`,
           };
         }
 
         // Keep SeePoint Google Sheets plan fresh right before dispatching briefings or manager recap
-        if (isSeePointOrganization(org)) {
+        if (canWork && isSeePointOrganization(org)) {
           try {
             await syncGooglePlanToWorkOrders({ organizationId: org.id });
           } catch (syncErr) {
@@ -159,6 +187,13 @@ async function handleCronExecution(request: Request) {
 
         const managerSummary = shouldRunManager
           ? await sendManagerMorningDigestForOrganization(org.id, {
+              force: isForceRun,
+            })
+          : undefined;
+
+        const ownerSummary = shouldRunOwner
+          ? await sendOwnerExecutiveDigestForOrganization(org.id, {
+              date: ownerTodayDate,
               force: isForceRun,
             })
           : undefined;
@@ -182,6 +217,16 @@ async function handleCronExecution(request: Request) {
                   sentCount: managerSummary.sentCount,
                   skippedAlreadySentCount: managerSummary.skippedAlreadySentCount,
                   skippedEmpty: managerSummary.skippedEmpty,
+                },
+              }
+            : {}),
+          ...(ownerSummary
+            ? {
+                ownerDigest: {
+                  date: ownerSummary.date,
+                  sentCount: ownerSummary.sentCount,
+                  skippedAlreadySentCount: ownerSummary.skippedAlreadySentCount,
+                  recipientsCount: ownerSummary.recipientsCount,
                 },
               }
             : {}),

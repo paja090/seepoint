@@ -13,11 +13,14 @@ import {
   renderApprovalNotificationEmail,
   sanitizeApprovalRequests,
   sanitizeCheckouts,
+  sanitizeOwnerEmailDigestSettings,
   type ApprovalCategory,
   type ApprovalRequestRecord,
   type ApprovalStatus,
   type DailyCheckoutRecord,
 } from '@/lib/planner/owner-reports';
+import { sendOwnerExecutiveDigestForOrganization } from '@/lib/planner/owner-digest-delivery';
+import { getAppOrigin } from '@/lib/app-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -493,6 +496,79 @@ export function POST(request: Request) {
       });
 
       return { ok: true, digest };
+    }
+
+    if (action === 'send_owner_email') {
+      if (!canSeeTeam(actor)) {
+        return new Response(JSON.stringify({ error: 'Pouze pro majitele a vedení.' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      const explicitRecipientsRaw = Array.isArray(body.recipients)
+        ? body.recipients.filter((r): r is string => typeof r === 'string' && Boolean(r.trim()))
+        : typeof body.recipientsText === 'string'
+        ? body.recipientsText
+            .split(/[,;\s]+/)
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined;
+
+      const result = await sendOwnerExecutiveDigestForOrganization(actor.organizationId, {
+        date: targetDate,
+        actorUserId: actor.id,
+        force: true,
+        explicitRecipients: explicitRecipientsRaw,
+        baseUrl: getAppOrigin(request),
+      });
+
+      if (result.recipientsCount === 0) {
+        return new Response(
+          JSON.stringify({
+            error: 'Nebyl nalezen žádný platný e-mail příjemce. Zadejte e-mail nebo povolte příjemce v nastavení.',
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return { ok: true, emailResult: result };
+    }
+
+    if (action === 'save_email_settings') {
+      if (!canSeeTeam(actor)) {
+        return new Response(JSON.stringify({ error: 'Pouze pro majitele a vedení.' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      const rawCustom = Array.isArray(body.customRecipients)
+        ? body.customRecipients
+        : typeof body.customRecipientsText === 'string'
+        ? body.customRecipientsText.split(/[,;\s]+/)
+        : [];
+
+      const nextSettings = sanitizeOwnerEmailDigestSettings({
+        enabled: body.enabled,
+        sendHourLocal: Number(body.sendHourLocal),
+        timezone: preferences.timezone,
+        skipWeekends: body.skipWeekends,
+        includeAllAdminsAndOwners: body.includeAllAdminsAndOwners,
+        customRecipients: rawCustom,
+      });
+
+      await prisma.organization.update({
+        where: { id: actor.organizationId },
+        data: {
+          plannerDefaults: {
+            ...prevDefaults,
+            ownerEmailDigest: nextSettings,
+          },
+        },
+      });
+
+      return { ok: true, settings: nextSettings };
     }
 
     return new Response(JSON.stringify({ error: 'Neznámá akce.' }), {
