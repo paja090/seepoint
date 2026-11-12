@@ -1,6 +1,10 @@
 import { logAIUsage } from '@/lib/ai-usage';
 import { getGeminiApiKey } from '@/lib/ai-gemini';
-import { canonicalFirstName, normalizePersonToken } from './work-projection';
+import {
+  canonicalFirstName,
+  normalizePersonToken,
+  resolveCanonicalPersonToken,
+} from './work-projection';
 import { dateInZone, plusDays } from './time';
 
 export type TeamDailyTaskItem = {
@@ -123,7 +127,13 @@ export function matchWorkerToMember(
   const direct = members.find((m) => normalizePersonToken(m.name) === normFull);
   if (direct) return direct;
 
-  const tokens = normFull.split(' ').filter(Boolean);
+  const canonicalFull = resolveCanonicalPersonToken(rawName);
+  if (canonicalFull !== normFull) {
+    const byAlias = members.find((m) => normalizePersonToken(m.name) === canonicalFull);
+    if (byAlias) return byAlias;
+  }
+
+  const tokens = canonicalFull.split(' ').filter(Boolean);
   if (!tokens.length) return null;
   const firstCanonical = canonicalFirstName(tokens[0]);
 
@@ -156,8 +166,11 @@ function isOrderAcknowledgedByWorker(
     if (entry.acknowledgedAt) {
       const ackName = typeof entry.workerName === 'string' ? entry.workerName : '';
       if (!ackName) return true;
-      const aTokens = normalizePersonToken(ackName).split(' ');
-      const wTokens = normalizePersonToken(assignment.workerName).split(' ');
+      const canonicalAck = resolveCanonicalPersonToken(ackName);
+      const canonicalWorker = resolveCanonicalPersonToken(assignment.workerName);
+      if (canonicalAck === canonicalWorker) return true;
+      const aTokens = canonicalAck.split(' ');
+      const wTokens = canonicalWorker.split(' ');
       if (aTokens[0] && wTokens[0] && canonicalFirstName(aTokens[0]) === canonicalFirstName(wTokens[0])) {
         return true;
       }
@@ -491,14 +504,26 @@ export function extractMeetingStructuredFallback(
     }
 
     // Check if line mentions any team member or starts with Úkol / TODO / Akce
+    const words = norm.split(/[^a-z0-9]+/).filter(Boolean);
     let matchedMember: PulseMemberRef | null = null;
-    for (const m of members) {
-      const mTokens = normalizePersonToken(m.name).split(' ').filter(Boolean);
-      const firstCanon = mTokens[0] ? canonicalFirstName(mTokens[0]) : '';
-      const words = norm.split(/[^a-z0-9]+/).filter(Boolean);
-      if (words.some((w) => canonicalFirstName(w) === firstCanon)) {
-        matchedMember = m;
-        break;
+    for (const w of words) {
+      const canonicalWord = resolveCanonicalPersonToken(w);
+      if (canonicalWord !== w) {
+        const aliasMatch = members.find((m) => normalizePersonToken(m.name) === canonicalWord);
+        if (aliasMatch) {
+          matchedMember = aliasMatch;
+          break;
+        }
+      }
+    }
+    if (!matchedMember) {
+      for (const m of members) {
+        const mTokens = normalizePersonToken(m.name).split(' ').filter(Boolean);
+        const firstCanon = mTokens[0] ? canonicalFirstName(mTokens[0]) : '';
+        if (words.some((w) => canonicalFirstName(w) === firstCanon)) {
+          matchedMember = m;
+          break;
+        }
       }
     }
 
@@ -588,7 +613,7 @@ Datum porady: ${params.meetingDate}.
 ${membersListStr || 'Žádní členové'}
 
 Tvým úkolem je vytvořit přehledný manažerský zápis z porady a vytáhnout všechny konkrétní úkoly (kdo má co udělat a do kdy).
-Pokud je v textu zmíněno křestní jméno nebo přezdívka (např. Mirek -> Miroslav, Vlaďka -> Vladimíra, Jirka -> Jiří, Pája -> Pavel, Silva -> Silvie), spáruj úkol se správným členem týmu z nabídky výše.
+Pokud je v textu zmíněno křestní jméno, zkratka nebo přezdívka (např. Sonik -> Marek Šlapnička, MM -> Miroslav Mec, Marek -> Marek Konečný, Mirek -> Miroslav, Vlaďka -> Vladimíra, Jirka -> Jiří, Pája -> Pavel, Silva -> Silvie), spáruj úkol se správným členem týmu z nabídky výše.
 
 Vrať POUZE validní JSON objekt v tomto formátu:
 {

@@ -11,6 +11,7 @@ import type { PlanningResult } from '../field-planning/contracts';
 import { sendTransactionalEmail } from '../email';
 import { isValidEmailAddress } from '../email-policy';
 import { createBriefingAckToken, czechFirstNameVocative } from './briefing-ack';
+import { resolveCanonicalPersonToken } from '../planner/work-projection';
 
 export const DEFAULT_BRIEFING_TIMEZONE = 'Europe/Prague';
 export const DEFAULT_BRIEFING_HOUR = 17;
@@ -426,6 +427,13 @@ export function matchWorkerAssignment(
       normalizeCzechName(r.email) === normQuery
   );
   if (exactMatches.length > 0) return exactMatches;
+
+  // 2b. Explicit company shorthand / nickname disambiguation (Sonik -> Marek Šlapnička, MM -> Miroslav Mec, Marek -> Marek Konečný)
+  const canonicalAlias = resolveCanonicalPersonToken(assignment.workerName);
+  if (canonicalAlias && canonicalAlias !== normQuery) {
+    const aliasMatches = directory.filter((r) => normalizeCzechName(r.fullName) === canonicalAlias);
+    if (aliasMatches.length > 0) return aliasMatches;
+  }
 
   // 3. Name with surname initial e.g. "Marek S." or "Marek S"
   const initialMatch = normQuery.match(/^([^\s.]+)\s+([a-z])\.?$/);

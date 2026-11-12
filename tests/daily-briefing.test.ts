@@ -160,13 +160,25 @@ test('matchWorkerAssignment resolves Czech diminutives, full names, initials, an
     ['jizdenek@email.cz']
   );
 
-  // Initial disambiguation between two Mareks
+  // Initial and company shortcut disambiguation
   assert.deepEqual(
     matchWorkerAssignment({ workerName: 'Marek S.' }, DIRECTORY).map((m) => m.email),
     ['marek.slapn@gmail.com']
   );
   assert.deepEqual(
     matchWorkerAssignment({ workerName: 'Marek K.' }, DIRECTORY).map((m) => m.email),
+    ['marek.konecny@seepoint.cz']
+  );
+  assert.deepEqual(
+    matchWorkerAssignment({ workerName: 'Sonik' }, DIRECTORY).map((m) => m.email),
+    ['marek.slapn@gmail.com']
+  );
+  assert.deepEqual(
+    matchWorkerAssignment({ workerName: 'MM' }, DIRECTORY).map((m) => m.email),
+    ['mirek.mec@seepoint.cz']
+  );
+  assert.deepEqual(
+    matchWorkerAssignment({ workerName: 'Marek' }, DIRECTORY).map((m) => m.email),
     ['marek.konecny@seepoint.cz']
   );
 

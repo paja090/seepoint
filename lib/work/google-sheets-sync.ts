@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 import { prisma } from '@/lib/db';
 import { Prisma, WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
 import { syncWorkOrderTasks } from '@/lib/work-task-sync';
+import { resolvePersonAliasDisplay } from '@/lib/planner/work-projection';
 
 export const DEFAULT_GOOGLE_PLAN_SHEET_CSV_URL =
   process.env.GOOGLE_PLAN_SHEET_CSV_URL ||
@@ -343,7 +344,9 @@ export function parseZadavatel(code?: string | null): string | null {
   const c = code.trim().toUpperCase();
   if (c === 'V') return 'Vlaďka';
   if (c === 'Z') return 'Zuzka';
-  if (c === 'M' || c === 'MM') return 'Marek';
+  if (c === 'M') return 'Marek Konečný';
+  const alias = resolvePersonAliasDisplay(c);
+  if (alias) return alias;
   return code.trim();
 }
 
@@ -358,9 +361,9 @@ export function parseWorkersList(workerCell?: string | null): string[] {
   for (const part of parts) {
     const clean = part.replace(/^[-+.\s]+/, '').replace(/[-+.\s]+$/, '');
     if (!clean) continue;
-    // Map known aliases
-    if (clean.toLowerCase() === 'sonik') {
-      normalized.push('Sonik');
+    const alias = resolvePersonAliasDisplay(clean);
+    if (alias) {
+      normalized.push(alias);
     } else if (clean.toLowerCase().includes('krašik') || clean.toLowerCase().includes('krasik')) {
       normalized.push('Ondra Krašik');
     } else if (clean.toLowerCase().includes('kanaloš') || clean.toLowerCase().includes('kanalos')) {
@@ -496,7 +499,7 @@ function parseGooglePlanRows(
     const requestedBy = parseZadavatel(rawZadal);
 
     let status: WorkOrderStatus;
-    if (isFtdSent || isInvoiced || isCompletedByColor) {
+    if (isFtdSent || isCompletedByColor) {
       status = 'DONE';
     } else if (scheduledDate.getTime() < todayStart.getTime()) {
       status = 'DONE';
@@ -838,10 +841,17 @@ export async function syncGooglePlanToWorkOrders(
         task.scheduledAt
       );
       const nextDateIso = nextScheduledAt.toISOString().slice(0, 10);
+      const wasOnlyAutoClosedByInvoice =
+        existing.status === 'DONE' &&
+        Boolean(existing.invoiced) &&
+        !existing.ftdSent &&
+        !prevPc.manualFtdSent &&
+        !prevPc.completedBySheetColor &&
+        task.status !== 'DONE';
       const nextStatus: WorkOrderStatus =
         existing.status === 'CANCELLED'
           ? 'CANCELLED'
-          : existing.status === 'DONE' && !prevPc.completedBySheetColor
+          : existing.status === 'DONE' && !prevPc.completedBySheetColor && !wasOnlyAutoClosedByInvoice
           ? 'DONE'
           : task.status;
 
