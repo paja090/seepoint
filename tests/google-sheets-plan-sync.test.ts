@@ -110,11 +110,11 @@ test('Google Sheets Sync: parseContactDetails extracts name and telephone number
 });
 
 test('Google Sheets Sync: parseWorkersList splits and normalizes multiple worker names', () => {
-  const w1 = parseWorkersList('Mirek, Marek, Karel');
-  assert.deepEqual(w1, ['Mirek', 'Marek', 'Karel']);
+  const w1 = parseWorkersList('MM, Marek, Karel');
+  assert.deepEqual(w1, ['Miroslav Mec', 'Marek Konečný', 'Karel']);
 
   const w2 = parseWorkersList('Sonik, ONDRA  Krašik');
-  assert.deepEqual(w2, ['Sonik', 'Ondra Krašik']);
+  assert.deepEqual(w2, ['Marek Šlapnička', 'Ondra Krašik']);
 });
 
 test('Google Sheets Sync: parseGooglePlanCsv parses real sample rows correctly and skips month separators', () => {
@@ -122,7 +122,7 @@ test('Google Sheets Sync: parseGooglePlanCsv parses real sample rows correctly a
     'FTD odeslána,FAKT,Datum,Den,Zadal,Pracovník dílna,Předáno klukům,Klient,Zadání,Kontakt na klienta/ osobu na místě,Datum zahájení,Datum ukončení,Typ nosiče,KS,Práce,Odkaz,Odkaz na FTD',
     'BEZ,BEZ,,sobota,,Vlaďka,FALSE,,L  E  D  E  N,,,,,,,,',
     'ANO,BEZ,4.1.,neděle,V,Pavel,FALSE,Promed optic,Deinstalace 1 ks - Hlavní třída - Poruba,,4.1.2026,4.1.2026,Nav,1,deinstalace,,04 01 Promed optic',
-    ',,10.11.,úterý,M,Sonik,FALSE,OVA JIH,Deinstalace 6 ks MT Ova Jih,,9.11.2026,9.11.2026,MT,6,deinstalace,23 10 Ova Jih,',
+    ',,10.11.,úterý,MM,Sonik,FALSE,OVA JIH,Deinstalace 6 ks MT Ova Jih,,9.11.2026,9.11.2026,MT,6,deinstalace,23 10 Ova Jih,',
     'ANO,ANO,10.11.,úterý,V,Sonik,TRUE,DPO,"Deinstalace 3 ks MT https://maps.google.com",,10.11.2026,10.11.2026,MT,3,deinstalace,,10 11 DPO',
   ].join('\n');
 
@@ -139,12 +139,13 @@ test('Google Sheets Sync: parseGooglePlanCsv parses real sample rows correctly a
 
   // Second task (OVA JIH)
   assert.equal(tasks[1].clientName, 'OVA JIH');
+  assert.equal(tasks[1].requestedBy, 'Miroslav Mec');
   assert.equal(tasks[1].quantity, 6);
   assert.equal(tasks[1].isFtdSent, false);
   assert.equal(tasks[1].isHandedOver, false);
   assert.equal(tasks[1].status, 'PLANNED');
   assert.equal(tasks[1].mediaLabel, 'MiniTower (MT)');
-  assert.deepEqual(tasks[1].workers, ['Sonik']);
+  assert.deepEqual(tasks[1].workers, ['Marek Šlapnička']);
 
   // Third task (DPO)
   assert.equal(tasks[2].clientName, 'DPO');
@@ -315,7 +316,7 @@ test('Google Sheets Sync: syncGooglePlanToWorkOrders rejects non-SeePoint agency
   );
 });
 
-test('Google Sheets Sync: automatically sets status DONE for past historical or invoiced tasks', () => {
+test('Google Sheets Sync: keeps future invoiced tasks open (PLANNED/HANDED_OVER) while closing past tasks', () => {
   const sampleCsv = [
     'FTD odeslána,FAKT,Datum,Den,Zadal,Pracovník dílna,Předáno klukům,Klient,Zadání,Kontakt na klienta/ osobu na místě,Datum zahájení,Datum ukončení,Typ nosiče,KS,Práce,Odkaz,Odkaz na FTD',
     'BEZ,BEZ,15.1.,středa,V,Pavel,TRUE,Minulý klient,Oprava nosiče v lednu,,15.1.2026,15.1.2026,CG,1,oprava,,',
@@ -337,9 +338,10 @@ test('Google Sheets Sync: automatically sets status DONE for past historical or 
   assert.equal(tasks[1].clientName, 'Starý nezaškrtnutý');
   assert.equal(tasks[1].status, 'DONE');
 
-  // 3. Future task (20.11.) with FAKT=ANO -> DONE
+  // 3. Future task (20.11.) with FAKT=ANO -> invoiced=true, but MUST NOT close early as DONE!
   assert.equal(tasks[2].clientName, 'Budoucí vyfakturovaný');
-  assert.equal(tasks[2].status, 'DONE');
+  assert.equal(tasks[2].isInvoiced, true);
+  assert.equal(tasks[2].status, 'PLANNED');
 
   // 4. Future task (20.11.) with Predano=TRUE -> HANDED_OVER
   assert.equal(tasks[3].clientName, 'Budoucí předaný');
@@ -471,6 +473,37 @@ test('Google Sheets Sync: parseGooglePlanXlsx detects green worker cell as DONE 
     fgColor: { argb: 'FFFFFFFF' },
   };
 
+  // Row 4: Green background on FAKT (col 2) for future task, white on worker cell -> MUST remain PLANNED
+  const r4 = ws.addRow([
+    'NE',
+    'ANO',
+    new Date(Date.UTC(2026, 10, 18, 0, 0, 0)),
+    'středa',
+    'MM',
+    'Sonik',
+    'FALSE',
+    'Předfakturováno',
+    'Polep výlohy příští týden',
+    '',
+    new Date(Date.UTC(2026, 10, 18, 0, 0, 0)),
+    new Date(Date.UTC(2026, 10, 18, 0, 0, 0)),
+    'MT',
+    2,
+    'instalace',
+    '',
+    '',
+  ]);
+  r4.getCell(2).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF00FF00' },
+  };
+  r4.getCell(6).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFFFFFF' },
+  };
+
   const buffer = await wb.xlsx.writeBuffer();
   const tasks = await parseGooglePlanXlsx(
     buffer,
@@ -478,7 +511,7 @@ test('Google Sheets Sync: parseGooglePlanXlsx detects green worker cell as DONE 
     new Date(Date.UTC(2026, 10, 11, 0, 0, 0))
   );
 
-  assert.equal(tasks.length, 2);
+  assert.equal(tasks.length, 3);
 
   assert.equal(tasks[0].clientName, 'MOaP');
   assert.equal(tasks[0].status, 'DONE');
@@ -490,6 +523,13 @@ test('Google Sheets Sync: parseGooglePlanXlsx detects green worker cell as DONE 
   assert.equal(tasks[1].status, 'PLANNED');
   assert.equal(tasks[1].isCompletedByColor, false);
   assert.equal(tasks[1].ftdUrl, '15 11 Billboard Megakoncert');
+
+  assert.equal(tasks[2].clientName, 'Předfakturováno');
+  assert.equal(tasks[2].requestedBy, 'Miroslav Mec');
+  assert.deepEqual(tasks[2].workers, ['Marek Šlapnička']);
+  assert.equal(tasks[2].isInvoiced, true);
+  assert.equal(tasks[2].isCompletedByColor, false);
+  assert.equal(tasks[2].status, 'PLANNED');
 });
 
 test('Google Sheets Sync: recognizes FAKT=BEZ and FTD=BEZ and excludes BEZ from invoicing queue', () => {
@@ -760,6 +800,61 @@ test('Google Sheets Sync: resolveSyncedScheduledAt preserves email/manual resche
   assert.equal(overridden.scheduledAt.toISOString(), newSheetDate.toISOString());
 });
 
+test('Google Sheets Sync: reopens future orders mistakenly closed solely by advance invoicing', async () => {
+  const sampleCsv = [
+    'FTD odeslána,FAKT,Datum,Den,Zadal,Pracovník dílna,Předáno klukům,Klient,Zadání,Kontakt na klienta/ osobu na místě,Datum zahájení,Datum ukončení,Typ nosiče,KS,Práce,Odkaz,Odkaz na FTD',
+    ',ANO,20.11.,pátek,M,Sonik,FALSE,Budoucí vyfakturovaný,Instalace baneru,,20.11.2026,20.11.2026,MT,2,instalace,,',
+  ].join('\n');
 
+  const existingOrder: any = {
+    id: 'wo-premature-done',
+    title: 'Budoucí vyfakturovaný – Instalace baneru',
+    description: 'Instalace baneru',
+    clientName: 'Budoucí vyfakturovaný',
+    scheduledAt: new Date(Date.UTC(2026, 10, 20, 0, 0, 0)),
+    status: 'DONE',
+    priority: 'NORMAL',
+    ftdSent: false,
+    invoiced: true,
+    ftdUrl: null,
+    referenceUrl: null,
+    crmOrderId: null,
+    navigationOrderId: null,
+    planningConstraints: {
+      source: 'GOOGLE_SHEETS_PLAN',
+      sheetKey: 'gsheet_2026-11-20_budouc__vyfakturovan__instalacebaneru',
+      sheetRow: 2,
+      completedBySheetColor: false,
+    },
+    assignments: [{ workerName: 'Marek Šlapnička', acknowledgedAt: null }],
+    _count: { workEntries: 0, warehouseMovements: 0 },
+  };
 
+  const mockTx = {
+    workOrder: {
+      findMany: async () => [existingOrder],
+      findUnique: async () => ({ ...existingOrder, assignments: existingOrder.assignments, items: [] }),
+      update: async ({ data }: any) => {
+        Object.assign(existingOrder, data);
+        return existingOrder;
+      },
+    },
+    workAssignment: { findMany: async () => [], deleteMany: async () => {}, createMany: async () => {} },
+    workTask: { findMany: async () => [], create: async () => ({}), update: async () => ({}), delete: async () => {} },
+    employee: { findMany: async () => [], findFirst: async () => null },
+  };
 
+  const res = await syncGooglePlanToWorkOrders(
+    {
+      organizationId: 'org-seepoint',
+      csvContent: sampleCsv,
+      defaultYear: 2026,
+      referenceDate: new Date(Date.UTC(2026, 10, 12, 0, 0, 0)),
+    },
+    { tx: mockTx as any }
+  );
+
+  assert.equal(res.updatedCount, 1);
+  assert.equal(existingOrder.status, 'PLANNED');
+  assert.equal(existingOrder.invoiced, true);
+});

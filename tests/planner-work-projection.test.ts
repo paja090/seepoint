@@ -142,8 +142,11 @@ test('Czech worker alias resolution links Vlaďka, Mirek, and Ondra Krašik whil
         assignments: [
           { workerName: 'Vlaďka', userId: null },
           { workerName: 'Mirek', userId: null },
+          { workerName: 'MM', userId: null },
           { workerName: 'Ondra Krašik', userId: null },
           { workerName: 'Marek', userId: null },
+          { workerName: 'Sonik', userId: null },
+          { workerName: 'Jan', userId: null },
         ],
       }),
     },
@@ -153,7 +156,9 @@ test('Czech worker alias resolution links Vlaďka, Mirek, and Ondra Krašik whil
         { id: 'emp-mirek', firstName: 'Miroslav', lastName: 'Mec', email: null },
         { id: 'emp-ondra', firstName: 'Ondřej', lastName: 'Krasula', email: null },
         { id: 'emp-marek-1', firstName: 'Marek', lastName: 'Konečný', email: null },
-        { id: 'emp-marek-2', firstName: 'Marek', lastName: 'Slapnička', email: null },
+        { id: 'emp-marek-2', firstName: 'Marek', lastName: 'Šlapnička', email: null },
+        { id: 'emp-jan-1', firstName: 'Jan', lastName: 'Novák', email: null },
+        { id: 'emp-jan-2', firstName: 'Jan', lastName: 'Dvořák', email: null },
       ],
     },
     workTask: {
@@ -169,6 +174,9 @@ test('Czech worker alias resolution links Vlaďka, Mirek, and Ondra Krašik whil
   const byTitle = (suffix: string) => createdTasks.find((t) => t.title.endsWith(suffix))?.assignedToEmployeeId;
   assert.equal(byTitle('Vlaďka'), 'emp-vladka');
   assert.equal(byTitle('Mirek'), 'emp-mirek');
+  assert.equal(byTitle('MM'), 'emp-mirek');
   assert.equal(byTitle('Ondra Krašik'), 'emp-ondra');
-  assert.equal(byTitle('Marek'), null, 'Ambiguous first name matching two employees must not guess');
+  assert.equal(byTitle('Marek'), 'emp-marek-1');
+  assert.equal(byTitle('Sonik'), 'emp-marek-2');
+  assert.equal(byTitle('Jan'), null, 'Ambiguous first name matching two employees must not guess');
 });

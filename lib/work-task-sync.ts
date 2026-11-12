@@ -1,6 +1,10 @@
 import type { Employee, Prisma, WorkOrderStatus, WorkPriority } from '@prisma/client';
 import { prisma } from './db.ts';
-import { canonicalFirstName, normalizePersonToken } from './planner/work-projection.ts';
+import {
+  canonicalFirstName,
+  normalizePersonToken,
+  resolveCanonicalPersonToken,
+} from './planner/work-projection.ts';
 
 type WorkOrderForSync = Prisma.WorkOrderGetPayload<{
   include: {
@@ -48,7 +52,13 @@ async function employeeByNames(
       const direct = byExactFull.get(norm);
       if (direct) return [workerName, direct];
 
-      const tokens = norm.split(' ');
+      const canonicalFull = resolveCanonicalPersonToken(workerName);
+      if (canonicalFull !== norm) {
+        const byAlias = byExactFull.get(canonicalFull);
+        if (byAlias) return [workerName, byAlias];
+      }
+
+      const tokens = canonicalFull.split(' ');
       const firstKey = canonicalFirstName(tokens[0]);
       const candidates = byFirstCanonical.get(firstKey) ?? [];
 

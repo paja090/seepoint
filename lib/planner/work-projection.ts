@@ -55,8 +55,39 @@ const FIRST_NAME_ALIASES: Record<string, string> = {
   michal: 'michal',
   lenka: 'lenka',
   lena: 'lenka',
-  sonik: 'sona',
+  sona: 'sona',
 };
+
+export const PERSON_DISPLAY_ALIASES: Record<string, string> = {
+  sonik: 'Marek Šlapnička',
+  mm: 'Miroslav Mec',
+  mk: 'Marek Konečný',
+  marek: 'Marek Konečný',
+};
+
+const PERSON_FULL_ALIASES: Record<string, string> = Object.fromEntries(
+  Object.entries(PERSON_DISPLAY_ALIASES).map(([k, v]) => [k, normalizePersonToken(v)])
+);
+
+/**
+ * Resolves company shorthand codes/nicknames (Sonik -> Marek Šlapnička,
+ * MM -> Miroslav Mec, Marek -> Marek Konečný) to their canonical display name.
+ */
+export function resolvePersonAliasDisplay(value: string): string | null {
+  const norm = normalizePersonToken(value);
+  if (!norm) return null;
+  return PERSON_DISPLAY_ALIASES[norm] ?? null;
+}
+
+/**
+ * Resolves shorthand codes/nicknames to a normalized token suitable for exact
+ * full-name matching before falling back to first-name buckets.
+ */
+export function resolveCanonicalPersonToken(value: string): string {
+  const norm = normalizePersonToken(value);
+  if (!norm) return '';
+  return PERSON_FULL_ALIASES[norm] ?? norm;
+}
 
 export function canonicalFirstName(firstName: string): string {
   const norm = normalizePersonToken(firstName);
