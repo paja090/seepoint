@@ -711,34 +711,49 @@ export function renderOwnerExecutiveDigestEmail(params: {
     .join('');
 
   const html = `
-    <div style="margin:0;background:#f1f5f9;padding:24px 12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0f172a;">
-      <div style="max-width:660px;margin:0 auto;border-radius:18px;overflow:hidden;background:#ffffff;border:1px solid #e2e8f0;">
-        <div style="background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%);padding:22px 24px;color:#ffffff;">
-          <div style="font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#a5b4fc;margin-bottom:6px;">
-            ${escapeHtml(params.organizationName)} · Jedna stránka pravdy pro majitele (${escapeHtml(params.date)})
+    <div style="margin:0;background:#f1f5f9;padding:28px 12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0f172a;">
+      <div style="max-width:640px;margin:0 auto;border-radius:18px;overflow:hidden;background:#ffffff;border:1px solid #e2e8f0;box-shadow:0 2px 10px rgba(15,23,42,0.05);">
+        <div style="height:6px;background:#4f46e5;"></div>
+        <div style="padding:24px 26px 18px;border-bottom:1px solid #f1f5f9;">
+          <div style="font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#4f46e5;margin-bottom:6px;">
+            ${escapeHtml(params.organizationName)} · Jedna stránka pravdy (${escapeHtml(params.date)})
           </div>
-          <h1 style="margin:0 0 10px;font-size:19px;line-height:1.3;font-weight:900;color:#ffffff;">
+          <h1 style="margin:0 0 14px;font-size:20px;line-height:1.3;font-weight:900;color:#0f172a;">
             ${escapeHtml(params.digest.headline)}
           </h1>
-          <div style="padding:10px 12px;border-radius:10px;background:rgba(255,255,255,0.08);font-size:12.5px;font-weight:700;color:#e2e8f0;">
-            💼 Obchod: ${params.sales.offersSentToday} nab. (${params.sales.offersSentValueCzk.toLocaleString('cs-CZ')} Kč) ·
-            ✅ Realizace: ${params.companyPulse?.completedCount ?? 0} hotovo ·
-            📝 Reporty: ${submittedCount}/${params.members.length}
-          </div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:6px 0;margin:0 -6px;">
+            <tr>
+              <td width="33%" style="padding:10px;border-radius:10px;background:#eef2ff;border:1px solid #e0e7ff;text-align:center;">
+                <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#4338ca;">Obchod</div>
+                <div style="font-size:15px;font-weight:900;color:#1e1b4b;margin-top:2px;">${params.sales.offersSentToday} nab.</div>
+                <div style="font-size:11px;color:#4338ca;margin-top:1px;">${params.sales.offersSentValueCzk.toLocaleString('cs-CZ')} Kč</div>
+              </td>
+              <td width="33%" style="padding:10px;border-radius:10px;background:#ecfdf5;border:1px solid #d1fae5;text-align:center;">
+                <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#047857;">Realizace</div>
+                <div style="font-size:15px;font-weight:900;color:#064e3b;margin-top:2px;">${params.companyPulse?.completedCount ?? 0} hotovo</div>
+                <div style="font-size:11px;color:#047857;margin-top:1px;">${params.companyPulse?.loggedHoursTotal ?? 0} h</div>
+              </td>
+              <td width="33%" style="padding:10px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;text-align:center;">
+                <div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#475569;">Reporty lidí</div>
+                <div style="font-size:15px;font-weight:900;color:#0f172a;margin-top:2px;">${submittedCount} / ${params.members.length}</div>
+                <div style="font-size:11px;color:#64748b;margin-top:1px;">odevzdáno</div>
+              </td>
+            </tr>
+          </table>
         </div>
-        <div style="padding:20px 24px;">
-          <h2 style="margin:0 0 8px;font-size:13px;font-weight:900;text-transform:uppercase;color:#047857;">
+        <div style="padding:22px 26px;">
+          <h2 style="margin:0 0 10px;font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:#047857;">
             🔥 Co se dnes posunulo
           </h2>
           ${highlightsHtml}
           ${attentionHtml}
           ${approvalsHtml}
-          <h2 style="margin:18px 0 8px;font-size:13px;font-weight:900;text-transform:uppercase;color:#0f172a;">
+          <h2 style="margin:20px 0 10px;font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:#475569;">
             👥 Přehled týmu a reportů
           </h2>
           ${teamRowsHtml}
-          <div style="margin-top:18px;padding-top:14px;border-top:1px solid #e2e8f0;">
-            <a href="${escapeHtml(`${cleanBase}/planner`)}" style="display:inline-block;padding:11px 18px;border-radius:10px;background:#4f46e5;color:#ffffff;font-size:13px;font-weight:800;text-decoration:none;">
+          <div style="margin-top:20px;padding-top:16px;border-top:1px solid #f1f5f9;text-align:center;">
+            <a href="${escapeHtml(`${cleanBase}/planner`)}" style="display:inline-block;padding:12px 22px;border-radius:12px;background:#0f172a;color:#ffffff;font-size:13.5px;font-weight:800;text-decoration:none;">
               Otevřít Kokpit majitele v Planneru →
             </a>
           </div>
