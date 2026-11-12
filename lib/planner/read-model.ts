@@ -12,6 +12,12 @@ import {
   projectWorkTaskToTimelineItem,
   sortPlannerTasks,
 } from './work-projection';
+import {
+  buildCompanyAndMemberDailyPulse,
+  sanitizeMeetingReports,
+  type CompanyDailyPulse,
+  type MemberDailyActivity,
+} from './team-pulse';
 
 export async function userTimeline(actor: AuthenticatedPlannerActor, userId: string, from: Date, to: Date, shared = false): Promise<PlannerItem[]> {
   const organizationId = actor.organizationId;
@@ -169,28 +175,137 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
     hasCollision: collision,
     unassignedOrdersCount,
   });
-  const team = [];
-  if (view === 'team') for (const member of await activeMembers(actor.organizationId)) {
-    const [p, schedule, rawMemberTasks] = await Promise.all([preferencesFor(actor.organizationId, member.userId, actor.organization?.plannerDefaults), userTimeline(actor, member.userId, from, to), tasksFor(actor, member.userId)]);
-    const memberTasks = sortPlannerTasks(rawMemberTasks, date, p.timezone);
-    const days = Array.from({ length: 7 }, (_, n) => capacity(plusDays(date, n), p, schedule.filter(i => i.busy)));
-    const plannedTaskMinutes = memberTasks.filter(t => t.dueAt && Date.parse(t.dueAt) <= +to).reduce((sum, t) => sum + (t.plannedMinutes || 0), 0);
-    const weekFreeMinutes = days.reduce((s, d) => s + d.freeMinutes, 0);
-    team.push({
-      id: member.userId,
-      name: member.user.name,
-      today: capacity(date, p, schedule.filter(i => i.busy)),
-      weekFreeMinutes,
-      importantTasks: memberTasks.filter(t => ['HIGH', 'URGENT'].includes(t.priority)).length,
-      deadlines: memberTasks.filter(t => t.dueAt && Date.parse(t.dueAt) <= +to).length,
-      todayWorkCount: memberTasks.filter(t => t.dueAt && dateInZone(new Date(t.dueAt), p.timezone) === date).length,
-      weekWorkCount: memberTasks.filter(t => t.dueAt && dateInZone(new Date(t.dueAt), p.timezone) >= date && Date.parse(t.dueAt) <= +to).length,
-      overCapacity: plannedTaskMinutes > weekFreeMinutes,
-    });
+  const team: Array<{
+    id: string;
+    name: string;
+    today: ReturnType<typeof capacity>;
+    weekFreeMinutes: number;
+    importantTasks: number;
+    deadlines: number;
+    todayWorkCount: number;
+    weekWorkCount: number;
+    overCapacity: boolean;
+    dailyActivity?: MemberDailyActivity;
+  }> = [];
+
+  let companyPulse: CompanyDailyPulse | null = null;
+  const pulseMembers: Array<{ userId: string; name: string; employeeId?: string | null }> = [];
+
+  if (canSeeTeam(actor)) {
+    const allMembers = await activeMembers(actor.organizationId);
+    for (const m of allMembers) {
+      pulseMembers.push({
+        userId: m.userId,
+        name: m.user.name,
+        employeeId: m.user.employees[0]?.id ?? null,
+      });
+    }
+
+    if (view === 'team') {
+      const [candidateOrders, dayWorkEntries] = await Promise.all([
+        prisma.workOrder.findMany({
+          where: {
+            organizationId: actor.organizationId,
+            OR: [
+              { scheduledAt: { gte: from, lt: dayEnd } },
+              { updatedAt: { gte: from, lt: dayEnd } },
+            ],
+          },
+          select: {
+            id: true,
+            title: true,
+            clientName: true,
+            status: true,
+            scheduledAt: true,
+            updatedAt: true,
+            planningConstraints: true,
+            assignments: {
+              select: {
+                userId: true,
+                workerName: true,
+                acknowledgedAt: true,
+                note: true,
+              },
+            },
+          },
+          take: 200,
+        }),
+        prisma.workEntry.findMany({
+          where: {
+            organizationId: actor.organizationId,
+            workDate: { gte: from, lt: dayEnd },
+          },
+          select: {
+            id: true,
+            employeeId: true,
+            workOrderId: true,
+            workTaskId: true,
+            clientName: true,
+            remunerationMethod: true,
+            quantity: true,
+            unit: true,
+            note: true,
+            workTask: { select: { title: true } },
+          },
+          take: 200,
+        }),
+      ]);
+
+      const pulseResult = buildCompanyAndMemberDailyPulse({
+        date,
+        timezone: preferences.timezone,
+        members: pulseMembers,
+        orders: candidateOrders,
+        workEntries: dayWorkEntries.map((e) => ({
+          id: e.id,
+          employeeId: e.employeeId,
+          workOrderId: e.workOrderId,
+          workTaskId: e.workTaskId,
+          clientName: e.clientName,
+          remunerationMethod: e.remunerationMethod,
+          quantity: Number(e.quantity),
+          unit: e.unit,
+          note: e.note,
+          workTaskTitle: e.workTask?.title ?? null,
+        })),
+      });
+
+      companyPulse = pulseResult.companyPulse;
+
+      for (const member of allMembers) {
+        const [p, schedule, rawMemberTasks] = await Promise.all([
+          preferencesFor(actor.organizationId, member.userId, actor.organization?.plannerDefaults),
+          userTimeline(actor, member.userId, from, to),
+          tasksFor(actor, member.userId),
+        ]);
+        const memberTasks = sortPlannerTasks(rawMemberTasks, date, p.timezone);
+        const days = Array.from({ length: 7 }, (_, n) => capacity(plusDays(date, n), p, schedule.filter((i) => i.busy)));
+        const plannedTaskMinutes = memberTasks
+          .filter((t) => t.dueAt && Date.parse(t.dueAt) <= +to)
+          .reduce((sum, t) => sum + (t.plannedMinutes || 0), 0);
+        const weekFreeMinutes = days.reduce((s, d) => s + d.freeMinutes, 0);
+
+        team.push({
+          id: member.userId,
+          name: member.user.name,
+          today: capacity(date, p, schedule.filter((i) => i.busy)),
+          weekFreeMinutes,
+          importantTasks: memberTasks.filter((t) => ['HIGH', 'URGENT'].includes(t.priority)).length,
+          deadlines: memberTasks.filter((t) => t.dueAt && Date.parse(t.dueAt) <= +to).length,
+          todayWorkCount: memberTasks.filter((t) => t.dueAt && dateInZone(new Date(t.dueAt), p.timezone) === date).length,
+          weekWorkCount: memberTasks.filter((t) => t.dueAt && dateInZone(new Date(t.dueAt), p.timezone) >= date && Date.parse(t.dueAt) <= +to).length,
+          overCapacity: plannedTaskMinutes > weekFreeMinutes,
+          dailyActivity: pulseResult.byUserId[member.userId],
+        });
+      }
+    }
   }
+
   const slots = findSlots({ from: new Date(Math.max(+from, Date.now())), to: dayEnd, durationMinutes: 60, participants: [{ preferences, busy: items.filter(i => i.busy) }], focus: true, limit: 3 });
-  const sheetMeta = (actor.organization?.plannerDefaults as { googleSheetPlanSync?: { lastSyncAt?: unknown } } | null)?.googleSheetPlanSync;
+  const defaultsObj = actor.organization?.plannerDefaults as Record<string, unknown> | null;
+  const sheetMeta = (defaultsObj?.googleSheetPlanSync as { lastSyncAt?: unknown } | null);
   const sheetSyncAt = typeof sheetMeta?.lastSyncAt === 'string' ? sheetMeta.lastSyncAt : null;
+  const meetingReports = canSeeTeam(actor) ? sanitizeMeetingReports(defaultsObj?.meetingReports) : [];
   const connectedSyncTimes = connections
     .filter(c => c.status === 'CONNECTED' && c.lastSyncAt)
     .map(c => c.lastSyncAt!.toISOString())
@@ -207,6 +322,9 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
     capacity: capacity(date, preferences, items.filter(i => i.busy)),
     slots,
     team,
+    companyPulse,
+    meetingReports,
+    teamMembers: canSeeTeam(actor) ? pulseMembers : [],
     connections,
     canSeeTeam: canSeeTeam(actor),
     aiAvailable: false,

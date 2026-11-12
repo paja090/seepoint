@@ -8,7 +8,7 @@ import { resolvePreferences } from './preferences';
 import { projectWorkTaskToPlannerTask } from './work-projection';
 
 export async function activeMembers(organizationId: string) {
-  const rows = await prisma.organizationMember.findMany({ where: { organizationId, isActive: true, user: { status: 'ACTIVE' }, organization: { isActive: true } }, select: { userId: true, role: true, user: { select: { name: true, employees: { where: { organizationId }, select: { isActive: true } } } } }, orderBy: { userId: 'asc' } });
+  const rows = await prisma.organizationMember.findMany({ where: { organizationId, isActive: true, user: { status: 'ACTIVE' }, organization: { isActive: true } }, select: { userId: true, role: true, user: { select: { name: true, employees: { where: { organizationId }, select: { id: true, isActive: true } } } } }, orderBy: { userId: 'asc' } });
   return rows.filter(r => !r.user.employees.some(e => !e.isActive));
 }
 export async function preferencesFor(organizationId: string, userId: string, defaults: unknown) {
