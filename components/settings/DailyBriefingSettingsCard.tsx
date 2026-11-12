@@ -12,12 +12,17 @@ import {
   RefreshCw,
   Calendar,
 } from 'lucide-react';
-import type { DailyBriefingSettings, SendBriefingsResult } from '@/lib/work/daily-briefing';
+import type {
+  DailyBriefingSettings,
+  ManagerDigestSettings,
+  SendBriefingsResult,
+} from '@/lib/work/daily-briefing';
 
 type PreviewWorker = {
   recipientName: string;
   recipientEmail: string;
   taskCount: number;
+  todayOpenCount?: number;
   vehicles: string[];
   crewMates: string[];
   tasks: Array<{
@@ -36,6 +41,7 @@ type BriefingLogItem = {
   sentAt: string;
   metadata?: {
     targetDate?: string;
+    auditedDate?: string;
     recipientName?: string;
     taskCount?: number;
     isTest?: boolean;
@@ -44,9 +50,19 @@ type BriefingLogItem = {
 
 type ApiResponse = {
   settings: DailyBriefingSettings;
+  managerSettings?: ManagerDigestSettings;
+  managerPreview?: {
+    auditedDate: string;
+    auditedDateLabel: string;
+    unfinishedCount: number;
+    rescheduledCount: number;
+    completedCount: number;
+  };
   preview: {
     targetDate: string;
     targetDateLabel: string;
+    todayDate?: string;
+    todayDateLabel?: string;
     unmatchedWorkerNames: string[];
     briefings: PreviewWorker[];
   };
@@ -58,6 +74,7 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
+  const [sendingManagerTest, setSendingManagerTest] = useState(false);
   const [sendingNow, setSendingNow] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -67,6 +84,13 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
     timezone: 'Europe/Prague',
     skipWeekends: false,
   });
+  const [managerSettings, setManagerSettings] = useState<ManagerDigestSettings>({
+    enabled: true,
+    sendHourLocal: 7,
+    timezone: 'Europe/Prague',
+    skipWeekends: false,
+  });
+  const [managerPreview, setManagerPreview] = useState<ApiResponse['managerPreview'] | null>(null);
   const [preview, setPreview] = useState<ApiResponse['preview'] | null>(null);
   const [recentLogs, setRecentLogs] = useState<BriefingLogItem[]>([]);
   const [notice, setNotice] = useState('');
@@ -79,6 +103,8 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
       const data = (await res.json()) as ApiResponse;
       if (!res.ok) throw new Error(data.error || 'Načtení selhalo.');
       setSettings(data.settings);
+      if (data.managerSettings) setManagerSettings(data.managerSettings);
+      setManagerPreview(data.managerPreview ?? null);
       setPreview(data.preview);
       setRecentLogs(data.recentLogs || []);
       setError('');
@@ -102,15 +128,21 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
       const res = await fetch('/api/settings/daily-briefing', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(settings),
+        body: JSON.stringify({ ...settings, managerSettings }),
       });
-      const data = (await res.json()) as { ok?: boolean; settings?: DailyBriefingSettings; error?: string };
+      const data = (await res.json()) as {
+        ok?: boolean;
+        settings?: DailyBriefingSettings;
+        managerSettings?: ManagerDigestSettings;
+        error?: string;
+      };
       if (!res.ok || !data.ok) throw new Error(data.error || 'Uložení selhalo.');
       if (data.settings) setSettings(data.settings);
+      if (data.managerSettings) setManagerSettings(data.managerSettings);
       setNotice(
         data.settings?.enabled
-          ? `Automatický rozesílač uložen. Pracovníkům budou chodit úkoly den předem v ${data.settings.sendHourLocal}:00.`
-          : 'Automatické rozesílání bylo pozastaveno a uloženo.'
+          ? `Automatický rozesílač uložen (pracovníci ${data.settings.sendHourLocal}:00, ranní kontrola manažerovi ${data.managerSettings?.enabled ? `${data.managerSettings.sendHourLocal}:00` : 'vypnuta'}).`
+          : 'Nastavení rozesílače bylo uloženo.'
       );
       setTimeout(() => setNotice(''), 5000);
     } catch (err) {
@@ -146,6 +178,40 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
       setError(err instanceof Error ? err.message : 'Test selhal.');
     } finally {
       setSendingTest(false);
+    }
+  }
+
+  async function handleSendTestManagerDigest() {
+    setSendingManagerTest(true);
+    setNotice('');
+    setError('');
+    try {
+      const res = await fetch('/api/settings/daily-briefing', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'send_test_manager_digest',
+          testEmail: currentUserEmail,
+        }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        digestSummary?: { auditedDate: string; sentCount: number };
+        error?: string;
+      };
+      if (!res.ok || !data.ok || !data.digestSummary) {
+        throw new Error(data.error || 'Testovací ranní souhrn se nepodařilo odeslat.');
+      }
+      setNotice(
+        data.digestSummary.sentCount > 0
+          ? `Testovací ranní souhrn za ${data.digestSummary.auditedDate} byl odeslán na ${currentUserEmail}.`
+          : `Testovací ranní souhrn proběhl v náhledovém režimu.`
+      );
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Odeslání ranního souhrnu selhalo.');
+    } finally {
+      setSendingManagerTest(false);
     }
   }
 
@@ -236,62 +302,125 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
       ) : (
         <>
           {/* Settings form */}
-          <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:grid-cols-3">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={settings.enabled}
-                onChange={(e) => setSettings((prev) => ({ ...prev, enabled: e.target.checked }))}
-                className="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600"
-              />
-              <div>
-                <span className="block text-sm font-bold text-slate-900">
-                  Automatické rozesílání zapnuto
-                </span>
-                <span className="block text-xs text-slate-500 mt-0.5">
-                  Pokud má pracovník na zítřek úkol nebo výjezd, obdrží e-mail.
-                </span>
-              </div>
-            </label>
-
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                <Clock size={12} className="inline mr-1" />
-                Hodina odeslání (den předem)
+          <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.enabled}
+                  onChange={(e) => setSettings((prev) => ({ ...prev, enabled: e.target.checked }))}
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600"
+                />
+                <div>
+                  <span className="block text-sm font-bold text-slate-900">
+                    Odpolední e-mail pracovníkům
+                  </span>
+                  <span className="block text-xs text-slate-500 mt-0.5">
+                    V jednom e-mailu pošle dnešní neuzavřené úkoly (Hotovo / Přesunout) i plán na zítřek.
+                  </span>
+                </div>
               </label>
-              <select
-                value={settings.sendHourLocal}
-                onChange={(e) =>
-                  setSettings((prev) => ({ ...prev, sendHourLocal: Number(e.target.value) }))
-                }
-                className="input w-full bg-white text-sm font-bold"
-              >
-                {[12, 13, 14, 15, 16, 17, 18, 19, 20, 21].map((h) => (
-                  <option key={h} value={h}>
-                    {String(h).padStart(2, '0')}:00 (čas ČR)
-                  </option>
-                ))}
-              </select>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                  <Clock size={12} className="inline mr-1" />
+                  Hodina odeslání pracovníkům
+                </label>
+                <select
+                  value={settings.sendHourLocal}
+                  onChange={(e) =>
+                    setSettings((prev) => ({ ...prev, sendHourLocal: Number(e.target.value) }))
+                  }
+                  className="input w-full bg-white text-sm font-bold"
+                >
+                  {[12, 13, 14, 15, 16, 17, 18, 19, 20, 21].map((h) => (
+                    <option key={h} value={h}>
+                      {String(h).padStart(2, '0')}:00 (čas ČR)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.skipWeekends}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setSettings((prev) => ({ ...prev, skipWeekends: checked }));
+                    setManagerSettings((prev) => ({ ...prev, skipWeekends: checked }));
+                  }}
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600"
+                />
+                <div>
+                  <span className="block text-sm font-bold text-slate-900">
+                    Přeskočit víkendové dny
+                  </span>
+                  <span className="block text-xs text-slate-500 mt-0.5">
+                    Neposílat víkendové přehledy (nechte vypnuté, pokud máte i víkendové akce).
+                  </span>
+                </div>
+              </label>
             </div>
 
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={settings.skipWeekends}
-                onChange={(e) =>
-                  setSettings((prev) => ({ ...prev, skipWeekends: e.target.checked }))
-                }
-                className="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600"
-              />
+            <div className="grid gap-4 border-t border-slate-200/80 pt-4 sm:grid-cols-3">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={managerSettings.enabled}
+                  onChange={(e) =>
+                    setManagerSettings((prev) => ({ ...prev, enabled: e.target.checked }))
+                  }
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600"
+                />
+                <div>
+                  <span className="block text-sm font-bold text-slate-900">
+                    Ranní kontrolní souhrn manažerům
+                  </span>
+                  <span className="block text-xs text-slate-500 mt-0.5">
+                    Ráno shrne včerejší neuzavřené úkoly a důvody/poznámky k přesunu od pracovníků.
+                  </span>
+                </div>
+              </label>
+
               <div>
-                <span className="block text-sm font-bold text-slate-900">
-                  Přeskočit víkendové dny
-                </span>
-                <span className="block text-xs text-slate-500 mt-0.5">
-                  V pátek a sobotu neposílat přehledy na sobotu/neděli (nechte vypnuté, pokud máte i víkendové akce).
-                </span>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                  <Clock size={12} className="inline mr-1" />
+                  Hodina ranního souhrnu
+                </label>
+                <select
+                  value={managerSettings.sendHourLocal}
+                  onChange={(e) =>
+                    setManagerSettings((prev) => ({
+                      ...prev,
+                      sendHourLocal: Number(e.target.value),
+                    }))
+                  }
+                  className="input w-full bg-white text-sm font-bold"
+                >
+                  {[5, 6, 7, 8, 9, 10].map((h) => (
+                    <option key={h} value={h}>
+                      {String(h).padStart(2, '0')}:00 (čas ČR)
+                    </option>
+                  ))}
+                </select>
               </div>
-            </label>
+
+              {managerPreview && (
+                <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-600">
+                  <div className="font-bold text-slate-800">
+                    Včera ({managerPreview.auditedDateLabel}):
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-2 font-semibold">
+                    <span className="text-rose-700">{managerPreview.unfinishedCount} neuzavřeno</span>
+                    <span>·</span>
+                    <span className="text-amber-700">{managerPreview.rescheduledCount} přesunuto</span>
+                    <span>·</span>
+                    <span className="text-emerald-700">{managerPreview.completedCount} hotovo</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -314,7 +443,19 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
               <span>
                 {sendingTest
                   ? 'Odesílám test…'
-                  : `Poslat testovací náhled na ${currentUserEmail || 'můj e-mail'}`}
+                  : `Test pro pracovníka (${currentUserEmail || 'můj e-mail'})`}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void handleSendTestManagerDigest()}
+              disabled={sendingManagerTest || !currentUserEmail}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs font-black text-amber-900 hover:bg-amber-100 transition disabled:opacity-50"
+            >
+              <Send size={14} />
+              <span>
+                {sendingManagerTest ? 'Odesílám souhrn…' : 'Test ranního souhrnu manažerovi'}
               </span>
             </button>
 
@@ -391,9 +532,16 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
                             {worker.recipientEmail}
                           </div>
                         </div>
-                        <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-black text-sky-800">
-                          {worker.taskCount} {worker.taskCount === 1 ? 'úkol' : worker.taskCount <= 4 ? 'úkoly' : 'úkolů'}
-                        </span>
+                        <div className="flex flex-wrap items-center justify-end gap-1">
+                          {(worker.todayOpenCount ?? 0) > 0 && (
+                            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-black text-amber-900">
+                              +{worker.todayOpenCount} dnes
+                            </span>
+                          )}
+                          <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-black text-sky-800">
+                            {worker.taskCount} {worker.taskCount === 1 ? 'úkol' : worker.taskCount <= 4 ? 'úkoly' : 'úkolů'}
+                          </span>
+                        </div>
                       </div>
                       <ul className="space-y-1 text-xs text-slate-700 border-t border-slate-200/70 pt-2">
                         {worker.tasks.map((task, idx) => (

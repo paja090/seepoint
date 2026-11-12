@@ -14,6 +14,7 @@ import {
   parseGooglePlanCsv,
   parseGooglePlanXlsx,
   syncGooglePlanToWorkOrders,
+  resolveSyncedScheduledAt,
   isSeePointOrganization,
   isGreenRgbHex,
   unwrapExcelValueToString,
@@ -736,6 +737,27 @@ test('Google Sheets Sync: edits on same row/date/client update in place and clea
   assert.deepEqual(deletedIds, ['wo-orphan-dup']);
   assert.equal(res.cleanedCount, 1);
   assert.equal(existingOrders[2].status, 'PLANNED');
+});
+
+test('Google Sheets Sync: resolveSyncedScheduledAt preserves email/manual reschedule until Sheet row date changes', () => {
+  const rescheduledAt = new Date('2026-11-13T07:00:00.000Z');
+  const unchangedSheetDate = new Date('2026-11-12T00:00:00.000Z');
+  const lockedPc = {
+    source: 'GOOGLE_SHEETS_PLAN',
+    manualScheduledDateIso: '2026-11-13',
+    sheetScheduledDateAtReschedule: '2026-11-12',
+  };
+
+  // Next 15-min sheet sync with unchanged sheet date must keep 2026-11-13
+  const kept = resolveSyncedScheduledAt(rescheduledAt, lockedPc, unchangedSheetDate);
+  assert.equal(kept.preservedManualReschedule, true);
+  assert.equal(kept.scheduledAt.toISOString(), rescheduledAt.toISOString());
+
+  // When dispatcher edits date in Google Sheet to 2026-11-15, new sheet date applies
+  const newSheetDate = new Date('2026-11-15T00:00:00.000Z');
+  const overridden = resolveSyncedScheduledAt(rescheduledAt, lockedPc, newSheetDate);
+  assert.equal(overridden.preservedManualReschedule, false);
+  assert.equal(overridden.scheduledAt.toISOString(), newSheetDate.toISOString());
 });
 
 
