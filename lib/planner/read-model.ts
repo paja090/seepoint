@@ -23,6 +23,7 @@ import {
   buildUserAutoDaySummary,
   sanitizeApprovalRequests,
   sanitizeCheckouts,
+  sanitizeOwnerEmailDigestSettings,
   type ApprovalRequestRecord,
   type DailyCheckoutRecord,
   type OwnerReportSnapshot,
@@ -481,6 +482,9 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
   const sheetMeta = (defaultsObj?.googleSheetPlanSync as { lastSyncAt?: unknown } | null);
   const sheetSyncAt = typeof sheetMeta?.lastSyncAt === 'string' ? sheetMeta.lastSyncAt : null;
   const meetingReports = canSeeTeam(actor) ? sanitizeMeetingReports(defaultsObj?.meetingReports) : [];
+  const ownerEmailSettings = canSeeTeam(actor)
+    ? sanitizeOwnerEmailDigestSettings(defaultsObj?.ownerEmailDigest)
+    : null;
   const connectedSyncTimes = connections
     .filter(c => c.status === 'CONNECTED' && c.lastSyncAt)
     .map(c => c.lastSyncAt!.toISOString())
@@ -499,6 +503,8 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
     team,
     companyPulse,
     ownerSnapshot,
+    ownerEmailSettings,
+    currentUserEmail: actor.email || null,
     myDayCheckout,
     pendingApprovalsCount: canSeeTeam(actor) ? pendingApprovalsAll.length : 0,
     meetingReports,

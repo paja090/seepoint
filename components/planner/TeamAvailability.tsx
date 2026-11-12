@@ -67,6 +67,24 @@ export function TeamAvailability({
   const [decidingId, setDecidingId] = useState<string | null>(null);
   const [ownerNotice, setOwnerNotice] = useState('');
 
+  // Owner email delivery & schedule modal state
+  const initialEmailCfg = data.ownerEmailSettings;
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [manualEmailRecipients, setManualEmailRecipients] = useState(
+    data.currentUserEmail || ''
+  );
+  const [sendingOwnerEmail, setSendingOwnerEmail] = useState(false);
+  const [emailAutoEnabled, setEmailAutoEnabled] = useState(initialEmailCfg?.enabled ?? false);
+  const [emailSendHour, setEmailSendHour] = useState(initialEmailCfg?.sendHourLocal ?? 18);
+  const [emailSkipWeekends, setEmailSkipWeekends] = useState(initialEmailCfg?.skipWeekends ?? true);
+  const [emailIncludeAdmins, setEmailIncludeAdmins] = useState(
+    initialEmailCfg?.includeAllAdminsAndOwners ?? true
+  );
+  const [emailCustomText, setEmailCustomText] = useState(
+    (initialEmailCfg?.customRecipients ?? []).join(', ')
+  );
+  const [savingEmailSettings, setSavingEmailSettings] = useState(false);
+
   // Meeting modal form state
   const [meetingStep, setMeetingStep] = useState<'input' | 'review'>('input');
   const [meetingTitle, setMeetingTitle] = useState('');
@@ -104,6 +122,63 @@ export function TeamAvailability({
       setOwnerNotice(err instanceof Error ? err.message : 'Nepodařilo se vygenerovat souhrn.');
     } finally {
       setLoadingDigest(false);
+    }
+  }
+
+  async function handleSendOwnerEmail() {
+    setSendingOwnerEmail(true);
+    setOwnerNotice('');
+    try {
+      const res = await plannerRequest<{
+        ok: boolean;
+        emailResult: {
+          sentCount: number;
+          skippedEnvCount: number;
+          recipients: string[];
+        };
+      }>('/checkouts', {
+        action: 'send_owner_email',
+        date: data.date,
+        recipientsText: manualEmailRecipients,
+      });
+      if (res.ok && res.emailResult) {
+        setOwnerNotice(
+          res.emailResult.sentCount > 0
+            ? `Report majitele byl úspěšně odeslán na: ${res.emailResult.recipients.join(', ')}.`
+            : `Report připraven pro ${res.emailResult.recipients.join(', ')} (náhledový režim).`
+        );
+        setShowEmailModal(false);
+      }
+    } catch (err) {
+      setOwnerNotice(err instanceof Error ? err.message : 'Odeslání reportu selhalo.');
+    } finally {
+      setSendingOwnerEmail(false);
+    }
+  }
+
+  async function handleSaveEmailSettings() {
+    setSavingEmailSettings(true);
+    setOwnerNotice('');
+    try {
+      await plannerRequest<{ ok: boolean }>('/checkouts', {
+        action: 'save_email_settings',
+        enabled: emailAutoEnabled,
+        sendHourLocal: emailSendHour,
+        skipWeekends: emailSkipWeekends,
+        includeAllAdminsAndOwners: emailIncludeAdmins,
+        customRecipientsText: emailCustomText,
+      });
+      setOwnerNotice(
+        emailAutoEnabled
+          ? `Automatické odesílání reportu uloženo (každý den v ${String(emailSendHour).padStart(2, '0')}:00).`
+          : 'Nastavení e-mailového reportu majitele bylo uloženo.'
+      );
+      setShowEmailModal(false);
+      onReload?.();
+    } catch (err) {
+      setOwnerNotice(err instanceof Error ? err.message : 'Uložení nastavení selhalo.');
+    } finally {
+      setSavingEmailSettings(false);
     }
   }
 
@@ -248,6 +323,18 @@ export function TeamAvailability({
 
           <button
             type="button"
+            onClick={() => setShowEmailModal(true)}
+            className={secondaryButton}
+          >
+            <Mail className="h-4 w-4 text-emerald-700" />
+            <span>E-mail report</span>
+            {emailAutoEnabled && (
+              <span className="h-2 w-2 rounded-full bg-emerald-500" title="Automatické odesílání zapnuto" />
+            )}
+          </button>
+
+          <button
+            type="button"
             onClick={() => {
               setMeetingDate(data.date);
               setMeetingStep('input');
@@ -278,13 +365,23 @@ export function TeamAvailability({
                 Jedna stránka pravdy pro majitele ({data.date})
               </span>
             </div>
-            <button
-              type="button"
-              onClick={() => setAiDigest(null)}
-              className="rounded-lg px-2 py-1 text-xs font-bold text-slate-300 hover:bg-white/10"
-            >
-              Skrýt
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowEmailModal(true)}
+                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-emerald-500"
+              >
+                <Mail className="h-3.5 w-3.5" />
+                <span>Odeslat do e-mailu</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAiDigest(null)}
+                className="rounded-lg px-2 py-1 text-xs font-bold text-slate-300 hover:bg-white/10"
+              >
+                Skrýt
+              </button>
+            </div>
           </div>
           <p className="mt-3 text-base sm:text-lg font-extrabold text-white">{aiDigest.headline}</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -1335,6 +1432,147 @@ export function TeamAvailability({
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* OWNER EMAIL REPORT & SCHEDULE MODAL */}
+      {showEmailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                  <Mail className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">Report majitele do e-mailu</h3>
+                  <p className="text-xs text-slate-500">
+                    Pošlete dnešní souhrn ihned nebo zapněte každodenní automatický e-mail.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEmailModal(false)}
+                className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-5">
+              {/* SECTION 1: SEND NOW */}
+              <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/50 p-4 space-y-3">
+                <p className="text-xs font-black uppercase tracking-wider text-emerald-900">
+                  Odeslat dnešní report ({data.date}) ihned
+                </p>
+                <label className="block text-xs font-bold text-slate-700">
+                  <span>Komu poslat (e-maily oddělené čárkou; prázdné = všichni nastaveným majitelům)</span>
+                  <input
+                    type="text"
+                    placeholder="např. majitel@firma.cz, vedeni@firma.cz"
+                    value={manualEmailRecipients}
+                    onChange={(e) => setManualEmailRecipients(e.target.value)}
+                    className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900"
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={sendingOwnerEmail}
+                  onClick={handleSendOwnerEmail}
+                  className={`${primaryButton} w-full justify-center`}
+                >
+                  <Mail className="h-4 w-4" />
+                  <span>{sendingOwnerEmail ? 'Odesílám e-mail…' : 'Odeslat report majitele na e-mail teď'}</span>
+                </button>
+              </div>
+
+              {/* SECTION 2: DAILY SCHEDULE */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-black uppercase tracking-wider text-slate-800">
+                    Automatický denní e-mail majiteli
+                  </p>
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-extrabold text-slate-900">
+                    <input
+                      type="checkbox"
+                      checked={emailAutoEnabled}
+                      onChange={(e) => setEmailAutoEnabled(e.target.checked)}
+                      className="h-4 w-4 rounded text-emerald-600"
+                    />
+                    <span>{emailAutoEnabled ? 'Zapnuto' : 'Vypnuto'}</span>
+                  </label>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block text-xs font-bold text-slate-700">
+                    <span>Hodina odeslání (Praha)</span>
+                    <select
+                      value={emailSendHour}
+                      onChange={(e) => setEmailSendHour(Number(e.target.value))}
+                      className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-900"
+                    >
+                      {Array.from({ length: 24 }, (_, h) => (
+                        <option key={h} value={h}>
+                          {String(h).padStart(2, '0')}:00
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer self-end rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={emailSkipWeekends}
+                      onChange={(e) => setEmailSkipWeekends(e.target.checked)}
+                      className="h-4 w-4 rounded text-emerald-600"
+                    />
+                    <span>Vynechat víkendy (So–Ne)</span>
+                  </label>
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={emailIncludeAdmins}
+                    onChange={(e) => setEmailIncludeAdmins(e.target.checked)}
+                    className="h-4 w-4 rounded text-emerald-600"
+                  />
+                  <span>Posílat všem vlastníkům (OWNER) a administrátorům (ADMIN)</span>
+                </label>
+
+                <label className="block text-xs font-bold text-slate-700">
+                  <span>Další e-maily příjemců (oddělené čárkou)</span>
+                  <input
+                    type="text"
+                    placeholder="např. reditel@firma.cz, partner@firma.cz"
+                    value={emailCustomText}
+                    onChange={(e) => setEmailCustomText(e.target.value)}
+                    className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900"
+                  />
+                </label>
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowEmailModal(false)}
+                    className={secondaryButton}
+                  >
+                    Zavřít
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingEmailSettings}
+                    onClick={handleSaveEmailSettings}
+                    className={secondaryButton}
+                  >
+                    <CheckCircle2 className="h-4 w-4 text-emerald-700" />
+                    <span>{savingEmailSettings ? 'Ukládám…' : 'Uložit automatické odesílání'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
