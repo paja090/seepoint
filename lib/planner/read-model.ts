@@ -18,6 +18,16 @@ import {
   type CompanyDailyPulse,
   type MemberDailyActivity,
 } from './team-pulse';
+import {
+  buildSalesDailySummary,
+  buildUserAutoDaySummary,
+  sanitizeApprovalRequests,
+  sanitizeCheckouts,
+  type ApprovalRequestRecord,
+  type DailyCheckoutRecord,
+  type OwnerReportSnapshot,
+  type UserSalesDailyActivity,
+} from './owner-reports';
 
 export async function userTimeline(actor: AuthenticatedPlannerActor, userId: string, from: Date, to: Date, shared = false): Promise<PlannerItem[]> {
   const organizationId = actor.organizationId;
@@ -175,6 +185,22 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
     hasCollision: collision,
     unassignedOrdersCount,
   });
+  const defaultsObj = actor.organization?.plannerDefaults as Record<string, unknown> | null;
+  const allCheckouts = sanitizeCheckouts(defaultsObj?.dailyCheckouts);
+  const allApprovals = sanitizeApprovalRequests(defaultsObj?.approvalRequests);
+  const dayCheckouts = allCheckouts.filter((c) => c.date === date);
+  const checkoutsByUserId: Record<string, DailyCheckoutRecord> = {};
+  for (const c of dayCheckouts) {
+    checkoutsByUserId[c.userId] = c;
+  }
+
+  const pendingApprovalsAll = allApprovals.filter(
+    (a) => a.status === 'PENDING' || a.status === 'INFO_REQUESTED'
+  );
+  const recentDecisionsAll = allApprovals
+    .filter((a) => a.status === 'APPROVED' || a.status === 'REJECTED')
+    .slice(0, 12);
+
   const team: Array<{
     id: string;
     name: string;
@@ -186,9 +212,13 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
     weekWorkCount: number;
     overCapacity: boolean;
     dailyActivity?: MemberDailyActivity;
+    salesActivity?: UserSalesDailyActivity;
+    checkout?: DailyCheckoutRecord | null;
   }> = [];
 
   let companyPulse: CompanyDailyPulse | null = null;
+  let ownerSnapshot: OwnerReportSnapshot | null = null;
+  let myAutoSummary = '';
   const pulseMembers: Array<{ userId: string; name: string; employeeId?: string | null }> = [];
 
   if (canSeeTeam(actor)) {
@@ -202,7 +232,7 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
     }
 
     if (view === 'team') {
-      const [candidateOrders, dayWorkEntries] = await Promise.all([
+      const [candidateOrders, dayWorkEntries, dayOffers, dayCrmTasks] = await Promise.all([
         prisma.workOrder.findMany({
           where: {
             organizationId: actor.organizationId,
@@ -249,6 +279,44 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
           },
           take: 200,
         }),
+        prisma.offer.findMany({
+          where: {
+            organizationId: actor.organizationId,
+            archivedAt: null,
+            OR: [
+              { createdAt: { gte: from, lt: dayEnd } },
+              { sentAt: { gte: from, lt: dayEnd } },
+              { acceptedAt: { gte: from, lt: dayEnd } },
+            ],
+          },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            totalPrice: true,
+            subtotal: true,
+            createdByUserId: true,
+            createdAt: true,
+            sentAt: true,
+            acceptedAt: true,
+          },
+          take: 150,
+        }),
+        prisma.crmTask.findMany({
+          where: {
+            organizationId: actor.organizationId,
+            status: 'DONE',
+            completedAt: { gte: from, lt: dayEnd },
+          },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            assignedUserId: true,
+            completedAt: true,
+          },
+          take: 150,
+        }),
       ]);
 
       const pulseResult = buildCompanyAndMemberDailyPulse({
@@ -270,7 +338,39 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
         })),
       });
 
+      const salesSummary = buildSalesDailySummary({
+        date,
+        timezone: preferences.timezone,
+        members: pulseMembers,
+        offers: dayOffers.map((o) => ({
+          id: o.id,
+          title: o.title,
+          status: o.status,
+          totalPrice: o.totalPrice ? Number(o.totalPrice) : null,
+          subtotal: o.subtotal ? Number(o.subtotal) : null,
+          createdByUserId: o.createdByUserId,
+          createdAt: o.createdAt,
+          sentAt: o.sentAt,
+          acceptedAt: o.acceptedAt,
+        })),
+        crmTasks: dayCrmTasks,
+      });
+
       companyPulse = pulseResult.companyPulse;
+      ownerSnapshot = {
+        date,
+        sales: salesSummary,
+        submittedCheckoutsCount: pulseMembers.filter((m) => Boolean(checkoutsByUserId[m.userId])).length,
+        totalMembersCount: pulseMembers.length,
+        checkoutsByUserId,
+        pendingApprovals: pendingApprovalsAll,
+        recentDecisions: recentDecisionsAll,
+      };
+
+      myAutoSummary = buildUserAutoDaySummary({
+        sales: salesSummary.byUserId[actor.id],
+        work: pulseResult.byUserId[actor.id],
+      });
 
       for (const member of allMembers) {
         const [p, schedule, rawMemberTasks] = await Promise.all([
@@ -296,13 +396,88 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
           weekWorkCount: memberTasks.filter((t) => t.dueAt && dateInZone(new Date(t.dueAt), p.timezone) >= date && Date.parse(t.dueAt) <= +to).length,
           overCapacity: plannedTaskMinutes > weekFreeMinutes,
           dailyActivity: pulseResult.byUserId[member.userId],
+          salesActivity: salesSummary.byUserId[member.userId],
+          checkout: checkoutsByUserId[member.userId] ?? null,
         });
       }
     }
   }
 
+  // Build auto-summary for the logged-in user on non-team views
+  if (!myAutoSummary) {
+    const [myEmployee, myOffers, myCrmTasks] = await Promise.all([
+      prisma.employee.findFirst({ where: { organizationId: actor.organizationId, userId: actor.id, isActive: true }, select: { id: true } }),
+      prisma.offer.findMany({
+        where: {
+          organizationId: actor.organizationId,
+          createdByUserId: actor.id,
+          archivedAt: null,
+          OR: [
+            { sentAt: { gte: from, lt: dayEnd } },
+            { acceptedAt: { gte: from, lt: dayEnd } },
+          ],
+        },
+        select: { id: true, title: true, status: true, totalPrice: true, subtotal: true, createdByUserId: true, createdAt: true, sentAt: true, acceptedAt: true },
+        take: 50,
+      }),
+      prisma.crmTask.findMany({
+        where: { organizationId: actor.organizationId, assignedUserId: actor.id, status: 'DONE', completedAt: { gte: from, lt: dayEnd } },
+        select: { id: true, title: true, status: true, assignedUserId: true, completedAt: true },
+        take: 50,
+      }),
+    ]);
+
+    const myEntriesCount = myEmployee
+      ? await prisma.workEntry.findMany({
+          where: { organizationId: actor.organizationId, employeeId: myEmployee.id, workDate: { gte: from, lt: dayEnd } },
+          select: { quantity: true, remunerationMethod: true, unit: true },
+          take: 50,
+        })
+      : [];
+
+    const myHours = myEntriesCount.reduce((sum, e) => {
+      const isH = e.remunerationMethod === 'HOURLY' || e.unit.toLowerCase().includes('hod') || e.unit.toLowerCase() === 'h';
+      return sum + (isH ? Number(e.quantity) || 0 : 0);
+    }, 0);
+
+    const mySales = buildSalesDailySummary({
+      date,
+      timezone: preferences.timezone,
+      members: [{ userId: actor.id, name: actor.name || '' }],
+      offers: myOffers.map((o) => ({
+        id: o.id,
+        title: o.title,
+        status: o.status,
+        totalPrice: o.totalPrice ? Number(o.totalPrice) : null,
+        subtotal: o.subtotal ? Number(o.subtotal) : null,
+        createdByUserId: o.createdByUserId,
+        createdAt: o.createdAt,
+        sentAt: o.sentAt,
+        acceptedAt: o.acceptedAt,
+      })),
+      crmTasks: myCrmTasks,
+    });
+
+    myAutoSummary = buildUserAutoDaySummary({
+      sales: mySales.byUserId[actor.id],
+      work: myHours > 0
+        ? { activeTasks: [], completedTasks: [], rescheduledTasks: [], loggedHoursToday: Math.round(myHours * 10) / 10, entriesCountToday: myEntriesCount.length }
+        : undefined,
+    });
+  }
+
+  const myApprovals = allApprovals.filter((a) => a.requesterUserId === actor.id).slice(0, 8);
+  const myDayCheckout: {
+    submitted: DailyCheckoutRecord | null;
+    autoSummary: string;
+    myApprovals: ApprovalRequestRecord[];
+  } = {
+    submitted: checkoutsByUserId[actor.id] ?? null,
+    autoSummary: myAutoSummary,
+    myApprovals,
+  };
+
   const slots = findSlots({ from: new Date(Math.max(+from, Date.now())), to: dayEnd, durationMinutes: 60, participants: [{ preferences, busy: items.filter(i => i.busy) }], focus: true, limit: 3 });
-  const defaultsObj = actor.organization?.plannerDefaults as Record<string, unknown> | null;
   const sheetMeta = (defaultsObj?.googleSheetPlanSync as { lastSyncAt?: unknown } | null);
   const sheetSyncAt = typeof sheetMeta?.lastSyncAt === 'string' ? sheetMeta.lastSyncAt : null;
   const meetingReports = canSeeTeam(actor) ? sanitizeMeetingReports(defaultsObj?.meetingReports) : [];
@@ -323,6 +498,9 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
     slots,
     team,
     companyPulse,
+    ownerSnapshot,
+    myDayCheckout,
+    pendingApprovalsCount: canSeeTeam(actor) ? pendingApprovalsAll.length : 0,
     meetingReports,
     teamMembers: canSeeTeam(actor) ? pulseMembers : [],
     connections,

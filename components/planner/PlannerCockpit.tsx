@@ -27,6 +27,7 @@ import { BlockEditor } from './BlockEditor';
 import { Timeline } from './Timeline';
 import { TeamAvailability } from './TeamAvailability';
 import { WeekView } from './WeekView';
+import { DayCheckoutCard } from './DayCheckoutCard';
 
 function formatSyncTime(iso: string | null | undefined, timezone: string) {
   if (!iso) return null;
@@ -212,15 +213,21 @@ export function PlannerCockpit() {
           {[['today', 'Dnes'], ['week', 'Týden'], ...(data?.canSeeTeam ? [['team', 'Tým']] : [])].map(([id, label]) => (
             <button
               key={id}
+              aria-label={label}
               aria-current={view === id ? 'page' : undefined}
               onClick={() => setView(id)}
-              className={`rounded-xl px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold transition ${
+              className={`inline-flex items-center gap-1.5 rounded-xl px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold transition ${
                 view === id
                   ? 'bg-white text-slate-950 shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              {label}
+              <span>{label}</span>
+              {id === 'team' && (data?.pendingApprovalsCount ?? 0) > 0 && (
+                <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-white">
+                  {data?.pendingApprovalsCount}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -495,48 +502,52 @@ export function PlannerCockpit() {
                 </div>
               </section>
 
-              {/* RIGHT: ATTENTION & TELEMETRY */}
-              <aside className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-sm">
-                <div className="mb-4 flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${data.attention.length ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                      {data.attention.length ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+              {/* RIGHT: ATTENTION, TELEMETRY & DAILY CHECK-OUT */}
+              <aside className="space-y-5">
+                <div className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-sm">
+                  <div className="mb-4 flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${data.attention.length ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        {data.attention.length ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                      </div>
+                      <h2 className="text-base font-black text-slate-900">Co potřebuje pozornost</h2>
                     </div>
-                    <h2 className="text-base font-black text-slate-900">Co potřebuje pozornost</h2>
+                  </div>
+
+                  {data.attention.length ? (
+                    <div className="space-y-2.5">
+                      {data.attention.map((a, i) => {
+                        const isOverdueOrCollision = a.reason.includes('Po termínu') || a.reason.includes('překrývají');
+                        return (
+                          <Link
+                            key={i}
+                            href={a.href}
+                            className={`block rounded-2xl border p-3.5 transition hover:shadow-sm ${
+                              isOverdueOrCollision
+                                ? 'border-rose-200/90 bg-rose-50/70 hover:bg-rose-100/70'
+                                : 'border-amber-200/90 bg-amber-50/70 hover:bg-amber-100/70'
+                            }`}
+                          >
+                            <p className={`text-[11px] font-black uppercase tracking-wider ${isOverdueOrCollision ? 'text-rose-700' : 'text-amber-800'}`}>
+                              {a.reason}
+                            </p>
+                            <p className="mt-1 break-words text-sm font-bold text-slate-900">{a.title}</p>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-4 text-xs font-semibold text-slate-500">
+                      V dostupných datech nejsou blížící se termíny ani časové kolize.
+                    </p>
+                  )}
+
+                  <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50/90 px-3.5 py-2.5 text-xs font-medium text-slate-600">
+                    Přehled dne: <strong className="text-slate-900">{dayItems.length}</strong> v ose · <strong className="text-slate-900">{data.todayScheduledWorkCount ?? 0}</strong> úkolů v termínu · <strong className="text-emerald-800">{freeHours} h</strong> volných.
                   </div>
                 </div>
 
-                {data.attention.length ? (
-                  <div className="space-y-2.5">
-                    {data.attention.map((a, i) => {
-                      const isOverdueOrCollision = a.reason.includes('Po termínu') || a.reason.includes('překrývají');
-                      return (
-                        <Link
-                          key={i}
-                          href={a.href}
-                          className={`block rounded-2xl border p-3.5 transition hover:shadow-sm ${
-                            isOverdueOrCollision
-                              ? 'border-rose-200/90 bg-rose-50/70 hover:bg-rose-100/70'
-                              : 'border-amber-200/90 bg-amber-50/70 hover:bg-amber-100/70'
-                          }`}
-                        >
-                          <p className={`text-[11px] font-black uppercase tracking-wider ${isOverdueOrCollision ? 'text-rose-700' : 'text-amber-800'}`}>
-                            {a.reason}
-                          </p>
-                          <p className="mt-1 break-words text-sm font-bold text-slate-900">{a.title}</p>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-4 text-xs font-semibold text-slate-500">
-                    V dostupných datech nejsou blížící se termíny ani časové kolize.
-                  </p>
-                )}
-
-                <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50/90 px-3.5 py-2.5 text-xs font-medium text-slate-600">
-                  Přehled dne: <strong className="text-slate-900">{dayItems.length}</strong> v ose · <strong className="text-slate-900">{data.todayScheduledWorkCount ?? 0}</strong> úkolů v termínu · <strong className="text-emerald-800">{freeHours} h</strong> volných.
-                </div>
+                <DayCheckoutCard data={data} onSaved={() => void load({ silent: true })} />
               </aside>
             </div>
           )}
