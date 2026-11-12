@@ -5,6 +5,7 @@ import {
   buildCompanyAndMemberDailyPulse,
   extractMeetingStructuredFallback,
   renderMeetingReportEmail,
+  sanitizeMeetingEmailDefaults,
   sanitizeMeetingReports,
   type PulseMemberRef,
   type PulseOrderInput,
@@ -187,4 +188,51 @@ test('sanitizeMeetingReports filters invalid objects and retains valid report re
   assert.equal(sanitized.length, 1);
   assert.equal(sanitized[0].id, 'r1');
   assert.equal(sanitized[0].title, 'Porada 1');
+});
+
+test('renderMeetingReportEmail highlights personal tasks when recipientUserId is provided', () => {
+  const rendered = renderMeetingReportEmail(
+    {
+      id: 'rep-2',
+      title: 'Pondělní porada',
+      meetingDate: '2026-11-12',
+      createdAt: '2026-11-12T10:00:00Z',
+      createdByName: 'Pavel',
+      sourceType: 'TRANSCRIPT',
+      summary: 'Rozdělení úkolů na týden.',
+      decisions: ['Nový ceník od pondělí'],
+      actionItems: [
+        {
+          id: 'i1',
+          title: 'Připravit nabídku KFC',
+          assigneeName: 'Vladimíra Dvořáková',
+          assigneeUserId: 'u-vladka',
+          dueDate: '2026-11-13',
+          priority: 'HIGH',
+          estimatedHours: 1,
+          createWorkOrder: true,
+          addToMyPlannerBlock: false,
+        },
+      ],
+    },
+    'SeePoint s.r.o.',
+    'https://seepoint.vercel.app',
+    { recipientUserId: 'u-vladka', recipientName: 'Vladimíra Dvořáková' }
+  );
+
+  assert.match(rendered.subject, /Úkoly z porady \(1\): Pondělní porada/);
+  assert.match(rendered.html, /Přímo pro vás/);
+  assert.match(rendered.html, /Vladimíra Dvořáková/);
+  assert.match(rendered.text, /VAŠE ÚKOLY \(1\)/);
+});
+
+test('sanitizeMeetingEmailDefaults validates and deduplicates recipient defaults', () => {
+  const clean = sanitizeMeetingEmailDefaults({
+    sendToAssignees: true,
+    sendToManagers: false,
+    extraRecipients: ['Externi@Firma.CZ', 'bad', 'externi@firma.cz'],
+  });
+  assert.equal(clean.sendToAssignees, true);
+  assert.equal(clean.sendToManagers, false);
+  assert.deepEqual(clean.extraRecipients, ['externi@firma.cz']);
 });

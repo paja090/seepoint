@@ -14,6 +14,7 @@ import {
 } from './work-projection';
 import {
   buildCompanyAndMemberDailyPulse,
+  sanitizeMeetingEmailDefaults,
   sanitizeMeetingReports,
   type CompanyDailyPulse,
   type MemberDailyActivity,
@@ -220,7 +221,7 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
   let companyPulse: CompanyDailyPulse | null = null;
   let ownerSnapshot: OwnerReportSnapshot | null = null;
   let myAutoSummary = '';
-  const pulseMembers: Array<{ userId: string; name: string; employeeId?: string | null }> = [];
+  const pulseMembers: Array<{ userId: string; name: string; role?: string; employeeId?: string | null }> = [];
 
   if (canSeeTeam(actor)) {
     const allMembers = await activeMembers(actor.organizationId);
@@ -228,6 +229,7 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
       pulseMembers.push({
         userId: m.userId,
         name: m.user.name,
+        role: m.role,
         employeeId: m.user.employees[0]?.id ?? null,
       });
     }
@@ -482,6 +484,9 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
   const sheetMeta = (defaultsObj?.googleSheetPlanSync as { lastSyncAt?: unknown } | null);
   const sheetSyncAt = typeof sheetMeta?.lastSyncAt === 'string' ? sheetMeta.lastSyncAt : null;
   const meetingReports = canSeeTeam(actor) ? sanitizeMeetingReports(defaultsObj?.meetingReports) : [];
+  const meetingEmailDefaults = canSeeTeam(actor)
+    ? sanitizeMeetingEmailDefaults(defaultsObj?.meetingEmailDefaults)
+    : null;
   const ownerEmailSettings = canSeeTeam(actor)
     ? sanitizeOwnerEmailDigestSettings(defaultsObj?.ownerEmailDigest)
     : null;
@@ -504,6 +509,7 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
     companyPulse,
     ownerSnapshot,
     ownerEmailSettings,
+    meetingEmailDefaults,
     currentUserEmail: actor.email || null,
     myDayCheckout,
     pendingApprovalsCount: canSeeTeam(actor) ? pendingApprovalsAll.length : 0,

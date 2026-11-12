@@ -750,6 +750,29 @@ export function sanitizeMeetingReports(raw: unknown): MeetingReportRecord[] {
   return result.slice(0, 30);
 }
 
+export type MeetingEmailDefaults = {
+  sendToAssignees: boolean;
+  sendToManagers: boolean;
+  extraRecipients: string[];
+};
+
+export function sanitizeMeetingEmailDefaults(raw: unknown): MeetingEmailDefaults {
+  const obj = asObject(raw);
+  const sendToAssignees = typeof obj.sendToAssignees === 'boolean' ? obj.sendToAssignees : true;
+  const sendToManagers = typeof obj.sendToManagers === 'boolean' ? obj.sendToManagers : true;
+  const extraRecipients = Array.isArray(obj.extraRecipients)
+    ? [
+        ...new Set(
+          obj.extraRecipients
+            .filter((r): r is string => typeof r === 'string')
+            .map((r) => r.trim().toLowerCase())
+            .filter((r) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r))
+        ),
+      ].slice(0, 15)
+    : [];
+  return { sendToAssignees, sendToManagers, extraRecipients };
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -759,70 +782,134 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+function formatCzechDateBadge(isoDate: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return isoDate;
+  const [y, m, d] = isoDate.split('-');
+  return `${Number(d)}. ${Number(m)}. ${y}`;
+}
+
 export function renderMeetingReportEmail(
   report: MeetingReportRecord,
   organizationName: string,
-  baseUrl = 'https://seepoint.vercel.app'
+  baseUrl = 'https://seepoint.vercel.app',
+  options?: {
+    recipientUserId?: string | null;
+    recipientName?: string | null;
+  }
 ): { subject: string; html: string; text: string } {
   const cleanBase = baseUrl.replace(/\/+$/, '');
-  const subject = `Zápis z porady: ${report.title} (${report.meetingDate})`;
+  const personalTasks = options?.recipientUserId
+    ? report.actionItems.filter((item) => item.assigneeUserId === options.recipientUserId)
+    : [];
+
+  const subject =
+    personalTasks.length > 0
+      ? `Úkoly z porady (${personalTasks.length}): ${report.title}`
+      : `Zápis z porady: ${report.title} (${formatCzechDateBadge(report.meetingDate)})`;
+
+  const renderTaskRow = (item: MeetingActionItemDraft, highlightPersonal = false) => {
+    const isUrgent = item.priority === 'URGENT' || item.priority === 'HIGH';
+    const prioBadge = isUrgent
+      ? `<span style="display:inline-block;margin-left:6px;padding:2px 7px;border-radius:999px;background:#fee2e2;color:#b91c1c;font-size:10px;font-weight:800;text-transform:uppercase;">Prioritní</span>`
+      : '';
+    const linkHtml = item.createdWorkOrderId
+      ? `<a href="${escapeHtml(`${cleanBase}/work/${item.createdWorkOrderId}`)}" style="display:inline-block;margin-top:8px;font-size:12px;font-weight:800;color:#059669;text-decoration:none;">Otevřít zakázku v systému →</a>`
+      : '';
+
+    return `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 10px;border-collapse:separate;border:1px solid ${
+        highlightPersonal ? '#a7f3d0' : '#e2e8f0'
+      };border-radius:12px;background:${highlightPersonal ? '#ecfdf5' : '#ffffff'};">
+        <tr>
+          <td style="padding:12px 14px;">
+            <div style="font-size:14.5px;font-weight:800;line-height:1.4;color:#0f172a;">
+              ${escapeHtml(item.title)}${prioBadge}
+            </div>
+            <div style="margin-top:6px;font-size:12.5px;color:#475569;line-height:1.5;">
+              <span style="display:inline-block;padding:2px 8px;border-radius:6px;background:#f1f5f9;color:#0f172a;font-weight:700;margin-right:6px;">
+                👤 ${escapeHtml(item.assigneeName || 'Nepřiřazeno')}
+              </span>
+              <span style="display:inline-block;padding:2px 8px;border-radius:6px;background:#f1f5f9;color:#334155;font-weight:700;">
+                📅 Termín: ${escapeHtml(formatCzechDateBadge(item.dueDate))}
+              </span>
+            </div>
+            ${linkHtml}
+          </td>
+        </tr>
+      </table>`;
+  };
+
+  const personalBlockHtml =
+    personalTasks.length > 0
+      ? `
+        <div style="margin:0 0 22px;padding:16px 18px;border-radius:14px;border:2px solid #10b981;background:#f0fdf4;">
+          <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:#047857;margin-bottom:8px;">
+            🎯 Přímo pro vás (${escapeHtml(options?.recipientName || 'vaše úkoly')})
+          </div>
+          ${personalTasks.map((t) => renderTaskRow(t, true)).join('')}
+        </div>`
+      : '';
 
   const decisionsHtml = report.decisions.length
-    ? `<ul style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.6;color:#1e293b;">
-        ${report.decisions.map((d) => `<li>${escapeHtml(d)}</li>`).join('')}
-       </ul>`
-    : '<p style="margin:0;font-size:13px;color:#64748b;">Bez zaznamenaných rozhodnutí.</p>';
-
-  const tasksHtml = report.actionItems.length
-    ? report.actionItems
+    ? report.decisions
         .map(
-          (item) => `
-        <div style="margin:0 0 8px;padding:10px 12px;border-radius:10px;border:1px solid #e2e8f0;background:#f8fafc;">
-          <div style="font-size:14px;font-weight:800;color:#0f172a;">
-            ${escapeHtml(item.title)}
-          </div>
-          <div style="margin-top:4px;font-size:12px;color:#475569;">
-            Odpovědná osoba: <strong>${escapeHtml(item.assigneeName || 'Nepřiřazeno')}</strong>
-            · Termín: <strong>${escapeHtml(item.dueDate)}</strong>
-            ${
-              item.createdWorkOrderId
-                ? ` · <a href="${escapeHtml(`${cleanBase}/work/${item.createdWorkOrderId}`)}" style="color:#059669;font-weight:700;text-decoration:none;">Otevřít zakázku →</a>`
-                : ''
-            }
-          </div>
-        </div>`
+          (d, idx) => `
+          <div style="margin:0 0 8px;padding:10px 12px;border-radius:10px;background:#f8fafc;border-left:3px solid #0ea5e9;font-size:13.5px;line-height:1.5;color:#1e293b;">
+            <strong style="color:#0369a1;">${idx + 1}.</strong> ${escapeHtml(d)}
+          </div>`
         )
         .join('')
-    : '<p style="margin:0;font-size:13px;color:#64748b;">Žádné úkoly nebyly vytvořeny.</p>';
+    : '<p style="margin:0;font-size:13px;color:#64748b;">Bez zvláštních rozhodnutí.</p>';
+
+  const allTasksHtml = report.actionItems.length
+    ? report.actionItems.map((t) => renderTaskRow(t, false)).join('')
+    : '<p style="margin:0;font-size:13px;color:#64748b;">Na této poradě nebyly vytvořeny žádné úkoly.</p>';
 
   const html = `
-    <div style="margin:0;background:#f1f5f9;padding:24px 12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0f172a;">
-      <div style="max-width:640px;margin:0 auto;border-radius:18px;overflow:hidden;background:#ffffff;border:1px solid #e2e8f0;">
-        <div style="background:linear-gradient(135deg,#0f172a 0%,#064e3b 100%);padding:22px 24px;color:#ffffff;">
-          <div style="font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#6ee7b7;margin-bottom:6px;">
-            ${escapeHtml(organizationName)} · Zápis a úkoly z porady
+    <div style="margin:0;background:#f1f5f9;padding:28px 12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0f172a;">
+      <div style="max-width:620px;margin:0 auto;border-radius:18px;overflow:hidden;background:#ffffff;border:1px solid #e2e8f0;box-shadow:0 2px 10px rgba(15,23,42,0.05);">
+        <div style="height:6px;background:#059669;"></div>
+        <div style="padding:24px 26px 18px;border-bottom:1px solid #f1f5f9;">
+          <div style="font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#059669;margin-bottom:6px;">
+            ${escapeHtml(organizationName)} · Zápis z porady
           </div>
-          <h1 style="margin:0 0 6px;font-size:20px;font-weight:900;color:#ffffff;">
+          <h1 style="margin:0 0 8px;font-size:21px;line-height:1.3;font-weight:900;color:#0f172a;">
             ${escapeHtml(report.title)}
           </h1>
-          <div style="font-size:12.5px;color:#cbd5e1;">
-            Datum: ${escapeHtml(report.meetingDate)} · Zapsal(a): ${escapeHtml(report.createdByName)}
+          <div style="font-size:13px;color:#64748b;font-weight:600;">
+            📅 ${escapeHtml(formatCzechDateBadge(report.meetingDate))} &nbsp;·&nbsp; ✍️ Zapsal(a): ${escapeHtml(report.createdByName)}
           </div>
         </div>
-        <div style="padding:20px 24px;">
-          <h2 style="margin:0 0 8px;font-size:13px;font-weight:900;text-transform:uppercase;color:#047857;">Shrnutí porady</h2>
-          <p style="margin:0 0 16px;font-size:14px;line-height:1.55;color:#334155;">
-            ${escapeHtml(report.summary)}
-          </p>
-          <h2 style="margin:0 0 8px;font-size:13px;font-weight:900;text-transform:uppercase;color:#0f172a;">Klíčová rozhodnutí a závěry</h2>
-          <div style="margin-bottom:16px;">
+
+        <div style="padding:22px 26px;">
+          ${personalBlockHtml}
+
+          <div style="margin:0 0 22px;">
+            <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:#64748b;margin-bottom:8px;">
+              📝 O čem porada byla
+            </div>
+            <div style="padding:14px 16px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;font-size:14px;line-height:1.6;color:#1e293b;">
+              ${escapeHtml(report.summary)}
+            </div>
+          </div>
+
+          <div style="margin:0 0 22px;">
+            <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:#64748b;margin-bottom:8px;">
+              ✅ Klíčová rozhodnutí (${report.decisions.length})
+            </div>
             ${decisionsHtml}
           </div>
-          <h2 style="margin:0 0 8px;font-size:13px;font-weight:900;text-transform:uppercase;color:#0f172a;">Rozdělené úkoly (${report.actionItems.length})</h2>
-          ${tasksHtml}
-          <div style="margin-top:18px;padding-top:14px;border-top:1px solid #e2e8f0;">
-            <a href="${escapeHtml(`${cleanBase}/planner`)}" style="display:inline-block;padding:10px 16px;border-radius:10px;background:#059669;color:#ffffff;font-size:13px;font-weight:800;text-decoration:none;">
-              Otevřít Planner a přehled týmu →
+
+          <div style="margin:0 0 22px;">
+            <div style="font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:#64748b;margin-bottom:10px;">
+              📋 Úkoly z porady (${report.actionItems.length})
+            </div>
+            ${allTasksHtml}
+          </div>
+
+          <div style="padding-top:16px;border-top:1px solid #f1f5f9;text-align:center;">
+            <a href="${escapeHtml(`${cleanBase}/planner`)}" style="display:inline-block;padding:12px 22px;border-radius:12px;background:#0f172a;color:#ffffff;font-size:13.5px;font-weight:800;text-decoration:none;">
+              Otevřít v SeePoint Planneru →
             </a>
           </div>
         </div>
@@ -832,17 +919,24 @@ export function renderMeetingReportEmail(
 
   const text = [
     subject,
-    `Zapsal(a): ${report.createdByName}`,
+    `Datum: ${formatCzechDateBadge(report.meetingDate)} | Zapsal(a): ${report.createdByName}`,
+    ...(personalTasks.length
+      ? [
+          '',
+          `VAŠE ÚKOLY (${personalTasks.length}):`,
+          ...personalTasks.map((i) => `- ${i.title} (termín ${formatCzechDateBadge(i.dueDate)})`),
+        ]
+      : []),
     '',
     'SHRNUTÍ:',
     report.summary,
     '',
     'ROZHODNUTÍ:',
-    ...report.decisions.map((d) => `- ${d}`),
+    ...report.decisions.map((d, idx) => `${idx + 1}. ${d}`),
     '',
     'ÚKOLY:',
     ...report.actionItems.map(
-      (i) => `- ${i.title} (${i.assigneeName || 'Nepřiřazeno'}, termín ${i.dueDate})`
+      (i) => `- ${i.title} (${i.assigneeName || 'Nepřiřazeno'}, termín ${formatCzechDateBadge(i.dueDate)})`
     ),
     '',
     `Planner: ${cleanBase}/planner`,

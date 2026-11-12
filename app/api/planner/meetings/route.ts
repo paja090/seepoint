@@ -7,6 +7,7 @@ import { localInstant, plusDays } from '@/lib/planner/time';
 import {
   analyzeMeetingTranscript,
   renderMeetingReportEmail,
+  sanitizeMeetingEmailDefaults,
   sanitizeMeetingReports,
   type MeetingActionItemDraft,
   type MeetingReportRecord,
@@ -15,6 +16,7 @@ import {
 import { syncWorkOrderTasks } from '@/lib/work-task-sync';
 import { sendTransactionalEmail } from '@/lib/email';
 import { hasModuleAccess } from '@/lib/module-policy';
+import { getAppOrigin } from '@/lib/app-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +24,113 @@ function asObject(val: unknown): Record<string, unknown> {
   return val && typeof val === 'object' && !Array.isArray(val)
     ? (val as Record<string, unknown>)
     : {};
+}
+
+async function resolveAndSendMeetingEmails(params: {
+  organizationId: string;
+  organizationName: string;
+  report: MeetingReportRecord;
+  baseUrl: string;
+  recipientUserIds?: string[];
+  extraEmails?: string[];
+  includeAssignees?: boolean;
+  includeManagers?: boolean;
+}): Promise<{ sentCount: number; recipientEmails: string[] }> {
+  const allActiveMembers = await prisma.organizationMember.findMany({
+    where: {
+      organizationId: params.organizationId,
+      isActive: true,
+      user: { status: 'ACTIVE', email: { not: '' } },
+    },
+    select: {
+      userId: true,
+      role: true,
+      user: { select: { email: true, name: true } },
+    },
+  });
+
+  const targetByEmail = new Map<
+    string,
+    { email: string; userId: string | null; name: string | null }
+  >();
+
+  const addMember = (m: (typeof allActiveMembers)[number]) => {
+    const emailClean = m.user?.email?.trim().toLowerCase();
+    if (!emailClean || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailClean)) return;
+    if (!targetByEmail.has(emailClean)) {
+      targetByEmail.set(emailClean, {
+        email: emailClean,
+        userId: m.userId,
+        name: m.user?.name || null,
+      });
+    }
+  };
+
+  if (Array.isArray(params.recipientUserIds) && params.recipientUserIds.length > 0) {
+    const selectedSet = new Set(params.recipientUserIds);
+    for (const m of allActiveMembers) {
+      if (selectedSet.has(m.userId)) addMember(m);
+    }
+  } else {
+    if (params.includeAssignees) {
+      const assigneeIds = new Set(
+        params.report.actionItems
+          .map((i) => i.assigneeUserId)
+          .filter((id): id is string => Boolean(id))
+      );
+      for (const m of allActiveMembers) {
+        if (assigneeIds.has(m.userId)) addMember(m);
+      }
+    }
+    if (params.includeManagers) {
+      for (const m of allActiveMembers) {
+        if (['OWNER', 'ADMIN', 'MANAGER'].includes(m.role)) addMember(m);
+      }
+    }
+  }
+
+  for (const extra of params.extraEmails ?? []) {
+    const clean = extra.trim().toLowerCase();
+    if (!clean || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) continue;
+    if (!targetByEmail.has(clean)) {
+      targetByEmail.set(clean, { email: clean, userId: null, name: null });
+    }
+  }
+
+  let sentCount = 0;
+  const recipientEmails: string[] = [];
+
+  for (const target of targetByEmail.values()) {
+    const rendered = renderMeetingReportEmail(
+      params.report,
+      params.organizationName,
+      params.baseUrl,
+      {
+        recipientUserId: target.userId,
+        recipientName: target.name,
+      }
+    );
+    try {
+      const res = await sendTransactionalEmail({
+        to: target.email,
+        bcc: [],
+        subject: rendered.subject,
+        message: rendered.text,
+        template: 'meeting-report',
+        customHtml: rendered.html,
+        organizationId: params.organizationId,
+        allowPlatformFallback: true,
+      });
+      if (res.status === 'sent') {
+        sentCount++;
+      }
+      recipientEmails.push(target.email);
+    } catch (err) {
+      console.error('[planner-meetings] Failed to send email to', target.email, err);
+    }
+  }
+
+  return { sentCount, recipientEmails };
 }
 
 export function POST(request: Request) {
@@ -228,40 +337,50 @@ export function POST(request: Request) {
       const existingReports = sanitizeMeetingReports(prevDefaults.meetingReports);
       const updatedReports = [newReport, ...existingReports.filter((r) => r.id !== reportId)].slice(0, 25);
 
-      let emailedToCount = 0;
-      if (sendEmail) {
-        const managers = await prisma.organizationMember.findMany({
-          where: {
-            organizationId: actor.organizationId,
-            isActive: true,
-            role: { in: ['OWNER', 'ADMIN', 'MANAGER'] },
-            user: { status: 'ACTIVE', email: { not: '' } },
-          },
-          select: { user: { select: { email: true, name: true } } },
+      const recipientUserIds = Array.isArray(body.recipientUserIds)
+        ? body.recipientUserIds.filter((id): id is string => typeof id === 'string' && Boolean(id.trim()))
+        : undefined;
+      const extraEmails =
+        typeof body.extraEmailsText === 'string'
+          ? body.extraEmailsText.split(/[,;\s]+/).filter(Boolean)
+          : Array.isArray(body.extraEmails)
+          ? body.extraEmails.filter((e): e is string => typeof e === 'string')
+          : [];
+      const includeAssignees =
+        typeof body.sendToAssignees === 'boolean' ? body.sendToAssignees : true;
+      const includeManagers =
+        typeof body.sendEmailToManagers === 'boolean' ? body.sendEmailToManagers : true;
+
+      const shouldSend =
+        sendEmail ||
+        (recipientUserIds && recipientUserIds.length > 0) ||
+        extraEmails.length > 0 ||
+        includeAssignees;
+
+      let sentEmailsList: string[] = [];
+      if (shouldSend) {
+        const emailOutcome = await resolveAndSendMeetingEmails({
+          organizationId: actor.organizationId,
+          organizationName: org?.name || 'SeePoint',
+          report: newReport,
+          baseUrl: getAppOrigin(request),
+          recipientUserIds,
+          extraEmails,
+          includeAssignees,
+          includeManagers,
         });
-
-        const orgName = org?.name || 'SeePoint';
-        const rendered = renderMeetingReportEmail(newReport, orgName);
-
-        for (const m of managers) {
-          if (!m.user?.email) continue;
-          try {
-            await sendTransactionalEmail({
-              to: m.user.email,
-              subject: rendered.subject,
-              message: rendered.text,
-              template: 'meeting-report',
-              customHtml: rendered.html,
-              organizationId: actor.organizationId,
-            });
-            emailedToCount++;
-          } catch (err) {
-            console.error('[planner-meetings] Failed to send email to', m.user.email, err);
-          }
-        }
-        newReport.emailedToCount = emailedToCount;
-        updatedReports[0].emailedToCount = emailedToCount;
+        newReport.emailedToCount = emailOutcome.sentCount || emailOutcome.recipientEmails.length;
+        updatedReports[0].emailedToCount = newReport.emailedToCount;
+        sentEmailsList = emailOutcome.recipientEmails;
       }
+
+      const nextEmailDefaults = body.saveEmailDefaults
+        ? sanitizeMeetingEmailDefaults({
+            sendToAssignees: includeAssignees,
+            sendToManagers: includeManagers,
+            extraRecipients: extraEmails,
+          })
+        : prevDefaults.meetingEmailDefaults;
 
       await prisma.organization.update({
         where: { id: actor.organizationId },
@@ -269,6 +388,7 @@ export function POST(request: Request) {
           plannerDefaults: {
             ...prevDefaults,
             meetingReports: updatedReports,
+            ...(nextEmailDefaults ? { meetingEmailDefaults: nextEmailDefaults } : {}),
           },
         },
       });
@@ -276,7 +396,82 @@ export function POST(request: Request) {
       return {
         ok: true,
         report: newReport,
+        sentEmails: sentEmailsList,
       };
+    }
+
+    if (action === 'resend_email') {
+      const reportId = typeof body.reportId === 'string' ? body.reportId : '';
+      const org = await prisma.organization.findUnique({
+        where: { id: actor.organizationId },
+        select: { plannerDefaults: true, name: true },
+      });
+      const prevDefaults = asObject(org?.plannerDefaults);
+      const existingReports = sanitizeMeetingReports(prevDefaults.meetingReports);
+      const report = existingReports.find((r) => r.id === reportId);
+      if (!report) {
+        return new Response(JSON.stringify({ error: 'Zápis z porady nebyl nalezen.' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      const recipientUserIds = Array.isArray(body.recipientUserIds)
+        ? body.recipientUserIds.filter((id): id is string => typeof id === 'string' && Boolean(id.trim()))
+        : undefined;
+      const extraEmails =
+        typeof body.extraEmailsText === 'string'
+          ? body.extraEmailsText.split(/[,;\s]+/).filter(Boolean)
+          : [];
+
+      const outcome = await resolveAndSendMeetingEmails({
+        organizationId: actor.organizationId,
+        organizationName: org?.name || 'SeePoint',
+        report,
+        baseUrl: getAppOrigin(request),
+        recipientUserIds,
+        extraEmails,
+        includeAssignees: true,
+        includeManagers: false,
+      });
+
+      return {
+        ok: true,
+        sentCount: outcome.sentCount,
+        recipientEmails: outcome.recipientEmails,
+      };
+    }
+
+    if (action === 'save_email_defaults') {
+      const org = await prisma.organization.findUnique({
+        where: { id: actor.organizationId },
+        select: { plannerDefaults: true },
+      });
+      const prevDefaults = asObject(org?.plannerDefaults);
+      const extraRecipients =
+        typeof body.extraRecipientsText === 'string'
+          ? body.extraRecipientsText.split(/[,;\s]+/).filter(Boolean)
+          : Array.isArray(body.extraRecipients)
+          ? body.extraRecipients.filter((r): r is string => typeof r === 'string')
+          : [];
+
+      const nextDefaults = sanitizeMeetingEmailDefaults({
+        sendToAssignees: body.sendToAssignees,
+        sendToManagers: body.sendToManagers,
+        extraRecipients,
+      });
+
+      await prisma.organization.update({
+        where: { id: actor.organizationId },
+        data: {
+          plannerDefaults: {
+            ...prevDefaults,
+            meetingEmailDefaults: nextDefaults,
+          },
+        },
+      });
+
+      return { ok: true, defaults: nextDefaults };
     }
 
     return new Response(JSON.stringify({ error: 'Neznámá akce.' }), {

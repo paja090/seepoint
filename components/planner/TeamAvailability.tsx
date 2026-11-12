@@ -86,6 +86,7 @@ export function TeamAvailability({
   const [savingEmailSettings, setSavingEmailSettings] = useState(false);
 
   // Meeting modal form state
+  const meetingEmailCfg = data.meetingEmailDefaults;
   const [meetingStep, setMeetingStep] = useState<'input' | 'review'>('input');
   const [meetingTitle, setMeetingTitle] = useState('');
   const [meetingDate, setMeetingDate] = useState(data.date);
@@ -96,7 +97,18 @@ export function TeamAvailability({
   const [meetingSummary, setMeetingSummary] = useState('');
   const [meetingDecisions, setMeetingDecisions] = useState<string[]>([]);
   const [meetingTasks, setMeetingTasks] = useState<MeetingActionItemDraft[]>([]);
-  const [sendMeetingEmail, setSendMeetingEmail] = useState(true);
+  const [sendToAssignees, setSendToAssignees] = useState(meetingEmailCfg?.sendToAssignees ?? true);
+  const [sendToManagers, setSendToManagers] = useState(meetingEmailCfg?.sendToManagers ?? true);
+  const [meetingRecipientIds, setMeetingRecipientIds] = useState<string[]>([]);
+  const [meetingExtraEmailsText, setMeetingExtraEmailsText] = useState(
+    (meetingEmailCfg?.extraRecipients ?? []).join(', ')
+  );
+  const [saveMeetingEmailDefaults, setSaveMeetingEmailDefaults] = useState(false);
+
+  // Resend modal / detail state
+  const [resendRecipientIds, setResendRecipientIds] = useState<string[]>([]);
+  const [resendExtraText, setResendExtraText] = useState('');
+  const [resendingEmail, setResendingEmail] = useState(false);
 
   const toggleMemberExpand = (id: string) => {
     setExpandedMembers((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -225,6 +237,27 @@ export function TeamAvailability({
     }
   }
 
+  function computeDefaultRecipients(
+    tasksList: MeetingActionItemDraft[],
+    includeAssig: boolean,
+    includeMgrs: boolean
+  ): string[] {
+    const ids = new Set<string>();
+    if (includeAssig) {
+      for (const t of tasksList) {
+        if (t.assigneeUserId) ids.add(t.assigneeUserId);
+      }
+    }
+    if (includeMgrs) {
+      for (const m of data.teamMembers ?? []) {
+        if (m.role && ['OWNER', 'ADMIN', 'MANAGER'].includes(m.role)) {
+          ids.add(m.userId);
+        }
+      }
+    }
+    return [...ids];
+  }
+
   const handleAnalyzeMeeting = async () => {
     if (!meetingTranscript.trim()) {
       setMeetingError('Vložte prosím přepis nebo poznámky z porady.');
@@ -249,10 +282,14 @@ export function TeamAvailability({
       });
 
       if (res.ok && res.draft) {
+        const items = res.draft.actionItems || [];
         setMeetingTitle(res.draft.title || meetingTitle || 'Porada týmu');
         setMeetingSummary(res.draft.summary || '');
         setMeetingDecisions(res.draft.decisions || []);
-        setMeetingTasks(res.draft.actionItems || []);
+        setMeetingTasks(items);
+        setMeetingRecipientIds(
+          computeDefaultRecipients(items, sendToAssignees, sendToManagers)
+        );
         setMeetingStep('review');
       }
     } catch (err) {
@@ -266,14 +303,22 @@ export function TeamAvailability({
     setSavingMeeting(true);
     setMeetingError('');
     try {
-      const res = await plannerRequest<{ ok: boolean; report: MeetingReportRecord }>('/meetings', {
+      const res = await plannerRequest<{
+        ok: boolean;
+        report: MeetingReportRecord;
+        sentEmails?: string[];
+      }>('/meetings', {
         action: 'commit',
         title: meetingTitle,
         meetingDate,
         summary: meetingSummary,
         decisions: meetingDecisions,
         actionItems: meetingTasks,
-        sendEmailToManagers: sendMeetingEmail,
+        recipientUserIds: meetingRecipientIds,
+        extraEmailsText: meetingExtraEmailsText,
+        sendToAssignees,
+        sendEmailToManagers: sendToManagers,
+        saveEmailDefaults: saveMeetingEmailDefaults,
       });
 
       if (res.ok) {
@@ -283,6 +328,11 @@ export function TeamAvailability({
         setMeetingSummary('');
         setMeetingDecisions([]);
         setMeetingTasks([]);
+        setOwnerNotice(
+          res.sentEmails && res.sentEmails.length > 0
+            ? `Porada uložena, úkoly založeny a zápis odeslán (${res.sentEmails.join(', ')}).`
+            : 'Porada byla uložena a úkoly založeny.'
+        );
         onReload?.();
       }
     } catch (err) {
@@ -291,6 +341,35 @@ export function TeamAvailability({
       setSavingMeeting(false);
     }
   };
+
+  async function handleResendMeetingReport(reportId: string) {
+    if (!resendRecipientIds.length && !resendExtraText.trim()) return;
+    setResendingEmail(true);
+    try {
+      const res = await plannerRequest<{
+        ok: boolean;
+        sentCount: number;
+        recipientEmails: string[];
+      }>('/meetings', {
+        action: 'resend_email',
+        reportId,
+        recipientUserIds: resendRecipientIds,
+        extraEmailsText: resendExtraText,
+      });
+      if (res.ok) {
+        setOwnerNotice(
+          res.sentCount > 0
+            ? `Zápis z porady byl přeposlán na: ${res.recipientEmails.join(', ')}.`
+            : `Zápis připraven k odeslání pro: ${res.recipientEmails.join(', ')}.`
+        );
+        setActiveReportDetail(null);
+      }
+    } catch (err) {
+      setOwnerNotice(err instanceof Error ? err.message : 'Přeposlání e-mailu selhalo.');
+    } finally {
+      setResendingEmail(false);
+    }
+  }
 
   const pulse = data.companyPulse;
   const owner = data.ownerSnapshot;
@@ -921,10 +1000,16 @@ export function TeamAvailability({
                 <div className="mt-3 border-t border-slate-100 pt-2 text-right">
                   <button
                     type="button"
-                    onClick={() => setActiveReportDetail(report)}
+                    onClick={() => {
+                      setActiveReportDetail(report);
+                      setResendRecipientIds(
+                        computeDefaultRecipients(report.actionItems, sendToAssignees, sendToManagers)
+                      );
+                      setResendExtraText(meetingExtraEmailsText);
+                    }}
                     className="text-xs font-extrabold text-emerald-800 hover:underline"
                   >
-                    Zobrazit celý zápis a rozhodnutí →
+                    Zobrazit celý zápis a odeslat lidem →
                   </button>
                 </div>
               </div>
@@ -1077,6 +1162,61 @@ export function TeamAvailability({
                   </div>
                 </div>
               )}
+
+              {/* RESEND SECTION */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-3 text-xs">
+                <p className="text-[11px] font-black uppercase tracking-wider text-slate-700">
+                  ✉️ Poslat nebo přeposlat zápis lidem z porady
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(data.teamMembers ?? []).map((m) => {
+                    const isAssigned = activeReportDetail.actionItems.some(
+                      (i) => i.assigneeUserId === m.userId
+                    );
+                    const checked = resendRecipientIds.includes(m.userId);
+                    return (
+                      <button
+                        key={m.userId}
+                        type="button"
+                        onClick={() =>
+                          setResendRecipientIds((prev) =>
+                            checked ? prev.filter((id) => id !== m.userId) : [...prev, m.userId]
+                          )
+                        }
+                        className={`rounded-full px-2.5 py-1 text-xs font-bold transition border ${
+                          checked
+                            ? 'border-emerald-500 bg-emerald-600 text-white'
+                            : isAssigned
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+                            : 'border-slate-300 bg-white text-slate-700'
+                        }`}
+                      >
+                        {checked ? '✓ ' : ''}
+                        {m.name}
+                        {isAssigned ? ' (úkol)' : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+                <input
+                  type="text"
+                  placeholder="Další e-maily (např. externi@firma.cz, oddělené čárkou)"
+                  value={resendExtraText}
+                  onChange={(e) => setResendExtraText(e.target.value)}
+                  className="block w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900"
+                />
+                <button
+                  type="button"
+                  disabled={resendingEmail || (!resendRecipientIds.length && !resendExtraText.trim())}
+                  onClick={() => handleResendMeetingReport(activeReportDetail.id)}
+                  className={primaryButton}
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  <span>
+                    {resendingEmail ? 'Odesílám…' : `Odeslat e-mail (${resendRecipientIds.length})`}
+                  </span>
+                </button>
+              </div>
             </div>
 
             <div className="mt-6 border-t border-slate-100 pt-3 text-right">
@@ -1397,16 +1537,126 @@ export function TeamAvailability({
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-800">
-                    <input
-                      type="checkbox"
-                      checked={sendMeetingEmail}
-                      onChange={(e) => setSendMeetingEmail(e.target.checked)}
-                      className="h-4 w-4 rounded text-emerald-600"
-                    />
-                    <span>Odeslat přehledný zápis a seznam úkolů všem manažerům e-mailem</span>
-                  </label>
+                <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/50 p-4 space-y-3 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-emerald-950">
+                      ✉️ Komu odeslat zápis a úkoly ({meetingRecipientIds.length} lidí)
+                    </span>
+                    <div className="flex flex-wrap gap-1.5 text-[11px]">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMeetingRecipientIds(
+                            computeDefaultRecipients(meetingTasks, true, false)
+                          )
+                        }
+                        className="font-extrabold text-emerald-800 hover:underline"
+                      >
+                        Jen z úkolů
+                      </button>
+                      <span className="text-slate-300">·</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMeetingRecipientIds(
+                            computeDefaultRecipients(meetingTasks, true, true)
+                          )
+                        }
+                        className="font-extrabold text-emerald-800 hover:underline"
+                      >
+                        Úkoly + vedení
+                      </button>
+                      <span className="text-slate-300">·</span>
+                      <button
+                        type="button"
+                        onClick={() => setMeetingRecipientIds([])}
+                        className="font-bold text-slate-500 hover:underline"
+                      >
+                        Nikomu
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {(data.teamMembers ?? []).map((m) => {
+                      const hasTask = meetingTasks.some((t) => t.assigneeUserId === m.userId);
+                      const checked = meetingRecipientIds.includes(m.userId);
+                      return (
+                        <button
+                          key={m.userId}
+                          type="button"
+                          onClick={() =>
+                            setMeetingRecipientIds((prev) =>
+                              checked ? prev.filter((id) => id !== m.userId) : [...prev, m.userId]
+                            )
+                          }
+                          className={`rounded-full px-2.5 py-1 text-xs font-bold transition border ${
+                            checked
+                              ? 'border-emerald-500 bg-emerald-600 text-white shadow-sm'
+                              : hasTask
+                              ? 'border-emerald-300 bg-white text-emerald-900'
+                              : 'border-slate-300 bg-white text-slate-700'
+                          }`}
+                        >
+                          {checked ? '✓ ' : ''}
+                          {m.name}
+                          {hasTask ? ' (má úkol)' : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <input
+                    type="text"
+                    placeholder="Další e-maily (např. klient nebo externí kolega, oddělené čárkou)"
+                    value={meetingExtraEmailsText}
+                    onChange={(e) => setMeetingExtraEmailsText(e.target.value)}
+                    className="block w-full rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900"
+                  />
+
+                  <div className="flex flex-wrap items-center gap-4 pt-1 border-t border-emerald-200/60">
+                    <label className="flex items-center gap-1.5 cursor-pointer font-semibold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={sendToAssignees}
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setSendToAssignees(val);
+                          setMeetingRecipientIds(
+                            computeDefaultRecipients(meetingTasks, val, sendToManagers)
+                          );
+                        }}
+                        className="h-3.5 w-3.5 rounded text-emerald-600"
+                      />
+                      <span>Automaticky předvybrat lidi z úkolů</span>
+                    </label>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer font-semibold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={sendToManagers}
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setSendToManagers(val);
+                          setMeetingRecipientIds(
+                            computeDefaultRecipients(meetingTasks, sendToAssignees, val)
+                          );
+                        }}
+                        className="h-3.5 w-3.5 rounded text-emerald-600"
+                      />
+                      <span>Přidat vedení / manažery</span>
+                    </label>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer font-bold text-emerald-900">
+                      <input
+                        type="checkbox"
+                        checked={saveMeetingEmailDefaults}
+                        onChange={(e) => setSaveMeetingEmailDefaults(e.target.checked)}
+                        className="h-3.5 w-3.5 rounded text-emerald-600"
+                      />
+                      <span>Uložit jako výchozí pro příště</span>
+                    </label>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
