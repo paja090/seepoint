@@ -660,6 +660,108 @@ export function TeamAvailability({
         </section>
       )}
 
+      {/* ZÁPISY Z PORAD & ÚKOLY V PLANNERU */}
+      <section className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-100 text-purple-700">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-900">Zápisy a rozdělené úkoly z porad</h3>
+              <p className="text-xs text-slate-500">
+                AI automaticky vytahuje ze záznamů rozhodnutí a úkoly spárované s lidmi.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMeetingDate(data.date);
+              setMeetingStep('input');
+              setShowMeetingModal(true);
+            }}
+            className={secondaryButton}
+          >
+            <Plus className="h-4 w-4 text-purple-700" />
+            <span>+ Zadat poradu z krabičky</span>
+          </button>
+        </div>
+
+        {data.meetingReports && data.meetingReports.length > 0 ? (
+          <div className="mt-4 space-y-3">
+            {data.meetingReports.map((report) => (
+              <div
+                key={report.id}
+                className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 transition hover:bg-white hover:shadow-sm"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <span className="text-[11px] font-bold text-slate-400">
+                      {report.meetingDate} · Zapsal(a): {report.createdByName}
+                    </span>
+                    <h4 className="text-base font-black text-slate-900">{report.title}</h4>
+                  </div>
+                  {report.emailedToCount && report.emailedToCount > 0 ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
+                      <Mail className="h-3 w-3" />
+                      <span>Odesláno manažerům ({report.emailedToCount})</span>
+                    </span>
+                  ) : null}
+                </div>
+
+                <p className="mt-2 text-xs leading-relaxed text-slate-600 line-clamp-2">{report.summary}</p>
+
+                {report.actionItems.length > 0 && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                      Úkoly ({report.actionItems.length}):
+                    </span>
+                    {report.actionItems.slice(0, 4).map((t, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-800 shadow-sm"
+                      >
+                        <span>{t.title}</span>
+                        {t.assigneeName && (
+                          <span className="text-emerald-700">· {t.assigneeName}</span>
+                        )}
+                      </span>
+                    ))}
+                    {report.actionItems.length > 4 && (
+                      <span className="text-xs font-bold text-slate-500">
+                        +{report.actionItems.length - 4} další
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-3 border-t border-slate-100 pt-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveReportDetail(report);
+                      setResendRecipientIds(
+                        computeDefaultRecipients(report.actionItems, sendToAssignees, sendToManagers)
+                      );
+                      setResendExtraText(meetingExtraEmailsText);
+                    }}
+                    className="text-xs font-extrabold text-emerald-800 hover:underline"
+                  >
+                    Zobrazit celý zápis a odeslat lidem →
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center text-xs text-slate-500">
+            Zatím zde nemáte žádný nahraný zápis z porady. Klikněte výše na <strong>Zpracovat poradu</strong> a vložte text z krabičky nebo poznámky.
+          </div>
+        )}
+      </section>
+
       {/* TEAM MEMBERS CARDS WITH LIVE ACTIVITY & CHECKOUT REPORTS */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {data.team.map((member) => {
@@ -919,108 +1021,6 @@ export function TeamAvailability({
           );
         })}
       </div>
-
-      {/* ZÁPISY Z PORAD & ÚKOLY V PLANNERU */}
-      <section className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-100 text-purple-700">
-              <FileText className="h-5 w-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-black text-slate-900">Zápisy a rozdělené úkoly z porad</h3>
-              <p className="text-xs text-slate-500">
-                AI automaticky vytahuje ze záznamů rozhodnutí a úkoly spárované s lidmi.
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              setMeetingDate(data.date);
-              setMeetingStep('input');
-              setShowMeetingModal(true);
-            }}
-            className={secondaryButton}
-          >
-            <Plus className="h-4 w-4 text-purple-700" />
-            <span>+ Zadat poradu z krabičky</span>
-          </button>
-        </div>
-
-        {data.meetingReports && data.meetingReports.length > 0 ? (
-          <div className="mt-4 space-y-3">
-            {data.meetingReports.map((report) => (
-              <div
-                key={report.id}
-                className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 transition hover:bg-white hover:shadow-sm"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <span className="text-[11px] font-bold text-slate-400">
-                      {report.meetingDate} · Zapsal(a): {report.createdByName}
-                    </span>
-                    <h4 className="text-base font-black text-slate-900">{report.title}</h4>
-                  </div>
-                  {report.emailedToCount && report.emailedToCount > 0 ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
-                      <Mail className="h-3 w-3" />
-                      <span>Odesláno manažerům ({report.emailedToCount})</span>
-                    </span>
-                  ) : null}
-                </div>
-
-                <p className="mt-2 text-xs leading-relaxed text-slate-600 line-clamp-2">{report.summary}</p>
-
-                {report.actionItems.length > 0 && (
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-                      Úkoly ({report.actionItems.length}):
-                    </span>
-                    {report.actionItems.slice(0, 4).map((t, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-800 shadow-sm"
-                      >
-                        <span>{t.title}</span>
-                        {t.assigneeName && (
-                          <span className="text-emerald-700">· {t.assigneeName}</span>
-                        )}
-                      </span>
-                    ))}
-                    {report.actionItems.length > 4 && (
-                      <span className="text-xs font-bold text-slate-500">
-                        +{report.actionItems.length - 4} další
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                <div className="mt-3 border-t border-slate-100 pt-2 text-right">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveReportDetail(report);
-                      setResendRecipientIds(
-                        computeDefaultRecipients(report.actionItems, sendToAssignees, sendToManagers)
-                      );
-                      setResendExtraText(meetingExtraEmailsText);
-                    }}
-                    className="text-xs font-extrabold text-emerald-800 hover:underline"
-                  >
-                    Zobrazit celý zápis a odeslat lidem →
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center text-xs text-slate-500">
-            Zatím zde nemáte žádný nahraný zápis z porady. Klikněte výše na <strong>Zpracovat poradu</strong> a vložte text z krabičky nebo poznámky.
-          </div>
-        )}
-      </section>
 
       {/* SPOLEČNÝ TERMÍN SCHŮZKY */}
       <section className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-sm">

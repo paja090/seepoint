@@ -10,8 +10,11 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
   Clock,
+  FileText,
   Flame,
+  Hand,
   ListTodo,
   RefreshCw,
   Settings,
@@ -55,6 +58,7 @@ export function PlannerCockpit() {
   const [view, setView] = useState('today'), [data, setData] = useState<PlannerReadModel | null>(null), [error, setError] = useState('');
   const [loading, setLoading] = useState(true), [syncing, setSyncing] = useState(false), [syncNotice, setSyncNotice] = useState('');
   const [editor, setEditor] = useState<{ block?: PlannerItem; startAt?: string } | null>(null);
+  const [showReportDrawer, setShowReportDrawer] = useState(false);
   const date = chosenDate || data?.date || '';
   const generation = useRef(0);
   const lastLoadAtRef = useRef(0);
@@ -187,6 +191,15 @@ export function PlannerCockpit() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 min-w-0 max-w-full lg:shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowReportDrawer((v) => !v)}
+              disabled={!data}
+              className={secondaryButton}
+            >
+              <ClipboardCheck className={`h-4 w-4 ${data?.myDayCheckout?.submitted ? 'text-emerald-600' : 'text-indigo-600'}`} />
+              <span>{data?.myDayCheckout?.submitted ? 'Report odevzdán' : 'Report dne'}</span>
+            </button>
             <button type="button" onClick={handleSyncAndRefresh} disabled={!data || syncing} className={secondaryButton}>
               <RefreshCw className={`h-4 w-4 text-emerald-700 ${syncing ? 'animate-spin' : ''}`} />
               <span>{syncing ? 'Synchronizuji…' : 'Obnovit & sync'}</span>
@@ -283,6 +296,87 @@ export function PlannerCockpit() {
 
       {data && !loading && !error && (
         <>
+          {/* TOP REPORTS & EXECUTIVE STRIP (ALWAYS VISIBLE AT THE TOP) */}
+          <section className="rounded-3xl border border-indigo-200/80 bg-gradient-to-r from-indigo-50/70 via-white to-emerald-50/70 p-4 sm:p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider text-indigo-900">
+                    <ClipboardCheck className="h-3 w-3" />
+                    <span>Report dne</span>
+                  </span>
+                  {data.myDayCheckout?.submitted ? (
+                    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-extrabold text-emerald-800">
+                      ✓ Odevzdáno
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-extrabold text-amber-900">
+                      ○ Čeká na doplnění
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs sm:text-sm font-semibold text-slate-800 break-words">
+                  {data.myDayCheckout?.submitted?.manualSummary
+                    ? `Váš report: „${data.myDayCheckout.submitted.manualSummary}“`
+                    : data.myDayCheckout?.autoSummary || 'Doplňte krátký souhrn, co se vám dnes podařilo.'}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {data.canSeeTeam && data.teamCheckoutsSummary && (
+                  <button
+                    type="button"
+                    onClick={() => setView('team')}
+                    className="inline-flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50/40"
+                  >
+                    <FileText className="h-3.5 w-3.5 text-emerald-700" />
+                    <span>
+                      Reporty týmu: <strong>{data.teamCheckoutsSummary.submitted}/{data.teamCheckoutsSummary.total}</strong>
+                    </span>
+                    {(data.pendingApprovalsCount ?? 0) > 0 && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-black text-white">
+                        <Hand className="h-3 w-3" />
+                        <span>{data.pendingApprovalsCount} ke schválení</span>
+                      </span>
+                    )}
+                    {data.meetingReports && data.meetingReports.length > 0 && (
+                      <span className="hidden sm:inline text-slate-500">
+                        · Poslední porada: <strong className="text-slate-700">{data.meetingReports[0].title}</strong>
+                      </span>
+                    )}
+                    <ArrowRight className="h-3.5 w-3.5 text-slate-400" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowReportDrawer((v) => !v)}
+                  className={primaryButton}
+                >
+                  <ClipboardCheck className="h-4 w-4" />
+                  <span>
+                    {showReportDrawer
+                      ? 'Skrýt formulář'
+                      : data.myDayCheckout?.submitted
+                      ? 'Upravit report dne'
+                      : 'Odevzdat report dne'}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {showReportDrawer && (
+              <div className="mt-4 border-t border-indigo-200/60 pt-4">
+                <DayCheckoutCard
+                  data={data}
+                  onSaved={() => {
+                    setShowReportDrawer(false);
+                    void load({ silent: true });
+                  }}
+                />
+              </div>
+            )}
+          </section>
+
           {/* KPI BENTO ROW */}
           <section className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg">
@@ -546,8 +640,6 @@ export function PlannerCockpit() {
                     Přehled dne: <strong className="text-slate-900">{dayItems.length}</strong> v ose · <strong className="text-slate-900">{data.todayScheduledWorkCount ?? 0}</strong> úkolů v termínu · <strong className="text-emerald-800">{freeHours} h</strong> volných.
                   </div>
                 </div>
-
-                <DayCheckoutCard data={data} onSaved={() => void load({ silent: true })} />
               </aside>
             </div>
           )}
