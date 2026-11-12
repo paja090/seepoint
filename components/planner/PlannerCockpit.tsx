@@ -360,7 +360,7 @@ export function PlannerCockpit() {
 
           {/* MAIN WORKSPACE VIEWS */}
           {view === 'team' ? (
-            <TeamAvailability data={data} />
+            <TeamAvailability data={data} onReload={() => void load({ silent: true })} />
           ) : view === 'week' ? (
             <WeekView date={date} timezone={data.preferences.timezone} items={data.items} tasks={data.tasks} onEdit={block => setEditor({ block })} />
           ) : (

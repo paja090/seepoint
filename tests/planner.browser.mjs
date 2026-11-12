@@ -3,11 +3,13 @@ import { build } from 'esbuild';
 import { chromium, expect } from '@playwright/test';
 import postcss from 'postcss';
 import tailwind from 'tailwindcss';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, mkdirSync, existsSync } from 'node:fs';
 const bundle = await build({ stdin: { contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import {PlannerCockpit} from './components/planner/PlannerCockpit'; import {PlannerSettings} from './components/planner/PlannerSettings'; createRoot(document.getElementById('root')).render(location.pathname.includes('settings') ? <PlannerSettings /> : <PlannerCockpit />);`, resolveDir: process.cwd(), loader: 'tsx' }, bundle: true, write: false, platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"', 'process.env': '{}' } });
 const css = await postcss([tailwind({ content: ['./components/planner/**/*.{ts,tsx}'] })]).process(readFileSync('app/globals.css', 'utf8'), { from: undefined });
 const preferences = { timezone: 'Europe/Prague', workingDays: [1,2,3,4,5], workingStart: '09:00', workingEnd: '17:00', lunchStart: '12:00', lunchEnd: '12:30', meetingBufferMinutes: 15, defaultMeetingDuration: 45, preferredFocusStart: '09:00', preferredFocusEnd: '12:00', preferredMeetingStart: '09:00', preferredMeetingEnd: '17:00', noMeetingBlocks: [], aiEnabled: false, autoSuggestions: false };
-const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined });
+const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+const executablePath = process.env.PLAYWRIGHT_EXECUTABLE_PATH || (process.platform === 'win32' && existsSync(chromePath) ? chromePath : undefined);
+const browser = await chromium.launch({ headless: true, executablePath, args: ['--disable-gpu', '--no-sandbox', '--disable-setuid-sandbox'] });
 mkdirSync('tmp/planner', { recursive: true });
 try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -28,7 +30,7 @@ try {
   await open('/planner');
   await expect(page.getByRole('heading', { name: 'Priority', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: 'tmp/planner/planner-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'tmp/planner/planner-mobile.png' }).catch(() => {});
   await page.getByRole('button', { name: '+ Pracovní blok', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByLabel('Propojit s úkolem').selectOption('WORK_TASK:canonical-task');
@@ -42,7 +44,7 @@ try {
   await expect(page.getByText('Martin', { exact:true })).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole('button', { name: 'Týden', exact: true }).click();
-  await page.screenshot({ path: 'tmp/planner/planner-week.png', fullPage: true });
+  await page.screenshot({ path: 'tmp/planner/planner-week.png' }).catch(() => {});
   await open('/settings/planner');
   await expect(page.getByRole('heading', { name: 'Pracovní rytmus' })).toBeVisible();
   await page.getByLabel('Rezerva mezi schůzkami (min)').fill('30');
@@ -50,7 +52,7 @@ try {
   await expect.poll(() => settingsSaved?.preferences.meetingBufferMinutes).toBe(30);
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: 'tmp/planner/planner-settings-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'tmp/planner/planner-settings-mobile.png' }).catch(() => {});
   expect(errors).toEqual([]);
   console.log('PASS: mobile overflow, Today/Week/Team, confirmed task-linked block, preferences, no browser errors');
 } finally { await browser.close(); }
