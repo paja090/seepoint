@@ -513,6 +513,12 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
     currentUserEmail: actor.email || null,
     myDayCheckout,
     pendingApprovalsCount: canSeeTeam(actor) ? pendingApprovalsAll.length : 0,
+    teamCheckoutsSummary: canSeeTeam(actor)
+      ? {
+          submitted: pulseMembers.filter((m) => Boolean(checkoutsByUserId[m.userId])).length,
+          total: pulseMembers.length,
+        }
+      : null,
     meetingReports,
     teamMembers: canSeeTeam(actor) ? pulseMembers : [],
     connections,
