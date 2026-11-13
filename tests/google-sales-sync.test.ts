@@ -126,14 +126,37 @@ březen 2026,V,Lidl ČR,Ing. Novotný,,MT,FALSE,,1.3.2026,31.3.2026,FALSE,FALSE,
   assert.equal(rows[2].computedStatus, 'DRAFT');
 });
 
+type MockClientRow = {
+  id: string;
+  organizationId: string;
+  name: string;
+  normalizedName: string;
+  [key: string]: unknown;
+};
+
+type MockOrderRow = {
+  id: string;
+  organizationId: string;
+  orderNumber: string;
+  clientOrderCode?: string | null;
+  assignedUserId?: string | null;
+  status: string;
+  projectType: string;
+  title: string;
+  internalNote?: string | null;
+  dateFrom?: Date | null;
+  dateTo?: Date | null;
+  [key: string]: unknown;
+};
+
 test('syncGoogleSalesToCrm creates clients and CRM orders idempotently', async () => {
   const mockOrg = { id: 'org_123', name: 'SeePOINT s.r.o.', slug: 'seepoint' };
   const mockUser = { id: 'usr_mirek', name: 'Miroslav Mec', email: 'mirek.mec@seepoint.cz' };
 
-  const existingClients: any[] = [];
-  const existingOrders: any[] = [];
+  const existingClients: MockClientRow[] = [];
+  const existingOrders: MockOrderRow[] = [];
 
-  const mockClient: any = {
+  const mockClient = {
     organization: {
       findUnique: async () => mockOrg,
       update: async () => mockOrg,
@@ -142,25 +165,25 @@ test('syncGoogleSalesToCrm creates clients and CRM orders idempotently', async (
       findMany: async () => [mockUser],
     },
     client: {
-      findFirst: async ({ where }: any) => {
+      findFirst: async ({ where }: { where: { organizationId: string; normalizedName: string } }) => {
         return (
           existingClients.find(
             (c) => c.organizationId === where.organizationId && c.normalizedName === where.normalizedName
           ) || null
         );
       },
-      create: async ({ data }: any) => {
-        const row = { id: `cli_${existingClients.length + 1}`, ...data };
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        const row = { id: `cli_${existingClients.length + 1}`, ...data } as MockClientRow;
         existingClients.push(row);
         return row;
       },
     },
     clientContact: {
       findFirst: async () => null,
-      create: async ({ data }: any) => ({ id: 'cont_1', ...data }),
+      create: async ({ data }: { data: Record<string, unknown> }) => ({ id: 'cont_1', ...data }),
     },
     crmOrder: {
-      findFirst: async ({ where }: any) => {
+      findFirst: async ({ where }: { where: { organizationId: string; clientOrderCode?: string; title?: string } }) => {
         if (where.clientOrderCode) {
           return (
             existingOrders.find(
@@ -170,18 +193,18 @@ test('syncGoogleSalesToCrm creates clients and CRM orders idempotently', async (
         }
         return null;
       },
-      create: async ({ data }: any) => {
-        const row = { id: `ord_${existingOrders.length + 1}`, ...data };
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        const row = { id: `ord_${existingOrders.length + 1}`, ...data } as MockOrderRow;
         existingOrders.push(row);
         return row;
       },
-      update: async ({ where, data }: any) => {
+      update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
         const idx = existingOrders.findIndex((o) => o.id === where.id);
         if (idx !== -1) {
           existingOrders[idx] = { ...existingOrders[idx], ...data };
           return existingOrders[idx];
         }
-        return data;
+        return data as MockOrderRow;
       },
     },
   };
