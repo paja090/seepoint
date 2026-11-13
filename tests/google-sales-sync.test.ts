@@ -2,25 +2,43 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { Prisma } from '@prisma/client';
 import {
+  CANONICAL_SALESPEOPLE,
   KNOWN_SALESPEOPLE,
+  resolveCanonicalSalesperson,
   resolveSalesProjectType,
   parseCampaignDates,
   parseContactDetails,
   parseGoogleSalesSheetCsv,
   syncGoogleSalesToCrm,
+  getGoogleSalesSheetSummary,
 } from '../lib/sales/google-sales-sync';
+import { sanitizeOwnerEmailDigestSettings } from '../lib/planner/owner-reports';
 
-test('KNOWN_SALESPEOPLE recognizes all key SeePoint salespeople codes', () => {
-  assert.equal(KNOWN_SALESPEOPLE['mm'].name, 'Miroslav Mec');
-  assert.equal(KNOWN_SALESPEOPLE['m'].name, 'Marek Konečný');
-  assert.equal(KNOWN_SALESPEOPLE['mk'].name, 'Marek Konečný');
-  assert.equal(KNOWN_SALESPEOPLE['v'].name, 'Vladimíra Konečná');
-  assert.equal(KNOWN_SALESPEOPLE['vk'].name, 'Vladimíra Konečná');
-  assert.equal(KNOWN_SALESPEOPLE['z'].name, 'Zuzana Vavrečková');
-  assert.equal(KNOWN_SALESPEOPLE['zv'].name, 'Zuzana Vavrečková');
-  assert.equal(KNOWN_SALESPEOPLE['s'].name, 'Silva');
-  assert.equal(KNOWN_SALESPEOPLE['silva'].name, 'Silva');
-  assert.equal(KNOWN_SALESPEOPLE['lv'].name, 'Lenka Valíčková');
+test('CANONICAL_SALESPEOPLE and KNOWN_SALESPEOPLE correctly unify SeePoint salespeople without duplicates', () => {
+  assert.equal(CANONICAL_SALESPEOPLE.length, 5);
+  const codes = CANONICAL_SALESPEOPLE.map((s) => s.code);
+  assert.deepEqual(codes, ['MM', 'M', 'V', 'Z', 'S']);
+
+  assert.equal(KNOWN_SALESPEOPLE['mm'].code, 'MM');
+  assert.equal(KNOWN_SALESPEOPLE['m'].code, 'M');
+  assert.equal(KNOWN_SALESPEOPLE['mk'].code, 'M'); // Canonical code is M
+  assert.equal(KNOWN_SALESPEOPLE['mk'].displayCode, 'M / MK');
+  assert.equal(KNOWN_SALESPEOPLE['v'].code, 'V');
+  assert.equal(KNOWN_SALESPEOPLE['vk'].code, 'V'); // Canonical code is V
+  assert.equal(KNOWN_SALESPEOPLE['vk'].displayCode, 'V / VK');
+  assert.equal(KNOWN_SALESPEOPLE['z'].code, 'Z');
+  assert.equal(KNOWN_SALESPEOPLE['zv'].code, 'Z'); // Canonical code is Z
+  assert.equal(KNOWN_SALESPEOPLE['zv'].displayCode, 'Z / ZV');
+  assert.equal(KNOWN_SALESPEOPLE['s'].code, 'S');
+
+  // resolveCanonicalSalesperson maps aliases correctly
+  assert.equal(resolveCanonicalSalesperson('MK').code, 'M');
+  assert.equal(resolveCanonicalSalesperson('MK').displayCode, 'M / MK');
+  assert.equal(resolveCanonicalSalesperson('Marek').code, 'M');
+  assert.equal(resolveCanonicalSalesperson('VK').code, 'V');
+  assert.equal(resolveCanonicalSalesperson('ZV').code, 'Z');
+  assert.equal(resolveCanonicalSalesperson('MM').code, 'MM');
+  assert.equal(resolveCanonicalSalesperson('Silva').code, 'S');
 });
 
 test('resolveSalesProjectType maps shorthand codes to proper Prisma CrmProjectType and labels', () => {
@@ -112,8 +130,8 @@ březen 2026,V,Lidl ČR,Ing. Novotný,,MT,FALSE,,1.3.2026,31.3.2026,FALSE,FALSE,
   assert.equal(rows[0].isCampaignConfirmed, true);
   assert.equal(rows[0].computedStatus, 'READY_FOR_PRODUCTION'); // vytisteno=true, instalace=false
 
-  // Row 2: MK - Auto Esa (instalace=true, nahranaFtd=true)
-  assert.equal(rows[1].salespersonCode, 'MK');
+  // Row 2: MK - Auto Esa (instalace=true, nahranaFtd=true) -> canonicalized to M (Marek Konečný)
+  assert.equal(rows[1].salespersonCode, 'M');
   assert.equal(rows[1].salespersonName, 'Marek Konečný');
   assert.equal(rows[1].clientName, 'Auto Esa');
   assert.equal(rows[1].computedStatus, 'COMPLETED'); // nahranaFtd=true
@@ -242,4 +260,88 @@ jaro 2026,MM,Test Firma,Jan Novák,777123456,CP,TRUE,PŘIJATÁ,1.4.2026,30.4.202
   assert.equal(result2.success, true);
   assert.equal(result2.createdOrdersCount, 0);
   assert.equal(result2.skippedOrdersCount, 1);
+});
+
+test('getGoogleSalesSheetSummary unifies M and MK under canonical Marek Konečný (M / MK) with only 5 canonical cards', async () => {
+  const mockOrders = [
+    {
+      id: 'ord_1',
+      orderNumber: 'ZAK-2026-0001',
+      title: 'Kampaň: Test 1',
+      status: 'CONFIRMED',
+      projectType: 'CITY_POSTER',
+      dateFrom: new Date('2026-04-01'),
+      dateTo: new Date('2026-04-30'),
+      internalNote: JSON.stringify({
+        salespersonCode: 'MK',
+        salespersonName: 'Marek Konečný',
+        carrierTypeLabel: 'City Poster (CP)',
+        campaignConfirmed: true,
+      }),
+      client: { name: 'Klient A' },
+      assignedUser: { id: 'usr_marek', name: 'Marek Konečný', email: 'marek.konecny@seepoint.cz' },
+    },
+    {
+      id: 'ord_2',
+      orderNumber: 'ZAK-2026-0002',
+      title: 'Kampaň: Test 2',
+      status: 'DRAFT',
+      projectType: 'TOWER',
+      dateFrom: new Date('2026-05-01'),
+      dateTo: new Date('2026-05-31'),
+      internalNote: JSON.stringify({
+        salespersonCode: 'M',
+        salespersonName: 'Marek Konečný',
+        carrierTypeLabel: 'Tower (T)',
+        campaignConfirmed: false,
+      }),
+      client: { name: 'Klient B' },
+      assignedUser: { id: 'usr_marek', name: 'Marek Konečný', email: 'marek.konecny@seepoint.cz' },
+    },
+  ];
+
+  const mockClient = {
+    crmOrder: {
+      findMany: async () => mockOrders,
+    },
+  };
+
+  const summary = await getGoogleSalesSheetSummary('org_123', mockClient as unknown as Prisma.TransactionClient);
+
+  // Exactly 5 canonical salespeople initialized
+  assert.equal(Object.keys(summary.bySalesperson).length, 5);
+  assert.deepEqual(Object.keys(summary.bySalesperson), ['MM', 'M', 'V', 'Z', 'S']);
+
+  // Both orders (MK and M) merged under M
+  const marekCard = summary.bySalesperson['M'];
+  assert.ok(marekCard);
+  assert.equal(marekCard.name, 'Marek Konečný');
+  assert.equal(marekCard.displayCode, 'M / MK');
+  assert.equal(marekCard.totalOrdersCount, 2);
+  assert.equal(marekCard.confirmedCampaignsCount, 1);
+  assert.equal(marekCard.pipelineCount, 1);
+  assert.equal(marekCard.activeOrders.length, 2);
+
+  // There is NO separate MK card
+  assert.equal(summary.bySalesperson['MK'], undefined);
+});
+
+test('sanitizeOwnerEmailDigestSettings defaults enabled to true with Marek Konečný recipient for SeePoint', () => {
+  // Generic org with no settings -> disabled by default
+  const genericSettings = sanitizeOwnerEmailDigestSettings({}, false);
+  assert.equal(genericSettings.enabled, false);
+  assert.deepEqual(genericSettings.customRecipients, []);
+
+  // SeePoint org with empty defaults -> auto-enabled with marek.konecny@seepoint.cz
+  const seepointDefault = sanitizeOwnerEmailDigestSettings({}, true);
+  assert.equal(seepointDefault.enabled, true);
+  assert.equal(seepointDefault.sendHourLocal, 18);
+  assert.equal(seepointDefault.skipWeekends, true);
+  assert.equal(seepointDefault.includeAllAdminsAndOwners, true);
+  assert.ok(seepointDefault.customRecipients.includes('marek.konecny@seepoint.cz'));
+
+  // SeePoint org with explicit disable -> respects explicit false
+  const seepointDisabled = sanitizeOwnerEmailDigestSettings({ enabled: false }, true);
+  assert.equal(seepointDisabled.enabled, false);
+  assert.ok(seepointDisabled.customRecipients.includes('marek.konecny@seepoint.cz'));
 });

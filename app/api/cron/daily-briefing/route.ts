@@ -127,7 +127,8 @@ async function handleCronExecution(request: Request) {
           org.plannerDefaults && typeof org.plannerDefaults === 'object' && !Array.isArray(org.plannerDefaults)
             ? (org.plannerDefaults as Record<string, unknown>)
             : {};
-        const ownerEmailSettings = sanitizeOwnerEmailDigestSettings(ownerDefaults.ownerEmailDigest);
+        const isSeePoint = isSeePointOrganization(org);
+        const ownerEmailSettings = sanitizeOwnerEmailDigestSettings(ownerDefaults.ownerEmailDigest, isSeePoint);
 
         const targetDate = targetDateParam || getTomorrowDateStr(now, settings.timezone);
         const workerLocalHour = getLocalHour(now, settings.timezone);

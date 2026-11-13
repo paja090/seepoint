@@ -13,6 +13,7 @@ import {
   type DailyCheckoutRecord,
 } from './owner-reports';
 import { getGoogleSalesSheetSummary } from '@/lib/sales/google-sales-sync';
+import { isSeePointOrganization } from '@/lib/work/google-sheets-sync';
 import { sendTransactionalEmail } from '@/lib/email';
 
 function asObject(val: unknown): Record<string, unknown> {
@@ -40,14 +41,15 @@ export async function sendOwnerExecutiveDigestForOrganization(
 }> {
   const org = await prisma.organization.findUnique({
     where: { id: organizationId },
-    select: { name: true, plannerDefaults: true },
+    select: { id: true, name: true, slug: true, plannerDefaults: true },
   });
   if (!org) {
     throw new Error('Organizace nebyla nalezena.');
   }
 
+  const isSeePoint = isSeePointOrganization(org);
   const prevDefaults = asObject(org.plannerDefaults);
-  const settings = sanitizeOwnerEmailDigestSettings(prevDefaults.ownerEmailDigest);
+  const settings = sanitizeOwnerEmailDigestSettings(prevDefaults.ownerEmailDigest, isSeePoint);
   const targetDate = options?.date || dateInZone(new Date(), settings.timezone);
   const { start, end } = dayRange(targetDate, settings.timezone);
 
@@ -218,6 +220,9 @@ export async function sendOwnerExecutiveDigestForOrganization(
     }
     for (const c of settings.customRecipients) {
       recipientSet.add(c.toLowerCase());
+    }
+    if (isSeePoint) {
+      recipientSet.add('marek.konecny@seepoint.cz');
     }
   }
 
