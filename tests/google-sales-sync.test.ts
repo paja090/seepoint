@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import type { Prisma } from '@prisma/client';
 import {
   KNOWN_SALESPEOPLE,
   resolveSalesProjectType,
@@ -219,7 +220,7 @@ jaro 2026,MM,Test Firma,Jan Novák,777123456,CP,TRUE,PŘIJATÁ,1.4.2026,30.4.202
       csvContent,
       defaultYear: 2026,
     },
-    { tx: mockClient }
+    { tx: mockClient as unknown as Prisma.TransactionClient }
   );
 
   assert.equal(result1.success, true);
@@ -235,7 +236,7 @@ jaro 2026,MM,Test Firma,Jan Novák,777123456,CP,TRUE,PŘIJATÁ,1.4.2026,30.4.202
       csvContent,
       defaultYear: 2026,
     },
-    { tx: mockClient }
+    { tx: mockClient as unknown as Prisma.TransactionClient }
   );
 
   assert.equal(result2.success, true);
