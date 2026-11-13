@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Mic,
   Plus,
+  RefreshCw,
   Sparkles,
   TrendingUp,
   UserCheck,
@@ -134,6 +135,34 @@ export function TeamAvailability({
       setOwnerNotice(err instanceof Error ? err.message : 'Nepodařilo se vygenerovat souhrn.');
     } finally {
       setLoadingDigest(false);
+    }
+  }
+
+  const [syncingSalesSheet, setSyncingSalesSheet] = useState(false);
+
+  async function handleSyncSalesSheet() {
+    setSyncingSalesSheet(true);
+    setOwnerNotice('');
+    try {
+      const res = await fetch('/api/sales/google-sheets/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const json = await res.json();
+      if (!res.ok || json.ok === false) {
+        throw new Error(json.error || 'Synchronizace tabulky obchodníků selhala.');
+      }
+      setOwnerNotice(
+        json.message ||
+          `Tabulka obchodníků synchronizována: ${json.createdOrdersCount ?? 0} vytvořeno, ${json.updatedOrdersCount ?? 0} aktualizováno.`
+      );
+      if (onReload) {
+        onReload();
+      }
+    } catch (err) {
+      setOwnerNotice(err instanceof Error ? err.message : 'Chyba při synchronizaci tabulky obchodníků.');
+    } finally {
+      setSyncingSalesSheet(false);
     }
   }
 
@@ -402,6 +431,17 @@ export function TeamAvailability({
 
           <button
             type="button"
+            disabled={syncingSalesSheet}
+            onClick={handleSyncSalesSheet}
+            className={secondaryButton}
+            title="Aktualizovat zakázky obchodníků z centrální Google Tabulky (MM, M, V, Z, S)"
+          >
+            <RefreshCw className={`h-4 w-4 text-amber-600 ${syncingSalesSheet ? 'animate-spin' : ''}`} />
+            <span>{syncingSalesSheet ? 'Aktualizuji…' : '↻ Tabulka obchodníků'}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setShowEmailModal(true)}
             className={secondaryButton}
           >
@@ -660,6 +700,118 @@ export function TeamAvailability({
         </section>
       )}
 
+      {/* CENTRÁLNÍ TABULKA ZAKÁZEK OBCHODNÍKŮ */}
+      {data.salesSheet && data.salesSheet.totalOrders > 0 && (
+        <section className="rounded-3xl border border-amber-300/80 bg-gradient-to-br from-amber-50/70 via-white to-orange-50/30 p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200/70 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500 text-white shadow-sm">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-slate-900">
+                    Zakázky obchodníků z centrální tabulky
+                  </h3>
+                  <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-900">
+                    Google Sheets
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600">
+                  {data.salesSheet.totalOrders} zakázek celkem · {data.salesSheet.confirmedCampaigns} potvrzených kampaní · {data.salesSheet.inRealizationCampaigns} v realizaci
+                  {data.salesSheetSyncAt && ` · synchronizováno ${new Date(data.salesSheetSyncAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={syncingSalesSheet}
+                onClick={handleSyncSalesSheet}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs font-black text-amber-900 hover:bg-amber-50 disabled:opacity-50 shadow-sm"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 text-amber-700 ${syncingSalesSheet ? 'animate-spin' : ''}`} />
+                <span>{syncingSalesSheet ? 'Synchronizuji…' : 'Aktualizovat tabulku'}</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            {Object.values(data.salesSheet.bySalesperson)
+              .filter((sp) => sp.totalOrdersCount > 0 || ['MM', 'M', 'MK', 'V', 'VK', 'Z', 'ZV', 'S'].includes(sp.code))
+              .map((sp) => (
+                <div
+                  key={sp.code}
+                  className="flex flex-col justify-between rounded-2xl border border-amber-200/90 bg-white p-3.5 shadow-sm"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-sm font-black text-slate-900 truncate">
+                        {sp.name}
+                      </span>
+                      <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-black text-white shrink-0">
+                        {sp.code}
+                      </span>
+                    </div>
+
+                    <div className="mt-2 flex items-baseline gap-2">
+                      <span className="text-xl font-black text-slate-950">{sp.totalOrdersCount}</span>
+                      <span className="text-xs font-bold text-slate-500">zakázek</span>
+                    </div>
+
+                    <div className="mt-1 flex flex-wrap gap-1.5 text-[10px] font-bold">
+                      <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-emerald-800">
+                        {sp.confirmedCampaignsCount} potvrzeno
+                      </span>
+                      {sp.inRealizationCount > 0 && (
+                        <span className="rounded-md bg-sky-50 px-1.5 py-0.5 text-sky-800">
+                          {sp.inRealizationCount} montáž
+                        </span>
+                      )}
+                      {sp.completedCount > 0 && (
+                        <span className="rounded-md bg-purple-50 px-1.5 py-0.5 text-purple-800">
+                          {sp.completedCount} hotovo
+                        </span>
+                      )}
+                    </div>
+
+                    {sp.activeOrders.length > 0 && (
+                      <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-2.5">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                          Aktivní kampaně ({sp.activeOrders.length})
+                        </p>
+                        {sp.activeOrders.slice(0, 3).map((order) => (
+                          <div
+                            key={order.id}
+                            className="rounded-lg bg-amber-50/60 p-2 text-[11px] leading-snug text-slate-800"
+                          >
+                            <div className="flex items-start justify-between gap-1 font-extrabold text-slate-900">
+                              <span className="truncate">{order.clientName}</span>
+                              <span className="shrink-0 text-[10px] font-bold text-amber-800">
+                                {order.carrierTypeLabel.replace(/\s*\(.*\)/, '')}
+                              </span>
+                            </div>
+                            <div className="mt-0.5 flex items-center justify-between text-[10px] text-slate-500">
+                              <span>{order.period || 'neuvedeno'}</span>
+                              <span className="font-bold text-emerald-800">{order.checklistProgress}</span>
+                            </div>
+                          </div>
+                        ))}
+                        {sp.activeOrders.length > 3 && (
+                          <p className="text-center text-[10px] font-bold text-slate-400">
+                            +{sp.activeOrders.length - 3} dalších v CRM
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </section>
+      )}
+
       {/* ZÁPISY Z PORAD & ÚKOLY V PLANNERU */}
       <section className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
@@ -859,6 +1011,26 @@ export function TeamAvailability({
                     </span>
                   </div>
                 )}
+
+                {/* GOOGLE SHEETS SALES STATS PILL */}
+                {(() => {
+                  if (!data.salesSheet) return null;
+                  const spEntry = Object.values(data.salesSheet.bySalesperson).find(
+                    (sp) => sp.userId === member.id || sp.name.toLowerCase() === member.name.toLowerCase()
+                  );
+                  if (!spEntry || spEntry.totalOrdersCount === 0) return null;
+                  return (
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-1 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-1.5 text-[11px] font-bold text-amber-950">
+                      <span className="flex items-center gap-1.5">
+                        <TrendingUp className="h-3.5 w-3.5 text-amber-700" />
+                        <span>Tabulka obchodníka ({spEntry.code}): {spEntry.totalOrdersCount} zakázek</span>
+                      </span>
+                      <span className="text-[10px] font-extrabold text-amber-800">
+                        {spEntry.confirmedCampaignsCount} potvrz. · {spEntry.inRealizationCount} montáž
+                      </span>
+                    </div>
+                  );
+                })()}
 
                 <div className="mt-3.5 space-y-1.5">
                   <div className="flex items-center justify-between text-xs font-semibold text-slate-500">

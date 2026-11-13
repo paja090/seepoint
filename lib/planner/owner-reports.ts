@@ -2,6 +2,7 @@ import { logAIUsage } from '@/lib/ai-usage';
 import { getGeminiApiKey } from '@/lib/ai-gemini';
 import { dateInZone } from './time';
 import type { MemberDailyActivity, CompanyDailyPulse, PulseMemberRef } from './team-pulse';
+import type { GoogleSalesSheetSummary } from '@/lib/sales/google-sales-sync';
 import {
   APPROVAL_CATEGORY_LABELS,
   type ApprovalCategory,
@@ -71,6 +72,7 @@ export type OwnerReportSnapshot = {
   checkoutsByUserId: Record<string, DailyCheckoutRecord>;
   pendingApprovals: ApprovalRequestRecord[];
   recentDecisions: ApprovalRequestRecord[];
+  salesSheet?: GoogleSalesSheetSummary | null;
 };
 
 export type SalesOfferInput = {
@@ -370,6 +372,7 @@ export async function generateAiOwnerDigest(params: {
   members: PulseMemberRef[];
   checkoutsByUserId: Record<string, DailyCheckoutRecord>;
   pendingApprovals: ApprovalRequestRecord[];
+  salesSheet?: GoogleSalesSheetSummary | null;
 }): Promise<{
   headline: string;
   highlights: string[];
@@ -398,6 +401,22 @@ export async function generateAiOwnerDigest(params: {
     .map((a) => `- ${a.requesterName}: [${APPROVAL_CATEGORY_LABELS[a.category]}] ${a.title} – ${a.detail}`)
     .join('\n');
 
+  const salesSheetContext =
+    params.salesSheet && params.salesSheet.totalOrders > 0
+      ? `ZAKÁZKY OBCHODNÍKŮ (CENTRÁLNÍ TABULKA):\n` +
+        `- Celkem: ${params.salesSheet.totalOrders} zakázek (${params.salesSheet.confirmedCampaigns} potvrzených, ${params.salesSheet.inRealizationCampaigns} v realizaci).\n` +
+        Object.values(params.salesSheet.bySalesperson)
+          .filter((sp) => sp.totalOrdersCount > 0)
+          .map(
+            (sp) =>
+              `  * ${sp.name} (${sp.code}): ${sp.totalOrdersCount} zakázek (${sp.confirmedCampaignsCount} potvrzeno, ${sp.inRealizationCount} v realizaci). Kampaně: ${sp.activeOrders
+                .slice(0, 3)
+                .map((o) => `${o.clientName} [${o.carrierTypeLabel}, postup: ${o.checklistProgress}]`)
+                .join(', ')}`
+          )
+          .join('\n')
+      : '';
+
   const prompt = `Jsi výkonný ředitelský asistent majitele firmy SeePoint (venkovní reklama, obchod, montáže).
 Majitel chce za 20 sekund vědět, co se dnes (${params.date}) ve firmě reálně udělalo, kdo táhne výkon a co stojí na jeho rozhodnutí.
 
@@ -405,7 +424,7 @@ TVRDÁ DATA ZE SYSTÉMU:
 - Obchod: ${params.sales.offersSentToday} odeslaných nabídek (${params.sales.offersSentValueCzk} Kč), ${params.sales.offersAcceptedToday} podepsaných (${params.sales.offersAcceptedValueCzk} Kč), ${params.sales.crmTasksDoneToday} uzavřených CRM úkolů.
 - Provoz: ${params.companyPulse?.completedCount ?? 0} hotových zakázek, ${params.companyPulse?.activeCount ?? 0} aktivních, ${params.companyPulse?.rescheduledCount ?? 0} přesunutých, ${params.companyPulse?.loggedHoursTotal ?? 0} vykázaných hodin.
 
-LIDÉ A JEJICH REPORTY:
+${salesSheetContext ? `${salesSheetContext}\n` : ''}LIDÉ A JEJICH REPORTY:
 ${peopleContext || 'Žádní členové'}
 
 ČEKAJÍCÍ SCHVÁLENÍ MAJITELEM:
@@ -414,7 +433,7 @@ ${approvalsContext || 'Žádná čekající schválení'}
 Vrať POUZE validní JSON v tomto tvaru:
 {
   "headline": "1 krátká úderná věta shrnující dnešní den pro majitele",
-  "highlights": ["3 až 4 nejvýznamnější věci, které se dnes reálně pohly nebo dokončily (konkrétně jména, klienty, částky)"],
+  "highlights": ["3 až 4 nejvýznamnější věci, které se dnes reálně pohly nebo dokončily (konkrétně jména, klienty, částky, zakázky obchodníků)"],
   "attentionPoints": ["Pouze konkrétní záseky, čekající schválení nebo lidé bez reportu – prázdné pole, pokud je vše v pořádku"]
 }`;
 
@@ -627,6 +646,7 @@ export function renderOwnerExecutiveDigestEmail(params: {
   members: PulseMemberRef[];
   checkoutsByUserId: Record<string, DailyCheckoutRecord>;
   pendingApprovals: ApprovalRequestRecord[];
+  salesSheet?: GoogleSalesSheetSummary | null;
   baseUrl?: string;
 }): { subject: string; html: string; text: string } {
   const cleanBase = (params.baseUrl || 'https://seepoint.vercel.app').replace(/\/+$/, '');
@@ -675,6 +695,44 @@ export function renderOwnerExecutiveDigestEmail(params: {
           .join('')}
        </div>`
     : '';
+
+  const salesSheetHtml =
+    params.salesSheet && params.salesSheet.totalOrders > 0
+      ? `<div style="margin-top:20px;">
+          <h2 style="margin:0 0 8px;font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:#c2410c;">
+            📊 Zakázky obchodníků z centrální tabulky (${params.salesSheet.totalOrders} zakázek · ${params.salesSheet.confirmedCampaigns} potvrzeno)
+          </h2>
+          ${Object.values(params.salesSheet.bySalesperson)
+            .filter((sp) => sp.totalOrdersCount > 0)
+            .map(
+              (sp) => `
+            <div style="margin:0 0 8px;padding:10px 12px;border-radius:10px;border:1px solid #fed7aa;background:#fffaf5;">
+              <div style="font-size:13px;font-weight:800;color:#9a3412;">
+                ${escapeHtml(sp.name)} (${escapeHtml(sp.code)})
+                <span style="font-size:11px;font-weight:700;color:#c2410c;margin-left:6px;">
+                  ${sp.totalOrdersCount} zakázek · ${sp.confirmedCampaignsCount} potvrzeno · ${sp.inRealizationCount} v realizaci
+                </span>
+              </div>
+              ${
+                sp.activeOrders.length > 0
+                  ? `<ul style="margin:6px 0 0;padding-left:16px;font-size:12px;color:#334155;line-height:1.5;">
+                      ${sp.activeOrders
+                        .slice(0, 3)
+                        .map(
+                          (o) =>
+                            `<li><strong>${escapeHtml(o.clientName)}</strong> · ${escapeHtml(o.carrierTypeLabel)}${
+                              o.period ? ` (${escapeHtml(o.period)})` : ''
+                            } · <span style="color:#047857;font-weight:700;">${escapeHtml(o.checklistProgress)}</span></li>`
+                        )
+                        .join('')}
+                     </ul>`
+                  : ''
+              }
+            </div>`
+            )
+            .join('')}
+         </div>`
+      : '';
 
   const teamRowsHtml = params.members
     .map((m) => {
@@ -748,6 +806,7 @@ export function renderOwnerExecutiveDigestEmail(params: {
           ${highlightsHtml}
           ${attentionHtml}
           ${approvalsHtml}
+          ${salesSheetHtml}
           <h2 style="margin:20px 0 10px;font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:#475569;">
             👥 Přehled týmu a reportů
           </h2>
@@ -777,6 +836,21 @@ export function renderOwnerExecutiveDigestEmail(params: {
       : []),
     ...(params.pendingApprovals.length
       ? ['', 'ČEKÁ NA SCHVÁLENÍ:', ...params.pendingApprovals.map((a) => `- ${a.title} (${a.requesterName})`)]
+      : []),
+    ...(params.salesSheet && params.salesSheet.totalOrders > 0
+      ? [
+          '',
+          `ZAKÁZKY OBCHODNÍKŮ (GOOGLE TABULKA: ${params.salesSheet.totalOrders} zakázek, ${params.salesSheet.confirmedCampaigns} potvrzeno):`,
+          ...Object.values(params.salesSheet.bySalesperson)
+            .filter((sp) => sp.totalOrdersCount > 0)
+            .map(
+              (sp) =>
+                `- ${sp.name} (${sp.code}): ${sp.totalOrdersCount} zakázek (${sp.confirmedCampaignsCount} potvrzeno, ${sp.inRealizationCount} v realizaci) | ${sp.activeOrders
+                  .slice(0, 2)
+                  .map((o) => `${o.clientName} [${o.carrierTypeLabel}]`)
+                  .join(', ')}`
+            ),
+        ]
       : []),
     '',
     `Planner: ${cleanBase}/planner`,

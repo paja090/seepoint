@@ -30,6 +30,7 @@ import {
   type OwnerReportSnapshot,
   type UserSalesDailyActivity,
 } from './owner-reports';
+import { getGoogleSalesSheetSummary } from '@/lib/sales/google-sales-sync';
 
 export async function userTimeline(actor: AuthenticatedPlannerActor, userId: string, from: Date, to: Date, shared = false): Promise<PlannerItem[]> {
   const organizationId = actor.organizationId;
@@ -360,6 +361,13 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
       });
 
       companyPulse = pulseResult.companyPulse;
+      let salesSheetSummary = null;
+      try {
+        salesSheetSummary = await getGoogleSalesSheetSummary(actor.organizationId);
+      } catch (err) {
+        console.warn('[read-model] getGoogleSalesSheetSummary error:', err);
+      }
+
       ownerSnapshot = {
         date,
         sales: salesSummary,
@@ -368,6 +376,7 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
         checkoutsByUserId,
         pendingApprovals: pendingApprovalsAll,
         recentDecisions: recentDecisionsAll,
+        salesSheet: salesSheetSummary,
       };
 
       myAutoSummary = buildUserAutoDaySummary({
@@ -483,6 +492,8 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
   const slots = findSlots({ from: new Date(Math.max(+from, Date.now())), to: dayEnd, durationMinutes: 60, participants: [{ preferences, busy: items.filter(i => i.busy) }], focus: true, limit: 3 });
   const sheetMeta = (defaultsObj?.googleSheetPlanSync as { lastSyncAt?: unknown } | null);
   const sheetSyncAt = typeof sheetMeta?.lastSyncAt === 'string' ? sheetMeta.lastSyncAt : null;
+  const salesSheetMeta = (defaultsObj?.googleSalesSheetSync as { lastSyncAt?: unknown } | null);
+  const salesSheetSyncAt = typeof salesSheetMeta?.lastSyncAt === 'string' ? salesSheetMeta.lastSyncAt : (ownerSnapshot?.salesSheet?.lastSyncAt || null);
   const meetingReports = canSeeTeam(actor) ? sanitizeMeetingReports(defaultsObj?.meetingReports) : [];
   const meetingEmailDefaults = canSeeTeam(actor)
     ? sanitizeMeetingEmailDefaults(defaultsObj?.meetingEmailDefaults)
@@ -508,6 +519,8 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
     team,
     companyPulse,
     ownerSnapshot,
+    salesSheet: ownerSnapshot?.salesSheet ?? null,
+    salesSheetSyncAt,
     ownerEmailSettings,
     meetingEmailDefaults,
     currentUserEmail: actor.email || null,
