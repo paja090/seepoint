@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/google-sheet-plan",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/google-sheet-sales",
+      "schedule": "0 5 * * *"
     }
   ]
 }

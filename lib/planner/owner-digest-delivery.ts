@@ -12,6 +12,7 @@ import {
   sanitizeOwnerEmailDigestSettings,
   type DailyCheckoutRecord,
 } from './owner-reports';
+import { getGoogleSalesSheetSummary } from '@/lib/sales/google-sales-sync';
 import { sendTransactionalEmail } from '@/lib/email';
 
 function asObject(val: unknown): Record<string, unknown> {
@@ -251,6 +252,13 @@ export async function sendOwnerExecutiveDigestForOrganization(
     }
   }
 
+  let salesSheet = null;
+  try {
+    salesSheet = await getGoogleSalesSheetSummary(organizationId);
+  } catch (sheetErr) {
+    console.warn('[owner-digest-delivery] Could not fetch sales sheet summary:', sheetErr);
+  }
+
   const digest = await generateAiOwnerDigest({
     organizationId,
     userId: options?.actorUserId || pulseMembers[0]?.userId || 'system',
@@ -260,6 +268,7 @@ export async function sendOwnerExecutiveDigestForOrganization(
     members: pulseMembers,
     checkoutsByUserId,
     pendingApprovals,
+    salesSheet,
   });
 
   const rendered = renderOwnerExecutiveDigestEmail({
@@ -271,6 +280,7 @@ export async function sendOwnerExecutiveDigestForOrganization(
     members: pulseMembers,
     checkoutsByUserId,
     pendingApprovals,
+    salesSheet,
     baseUrl: options?.baseUrl,
   });
 

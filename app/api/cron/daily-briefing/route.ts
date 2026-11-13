@@ -18,6 +18,7 @@ import {
   isSeePointOrganization,
   syncGooglePlanToWorkOrders,
 } from '@/lib/work/google-sheets-sync';
+import { syncGoogleSalesToCrm } from '@/lib/sales/google-sales-sync';
 import { sanitizeOwnerEmailDigestSettings } from '@/lib/planner/owner-reports';
 import { sendOwnerExecutiveDigestForOrganization } from '@/lib/planner/owner-digest-delivery';
 
@@ -169,12 +170,19 @@ async function handleCronExecution(request: Request) {
           };
         }
 
-        // Keep SeePoint Google Sheets plan fresh right before dispatching briefings or manager recap
-        if (canWork && isSeePointOrganization(org)) {
+        // Keep SeePoint Google Sheets plan & sales fresh right before dispatching briefings or manager recap
+        if (isSeePointOrganization(org)) {
+          if (canWork) {
+            try {
+              await syncGooglePlanToWorkOrders({ organizationId: org.id });
+            } catch (syncErr) {
+              console.warn('[cron/daily-briefing] Pre-send Google Sheets plan sync failed:', syncErr);
+            }
+          }
           try {
-            await syncGooglePlanToWorkOrders({ organizationId: org.id });
-          } catch (syncErr) {
-            console.warn('[cron/daily-briefing] Pre-send Google Sheets sync failed:', syncErr);
+            await syncGoogleSalesToCrm({ organizationId: org.id });
+          } catch (salesSyncErr) {
+            console.warn('[cron/daily-briefing] Pre-send Google Sales sync failed:', salesSyncErr);
           }
         }
 
