@@ -409,7 +409,7 @@ export async function generateAiOwnerDigest(params: {
           .filter((sp) => sp.totalOrdersCount > 0)
           .map(
             (sp) =>
-              `  * ${sp.name} (${sp.code}): ${sp.totalOrdersCount} zakázek (${sp.confirmedCampaignsCount} potvrzeno, ${sp.inRealizationCount} v realizaci). Kampaně: ${sp.activeOrders
+              `  * ${sp.name} (${sp.displayCode || sp.code}): ${sp.totalOrdersCount} zakázek (${sp.confirmedCampaignsCount} potvrzeno, ${sp.inRealizationCount} v realizaci). Kampaně: ${sp.activeOrders
                 .slice(0, 3)
                 .map((o) => `${o.clientName} [${o.carrierTypeLabel}, postup: ${o.checklistProgress}]`)
                 .join(', ')}`
@@ -590,9 +590,9 @@ export function renderApprovalDecisionEmail(
   return { subject, html, text };
 }
 
-export function sanitizeOwnerEmailDigestSettings(raw: unknown): OwnerEmailDigestSettings {
+export function sanitizeOwnerEmailDigestSettings(raw: unknown, isSeePoint = false): OwnerEmailDigestSettings {
   const o = asObject(raw);
-  const enabled = typeof o.enabled === 'boolean' ? o.enabled : false;
+  const enabled = typeof o.enabled === 'boolean' ? o.enabled : isSeePoint;
   let sendHourLocal = 18;
   if (typeof o.sendHourLocal === 'number' && Number.isFinite(o.sendHourLocal)) {
     sendHourLocal = Math.min(23, Math.max(0, Math.round(o.sendHourLocal)));
@@ -621,7 +621,11 @@ export function sanitizeOwnerEmailDigestSettings(raw: unknown): OwnerEmailDigest
             .filter((r) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r))
         ),
       ].slice(0, 15)
-    : [];
+    : (isSeePoint ? ['marek.konecny@seepoint.cz'] : []);
+
+  if (isSeePoint && !customRecipients.includes('marek.konecny@seepoint.cz')) {
+    customRecipients.push('marek.konecny@seepoint.cz');
+  }
 
   return {
     enabled,
@@ -708,7 +712,7 @@ export function renderOwnerExecutiveDigestEmail(params: {
               (sp) => `
             <div style="margin:0 0 8px;padding:10px 12px;border-radius:10px;border:1px solid #fed7aa;background:#fffaf5;">
               <div style="font-size:13px;font-weight:800;color:#9a3412;">
-                ${escapeHtml(sp.name)} (${escapeHtml(sp.code)})
+                ${escapeHtml(sp.name)} (${escapeHtml(sp.displayCode || sp.code)})
                 <span style="font-size:11px;font-weight:700;color:#c2410c;margin-left:6px;">
                   ${sp.totalOrdersCount} zakázek · ${sp.confirmedCampaignsCount} potvrzeno · ${sp.inRealizationCount} v realizaci
                 </span>
@@ -845,7 +849,7 @@ export function renderOwnerExecutiveDigestEmail(params: {
             .filter((sp) => sp.totalOrdersCount > 0)
             .map(
               (sp) =>
-                `- ${sp.name} (${sp.code}): ${sp.totalOrdersCount} zakázek (${sp.confirmedCampaignsCount} potvrzeno, ${sp.inRealizationCount} v realizaci) | ${sp.activeOrders
+                `- ${sp.name} (${sp.displayCode || sp.code}): ${sp.totalOrdersCount} zakázek (${sp.confirmedCampaignsCount} potvrzeno, ${sp.inRealizationCount} v realizaci) | ${sp.activeOrders
                   .slice(0, 2)
                   .map((o) => `${o.clientName} [${o.carrierTypeLabel}]`)
                   .join(', ')}`

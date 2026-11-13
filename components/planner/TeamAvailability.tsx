@@ -739,7 +739,7 @@ export function TeamAvailability({
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {Object.values(data.salesSheet.bySalesperson)
-              .filter((sp) => sp.totalOrdersCount > 0 || ['MM', 'M', 'MK', 'V', 'VK', 'Z', 'ZV', 'S'].includes(sp.code))
+              .filter((sp) => sp.totalOrdersCount > 0 || ['MM', 'M', 'V', 'Z', 'S'].includes(sp.code))
               .map((sp) => (
                 <div
                   key={sp.code}
@@ -751,7 +751,7 @@ export function TeamAvailability({
                         {sp.name}
                       </span>
                       <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-black text-white shrink-0">
-                        {sp.code}
+                        {sp.displayCode || sp.code}
                       </span>
                     </div>
 

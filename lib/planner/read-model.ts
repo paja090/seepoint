@@ -31,6 +31,7 @@ import {
   type UserSalesDailyActivity,
 } from './owner-reports';
 import { getGoogleSalesSheetSummary } from '@/lib/sales/google-sales-sync';
+import { isSeePointOrganization } from '@/lib/work/google-sheets-sync';
 
 export async function userTimeline(actor: AuthenticatedPlannerActor, userId: string, from: Date, to: Date, shared = false): Promise<PlannerItem[]> {
   const organizationId = actor.organizationId;
@@ -498,8 +499,9 @@ export async function readPlanner(actor: AuthenticatedPlannerActor, date: string
   const meetingEmailDefaults = canSeeTeam(actor)
     ? sanitizeMeetingEmailDefaults(defaultsObj?.meetingEmailDefaults)
     : null;
+  const isSeePoint = isSeePointOrganization(actor.organization);
   const ownerEmailSettings = canSeeTeam(actor)
-    ? sanitizeOwnerEmailDigestSettings(defaultsObj?.ownerEmailDigest)
+    ? sanitizeOwnerEmailDigestSettings(defaultsObj?.ownerEmailDigest, isSeePoint)
     : null;
   const connectedSyncTimes = connections
     .filter(c => c.status === 'CONNECTED' && c.lastSyncAt)

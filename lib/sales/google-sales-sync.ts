@@ -23,27 +23,94 @@ export function toGoogleSalesSheetsXlsxUrl(url: string): string | null {
 }
 
 /**
- * Standard salesperson codes as configured by SeePoint management:
+ * Canonical salesperson codes and aliases as configured by SeePoint management:
  * MM: Miroslav Mec
- * M / MK: Marek Konečný
- * V / VK: Vladimíra Konečná
- * Z / ZV: Zuzana Vavrečková
+ * M / MK: Marek Konečný (canonical code: M, display: M / MK)
+ * V / VK: Vladimíra Konečná (canonical code: V, display: V / VK)
+ * Z / ZV: Zuzana Vavrečková (canonical code: Z, display: Z / ZV)
  * S: Silva (Silvie)
- * LV: Lenka Valíčková
  */
-export const KNOWN_SALESPEOPLE: Record<string, { code: string; name: string; email?: string }> = {
-  mm: { code: 'MM', name: 'Miroslav Mec', email: 'mirek.mec@seepoint.cz' },
-  m: { code: 'M', name: 'Marek Konečný', email: 'marek.konecny@seepoint.cz' },
-  mk: { code: 'MK', name: 'Marek Konečný', email: 'marek.konecny@seepoint.cz' },
-  v: { code: 'V', name: 'Vladimíra Konečná', email: 'vladka.konecna@seepoint.cz' },
-  vk: { code: 'VK', name: 'Vladimíra Konečná', email: 'vladka.konecna@seepoint.cz' },
-  z: { code: 'Z', name: 'Zuzana Vavrečková', email: 'zuzana.vavreckova@seepoint.cz' },
-  zv: { code: 'ZV', name: 'Zuzana Vavrečková', email: 'zuzana.vavreckova@seepoint.cz' },
-  s: { code: 'S', name: 'Silva', email: 'silva@seepoint.cz' },
-  silva: { code: 'S', name: 'Silva', email: 'silva@seepoint.cz' },
-  silvie: { code: 'S', name: 'Silva', email: 'silva@seepoint.cz' },
-  lv: { code: 'LV', name: 'Lenka Valíčková', email: 'lenka.valickova@seepoint.cz' },
+export type CanonicalSalesperson = {
+  code: string;
+  displayCode: string;
+  name: string;
+  email?: string;
+  aliases: string[];
 };
+
+export const CANONICAL_SALESPEOPLE: CanonicalSalesperson[] = [
+  {
+    code: 'MM',
+    displayCode: 'MM',
+    name: 'Miroslav Mec',
+    email: 'mirek.mec@seepoint.cz',
+    aliases: ['mm', 'mec', 'miroslav'],
+  },
+  {
+    code: 'M',
+    displayCode: 'M / MK',
+    name: 'Marek Konečný',
+    email: 'marek.konecny@seepoint.cz',
+    aliases: ['m', 'mk', 'konecny', 'konečný', 'marek'],
+  },
+  {
+    code: 'V',
+    displayCode: 'V / VK',
+    name: 'Vladimíra Konečná',
+    email: 'vladka.konecna@seepoint.cz',
+    aliases: ['v', 'vk', 'vladka', 'vlaďka', 'vladimira', 'vladimíra'],
+  },
+  {
+    code: 'Z',
+    displayCode: 'Z / ZV',
+    name: 'Zuzana Vavrečková',
+    email: 'zuzana.vavreckova@seepoint.cz',
+    aliases: ['z', 'zv', 'vavreckova', 'vavrečková', 'zuzana'],
+  },
+  {
+    code: 'S',
+    displayCode: 'S',
+    name: 'Silva',
+    email: 'silva@seepoint.cz',
+    aliases: ['s', 'silva', 'silvie'],
+  },
+];
+
+export const KNOWN_SALESPEOPLE: Record<string, { code: string; displayCode: string; name: string; email?: string }> = {
+  mm: { code: 'MM', displayCode: 'MM', name: 'Miroslav Mec', email: 'mirek.mec@seepoint.cz' },
+  m: { code: 'M', displayCode: 'M / MK', name: 'Marek Konečný', email: 'marek.konecny@seepoint.cz' },
+  mk: { code: 'M', displayCode: 'M / MK', name: 'Marek Konečný', email: 'marek.konecny@seepoint.cz' },
+  v: { code: 'V', displayCode: 'V / VK', name: 'Vladimíra Konečná', email: 'vladka.konecna@seepoint.cz' },
+  vk: { code: 'V', displayCode: 'V / VK', name: 'Vladimíra Konečná', email: 'vladka.konecna@seepoint.cz' },
+  z: { code: 'Z', displayCode: 'Z / ZV', name: 'Zuzana Vavrečková', email: 'zuzana.vavreckova@seepoint.cz' },
+  zv: { code: 'Z', displayCode: 'Z / ZV', name: 'Zuzana Vavrečková', email: 'zuzana.vavreckova@seepoint.cz' },
+  s: { code: 'S', displayCode: 'S', name: 'Silva', email: 'silva@seepoint.cz' },
+  silva: { code: 'S', displayCode: 'S', name: 'Silva', email: 'silva@seepoint.cz' },
+  silvie: { code: 'S', displayCode: 'S', name: 'Silva', email: 'silva@seepoint.cz' },
+  lv: { code: 'LV', displayCode: 'LV', name: 'Lenka Valíčková', email: 'lenka.valickova@seepoint.cz' },
+};
+
+export function resolveCanonicalSalesperson(raw?: string | null): {
+  code: string;
+  displayCode: string;
+  name: string;
+  email?: string;
+} {
+  if (!raw || !raw.trim()) {
+    return { code: 'OBCHOD', displayCode: 'OBCHOD', name: 'Obchodní tým' };
+  }
+  const clean = raw.trim().toLowerCase();
+  if (KNOWN_SALESPEOPLE[clean]) {
+    const k = KNOWN_SALESPEOPLE[clean];
+    return { code: k.code, displayCode: k.displayCode, name: k.name, email: k.email };
+  }
+  for (const sp of CANONICAL_SALESPEOPLE) {
+    if (sp.code.toLowerCase() === clean || sp.aliases.includes(clean)) {
+      return { code: sp.code, displayCode: sp.displayCode, name: sp.name, email: sp.email };
+    }
+  }
+  return { code: raw.trim().toUpperCase(), displayCode: raw.trim().toUpperCase(), name: raw.trim() };
+}
 
 /**
  * Maps shorthand carrier / campaign types to Prisma CrmProjectType and descriptive labels:
@@ -315,9 +382,9 @@ export function parseGoogleSalesSheetRows(
     };
 
     // Canonical salesperson naming
-    const cleanSpCode = rawObchodnik.trim().toUpperCase();
-    const known = KNOWN_SALESPEOPLE[cleanSpCode.toLowerCase()];
-    const salespersonName = known ? known.name : rawObchodnik.trim() || 'Obchodní tým';
+    const spInfo = resolveCanonicalSalesperson(rawObchodnik);
+    const cleanSpCode = spInfo.code;
+    const salespersonName = spInfo.name;
 
     // Status progression logic
     let computedStatus: CrmOrderStatus = 'DRAFT';
@@ -801,6 +868,7 @@ export async function syncGoogleSalesToCrm(
 
 export type SalespersonCrmSummary = {
   code: string;
+  displayCode: string;
   name: string;
   userId: string | null;
   totalOrdersCount: number;
@@ -853,21 +921,20 @@ export async function getGoogleSalesSheetSummary(
 
   const bySalesperson: Record<string, SalespersonCrmSummary> = {};
 
-  // Initialize known salespeople so they appear even if 0 campaigns
-  for (const [, sp] of Object.entries(KNOWN_SALESPEOPLE)) {
-    if (!bySalesperson[sp.code]) {
-      bySalesperson[sp.code] = {
-        code: sp.code,
-        name: sp.name,
-        userId: null,
-        totalOrdersCount: 0,
-        confirmedCampaignsCount: 0,
-        inRealizationCount: 0,
-        completedCount: 0,
-        pipelineCount: 0,
-        activeOrders: [],
-      };
-    }
+  // Initialize canonical salespeople so each real person has exactly ONE card
+  for (const sp of CANONICAL_SALESPEOPLE) {
+    bySalesperson[sp.code] = {
+      code: sp.code,
+      displayCode: sp.displayCode,
+      name: sp.name,
+      userId: null,
+      totalOrdersCount: 0,
+      confirmedCampaignsCount: 0,
+      inRealizationCount: 0,
+      completedCount: 0,
+      pipelineCount: 0,
+      activeOrders: [],
+    };
   }
 
   let totalOrders = 0;
@@ -883,8 +950,17 @@ export async function getGoogleSalesSheetSummary(
       meta = {};
     }
 
-    const spCode = (typeof meta.salespersonCode === 'string' ? meta.salespersonCode : 'OBCHOD').toUpperCase();
-    const spName = typeof meta.salespersonName === 'string' ? meta.salespersonName : (o.assignedUser?.name || 'Obchodník');
+    const rawSpKey =
+      (typeof meta.salespersonCode === 'string' && meta.salespersonCode) ||
+      (typeof meta.rawSalesperson === 'string' && meta.rawSalesperson) ||
+      (typeof meta.salespersonName === 'string' && meta.salespersonName) ||
+      o.assignedUser?.name ||
+      'OBCHOD';
+
+    const spInfo = resolveCanonicalSalesperson(rawSpKey);
+    const spCode = spInfo.code;
+    const spDisplayCode = spInfo.displayCode;
+    const spName = spInfo.name;
     const isConfirmed = Boolean(meta.campaignConfirmed) || o.status === 'CONFIRMED' || o.status === 'IN_REALIZATION' || o.status === 'COMPLETED';
     const period = typeof meta.period === 'string' ? meta.period : '';
     const carrierTypeLabel = typeof meta.carrierTypeLabel === 'string' ? meta.carrierTypeLabel : 'Media';
@@ -892,6 +968,7 @@ export async function getGoogleSalesSheetSummary(
     if (!bySalesperson[spCode]) {
       bySalesperson[spCode] = {
         code: spCode,
+        displayCode: spDisplayCode,
         name: spName,
         userId: o.assignedUserId,
         totalOrdersCount: 0,
