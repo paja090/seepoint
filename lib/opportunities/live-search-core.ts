@@ -120,7 +120,7 @@ Vrať VÝHRADNĚ platný JSON seznam (pole objektů) s 6 až 8 nalezenými pří
           // Disabling internal reasoning halves grounded-search latency (measured ~46 s -> ~25 s).
           generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
         }),
-        signal: radarRequestSignal(deadline, 70_000),
+        signal: radarRequestSignal(deadline, 60_000),
       });
 
       if (!resp.ok) { failure = `Gemini ${model}: HTTP ${resp.status}.`; continue; }
