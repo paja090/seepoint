@@ -1,6 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
+import Module from 'node:module';
 import test from 'node:test';
+
+// Next aliases server-only in production; this Node test imports the runner directly.
+const loader = Module as unknown as { _load: (...args: any[]) => any };
+const originalLoad = loader._load;
+loader._load = function (id: string, ...args: any[]) { return id === 'server-only' ? {} : originalLoad.call(this, id, ...args); };
 
 const source = (relPath: string) => readFileSync(new URL(`../${relPath}`, import.meta.url), 'utf8');
 
