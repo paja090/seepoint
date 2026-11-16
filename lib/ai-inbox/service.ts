@@ -796,7 +796,41 @@ export async function processAiInboxMessage(organizationId: string, messageId: s
       },
     });
 
+    const isSpam = analysis.classification === 'SPAM_IRRELEVANT';
+    const isHighConfidenceKnownClient = Boolean(!isSpam && bestClient && bestClient.confidence >= 0.85);
+    const autoExecutedActionTypes = new Set<string>(
+      isHighConfidenceKnownClient ? ['LINK_CLIENT', 'LINK_CRM_ORDER', 'CREATE_COMMUNICATION'] : []
+    );
+
+    if (isHighConfidenceKnownClient && bestClient) {
+      const existingComm = await prisma.clientCommunication.findFirst({
+        where: {
+          organizationId,
+          clientId: bestClient.id,
+          type: 'EMAIL',
+          subject: msg.subject,
+        },
+        select: { id: true },
+      });
+      if (!existingComm) {
+        await prisma.clientCommunication.create({
+          data: {
+            organizationId,
+            clientId: bestClient.id,
+            contactId: bestClient.contactId || msg.contactId || null,
+            crmOrderId: entityMatch.crmOrderId || msg.crmOrderId || null,
+            authorUserId: null,
+            type: 'EMAIL',
+            subject: msg.subject,
+            content: msg.textBody || analysis.summary || 'Příchozí e-mail z AI Inboxu',
+            isInternal: false,
+          },
+        }).catch(() => null);
+      }
+    }
+
     for (const action of proposedActions) {
+      const shouldAutoExecute = autoExecutedActionTypes.has(action.type);
       await prisma.aiInboxAction.create({
         data: {
           organizationId,
@@ -806,16 +840,24 @@ export async function processAiInboxMessage(organizationId: string, messageId: s
           description: action.description,
           payload: action.payload as Prisma.InputJsonValue,
           confidence: action.confidence,
-          status: 'PROPOSED',
+          status: shouldAutoExecute ? 'EXECUTED' : 'PROPOSED',
+          executedAt: shouldAutoExecute ? new Date() : null,
         },
       });
     }
 
-    const isSpam = analysis.classification === 'SPAM_IRRELEVANT';
+    const hasRemainingProposedActions = proposedActions.some(
+      (a) => !autoExecutedActionTypes.has(a.type)
+    );
+
     const nextStatus: AiInboxStatus = isSpam
       ? 'IGNORED'
-      : (analysis.confidence < 0.8 || !bestClient ? 'REVIEW_REQUIRED' : 'READY');
-    const requiresReview = !isSpam && (nextStatus === 'REVIEW_REQUIRED' || !bestClient);
+      : !hasRemainingProposedActions && isHighConfidenceKnownClient
+      ? 'PROCESSED'
+      : analysis.confidence < 0.8 || !bestClient
+      ? 'REVIEW_REQUIRED'
+      : 'READY';
+    const requiresReview = !isSpam && (hasRemainingProposedActions || !bestClient || analysis.confidence < 0.8);
 
     const updated = await prisma.aiInboxMessage.update({
       where: { id: msg.id },

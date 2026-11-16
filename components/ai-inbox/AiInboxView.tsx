@@ -29,15 +29,20 @@ export type MailboxItem = {
   id: string;
   accountEmail: string | null;
   provider: string;
+  status?: string | null;
+  error?: string | null;
+  lastCheckedAt?: string | null;
   settings?: MailboxSettingsData | null;
 };
 
 export function AiInboxView({
   initialItems,
   mailboxes: initialMailboxes,
+  currentUserEmail,
 }: {
   initialItems: AiInboxListItem[];
   mailboxes: MailboxItem[];
+  currentUserEmail?: string | null;
 }) {
   const [mailboxes, setMailboxes] = useState<MailboxItem[]>(initialMailboxes);
   const [editingMailbox, setEditingMailbox] = useState<MailboxItem | null>(null);
@@ -245,7 +250,7 @@ export function AiInboxView({
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           {mailboxes.length === 0 ? (
             <a
-              href="/settings/integrations"
+              href="/api/integrations/google/connect?provider=GMAIL&returnTo=/ai-inbox"
               className="inline-flex items-center gap-1.5 rounded-xl border border-fuchsia-200 bg-fuchsia-50 px-3.5 py-2 text-xs font-bold text-fuchsia-800 hover:bg-fuchsia-100 transition"
             >
               <Mail size={14} />
@@ -253,6 +258,15 @@ export function AiInboxView({
             </a>
           ) : (
             <>
+              <a
+                href="/api/integrations/google/connect?provider=GMAIL&returnTo=/ai-inbox"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100 active:scale-95 transition shadow-sm"
+                title="Připojit další firemní nebo osobní Gmail schránku obchodníka"
+              >
+                <Mail size={14} className="text-emerald-600" />
+                <span>+ Připojit schránku</span>
+              </a>
+
               {spamCount > 0 && (
                 <button
                   type="button"
@@ -306,6 +320,105 @@ export function AiInboxView({
           )}
         </div>
       </div>
+
+      {/* MAILBOX CONNECTION STATUS & QUICK SWITCHER BAR */}
+      {mailboxes.length > 0 && (
+        <div className="space-y-3">
+          {mailboxes.some((m) => m.status === 'ERROR') && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border-2 border-amber-300 bg-amber-50/90 p-4 text-amber-950 shadow-sm">
+              <div className="flex items-start gap-3">
+                <AlertCircle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="text-xs sm:text-sm font-black">
+                    Některá Gmail schránka vyžaduje obnovení přihlášení ({mailboxes.filter((m) => m.status === 'ERROR').map((m) => m.accountEmail).join(', ')})
+                  </p>
+                  <p className="text-xs text-amber-800">
+                    Platnost Google OAuth tokenu vypršela a automatické stahování nových e-mailů se zastavilo. Klikněte na tlačítko vpravo pro okamžité obnovení.
+                  </p>
+                </div>
+              </div>
+              <a
+                href="/api/integrations/google/connect?provider=GMAIL&returnTo=/ai-inbox"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 hover:bg-amber-700 px-4 py-2.5 text-xs font-black text-white shadow-sm transition shrink-0"
+              >
+                <RefreshCw size={14} />
+                <span>Znovu připojit Gmail 1 klikem</span>
+              </a>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mr-1">
+                Schránky:
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedMailboxId('ALL')}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                  selectedMailboxId === 'ALL'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <span>🏢 Celá firma ({mailboxes.length})</span>
+              </button>
+
+              {(() => {
+                const myMb = currentUserEmail
+                  ? mailboxes.find((m) => m.accountEmail?.toLowerCase() === currentUserEmail.toLowerCase())
+                  : null;
+                if (!myMb) return null;
+                const isSelected = selectedMailboxId === myMb.id;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMailboxId(myMb.id)}
+                    className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                      isSelected
+                        ? 'bg-fuchsia-600 text-white shadow-xs'
+                        : 'bg-fuchsia-50 text-fuchsia-900 border border-fuchsia-200 hover:bg-fuchsia-100'
+                    }`}
+                  >
+                    <span>👤 Moje schránka ({myMb.accountEmail})</span>
+                  </button>
+                );
+              })()}
+
+              {mailboxes.map((mb) => {
+                const isErr = mb.status === 'ERROR';
+                const isSelected = selectedMailboxId === mb.id;
+                return (
+                  <button
+                    key={mb.id}
+                    type="button"
+                    onClick={() => setSelectedMailboxId(isSelected ? 'ALL' : mb.id)}
+                    className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold transition cursor-pointer border ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                        : isErr
+                        ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                    title={isErr ? `Chyba ověření: ${mb.error || 'Obnovte připojení'}` : 'Kliknutím vyfiltrujete e-maily této schránky'}
+                  >
+                    <span className={`h-2 w-2 rounded-full ${isErr ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                    <span>{mb.accountEmail || 'Gmail'}</span>
+                    {isErr && <span className="text-[10px] font-black uppercase text-amber-700">(Odpojeno)</span>}
+                  </button>
+                );
+              })}
+            </div>
+
+            <a
+              href="/api/integrations/google/connect?provider=GMAIL&returnTo=/ai-inbox"
+              className="text-xs font-bold text-indigo-700 hover:text-indigo-900 underline"
+            >
+              + Připojit další Gmail účet
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* SYNC NOTIFICATION BANNER */}
       {syncFeedback && (

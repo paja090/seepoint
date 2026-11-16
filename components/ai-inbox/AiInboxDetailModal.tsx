@@ -1365,14 +1365,23 @@ export function AiInboxDetailModal({
                       </span>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowOrderPicker(!showOrderPicker)}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800"
-                  >
-                    <Link2 size={12} />
-                    <span>Přiřadit k zakázce</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={`/offers/${message.offer.id}`}
+                      className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-amber-700 transition"
+                    >
+                      <ExternalLink size={12} />
+                      <span>Otevřít nabídku</span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setShowOrderPicker(!showOrderPicker)}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800"
+                    >
+                      <Link2 size={12} />
+                      <span>Přiřadit k zakázce</span>
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1486,10 +1495,57 @@ export function AiInboxDetailModal({
                 </span>
               </div>
 
-              {proposedActions.length === 0 && completedActions.length > 0 ? (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-xs text-emerald-800 flex items-center gap-2">
-                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                  <span>Všechny navržené akce pro tento e-mail již byly úspěšně provedeny.</span>
+              {completedActions.length > 0 ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 text-xs text-emerald-900 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 font-bold">
+                      <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                      <span>
+                        {proposedActions.length === 0
+                          ? 'Všechny navržené akce pro tento e-mail již byly úspěšně provedeny.'
+                          : `Již provedeno (${completedActions.length}):`}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {message.offer?.id && (
+                        <a
+                          href={`/offers/${message.offer.id}`}
+                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-800 transition"
+                        >
+                          <ExternalLink size={11} />
+                          <span>Otevřít nabídku →</span>
+                        </a>
+                      )}
+                      {message.crmOrder?.id && (
+                        <a
+                          href={`/crm/orders/${message.crmOrder.id}`}
+                          className="inline-flex items-center gap-1 rounded-lg bg-white border border-emerald-300 px-2.5 py-1 text-[11px] font-bold text-emerald-900 hover:bg-emerald-100 transition"
+                        >
+                          <ExternalLink size={11} />
+                          <span>Zakázka {message.crmOrder.orderNumber} →</span>
+                        </a>
+                      )}
+                      {message.client?.id && (
+                        <a
+                          href={`/crm/clients/${message.client.id}`}
+                          className="inline-flex items-center gap-1 rounded-lg bg-white border border-emerald-300 px-2.5 py-1 text-[11px] font-bold text-emerald-900 hover:bg-emerald-100 transition"
+                        >
+                          <span>Karta klienta →</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {completedActions.map((ca) => (
+                      <span
+                        key={ca.id}
+                        className="inline-flex items-center gap-1 rounded-md bg-white/90 border border-emerald-200 px-2 py-0.5 text-[11px] font-semibold text-emerald-800"
+                      >
+                        <Check size={11} className="text-emerald-600" />
+                        <span>{ca.title}</span>
+                      </span>
+                    ))}
+                  </div>
                 </div>
               ) : null}
 
