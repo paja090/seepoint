@@ -697,7 +697,7 @@ export type {
 export async function processAiInboxMessage(organizationId: string, messageId: string) {
   const msg = await prisma.aiInboxMessage.findFirst({
     where: { id: messageId, organizationId },
-    include: { attachments: true },
+    include: { attachments: true, connection: { select: { userId: true } } },
   });
 
   if (!msg) throw new Error('Zpráva nebyla nalezena.');
@@ -813,19 +813,29 @@ export async function processAiInboxMessage(organizationId: string, messageId: s
         select: { id: true },
       });
       if (!existingComm) {
-        await prisma.clientCommunication.create({
-          data: {
-            organizationId,
-            clientId: bestClient.id,
-            contactId: bestClient.contactId || msg.contactId || null,
-            crmOrderId: entityMatch.crmOrderId || msg.crmOrderId || null,
-            authorUserId: null,
-            type: 'EMAIL',
-            subject: msg.subject,
-            content: msg.textBody || analysis.summary || 'Příchozí e-mail z AI Inboxu',
-            isInternal: false,
-          },
-        }).catch(() => null);
+        let authorUserId = msg.connection?.userId || null;
+        if (!authorUserId) {
+          const fallbackMember = await prisma.organizationMember.findFirst({
+            where: { organizationId, isActive: true },
+            select: { userId: true },
+          });
+          authorUserId = fallbackMember?.userId || null;
+        }
+        if (authorUserId) {
+          await prisma.clientCommunication.create({
+            data: {
+              organizationId,
+              clientId: bestClient.id,
+              contactId: bestClient.contactId || msg.contactId || null,
+              crmOrderId: entityMatch.crmOrderId || msg.crmOrderId || null,
+              authorUserId,
+              type: 'EMAIL',
+              subject: msg.subject,
+              content: msg.textBody || analysis.summary || 'Příchozí e-mail z AI Inboxu',
+              isInternal: false,
+            },
+          }).catch(() => null);
+        }
       }
     }
 
