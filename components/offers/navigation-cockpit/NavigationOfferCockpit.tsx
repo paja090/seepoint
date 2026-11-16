@@ -16,6 +16,7 @@ import { formatNavigationPositionName } from '@/lib/navigation/navigation-naming
 import {
   inferArrowDirectionFromRoute,
   formatNavigationPointDetails,
+  formatNavigationDistance,
   extractCleanStreetName,
 } from '@/lib/ai-offers/route-direction-helper';
 import {
@@ -1062,7 +1063,14 @@ export function NavigationOfferCockpit({
         <NavigationSignVisualizer
           pointLabel={points.find((p) => p.id === activeVisualizerPointId)?.label || 'Bod'}
           initialSignText={campaignName || selectedClient?.name || 'Navigace'}
-          distanceText={points.find((p) => p.id === activeVisualizerPointId)?.calculatedDistanceMeters ? `${points.find((p) => p.id === activeVisualizerPointId)?.calculatedDistanceMeters} m` : '350 m'}
+          distanceText={(() => {
+            const pt = points.find((p) => p.id === activeVisualizerPointId);
+            if (!pt) return '350 m';
+            if (pt.distanceSource === 'MANUAL' && pt.manualDistanceValue?.trim()) {
+              return `${pt.manualDistanceValue.trim()} ${pt.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'}`;
+            }
+            return pt.calculatedDistanceMeters ? (formatNavigationDistance(pt.calculatedDistanceMeters) || '350 m') : '350 m';
+          })()}
           arrowDirectionEnum={points.find((p) => p.id === activeVisualizerPointId)?.arrowDirectionEnum || 'STRAIGHT'}
           orientation={points.find((p) => p.id === activeVisualizerPointId)?.orientation || 'Jednostranná'}
           initialPhotoUrl={points.find((p) => p.id === activeVisualizerPointId)?.sitePhotoUrl || null}

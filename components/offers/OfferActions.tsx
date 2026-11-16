@@ -53,12 +53,8 @@ export function OfferActions({
 
   const effectiveToken = customToken || portalToken || null;
   const linkExists = Boolean(hasPublicLink || effectiveToken);
-  const persistentPublicUrl = effectiveToken && typeof window !== 'undefined'
-    ? `${window.location.origin}/offer/${effectiveToken}`
-    : null;
-  const persistentCampaignUrl = effectiveToken && typeof window !== 'undefined'
-    ? `${window.location.origin}/campaign/${effectiveToken}`
-    : null;
+  const publicPath = effectiveToken ? `/offer/${effectiveToken}` : null;
+  const campaignPath = effectiveToken ? `/campaign/${effectiveToken}` : null;
 
   async function action(name: string, body?: unknown) {
     setBusy(name);
@@ -84,6 +80,9 @@ export function OfferActions({
 
   const disabled = Boolean(busy);
   const isNavigationLocationSelection = offerType === 'NAVIGATION' && navigationProposalMode !== 'PRICED_QUOTE';
+  const currentlyNoPrice = offerType === 'NAVIGATION'
+    ? (Boolean(isNoPriceConcept) || isNavigationLocationSelection)
+    : Boolean(isNoPriceConcept);
 
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -98,9 +97,9 @@ export function OfferActions({
           type="button"
           disabled={disabled}
           onClick={() => void action('toggle-concept')}
-          className={isNoPriceConcept ? 'inline-flex w-full items-center justify-center gap-2 rounded-xl bg-purple-900 hover:bg-purple-800 text-white font-bold text-xs sm:text-sm py-3 transition shadow-md' : 'inline-flex w-full items-center justify-center gap-2 rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-900 font-bold text-xs sm:text-sm py-3 transition'}
+          className={currentlyNoPrice ? 'inline-flex w-full items-center justify-center gap-2 rounded-xl bg-purple-900 hover:bg-purple-800 text-white font-bold text-xs sm:text-sm py-3 transition shadow-md cursor-pointer' : 'inline-flex w-full items-center justify-center gap-2 rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-900 font-bold text-xs sm:text-sm py-3 transition cursor-pointer'}
         >
-          {isNoPriceConcept ? '💰 Převést na nabídku s cenovou kalkulací' : '🔒 Přepnout na nezávazný koncept bez cen'}
+          {currentlyNoPrice ? '💰 Převést na nabídku s cenovou kalkulací' : '🔒 Přepnout na nezávazný koncept bez cen'}
         </button>
 
         {isNavigationLocationSelection && navigationSelectionSubmitted ? (
@@ -123,32 +122,35 @@ export function OfferActions({
               Veřejný odkaz pro klienta:
             </span>
             <span className={`${linkExists ? 'text-emerald-700 bg-emerald-100/80' : 'text-slate-600 bg-slate-100'} font-extrabold text-[11px] px-2 py-0.5 rounded-md`}>
-              {linkExists ? '● Aktivní – token skrytý' : '○ Zatím nevytvořen'}
+              {effectiveToken ? '● Aktivní' : linkExists ? '● Aktivní – token skrytý' : '○ Zatím nevytvořen'}
             </span>
           </div>
 
-          {persistentPublicUrl ? (
+          {publicPath ? (
             <a
               className="block break-all text-xs text-sky-700 hover:text-sky-900 underline font-mono bg-white/80 p-2 rounded-lg border border-sky-100"
-              href={persistentPublicUrl}
+              href={publicPath}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
             >
-              {persistentPublicUrl}
+              {publicPath}
             </a>
           ) : (
             <p className="rounded-lg border border-sky-100 bg-white/80 p-2 text-xs leading-relaxed text-sky-900">
-              Z bezpečnostních důvodů se ukládá pouze hash tokenu. Existující odkaz nelze znovu zobrazit; můžete jej bezpečně obnovit.
+              {linkExists
+                ? 'Pro zobrazení a zkopírování odkazu klikněte níže na „Obnovit a zobrazit odkaz“.'
+                : 'Zatím nebyl vygenerován veřejný odkaz pro klienta.'}
             </p>
           )}
 
           <div className="flex flex-wrap gap-2 pt-0.5">
-            {persistentPublicUrl ? (
+            {publicPath ? (
               <>
                 <button
                   type="button"
                   onClick={() => {
-                    void navigator.clipboard.writeText(persistentPublicUrl);
+                    const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${publicPath}` : publicPath;
+                    void navigator.clipboard.writeText(fullUrl);
                     setMessage('✓ Odkaz byl zkopírován do schránky!');
                   }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs transition cursor-pointer shadow-xs"
@@ -157,19 +159,19 @@ export function OfferActions({
                   Zkopírovat odkaz pro klienta
                 </button>
                 <a
-                  href={persistentPublicUrl}
+                  href={publicPath}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-sky-300 bg-white hover:bg-sky-50 text-sky-800 font-bold text-xs transition cursor-pointer"
                 >
                   <ExternalLink size={13} />
-                  Náhled nabídky
+                  Otevřít nabídku klienta
                 </a>
-                {persistentCampaignUrl && (
+                {campaignPath && (
                   <a
-                    href={persistentCampaignUrl}
+                    href={campaignPath}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition cursor-pointer shadow-xs"
                     title="Otevřít Klientský Live Portál & Proof of Play fotodokumentaci"
                   >
@@ -178,16 +180,15 @@ export function OfferActions({
                   </a>
                 )}
               </>
-            ) : null}
-            {!persistentPublicUrl && (
+            ) : (
               <button
                 type="button"
                 disabled={disabled}
                 onClick={() => void action('publish')}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-bold text-sky-800 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-bold text-sky-800 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
               >
                 <Link2 size={13} />
-                Vytvořit bezpečný odkaz
+                {linkExists ? 'Obnovit a zobrazit odkaz pro klienta' : 'Vytvořit bezpečný odkaz'}
               </button>
             )}
           </div>

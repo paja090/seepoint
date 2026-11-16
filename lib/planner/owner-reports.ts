@@ -738,6 +738,51 @@ export function renderOwnerExecutiveDigestEmail(params: {
          </div>`
       : '';
 
+  const completedFeedItems = (params.companyPulse?.recentFeed || []).filter((item) => item.status === 'DONE');
+  const completedByWorker = new Map<string, typeof completedFeedItems>();
+  for (const item of completedFeedItems) {
+    const workerKey = item.workerNames.length > 0 ? item.workerNames.join(', ') : 'Realizační tým';
+    const arr = completedByWorker.get(workerKey) || [];
+    arr.push(item);
+    completedByWorker.set(workerKey, arr);
+  }
+  const completedWorkHtml =
+    completedFeedItems.length > 0
+      ? `<div style="margin-top:20px;">
+          <h2 style="margin:0 0 10px;font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:#047857;">
+            ✅ Dokončená práce podle realizátora (${completedFeedItems.length})
+          </h2>
+          ${Array.from(completedByWorker.entries())
+            .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], 'cs'))
+            .map(
+              ([worker, items]) => `
+            <div style="margin:0 0 10px;padding:10px 12px;border-radius:10px;border:1px solid #a7f3d0;background:#f0fdf4;">
+              <div style="font-size:12px;font-weight:900;color:#065f46;margin-bottom:6px;">
+                👤 ${escapeHtml(worker)} · ${items.length} ${items.length === 1 ? 'úkol' : items.length < 5 ? 'úkoly' : 'úkolů'}
+              </div>
+              ${items
+                .map(
+                  (item) => `
+                <div style="margin:0 0 6px;padding:8px 10px;border-radius:8px;border:1px solid #d1fae5;background:#ffffff;">
+                  <div style="font-size:13px;font-weight:800;color:#0f172a;">✅ ${escapeHtml(item.title)}</div>
+                  <div style="font-size:11.5px;color:#475569;margin-top:2px;">
+                    ${item.clientName ? `Klient: <strong>${escapeHtml(item.clientName)}</strong>` : 'Interní úkol'}
+                    ${item.hoursWorked ? ` · <strong>${item.hoursWorked} h</strong>` : ''}
+                  </div>
+                  ${
+                    item.note
+                      ? `<div style="margin-top:4px;padding:5px 8px;border-radius:6px;background:#f8fafc;border:1px solid #e2e8f0;font-size:11.5px;color:#334155;">💬 Poznámka: ${escapeHtml(item.note)}</div>`
+                      : ''
+                  }
+                </div>`
+                )
+                .join('')}
+            </div>`
+            )
+            .join('')}
+         </div>`
+      : '';
+
   const teamRowsHtml = params.members
     .map((m) => {
       const chk = params.checkoutsByUserId[m.userId];
@@ -810,6 +855,7 @@ export function renderOwnerExecutiveDigestEmail(params: {
           ${highlightsHtml}
           ${attentionHtml}
           ${approvalsHtml}
+          ${completedWorkHtml}
           ${salesSheetHtml}
           <h2 style="margin:20px 0 10px;font-size:11px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;color:#475569;">
             👥 Přehled týmu a reportů

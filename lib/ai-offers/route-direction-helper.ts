@@ -234,11 +234,12 @@ export function inferArrowDirectionFromRoute(
  */
 export function formatNavigationDistance(distMeters?: number | null): string {
   if (distMeters == null || !Number.isFinite(distMeters)) return '';
-  if (distMeters >= 1000) {
-    const km = (distMeters / 1000).toFixed(1).replace('.0', '').replace('.', ',');
+  const rounded = Math.max(50, Math.round(distMeters / 50) * 50);
+  if (rounded >= 1000) {
+    const km = (rounded / 1000).toFixed(1).replace(/\.0$/, '').replace('.', ',');
     return `${km} km`;
   }
-  return `${Math.max(50, Math.round(distMeters / 50) * 50)} m`;
+  return `${rounded} m`;
 }
 
 /**

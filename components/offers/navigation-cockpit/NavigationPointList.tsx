@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { DraftPoint, DraftTarget } from './types';
 import { getPointPinVisual } from '@/lib/offers/navigation-carrier-types';
+import { formatNavigationDistance } from '@/lib/ai-offers/route-direction-helper';
 
 interface NavigationPointListProps {
   points: DraftPoint[];
@@ -63,9 +64,7 @@ export function NavigationPointList({
         const distText = pt.distanceSource === 'MANUAL' && pt.manualDistanceValue?.trim()
           ? `${pt.manualDistanceValue.trim()} ${pt.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'} (ručně)`
           : pt.calculatedDistanceMeters
-          ? pt.calculatedDistanceMeters >= 1000
-            ? `${(pt.calculatedDistanceMeters / 1000).toFixed(1)} km`
-            : `${pt.calculatedDistanceMeters} m`
+          ? formatNavigationDistance(pt.calculatedDistanceMeters)
           : null;
 
         const hasPhoto = Boolean(pt.sitePhotoUrl || pt.visualizedPhotoUrl);
