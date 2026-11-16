@@ -813,21 +813,11 @@ export async function processAiInboxMessage(organizationId: string, messageId: s
         select: { id: true },
       });
       if (!existingComm) {
-        let authorUserId: string | null = null;
-        if (msg.connectionId) {
-          const conn = await prisma.integrationConnection.findFirst({
-            where: { id: msg.connectionId, organizationId },
-            select: { userId: true },
-          });
-          authorUserId = conn?.userId || null;
-        }
-        if (!authorUserId) {
-          const fallbackMember = await prisma.organizationMember.findFirst({
-            where: { organizationId, isActive: true },
-            select: { userId: true },
-          });
-          authorUserId = fallbackMember?.userId || null;
-        }
+        const fallbackMember = await prisma.organizationMember.findFirst({
+          where: { organizationId, isActive: true },
+          select: { userId: true },
+        });
+        const authorUserId = fallbackMember?.userId || null;
         if (authorUserId) {
           await prisma.clientCommunication.create({
             data: {
