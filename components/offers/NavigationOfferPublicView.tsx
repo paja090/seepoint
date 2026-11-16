@@ -1104,6 +1104,11 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                             <div className="text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-md inline-block">
                               jen cca {money(Math.round(pointCalc.monthlyRate / 30))} / den
                             </div>
+                            {pointCalc.oneOffTotal > 0 && (
+                              <div className="text-[11px] font-bold text-slate-600 mt-0.5">
+                                Realizace na klíč: <span className="text-slate-900 font-black">{money(pointCalc.oneOffTotal)}</span>
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -1295,6 +1300,11 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                           <div className="text-[10px] font-bold text-slate-500">
                             cca {money(Math.round(pointCalc.monthlyRate / 30))} / den
                           </div>
+                          {pointCalc.oneOffTotal > 0 && (
+                            <div className="text-[10px] font-medium text-slate-500 mt-0.5">
+                              Realizace: <span className="text-slate-700 font-bold">{money(pointCalc.oneOffTotal)}</span>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -1442,6 +1452,11 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                           <div className="text-[10px] font-bold text-emerald-700">
                             jen cca {money(Math.round(pointCalc.monthlyRate / 30))} / den
                           </div>
+                          {pointCalc.oneOffTotal > 0 && (
+                            <div className="text-[10px] font-bold text-slate-600 mt-0.5">
+                              Realizace na klíč: <span className="text-slate-900 font-black">{money(pointCalc.oneOffTotal)}</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
