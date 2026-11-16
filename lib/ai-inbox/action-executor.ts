@@ -255,7 +255,7 @@ export async function executeAiInboxAction(
 
       case 'UPDATE_OFFER': {
         let offerId = msg.offerId || (payload.offerId ? String(payload.offerId) : '');
-        let crmOrderId = msg.crmOrderId || (payload.crmOrderId ? String(payload.crmOrderId) : '');
+        const crmOrderId = msg.crmOrderId || (payload.crmOrderId ? String(payload.crmOrderId) : '');
         const rawChanges = Array.isArray(payload.changes)
           ? (payload.changes as Array<{ label?: string; fromValue?: string; toValue?: string }>)
           : [];
