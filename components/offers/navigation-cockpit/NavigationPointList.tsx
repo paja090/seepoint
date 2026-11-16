@@ -153,6 +153,16 @@ export function NavigationPointList({
               )}
             </div>
 
+            {hasPhoto && isSelected && (
+              <div className="mt-2.5 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 h-28 w-full relative">
+                <img
+                  src={pt.visualizedPhotoUrl || pt.sitePhotoUrl}
+                  alt={`Snímek bodu ${pt.label}`}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            )}
+
             {/* Bottom action bar */}
             <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 text-[11px]">
               <div className="flex items-center gap-1">

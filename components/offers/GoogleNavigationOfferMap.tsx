@@ -102,6 +102,7 @@ export function GoogleNavigationOfferMap({
   maxRadiusKm = 5,
   onSuggestedPoints,
   selectedPointId,
+  selectedPointIds,
   onPointClick,
 }: {
   target?: NavigationMapTarget;
@@ -118,6 +119,7 @@ export function GoogleNavigationOfferMap({
   maxRadiusKm?: number;
   onSuggestedPoints?: (points: SuggestedNavigationPoint[], error?: string) => void;
   selectedPointId?: string | null;
+  selectedPointIds?: string[];
   onPointClick?: (id: string) => void;
 }) {
   const apiKey =
@@ -618,30 +620,38 @@ export function GoogleNavigationOfferMap({
     points.forEach((point, index) => {
       const pointPos = { lat: point.latitude, lng: point.longitude };
       bounds.extend(pointPos);
-      const isSelected = selectedPointId === point.id;
+      const isFocused = selectedPointId === point.id;
+      const isChosen = selectedPointIds ? selectedPointIds.includes(point.id) : true;
 
       const pinColor = getPointPinColor(point);
       const visual = getPointPinVisual(point);
 
+      const markerScale = isFocused ? 2.8 : isChosen ? 2.3 : 1.5;
+      const strokeColor = isFocused ? '#fde047' : isChosen ? '#ffffff' : '#94a3b8';
+      const strokeWeight = isFocused ? 3.5 : isChosen ? 2.5 : 1;
+      const fillOpacity = isChosen || isFocused ? 1 : 0.55;
+      const zIndex = isFocused ? 99999 : isChosen ? 500 + index : 50 + index;
+      const fillColor = isFocused ? '#ea580c' : pinColor;
+
       const marker = new googleMaps.Marker({
         position: pointPos,
         map,
-        title: `${visual.icon} #${index + 1} ${point.label} (${visual.label})`,
+        title: `${visual.icon} #${index + 1} ${point.label} (${visual.label})${isChosen ? ' [Vybráno v nabídce]' : ' [Není vybráno]'}`,
         draggable: !readOnly,
-        zIndex: isSelected ? 99999 : 100 + index,
+        zIndex,
         label: {
           text: `#${index + 1}`,
-          color: '#ffffff',
+          color: isChosen || isFocused ? '#ffffff' : '#e2e8f0',
           fontWeight: '900',
-          fontSize: isSelected ? '13px' : '11px',
+          fontSize: isFocused ? '14px' : isChosen ? '12px' : '10px',
         },
         icon: {
           path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
-          fillColor: isSelected ? '#ea580c' : pinColor,
-          fillOpacity: 1,
-          strokeColor: isSelected ? '#fde047' : '#ffffff',
-          strokeWeight: isSelected ? 3.5 : 2,
-          scale: isSelected ? 2.4 : 1.9,
+          fillColor,
+          fillOpacity,
+          strokeColor,
+          strokeWeight,
+          scale: markerScale,
           anchor: new googleMaps.Point(12, 22),
           labelOrigin: new googleMaps.Point(12, 9),
         },
@@ -680,9 +690,10 @@ export function GoogleNavigationOfferMap({
             const polyline = new googleMaps.Polyline({
               path: polylinePath,
               geodesic: true,
-              strokeColor: isSelected ? '#ea580c' : '#0284c7',
-              strokeOpacity: isSelected ? 1 : 0.8,
-              strokeWeight: isSelected ? 5 : 4,
+              strokeColor: isFocused ? '#ea580c' : isChosen ? (point.color || '#0284c7') : '#cbd5e1',
+              strokeOpacity: isFocused ? 1 : isChosen ? 0.85 : 0.35,
+              strokeWeight: isFocused ? 5 : isChosen ? 4 : 2,
+              zIndex: isFocused ? 9999 : isChosen ? 50 : 10,
               map,
             });
             polylinesRef.current.push(polyline);
@@ -725,7 +736,7 @@ export function GoogleNavigationOfferMap({
     if (!selectedPointId && (points.length > 0 || target || userLocation) && (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds) {
       (map as { fitBounds: (b: unknown, opts: unknown) => void }).fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
     }
-  }, [mapsLoaded, target, targets, points, userLocation, onMapClick, onPointMove, onTargetSelect, readOnly, selectedPointId, onPointClick, showRestrictedZones, showHeritageZones]);
+  }, [mapsLoaded, target, targets, points, userLocation, onMapClick, onPointMove, onTargetSelect, readOnly, selectedPointId, selectedPointIds, onPointClick, showRestrictedZones, showHeritageZones]);
 
   // Center/Pan smoothly to selected point when it changes
   useEffect(() => {
