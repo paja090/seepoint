@@ -183,11 +183,12 @@ export function NavigationMapStep({
         </div>
       </div>
 
-      {/* Main Workspace: 68% Map + 32% Compact Point List */}
+      {/* Main Workspace: Compact Sticky Map (5 cols) + Spacious Points List (7 cols) */}
       <div className="grid gap-4 lg:grid-cols-12 items-start">
-        {/* Left Column: Dominant Map View (8 of 12 cols = 67%) */}
-        <div className="lg:col-span-8 rounded-2xl border border-slate-200 bg-white p-3 shadow-xs">
+        {/* Left Column: Compact Sticky Map (5 of 12 cols = 42%) */}
+        <div className="lg:col-span-5 rounded-2xl border border-slate-200 bg-white p-3 shadow-xs lg:sticky lg:top-4 z-10">
           <GoogleNavigationOfferMap
+            compact={true}
             mode={mode}
             targets={targets.map((t) => ({
               id: t.id,
@@ -231,8 +232,8 @@ export function NavigationMapStep({
           />
         </div>
 
-        {/* Right Column: Compact Points List (4 of 12 cols = 33%) */}
-        <div className="lg:col-span-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
+        {/* Right Column: Spacious Points List (7 of 12 cols = 58%) */}
+        <div className="lg:col-span-7 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
           <div className="flex items-center justify-between border-b pb-2.5">
             <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
               <span>Navigační body trasy</span>

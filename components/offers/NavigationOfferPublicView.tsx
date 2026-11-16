@@ -88,135 +88,141 @@ export function formatNavigationClientNote(rawNote?: string | null): string {
   return note;
 }
 
-export function ArrowBadge({ arrowEnum }: { arrowEnum?: string | null }) {
+export function ArrowBadge({ arrowEnum, size = 'md' }: { arrowEnum?: string | null; size?: 'sm' | 'md' | 'lg' }) {
+  const isLg = size === 'lg';
+  const pad = isLg ? 'px-3.5 py-1.5 text-xs sm:text-sm' : 'px-2.5 py-1 text-xs';
+  const r = isLg ? 'rounded-xl' : 'rounded-lg';
+  const iSize = isLg ? 17 : 14;
+  const iComb = isLg ? 15 : 13;
+
   switch (arrowEnum) {
     case 'LEFT':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-sky-100 px-2.5 py-1 text-xs font-black text-sky-900 border border-sky-300">
-          <ArrowLeft size={14} className="text-sky-700 stroke-[3]" /> VLEVO
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-sky-100 ${pad} font-black text-sky-900 border border-sky-300`}>
+          <ArrowLeft size={iSize} className="text-sky-700 stroke-[3]" /> VLEVO
         </span>
       );
     case 'RIGHT':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-sky-100 px-2.5 py-1 text-xs font-black text-sky-900 border border-sky-300">
-          <ArrowRight size={14} className="text-sky-700 stroke-[3]" /> VPRAVO
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-sky-100 ${pad} font-black text-sky-900 border border-sky-300`}>
+          <ArrowRight size={iSize} className="text-sky-700 stroke-[3]" /> VPRAVO
         </span>
       );
     case 'SLANTED_LEFT':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-sky-100 px-2.5 py-1 text-xs font-black text-sky-900 border border-sky-300">
-          <ArrowUpLeft size={14} className="text-sky-700 stroke-[3]" /> ŠIKMO VLEVO
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-sky-100 ${pad} font-black text-sky-900 border border-sky-300`}>
+          <ArrowUpLeft size={iSize} className="text-sky-700 stroke-[3]" /> ŠIKMO VLEVO
         </span>
       );
     case 'SLANTED_RIGHT':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-sky-100 px-2.5 py-1 text-xs font-black text-sky-900 border border-sky-300">
-          <ArrowUpRight size={14} className="text-sky-700 stroke-[3]" /> ŠIKMO VPRAVO
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-sky-100 ${pad} font-black text-sky-900 border border-sky-300`}>
+          <ArrowUpRight size={iSize} className="text-sky-700 stroke-[3]" /> ŠIKMO VPRAVO
         </span>
       );
     case 'STRAIGHT_LEFT':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-teal-100 px-2.5 py-1 text-xs font-black text-teal-900 border border-teal-300">
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-teal-100 ${pad} font-black text-teal-900 border border-teal-300`}>
           <span className="inline-flex items-center gap-0.5">
-            <ArrowUp size={13} className="text-teal-700 stroke-[3]" />
-            <ArrowLeft size={13} className="text-teal-700 stroke-[3]" />
+            <ArrowUp size={iComb} className="text-teal-700 stroke-[3]" />
+            <ArrowLeft size={iComb} className="text-teal-700 stroke-[3]" />
           </span>
           ROVNĚ A VLEVO
         </span>
       );
     case 'STRAIGHT_RIGHT':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-teal-100 px-2.5 py-1 text-xs font-black text-teal-900 border border-teal-300">
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-teal-100 ${pad} font-black text-teal-900 border border-teal-300`}>
           <span className="inline-flex items-center gap-0.5">
-            <ArrowUp size={13} className="text-teal-700 stroke-[3]" />
-            <ArrowRight size={13} className="text-teal-700 stroke-[3]" />
+            <ArrowUp size={iComb} className="text-teal-700 stroke-[3]" />
+            <ArrowRight size={iComb} className="text-teal-700 stroke-[3]" />
           </span>
           ROVNĚ A VPRAVO
         </span>
       );
     case 'LEFT_STRAIGHT':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-100 px-2.5 py-1 text-xs font-black text-cyan-900 border border-cyan-300">
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-cyan-100 ${pad} font-black text-cyan-900 border border-cyan-300`}>
           <span className="inline-flex items-center gap-0.5">
-            <ArrowLeft size={13} className="text-cyan-700 stroke-[3]" />
-            <ArrowUp size={13} className="text-cyan-700 stroke-[3]" />
+            <ArrowLeft size={iComb} className="text-cyan-700 stroke-[3]" />
+            <ArrowUp size={iComb} className="text-cyan-700 stroke-[3]" />
           </span>
           VLEVO A ROVNĚ
         </span>
       );
     case 'RIGHT_STRAIGHT':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-100 px-2.5 py-1 text-xs font-black text-cyan-900 border border-cyan-300">
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-cyan-100 ${pad} font-black text-cyan-900 border border-cyan-300`}>
           <span className="inline-flex items-center gap-0.5">
-            <ArrowRight size={13} className="text-cyan-700 stroke-[3]" />
-            <ArrowUp size={13} className="text-cyan-700 stroke-[3]" />
+            <ArrowRight size={iComb} className="text-cyan-700 stroke-[3]" />
+            <ArrowUp size={iComb} className="text-cyan-700 stroke-[3]" />
           </span>
           VPRAVO A ROVNĚ
         </span>
       );
     case 'LEFT_RIGHT':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-purple-100 px-2.5 py-1 text-xs font-black text-purple-900 border border-purple-300">
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-purple-100 ${pad} font-black text-purple-900 border border-purple-300`}>
           <span className="inline-flex items-center gap-0.5">
-            <ArrowLeft size={13} className="text-purple-700 stroke-[3]" />
-            <ArrowRight size={13} className="text-purple-700 stroke-[3]" />
+            <ArrowLeft size={iComb} className="text-purple-700 stroke-[3]" />
+            <ArrowRight size={iComb} className="text-purple-700 stroke-[3]" />
           </span>
           VLEVO I VPRAVO
         </span>
       );
     case 'U_TURN':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-900 border border-amber-300">
-          <RotateCcw size={14} className="text-amber-700 stroke-[3]" /> OTOČENÍ DO PROTISMĚRU
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-amber-100 ${pad} font-black text-amber-900 border border-amber-300`}>
+          <RotateCcw size={iSize} className="text-amber-700 stroke-[3]" /> OTOČENÍ DO PROTISMĚRU
         </span>
       );
     case 'TWO_WAY':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-purple-100 px-2.5 py-1 text-xs font-black text-purple-900 border border-purple-300">
-          <MoveHorizontal size={14} className="text-purple-700 stroke-[3]" /> OBOUSMĚRNÝ
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-purple-100 ${pad} font-black text-purple-900 border border-purple-300`}>
+          <MoveHorizontal size={iSize} className="text-purple-700 stroke-[3]" /> OBOUSMĚRNÝ
         </span>
       );
     case 'ROUNDABOUT_1':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-100 px-2.5 py-1 text-xs font-black text-indigo-900 border border-indigo-300">
-          <RotateCw size={14} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJ. – 1. VÝJEZD
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-indigo-100 ${pad} font-black text-indigo-900 border border-indigo-300`}>
+          <RotateCw size={iSize} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJ. – 1. VÝJEZD
         </span>
       );
     case 'ROUNDABOUT_2':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-100 px-2.5 py-1 text-xs font-black text-indigo-900 border border-indigo-300">
-          <RotateCw size={14} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJ. – 2. VÝJEZD
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-indigo-100 ${pad} font-black text-indigo-900 border border-indigo-300`}>
+          <RotateCw size={iSize} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJ. – 2. VÝJEZD
         </span>
       );
     case 'ROUNDABOUT_3':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-100 px-2.5 py-1 text-xs font-black text-indigo-900 border border-indigo-300">
-          <RotateCw size={14} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJ. – 3. VÝJEZD
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-indigo-100 ${pad} font-black text-indigo-900 border border-indigo-300`}>
+          <RotateCw size={iSize} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJ. – 3. VÝJEZD
         </span>
       );
     case 'ROUNDABOUT_4':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-100 px-2.5 py-1 text-xs font-black text-indigo-900 border border-indigo-300">
-          <RotateCw size={14} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJ. – 4. VÝJEZD
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-indigo-100 ${pad} font-black text-indigo-900 border border-indigo-300`}>
+          <RotateCw size={iSize} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJ. – 4. VÝJEZD
         </span>
       );
     case 'ROUNDABOUT_5':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-100 px-2.5 py-1 text-xs font-black text-indigo-900 border border-indigo-300">
-          <RotateCw size={14} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJ. – 5. VÝJEZD
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-indigo-100 ${pad} font-black text-indigo-900 border border-indigo-300`}>
+          <RotateCw size={iSize} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJ. – 5. VÝJEZD
         </span>
       );
     case 'ROUNDABOUT':
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-100 px-2.5 py-1 text-xs font-black text-indigo-900 border border-indigo-300">
-          <RotateCw size={14} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJEZD
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-indigo-100 ${pad} font-black text-indigo-900 border border-indigo-300`}>
+          <RotateCw size={iSize} className="text-indigo-700 stroke-[3]" /> KRUHOVÝ OBJEZD
         </span>
       );
     case 'STRAIGHT':
     default:
       return (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-900 border border-emerald-300">
-          <ArrowUp size={14} className="text-emerald-700 stroke-[3]" /> ROVNĚ
+        <span className={`inline-flex items-center gap-1.5 ${r} bg-emerald-100 ${pad} font-black text-emerald-900 border border-emerald-300`}>
+          <ArrowUp size={iSize} className="text-emerald-700 stroke-[3]" /> ROVNĚ
         </span>
       );
   }
@@ -869,12 +875,12 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
       )}
 
       {/* Main Interactive Google Map & Detail Panel */}
-      <div id="nav-points-section" className="scroll-mt-6 grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-        {/* Interactive Map */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+      <div id="nav-points-section" className="scroll-mt-6 grid gap-6 xl:grid-cols-[440px_1fr] items-start">
+        {/* Interactive Map (Compact Sticky Sidebar) */}
+        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm space-y-3 xl:sticky xl:top-4 z-10">
           <div className="flex flex-wrap items-center justify-between gap-2 px-2 pt-1">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Compass size={18} className="text-sky-600" /> Interaktivní mapa navigační trasy
+              <Compass size={18} className="text-sky-600" /> Trasa navigace
             </h3>
             <span className="text-xs font-semibold text-slate-500">
               {displayedPoints.length} bodů v zobrazení
@@ -898,11 +904,11 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                         <span className="font-bold">AI Kontrola tras a směrových rčení:</span>{' '}
                         {allRoutesVerified ? (
                           <span className="text-emerald-800 font-semibold">
-                            ✓ Všech {pointsWithRoutes} bodů má ověřenou jízdní trasu a šipku podle pravdy.
+                            ✓ Všech {pointsWithRoutes} bodů má ověřenou jízdní trasu a šipku.
                           </span>
                         ) : (
                           <span className="text-amber-800 font-semibold">
-                            {pointsWithRoutes} z {displayedPoints.length} bodů má vypočtenou trasu. Spusťte AI kontrolu pro ověření zbývajících tras a směrů.
+                            {pointsWithRoutes} z {displayedPoints.length} bodů má vypočtenou trasu.
                           </span>
                         )}
                       </div>
@@ -914,16 +920,16 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                         disabled={runningAiCheck}
                         onClick={() => void handleRunAiCheck()}
                         className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-indigo-900 shadow-2xs hover:bg-indigo-50 transition cursor-pointer disabled:opacity-50"
-                        title="AI přepočte reálné trasy a směrové šipky (vpravo/vlevo/rovně) podle skutečné jízdy k prodejně"
+                        title="AI přepočte reálné trasy a směrové šipky podle jízdy k prodejně"
                       >
                         <RefreshCw size={13} className={runningAiCheck ? 'animate-spin text-indigo-600' : ''} />
-                        <span>{runningAiCheck ? 'AI kontroluje trasy...' : allRoutesVerified ? 'Znovu prověřit AI trasy' : '✨ Spustit AI kontrolu tras'}</span>
+                        <span>{runningAiCheck ? 'AI kontroluje...' : allRoutesVerified ? 'Znovu prověřit' : '✨ AI kontrola'}</span>
                       </button>
                       <a
                         href={`/offers/${offer.id}/navigation/edit`}
                         className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
                       >
-                        Upravit v editoru
+                        Editor
                       </a>
                     </div>
                   </div>
@@ -947,6 +953,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
           )}
 
           <GoogleNavigationOfferMap
+            compact={true}
             readOnly
             target={target}
             targets={targets.map((t) => ({
@@ -978,6 +985,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             })}
             mode="point"
             selectedPointId={selectedPointId}
+            selectedPointIds={selectedPointIds}
             onPointClick={(id) => {
               setSelectedPointId(id);
               const el = document.getElementById(`nav-point-card-${id}`);
@@ -993,11 +1001,16 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
 
         {/* Navigation Points Selector List & Selected Detail */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-900">
-              Navigační body {targets.length > 1 && activeBranchFilter !== 'ALL' ? `pro pobočku (${displayedPoints.length})` : `v nabídce (${navigation.points.length})`}
-            </h3>
-            <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">
+                Navigační body {targets.length > 1 && activeBranchFilter !== 'ALL' ? `pro pobočku (${displayedPoints.length})` : `v nabídce (${navigation.points.length})`}
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Vybrané body jsou zobrazeny s velkou fotodokumentací a směrovými rčeními.
+              </p>
+            </div>
+            <span className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${
               selectedPointIds.length === navigation.points.length
                 ? 'text-emerald-800 bg-emerald-100 border-emerald-300'
                 : 'text-amber-800 bg-amber-100 border-amber-300'
@@ -1006,7 +1019,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             </span>
           </div>
 
-          <div className="space-y-3 max-h-[620px] overflow-y-auto pr-1">
+          <div className="space-y-4 max-h-[860px] overflow-y-auto pr-1 sm:pr-2">
             {displayedPoints.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-slate-500">
                 <p className="text-sm font-semibold">Pro tuto pobočku zatím nejsou navrženy žádné navigační body.</p>
@@ -1016,7 +1029,214 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
               const isSelected = selectedPointIds.includes(point.id);
               const isFocused = selectedPointId === point.id;
               const pObj = point as unknown as Record<string, unknown>;
+              const pointCalc = calculateNavigationPointPrice(point, selectedDuration);
+              const activePhoto = (typeof pObj.visualizedPhotoUrl === 'string' && pObj.visualizedPhotoUrl)
+                ? pObj.visualizedPhotoUrl
+                : (typeof pObj.sitePhotoUrl === 'string' && pObj.sitePhotoUrl ? pObj.sitePhotoUrl : null);
 
+              if (isSelected) {
+                // ==========================================
+                // ENLARGED SELECTED NAVIGATION POINT CARD
+                // ==========================================
+                return (
+                  <article
+                    id={`nav-point-card-${point.id}`}
+                    key={point.id}
+                    onClick={() => setSelectedPointId(point.id)}
+                    className={`cursor-pointer rounded-3xl border-2 transition-all duration-300 p-4 sm:p-5 relative overflow-hidden ${
+                      isFocused
+                        ? 'border-amber-500 bg-gradient-to-br from-amber-50/70 via-white to-amber-50/30 shadow-xl ring-4 ring-amber-400/40'
+                        : 'border-emerald-500/80 bg-white ring-2 ring-emerald-500/15 shadow-md hover:shadow-lg'
+                    }`}
+                  >
+                    {/* Header: Title, numbering, badges, and pricing */}
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
+                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl font-mono text-xs font-black shadow-xs ${
+                          isFocused ? 'bg-amber-500 text-white' : 'bg-emerald-600 text-white'
+                        }`}>
+                          #{index + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-black text-slate-900 text-base sm:text-lg break-words">
+                              {formatNavigationPointDesignation(pObj, index).fullTitle}
+                            </h4>
+                            {(() => {
+                              const vis = getPointPinVisual({
+                                color: typeof pObj.color === 'string' ? pObj.color : undefined,
+                                navigationType: point.navigationType,
+                              });
+                              return (
+                                <span
+                                  className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold border shadow-2xs"
+                                  style={{
+                                    backgroundColor: `${vis.color}15`,
+                                    borderColor: `${vis.color}45`,
+                                    color: vis.color,
+                                  }}
+                                >
+                                  <span>{vis.icon}</span>
+                                  <span>{vis.label}</span>
+                                </span>
+                              );
+                            })()}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
+                              {point.variant ? `Formát: ${point.variant}` : point.navigationType}
+                            </span>
+                            {Boolean(pObj.pillarNumber) && (
+                              <span className="text-xs font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                                📍 Sloup VO č. {String(pObj.pillarNumber)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col sm:items-end gap-1.5 shrink-0 w-full sm:w-auto">
+                        {pointCalc.monthlyRate > 0 && (
+                          <div className="text-left sm:text-right">
+                            <div className="text-base font-black text-slate-900 tabular-nums">
+                              {money(pointCalc.monthlyRate)} <span className="text-xs font-medium text-slate-500">/ měs.</span>
+                            </div>
+                            <div className="text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-md inline-block">
+                              jen cca {money(Math.round(pointCalc.monthlyRate / 30))} / den
+                            </div>
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          disabled={selectionSubmitted}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            togglePointSelection(point.id);
+                          }}
+                          className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-70 w-full sm:w-auto bg-emerald-600 text-white shadow-xs hover:bg-emerald-700"
+                        >
+                          ✓ Vybráno v nabídce
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* ENLARGED PHOTO & VISUALIZER */}
+                    {activePhoto ? (
+                      <div
+                        className="mt-3.5 overflow-hidden rounded-2xl border border-slate-200 cursor-zoom-in relative group aspect-16/10 sm:h-72 w-full bg-slate-100 shadow-inner"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveLightboxImage(toPhotoFullUrl(String(activePhoto)));
+                        }}
+                      >
+                        <img
+                          src={toPhotoThumbnailUrl(String(activePhoto))}
+                          alt={`Fotografie a vizualizace nosiče – ${point.label}`}
+                          loading="lazy"
+                          className="h-full w-full object-cover group-hover:scale-105 transition duration-500"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-slate-950/20 opacity-60 group-hover:opacity-40 transition" />
+
+                        {/* Top photo bar */}
+                        <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-none">
+                          <span className="inline-flex items-center gap-1.5 rounded-xl bg-slate-950/80 backdrop-blur-md px-3 py-1.5 text-xs font-black text-white shadow-md">
+                            <span>#{index + 1}</span>
+                            <span className="text-slate-400">·</span>
+                            <span>{point.variant || 'Nosič D-FLEX'}</span>
+                          </span>
+
+                          {Boolean(point.latitude && point.longitude) && (
+                            <a
+                              href={`https://www.google.com/maps?q=&layer=c&cbll=${point.latitude},${point.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="pointer-events-auto inline-flex items-center gap-1.5 rounded-xl bg-slate-950/80 backdrop-blur-md px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-600 transition shadow-md"
+                              title="Otevřít 360° Google Street View v novém okně"
+                            >
+                              <Eye size={13} className="text-sky-400" />
+                              <span>Street View ↗</span>
+                            </a>
+                          )}
+                        </div>
+
+                        {/* Bottom photo bar */}
+                        <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+                          <div className="pointer-events-auto flex items-center gap-2">
+                            <ArrowBadge arrowEnum={typeof pObj.arrowDirectionEnum === 'string' ? pObj.arrowDirectionEnum : undefined} size="lg" />
+                            <span className="inline-flex items-center gap-1 rounded-xl bg-slate-950/85 backdrop-blur-md px-3 py-1.5 text-xs font-black text-white shadow-md">
+                              <Compass size={14} className="text-sky-400" />
+                              {formatDistanceBadge(getPointWithDistanceOverride(pObj))}
+                            </span>
+                          </div>
+
+                          <span className="inline-flex items-center gap-1 rounded-xl bg-black/60 backdrop-blur-md px-3 py-1.5 text-xs font-bold text-white opacity-0 group-hover:opacity-100 transition shadow-md">
+                            🔍 Zvětšit snímek
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-3.5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-slate-500">
+                        <p className="text-xs font-semibold">Fotografie umístění a vizualizace nosiče se připravuje naším týmem.</p>
+                      </div>
+                    )}
+
+                    {/* Metadata Details Row */}
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                      <ArrowBadge arrowEnum={typeof pObj.arrowDirectionEnum === 'string' ? pObj.arrowDirectionEnum : undefined} />
+
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700 border border-slate-200">
+                        <Compass size={13} className="text-sky-600" />
+                        {formatDistanceBadge(getPointWithDistanceOverride(pObj))}
+                      </span>
+
+                      {Boolean(pObj.pillarNumber) && (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 border border-amber-200">
+                          📍 Sloup VO č. {String(pObj.pillarNumber)}
+                        </span>
+                      )}
+
+                      {targets.length > 1 && (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2 py-1 text-xs font-bold text-sky-900 border border-sky-200 truncate max-w-full">
+                          🎯 Směr: {targets.find((t) => t.id === ((pObj.targetId as string) || targets[0].id))?.name || 'Prodejna'}
+                        </span>
+                      )}
+
+                      {Boolean(point.latitude && point.longitude) && (
+                        <a
+                          href={`https://www.google.com/maps?q=&layer=c&cbll=${point.latitude},${point.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2 py-1 text-xs font-bold text-sky-700 border border-sky-200 hover:bg-sky-100 hover:text-sky-900 transition"
+                          title="Otevřít 360° Google Street View v novém okně"
+                        >
+                          <Eye size={12} className="text-sky-600" />
+                          <span>Street View ↗</span>
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Address & Client Notes */}
+                    {point.address && cleanDisplayAddress(point.address) && (
+                      <div className="mt-2 text-xs font-medium text-slate-600">
+                        📍 {cleanDisplayAddress(point.address)}
+                      </div>
+                    )}
+
+                    {point.clientNote && formatNavigationClientNote(point.clientNote) && (
+                      <p className="mt-2 rounded-xl bg-slate-50 p-2.5 text-xs text-slate-700 border border-slate-200/80 leading-relaxed">
+                        {formatNavigationClientNote(point.clientNote)}
+                      </p>
+                    )}
+                  </article>
+                );
+              }
+
+              // ==========================================
+              // COMPACT UNSELECTED NAVIGATION POINT CARD
+              // ==========================================
               return (
                 <article
                   id={`nav-point-card-${point.id}`}
@@ -1024,16 +1244,14 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                   onClick={() => setSelectedPointId(point.id)}
                   className={`cursor-pointer rounded-2xl border p-4 transition-all duration-300 ${
                     isFocused
-                      ? 'border-amber-500 bg-amber-50/70 shadow-lg ring-4 ring-amber-400/40 scale-[1.01]'
-                      : isSelected
-                      ? 'border-slate-200 bg-white hover:border-sky-300'
-                      : 'border-slate-200 bg-slate-50 opacity-60 hover:opacity-100'
+                      ? 'border-amber-500 bg-amber-50/70 shadow-lg ring-4 ring-amber-400/40'
+                      : 'border-slate-200 bg-slate-50/80 opacity-75 hover:opacity-100 hover:bg-white hover:border-slate-300'
                   }`}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0 flex-1">
                       <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-xl font-mono text-xs font-black ${
-                        selectedPointId === point.id ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-700'
+                        isFocused ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-700'
                       }`}>
                         #{index + 1}
                       </span>
@@ -1068,43 +1286,33 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                       </div>
                     </div>
 
-                    {(() => {
-                      const pointCalc = calculateNavigationPointPrice(point, selectedDuration);
-                      return (
-                        <div className="flex flex-col sm:items-end gap-1.5 shrink-0 w-full sm:w-auto">
-                          {pointCalc.monthlyRate > 0 && (
-                            <div className="text-left sm:text-right">
-                              <div className="text-xs font-black text-slate-900 tabular-nums">
-                                {money(pointCalc.monthlyRate)} <span className="text-[10px] font-medium text-slate-500">/ měs.</span>
-                              </div>
-                              <div className="text-[10px] font-bold text-emerald-700">
-                                jen cca {money(Math.round(pointCalc.monthlyRate / 30))} / den
-                              </div>
-                            </div>
-                          )}
-
-                          <button
-                            type="button"
-                            disabled={selectionSubmitted}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              togglePointSelection(point.id);
-                            }}
-                            className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-70 w-full sm:w-auto ${
-                              isSelected
-                                ? 'bg-emerald-600 text-white shadow-xs hover:bg-emerald-700'
-                                : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                            }`}
-                          >
-                            {isSelected ? '✓ Vybráno v nabídce' : '+ Vybrat do nabídky'}
-                          </button>
+                    <div className="flex flex-col sm:items-end gap-1.5 shrink-0 w-full sm:w-auto">
+                      {pointCalc.monthlyRate > 0 && (
+                        <div className="text-left sm:text-right">
+                          <div className="text-xs font-black text-slate-900 tabular-nums">
+                            {money(pointCalc.monthlyRate)} <span className="text-[10px] font-medium text-slate-500">/ měs.</span>
+                          </div>
+                          <div className="text-[10px] font-bold text-slate-500">
+                            cca {money(Math.round(pointCalc.monthlyRate / 30))} / den
+                          </div>
                         </div>
-                      );
-                    })()}
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={selectionSubmitted}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePointSelection(point.id);
+                        }}
+                        className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-70 w-full sm:w-auto bg-sky-600 text-white shadow-xs hover:bg-sky-700"
+                      >
+                        + Vybrat do nabídky
+                      </button>
+                    </div>
                   </div>
 
-
-                  {/* Metadata Row: Arrow + Distance + Pillar + Target Store */}
+                  {/* Metadata Row */}
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
                     <ArrowBadge arrowEnum={typeof pObj.arrowDirectionEnum === 'string' ? pObj.arrowDirectionEnum : undefined} />
 
@@ -1140,59 +1348,201 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                     )}
                   </div>
 
-                  {/* Address & Notes */}
                   {point.address && cleanDisplayAddress(point.address) && (
                     <div className="mt-2 text-xs font-medium text-slate-600">
                       📍 {cleanDisplayAddress(point.address)}
                     </div>
                   )}
 
-                  {point.clientNote && formatNavigationClientNote(point.clientNote) && (
-                    <p className="mt-2 rounded-lg bg-white/80 p-2 text-xs text-slate-700 border border-slate-100">
-                      {formatNavigationClientNote(point.clientNote)}
-                    </p>
+                  {activePhoto && (
+                    <div
+                      className="mt-2.5 overflow-hidden rounded-xl border border-slate-200 cursor-zoom-in relative group"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveLightboxImage(toPhotoFullUrl(String(activePhoto)));
+                      }}
+                    >
+                      <img
+                        src={toPhotoThumbnailUrl(String(activePhoto))}
+                        alt={`Fotografie – ${point.label}`}
+                        loading="lazy"
+                        className="h-32 w-full object-cover group-hover:scale-105 transition duration-300"
+                      />
+                    </div>
                   )}
-
-                  {/* Visualizer / Site Photo Preview if available */}
-                  {(() => {
-                    const activePhoto = (typeof pObj.visualizedPhotoUrl === 'string' && pObj.visualizedPhotoUrl)
-                      ? pObj.visualizedPhotoUrl
-                      : (typeof pObj.sitePhotoUrl === 'string' && pObj.sitePhotoUrl ? pObj.sitePhotoUrl : null);
-
-                    if (!activePhoto) {
-                      return isLocationSelectionPhase ? (
-                        <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
-                          Fotografie umístění a vizualizace nosiče zatím nebyla přiložena.
-                        </div>
-                      ) : null;
-                    }
-
-                    return (
-                      <div
-                        className="mt-3 overflow-hidden rounded-xl border border-slate-200 cursor-zoom-in relative group"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveLightboxImage(toPhotoFullUrl(String(activePhoto)));
-                        }}
-                      >
-                        <img
-                          src={toPhotoThumbnailUrl(String(activePhoto))}
-                          alt={`Fotografie a vizualizace nosiče – ${point.label}`}
-                          loading="lazy"
-                          className="h-48 w-full object-cover group-hover:scale-105 transition duration-300"
-                        />
-                        <div className="absolute inset-0 bg-slate-950/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white font-bold text-xs">
-                          🔍 Kliknutím zvětšíte snímek
-                        </div>
-                      </div>
-                    );
-                  })()}
                 </article>
               );
             }))}
           </div>
         </div>
       </div>
+
+      {/* ⭐ DEDICATED SHOWCASE: VYBRANÉ NAVIGAČNÍ BODY V NABÍDCE */}
+      {activePoints.length > 0 && (
+        <section className="mt-8 rounded-3xl border-2 border-emerald-300/80 bg-gradient-to-b from-emerald-50/60 via-white to-sky-50/30 p-6 sm:p-8 shadow-sm space-y-6" aria-labelledby="selected-navigation-showcase">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-emerald-200/80 pb-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="flex size-7 items-center justify-center rounded-xl bg-emerald-600 text-white text-sm font-black shadow-xs">
+                  ⭐
+                </span>
+                <h3 id="selected-navigation-showcase" className="text-xl sm:text-2xl font-black text-slate-950">
+                  Vaše vybrané navigační body v nabídce ({activePoints.length})
+                </h3>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-600">
+                Detailní vizuální přehled schválených navigačních cedulí na trase k provozovně včetně velkých fotografií umístění a směrových šipek.
+              </p>
+            </div>
+            <a
+              href="#nav-points-section"
+              className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-sky-700 transition"
+            >
+              <Compass size={14} /> Zobrazit na mapě trasy ↑
+            </a>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-2">
+            {activePoints.map((point, actIdx) => {
+              const pObj = point as unknown as Record<string, unknown>;
+              const pointIndex = navigation.points.findIndex((p) => p.id === point.id);
+              const effectiveIndex = pointIndex >= 0 ? pointIndex : actIdx;
+              const desig = formatNavigationPointDesignation(pObj, effectiveIndex);
+              const pointCalc = calculateNavigationPointPrice(point, selectedDuration);
+              const activePhoto = (typeof pObj.visualizedPhotoUrl === 'string' && pObj.visualizedPhotoUrl)
+                ? pObj.visualizedPhotoUrl
+                : (typeof pObj.sitePhotoUrl === 'string' && pObj.sitePhotoUrl ? pObj.sitePhotoUrl : null);
+
+              return (
+                <article
+                  key={`showcase-${point.id}`}
+                  className="rounded-2xl border-2 border-emerald-400 bg-white p-5 shadow-md flex flex-col justify-between space-y-4 hover:shadow-lg transition-all"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white font-mono text-sm font-black shadow-xs">
+                          #{effectiveIndex + 1}
+                        </span>
+                        <div>
+                          <h4 className="text-base font-black text-slate-900 leading-tight">
+                            {desig.fullTitle}
+                          </h4>
+                          <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                            {point.variant ? `Formát: ${point.variant}` : point.navigationType}
+                          </p>
+                        </div>
+                      </div>
+
+                      {pointCalc.monthlyRate > 0 && (
+                        <div className="text-right shrink-0">
+                          <span className="text-sm font-black text-slate-900">
+                            {money(pointCalc.monthlyRate)} <span className="text-[10px] font-medium text-slate-500">/ měs.</span>
+                          </span>
+                          <div className="text-[10px] font-bold text-emerald-700">
+                            jen cca {money(Math.round(pointCalc.monthlyRate / 30))} / den
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Big Showcase Photo */}
+                    <div
+                      className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100 cursor-zoom-in relative group aspect-16/10 sm:h-64 w-full"
+                      onClick={() => activePhoto && setActiveLightboxImage(toPhotoFullUrl(String(activePhoto)))}
+                    >
+                      {activePhoto ? (
+                        <>
+                          <img
+                            src={toPhotoThumbnailUrl(String(activePhoto))}
+                            alt={`Fotografie nosiče – ${point.label}`}
+                            loading="lazy"
+                            className="h-full w-full object-cover group-hover:scale-105 transition duration-500"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition" />
+                          <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-white text-xs font-bold pointer-events-none">
+                            <span className="bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg">
+                              {formatDistanceBadge(getPointWithDistanceOverride(pObj))}
+                            </span>
+                            <span className="bg-emerald-600/90 backdrop-blur-md px-2.5 py-1 rounded-lg flex items-center gap-1">
+                              ✓ Zařazeno v trase
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="h-full flex flex-col items-center justify-center p-6 text-center text-slate-400 space-y-1">
+                          <Compass size={28} className="text-slate-300" />
+                          <span className="text-xs font-semibold text-slate-600">Terénní fotografie se připravuje</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Direction Badge and Pillar Information */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <ArrowBadge arrowEnum={typeof pObj.arrowDirectionEnum === 'string' ? pObj.arrowDirectionEnum : undefined} size="lg" />
+
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-900 border border-sky-200">
+                        <Compass size={13} className="text-sky-600" />
+                        {formatDistanceBadge(getPointWithDistanceOverride(pObj))}
+                      </span>
+
+                      {Boolean(pObj.pillarNumber) && (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 border border-amber-200">
+                          📍 Sloup VO č. {String(pObj.pillarNumber)}
+                        </span>
+                      )}
+                    </div>
+
+                    {point.address && cleanDisplayAddress(point.address) && (
+                      <p className="text-xs text-slate-600 font-medium">
+                        📍 {cleanDisplayAddress(point.address)}
+                      </p>
+                    )}
+
+                    {point.clientNote && formatNavigationClientNote(point.clientNote) && (
+                      <p className="text-xs rounded-xl bg-slate-50 p-2.5 text-slate-700 border border-slate-200/80 leading-relaxed">
+                        {formatNavigationClientNote(point.clientNote)}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-3 flex items-center justify-between gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPointId(point.id);
+                        const el = document.getElementById(`nav-point-card-${point.id}`);
+                        if (el) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        } else {
+                          const mapEl = document.getElementById('nav-points-section');
+                          if (mapEl) mapEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 text-sky-700 hover:text-sky-900 font-bold cursor-pointer"
+                    >
+                      <Compass size={13} />
+                      <span>Zvýraznit na mapě</span>
+                    </button>
+
+                    {Boolean(point.latitude && point.longitude) && (
+                      <a
+                        href={`https://www.google.com/maps?q=&layer=c&cbll=${point.latitude},${point.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900 font-bold"
+                      >
+                        <Eye size={12} className="text-sky-600" />
+                        <span>Street View ↗</span>
+                      </a>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {!isLocationSelectionPhase ? (
         activePoints.length === 0 ? (
