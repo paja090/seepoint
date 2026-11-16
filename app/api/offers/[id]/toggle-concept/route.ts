@@ -19,7 +19,7 @@ export async function POST(
         id: true,
         offerType: true,
         isNoPriceConcept: true,
-        navigation: { select: { id: true, proposalMode: true } },
+        navigationOffer: { select: { id: true, proposalMode: true } },
       },
     });
 
@@ -28,8 +28,8 @@ export async function POST(
     }
 
     const currentlyWithoutPrices =
-      existing.offerType === 'NAVIGATION' && existing.navigation
-        ? existing.isNoPriceConcept || existing.navigation.proposalMode !== 'PRICED_QUOTE'
+      existing.offerType === 'NAVIGATION' && existing.navigationOffer
+        ? existing.isNoPriceConcept || existing.navigationOffer.proposalMode !== 'PRICED_QUOTE'
         : existing.isNoPriceConcept;
 
     const nextNoPriceConcept = !currentlyWithoutPrices;
@@ -38,9 +38,9 @@ export async function POST(
       where: { id },
       data: {
         isNoPriceConcept: nextNoPriceConcept,
-        ...(existing.offerType === 'NAVIGATION' && existing.navigation
+        ...(existing.offerType === 'NAVIGATION' && existing.navigationOffer
           ? {
-              navigation: {
+              navigationOffer: {
                 update: {
                   proposalMode: nextNoPriceConcept ? 'LOCATION_SELECTION' : 'PRICED_QUOTE',
                 },
