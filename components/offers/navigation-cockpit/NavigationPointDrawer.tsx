@@ -23,6 +23,7 @@ import {
   getPointPinVisual,
 } from '@/lib/offers/navigation-carrier-types';
 import { toPhotoThumbnailUrl } from '@/lib/photo-url';
+import { formatNavigationDistance } from '@/lib/ai-offers/route-direction-helper';
 
 interface NavigationPointDrawerProps {
   point: DraftPoint | null;
@@ -223,7 +224,7 @@ export function NavigationPointDrawer({
               <span className="font-bold text-slate-800">Vzdálenost do cíle</span>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] text-slate-500">
-                  Google auto: <strong>{point.calculatedDistanceMeters ? `${point.calculatedDistanceMeters} m` : '—'}</strong>
+                  Google auto: <strong>{point.calculatedDistanceMeters ? formatNavigationDistance(point.calculatedDistanceMeters) : '—'}</strong>
                 </span>
                 {onRecalculateRoute && (
                   <button

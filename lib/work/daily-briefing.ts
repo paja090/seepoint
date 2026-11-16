@@ -1750,6 +1750,46 @@ export function renderManagerMorningDigestEmail(
     </div>
   `;
 
+  const completedByRealizer = new Map<string, ManagerMorningDigestItem[]>();
+  for (const item of digest.completedItems) {
+    const realizer =
+      item.reportBy?.trim() ||
+      (item.workerNames.length > 0 ? item.workerNames.join(', ') : 'Realizační tým');
+    const list = completedByRealizer.get(realizer) || [];
+    list.push(item);
+    completedByRealizer.set(realizer, list);
+  }
+  const completedGroupsHtml = Array.from(completedByRealizer.entries())
+    .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], 'cs'))
+    .map(
+      ([realizer, items]) => `
+        <div style="margin:0 0 14px;border:1px solid #a7f3d0;border-radius:12px;background:#f0fdf4;padding:12px 14px;">
+          <div style="font-size:12px;font-weight:900;color:#065f46;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em;">
+            👤 ${escapeHtml(realizer)} · ${items.length} ${items.length === 1 ? 'úkol' : items.length < 5 ? 'úkoly' : 'úkolů'}
+          </div>
+          ${items
+            .map(
+              (item) => `
+              <div style="margin:0 0 8px;border:1px solid #d1fae5;border-radius:10px;padding:10px 12px;background:#ffffff;">
+                <div style="font-size:13.5px;font-weight:800;color:#0f172a;">
+                  <a href="${escapeHtml(item.detailUrl)}" style="color:#0f172a;text-decoration:none;">✅ ${escapeHtml(item.title)}</a>
+                </div>
+                <div style="font-size:12px;color:#475569;margin-top:3px;">
+                  Klient: <strong>${escapeHtml(item.clientName)}</strong>
+                  ${item.workerNames.length ? ` · Tým: ${escapeHtml(item.workerNames.join(', '))}` : ''}
+                </div>
+                ${
+                  item.workerReason
+                    ? `<div style="margin-top:6px;padding:6px 10px;border-radius:8px;background:#f8fafc;border:1px solid #e2e8f0;font-size:12px;color:#334155;">💬 Poznámka: ${escapeHtml(item.workerReason)}</div>`
+                    : ''
+                }
+              </div>`
+            )
+            .join('')}
+        </div>`
+    )
+    .join('');
+
   const html = `
     <div style="margin:0;background:#f1f5f9;padding:24px 12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0f172a;">
       <div style="max-width:640px;margin:0 auto;border-radius:18px;overflow:hidden;background:#ffffff;border:1px solid #e2e8f0;box-shadow:0 4px 12px rgba(15,23,42,0.06);">
@@ -1805,18 +1845,8 @@ export function renderManagerMorningDigestEmail(
           }
           ${
             doneCount > 0
-              ? `<h2 style="margin:14px 0 8px;font-size:14px;font-weight:900;text-transform:uppercase;color:#047857;">✅ Dokončeno (${doneCount})</h2>
-                 <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6;color:#334155;">
-                   ${digest.completedItems
-                     .slice(0, 15)
-                     .map(
-                       (i) =>
-                         `<li><a href="${escapeHtml(i.detailUrl)}" style="color:#0f172a;font-weight:700;text-decoration:none;">${escapeHtml(i.title)}</a> (${escapeHtml(i.clientName)})${
-                           i.workerReason ? ` – <em>${escapeHtml(i.workerReason)}</em>` : ''
-                         }</li>`
-                     )
-                     .join('')}
-                 </ul>`
+              ? `<h2 style="margin:14px 0 10px;font-size:14px;font-weight:900;text-transform:uppercase;color:#047857;">✅ Dokončeno podle realizátora (${doneCount})</h2>
+                 ${completedGroupsHtml}`
               : ''
           }
           ${
@@ -1840,7 +1870,12 @@ export function renderManagerMorningDigestEmail(
       (i) =>
         `[PŘESUNUTO -> ${i.newDateLabel || '?'}] ${i.title} (${i.workerReason || 'bez poznámky'}) | ${i.detailUrl}`
     ),
-    ...digest.completedItems.map((i) => `[HOTOVO] ${i.title} (${i.clientName})`),
+    ...digest.completedItems.map(
+      (i) =>
+        `[HOTOVO] ${i.title} (${i.clientName}) – Realizoval: ${i.reportBy || i.workerNames.join(', ') || 'Tým'}${
+          i.workerReason ? ` | Poznámka: ${i.workerReason}` : ''
+        }`
+    ),
     '',
     `Planner: ${digest.plannerUrl}`,
   ];

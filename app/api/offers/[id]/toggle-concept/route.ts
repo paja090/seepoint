@@ -15,17 +15,38 @@ export async function POST(
     const { id } = await params;
     const existing = await prisma.offer.findUnique({
       where: { id },
-      select: { id: true, isNoPriceConcept: true },
+      select: {
+        id: true,
+        offerType: true,
+        isNoPriceConcept: true,
+        navigation: { select: { id: true, proposalMode: true } },
+      },
     });
 
     if (!existing) {
       return NextResponse.json({ error: 'Nabídka nebyla nalezena.' }, { status: 404 });
     }
 
+    const currentlyWithoutPrices =
+      existing.offerType === 'NAVIGATION' && existing.navigation
+        ? existing.isNoPriceConcept || existing.navigation.proposalMode !== 'PRICED_QUOTE'
+        : existing.isNoPriceConcept;
+
+    const nextNoPriceConcept = !currentlyWithoutPrices;
+
     const updated = await prisma.offer.update({
       where: { id },
       data: {
-        isNoPriceConcept: !existing.isNoPriceConcept,
+        isNoPriceConcept: nextNoPriceConcept,
+        ...(existing.offerType === 'NAVIGATION' && existing.navigation
+          ? {
+              navigation: {
+                update: {
+                  proposalMode: nextNoPriceConcept ? 'LOCATION_SELECTION' : 'PRICED_QUOTE',
+                },
+              },
+            }
+          : {}),
         events: {
           create: {
             type: 'UPDATED',
