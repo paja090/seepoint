@@ -697,7 +697,7 @@ export type {
 export async function processAiInboxMessage(organizationId: string, messageId: string) {
   const msg = await prisma.aiInboxMessage.findFirst({
     where: { id: messageId, organizationId },
-    include: { attachments: true, connection: { select: { userId: true } } },
+    include: { attachments: true },
   });
 
   if (!msg) throw new Error('Zpráva nebyla nalezena.');
@@ -813,7 +813,14 @@ export async function processAiInboxMessage(organizationId: string, messageId: s
         select: { id: true },
       });
       if (!existingComm) {
-        let authorUserId = msg.connection?.userId || null;
+        let authorUserId: string | null = null;
+        if (msg.connectionId) {
+          const conn = await prisma.integrationConnection.findFirst({
+            where: { id: msg.connectionId, organizationId },
+            select: { userId: true },
+          });
+          authorUserId = conn?.userId || null;
+        }
         if (!authorUserId) {
           const fallbackMember = await prisma.organizationMember.findFirst({
             where: { organizationId, isActive: true },
