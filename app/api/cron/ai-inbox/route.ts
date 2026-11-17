@@ -64,7 +64,7 @@ async function handleCronExecution(request: Request) {
           where: {
             organizationId: org.id,
             provider: 'GMAIL',
-            status: 'CONNECTED',
+            status: { in: ['CONNECTED', 'ERROR'] },
           },
           select: {
             id: true,

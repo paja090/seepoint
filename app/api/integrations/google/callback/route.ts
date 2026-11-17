@@ -15,8 +15,9 @@ import {
 } from '@/lib/integrations/google-oauth';
 import { assertGoogleTokenScopes } from '@/lib/integrations/google-oauth-policy';
 
-function integrationsRedirect(request: Request, result: 'connected' | 'cancelled' | 'error', reason?: string) {
-  const target = new URL(getAppUrl(request, `/settings/integrations?google=${result}`));
+function integrationsRedirect(request: Request, result: 'connected' | 'cancelled' | 'error', reason?: string, returnToPath?: string) {
+  const basePath = returnToPath === '/ai-inbox' ? '/ai-inbox' : '/settings/integrations';
+  const target = new URL(getAppUrl(request, `${basePath}?google=${result}`));
   if (reason) target.searchParams.set('reason', reason);
   return NextResponse.redirect(target.toString());
 }
@@ -24,6 +25,7 @@ function integrationsRedirect(request: Request, result: 'connected' | 'cancelled
 function clearOAuthCookies(response: NextResponse) {
   response.cookies.set(GOOGLE_OAUTH_STATE_COOKIE, '', { path: '/', maxAge: 0 });
   response.cookies.set(GOOGLE_OAUTH_VERIFIER_COOKIE, '', { path: '/', maxAge: 0 });
+  response.cookies.set('seepoint_google_oauth_return_to', '', { path: '/', maxAge: 0 });
   response.cookies.set(GOOGLE_OAUTH_STATE_COOKIE, '', { path: '/api/integrations/google', maxAge: 0 });
   response.cookies.set(GOOGLE_OAUTH_VERIFIER_COOKIE, '', { path: '/api/integrations/google', maxAge: 0 });
   return response;
@@ -31,11 +33,12 @@ function clearOAuthCookies(response: NextResponse) {
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  if (url.searchParams.has('error')) return clearOAuthCookies(integrationsRedirect(request, 'cancelled'));
+  const jar = await cookies();
+  const returnToPath = jar.get('seepoint_google_oauth_return_to')?.value;
+  if (url.searchParams.has('error')) return clearOAuthCookies(integrationsRedirect(request, 'cancelled', undefined, returnToPath));
   try {
-    const context = await requireOrganizationRole('ADMIN');
+    const context = await requireOrganizationRole('ADMIN', 'MANAGER', 'SALES');
     const config = googleOAuthConfiguration();
-    const jar = await cookies();
     const stateValue = url.searchParams.get('state');
     const code = url.searchParams.get('code');
     if (!stateValue || !code) throw new Error('OAuth callback is missing code or state.');
@@ -66,10 +69,10 @@ export async function GET(request: Request) {
         expiresIn: token.expires_in,
       }),
     );
-    return clearOAuthCookies(integrationsRedirect(request, 'connected'));
+    return clearOAuthCookies(integrationsRedirect(request, 'connected', undefined, returnToPath));
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown error';
     console.error('[google-oauth] Callback failed', message);
-    return clearOAuthCookies(integrationsRedirect(request, 'error', message));
+    return clearOAuthCookies(integrationsRedirect(request, 'error', message, returnToPath));
   }
 }

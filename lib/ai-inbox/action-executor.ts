@@ -253,6 +253,84 @@ export async function executeAiInboxAction(
         break;
       }
 
+      case 'UPDATE_OFFER': {
+        let offerId = msg.offerId || (payload.offerId ? String(payload.offerId) : '');
+        const crmOrderId = msg.crmOrderId || (payload.crmOrderId ? String(payload.crmOrderId) : '');
+        const rawChanges = Array.isArray(payload.changes)
+          ? (payload.changes as Array<{ label?: string; fromValue?: string; toValue?: string }>)
+          : [];
+        const changeDetails = rawChanges
+          .map((c) => `${c.label || 'Změna'}: ${c.fromValue ? `${c.fromValue} → ` : ''}${c.toValue || ''}`)
+          .filter(Boolean)
+          .join('; ');
+        const summaryNote = `[Požadavek z AI Inboxu (${new Date().toLocaleDateString('cs-CZ')}): ${
+          changeDetails || msg.aiSummary || msg.subject
+        }]`;
+
+        if (!offerId && msg.clientId) {
+          const latestOffer = await prisma.offer.findFirst({
+            where: { organizationId, clientId: msg.clientId, archivedAt: null },
+            orderBy: { updatedAt: 'desc' },
+            select: { id: true },
+          });
+          if (latestOffer) {
+            offerId = latestOffer.id;
+            await prisma.aiInboxMessage.update({
+              where: { id: msg.id },
+              data: { offerId },
+            });
+          }
+        }
+
+        if (offerId) {
+          const existingOffer = await prisma.offer.findFirst({
+            where: { id: offerId, organizationId },
+            select: { id: true, note: true },
+          });
+          if (existingOffer) {
+            const nextNote = existingOffer.note
+              ? `${existingOffer.note}\n${summaryNote}`
+              : summaryNote;
+            await prisma.offer.update({
+              where: { id: existingOffer.id },
+              data: {
+                note: nextNote,
+                events: {
+                  create: {
+                    type: 'UPDATED',
+                    actorUserId: actor.id,
+                    actorName: actor.name,
+                  },
+                },
+              },
+            });
+            createdEntityId = existingOffer.id;
+          }
+        }
+
+        if (crmOrderId) {
+          const existingOrder = await prisma.crmOrder.findFirst({
+            where: { id: crmOrderId, organizationId },
+            select: { id: true, note: true },
+          });
+          if (existingOrder) {
+            const nextOrderNote = existingOrder.note
+              ? `${existingOrder.note}\n${summaryNote}`
+              : summaryNote;
+            await prisma.crmOrder.update({
+              where: { id: existingOrder.id },
+              data: { note: nextOrderNote },
+            });
+            if (!createdEntityId) createdEntityId = existingOrder.id;
+          }
+        }
+
+        if (!offerId && !crmOrderId) {
+          throw new Error('Pro zapracování změny nejprve propojte e-mail s nabídkou nebo zakázkou klienta.');
+        }
+        break;
+      }
+
       case 'CHANGE_NAVIGATION_STATUS': {
         const navigationOrderId = msg.navigationOrderId || String(payload.navigationOrderId || '');
         const targetStatus = String(payload.targetStatus || '') as NavigationOrderStatus;

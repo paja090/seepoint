@@ -12,11 +12,14 @@ import {
 
 export async function GET(request: Request) {
   try {
-    const context = await requireOrganizationRole('ADMIN');
     const url = new URL(request.url);
     const requestedProvider = url.searchParams.get('provider')?.toUpperCase();
     const provider = requestedProvider === 'GMAIL' ? 'GMAIL' : 'GOOGLE_DRIVE';
+    const context = provider === 'GMAIL'
+      ? await requireOrganizationRole('ADMIN', 'MANAGER', 'SALES')
+      : await requireOrganizationRole('ADMIN');
     const gmailSend = provider === 'GMAIL' && url.searchParams.get('send') === 'true';
+    const returnTo = url.searchParams.get('returnTo') === '/ai-inbox' ? '/ai-inbox' : '';
     if (gmailSend && context.organizationId === 'org_seepoint_default') {
       return NextResponse.json({ error: 'SeePoint používá stávající odesílací konfiguraci. Nové tenantové odesílání ji nemění.' }, { status: 409 });
     }
@@ -51,6 +54,9 @@ export async function GET(request: Request) {
     };
     response.cookies.set(GOOGLE_OAUTH_STATE_COOKIE, nonce, cookieOptions);
     response.cookies.set(GOOGLE_OAUTH_VERIFIER_COOKIE, verifier, cookieOptions);
+    if (returnTo) {
+      response.cookies.set('seepoint_google_oauth_return_to', returnTo, cookieOptions);
+    }
     return response;
   } catch (error) {
     const message = error instanceof Error && error.message.includes('není nakonfigurovaná')

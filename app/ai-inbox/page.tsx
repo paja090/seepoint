@@ -32,13 +32,19 @@ export default async function AiInboxPage() {
     );
   }
 
-  const [{ items }, mailboxes] = await Promise.all([
+  const [{ items }, mailboxesRaw] = await Promise.all([
     listAiInboxMessages(organizationId, { take: 100 }),
     prisma.integrationConnection.findMany({
       where: { organizationId, provider: 'GMAIL', status: { not: 'REVOKED' } },
-      select: { id: true, accountEmail: true, provider: true, status: true, settings: true },
+      select: { id: true, accountEmail: true, provider: true, status: true, error: true, lastCheckedAt: true, settings: true },
+      orderBy: { connectedAt: 'desc' },
     }),
   ]);
+
+  const mailboxes = mailboxesRaw.map((m) => ({
+    ...m,
+    lastCheckedAt: m.lastCheckedAt?.toISOString() ?? null,
+  }));
 
   return (
     <AppShell>
@@ -46,6 +52,7 @@ export default async function AiInboxPage() {
         <AiInboxView
           initialItems={items as unknown as AiInboxListItem[]}
           mailboxes={mailboxes as unknown as Parameters<typeof AiInboxView>[0]['mailboxes']}
+          currentUserEmail={user.email}
         />
       </div>
     </AppShell>
