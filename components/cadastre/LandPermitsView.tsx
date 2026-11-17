@@ -23,8 +23,20 @@ import { LandPermitModal } from '@/components/election-removal/LandPermitModal';
 import type { CadastralParcelResult } from '@/lib/cadastre/cuzk-service';
 import type { AiScoutedLocation, AiPlotAnalysis } from '@/lib/cadastre/ai-land-scout';
 
+export interface CarrierCadastreItem {
+  id: string;
+  code: string;
+  name: string;
+  city: string | null;
+  address: string | null;
+  type: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
 interface LandPermitsViewProps {
   initialPoints: ElectionRemovalPoint[];
+  carriers?: CarrierCadastreItem[];
 }
 
 const CITY_PRESETS = [
@@ -39,12 +51,13 @@ const CITY_PRESETS = [
   'Pardubice',
 ];
 
-export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
+export function LandPermitsView({ initialPoints, carriers = [] }: LandPermitsViewProps) {
   const [points, setPoints] = useState<ElectionRemovalPoint[]>(initialPoints);
   const [selectedPointForModal, setSelectedPointForModal] = useState<ElectionRemovalPoint | null>(null);
 
-  // Scout Mode Toggle: AI Radar vs Manual GPS
-  const [scoutMode, setScoutMode] = useState<'AI_RADAR' | 'MANUAL_GPS'>('AI_RADAR');
+  // Scout Mode Toggle: AI Radar vs Manual GPS vs Own Carriers
+  const [scoutMode, setScoutMode] = useState<'AI_RADAR' | 'MANUAL_GPS' | 'CARRIERS'>('AI_RADAR');
+  const [carrierSearch, setCarrierSearch] = useState('');
 
   // AI Radar State
   const [aiCity, setAiCity] = useState('Ostrava');
@@ -427,6 +440,18 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
               <Search size={14} className="text-emerald-600" />
               <span>🗺️ Ruční zadání GPS & ČÚZK</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setScoutMode('CARRIERS')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                scoutMode === 'CARRIERS'
+                  ? 'bg-white text-sky-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Building2 size={14} className="text-sky-600" />
+              <span>📍 Naše nosiče ({carriers.length})</span>
+            </button>
           </div>
 
           {scoutMode === 'MANUAL_GPS' && (
@@ -782,6 +807,82 @@ export function LandPermitsView({ initialPoints }: LandPermitsViewProps) {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 3. Own Carriers Cadastre Verification */}
+        {scoutMode === 'CARRIERS' && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-sky-600" />
+                  Ověřit parcelu ČÚZK u existujících reklamních nosičů
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Vyberte libovolný nosič ze sítě SeePOINT a 1 klikem zjistěte parcelní číslo, katastrální území a zaevidujte pozemek ke správě smlouvy.
+                </p>
+              </div>
+              <div className="w-full sm:w-72">
+                <input
+                  type="text"
+                  value={carrierSearch}
+                  onChange={(e) => setCarrierSearch(e.target.value)}
+                  placeholder="Hledat kód nosiče, město, ulici..."
+                  className="w-full text-xs rounded-xl border border-slate-300 p-2.5 focus:border-sky-500 focus:outline-none bg-white"
+                />
+              </div>
+            </div>
+
+            <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
+              {carriers
+                .filter((c) => {
+                  if (!carrierSearch.trim()) return true;
+                  const q = carrierSearch.toLowerCase();
+                  return (
+                    c.code.toLowerCase().includes(q) ||
+                    c.name.toLowerCase().includes(q) ||
+                    (c.city || '').toLowerCase().includes(q) ||
+                    (c.address || '').toLowerCase().includes(q)
+                  );
+                })
+                .slice(0, 50)
+                .map((c) => {
+                  const hasGps = c.latitude !== null && c.longitude !== null;
+                  return (
+                    <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 p-3 hover:bg-slate-50 text-xs">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded">{c.code}</span>
+                          <span className="font-semibold text-slate-800">{c.name}</span>
+                          {c.city && <span className="text-slate-500">· {c.city}</span>}
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">
+                          {c.address || 'Bez adresy'} {hasGps ? `(GPS: ${c.latitude!.toFixed(5)}, ${c.longitude!.toFixed(5)})` : '· Chybí GPS'}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {hasGps && (
+                          <button
+                            type="button"
+                            disabled={identifying}
+                            onClick={() => {
+                              setLatInput(c.latitude!.toFixed(6));
+                              setLngInput(c.longitude!.toFixed(6));
+                              setPlotLabel(`${c.code} – ${c.name}${c.city ? ` (${c.city})` : ''}`);
+                              handleIdentify(c.latitude!, c.longitude!);
+                            }}
+                            className="btn bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs py-1.5 px-3 rounded-lg flex items-center gap-1 shadow-xs disabled:opacity-50"
+                          >
+                            <Search size={12} />
+                            <span>Ověřit parcelu v ČÚZK</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         )}

@@ -67,6 +67,7 @@ export function RealizationDetailView({
 
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [createdInvoice, setCreatedInvoice] = useState<{ id: string; invoiceNumber: string; totalAmount: string } | null>(null);
   const [contractCodeInput, setContractCodeInput] = useState(context.clientOrderCode || '');
   const [dateFromInput, setDateFromInput] = useState(context.campaign.dateFrom ? new Date(context.campaign.dateFrom).toISOString().split('T')[0] : '');
   const [dateToInput, setDateToInput] = useState(context.campaign.dateTo ? new Date(context.campaign.dateTo).toISOString().split('T')[0] : '');
@@ -131,6 +132,28 @@ export function RealizationDetailView({
       router.refresh();
     } catch (err) {
       setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Chyba při změně fáze.' });
+    } finally {
+      setIsUpdating(false);
+    }
+  }
+
+  async function handleCreateInvoice() {
+    setIsUpdating(true);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/realization/${context.orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'CREATE_INVOICE' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Vystavení faktury selhalo.');
+      if (data.context) setContext(data.context);
+      if (data.invoice) setCreatedInvoice(data.invoice);
+      setFeedback({ type: 'success', message: data.message || 'Faktura byla úspěšně vystavena.' });
+      router.refresh();
+    } catch (err) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Chyba při vystavování faktury.' });
     } finally {
       setIsUpdating(false);
     }
@@ -764,15 +787,61 @@ export function RealizationDetailView({
               </div>
             </div>
 
+            {createdInvoice && (
+              <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-900">
+                  <FileCheck size={16} className="text-emerald-600" />
+                  <span>
+                    Vystavena faktura <strong>{createdInvoice.invoiceNumber}</strong> (celkem s DPH: {Number(createdInvoice.totalAmount).toLocaleString('cs-CZ')} Kč)
+                  </span>
+                </div>
+                <Link
+                  href={`/clients/${context.clientId}`}
+                  className="inline-flex items-center gap-1 rounded-lg bg-white border border-emerald-300 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
+                >
+                  Otevřít faktury klienta <ExternalLink size={12} />
+                </Link>
+              </div>
+            )}
+
             <div className="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => handleQuickPhaseJump('COMPLETED')}
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-3 transition shadow-xs cursor-pointer"
-              >
-                <CheckCircle2 size={16} />
-                Schválit realizaci & Uzavřít zakázku
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isUpdating}
+                  onClick={handleCreateInvoice}
+                  className="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-5 py-3 transition shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  <FileText size={16} />
+                  {isUpdating ? 'Vystavuji fakturu...' : '🧾 Vystavit fakturu klientovi (1 klikem)'}
+                </button>
+                <button
+                  type="button"
+                  disabled={isUpdating}
+                  onClick={() => handleQuickPhaseJump('COMPLETED')}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-3 transition shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  <CheckCircle2 size={16} />
+                  Schválit realizaci & Uzavřít zakázku
+                </button>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {context.navigationOrderId && (
+                  <Link
+                    href={`/navigation/orders/${context.navigationOrderId}`}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs px-4 py-2.5 transition"
+                  >
+                    PDF faktura & odeslání e-mailem (Navigace) <ExternalLink size={13} />
+                  </Link>
+                )}
+                <Link
+                  href={`/clients/${context.clientId}`}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs px-4 py-2.5 transition"
+                >
+                  Karta klienta <ExternalLink size={13} />
+                </Link>
+              </div>
             </div>
           </div>
         </div>
