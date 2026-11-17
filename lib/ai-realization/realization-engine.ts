@@ -751,12 +751,50 @@ export async function buildRealizationContext(
         crmOrder.navigationOrder as NavigationOrderWithPoints,
         fallbackWorker
       );
-    } else {
+    } else if (crmOrder.realizations.length > 0) {
       items = adaptStandardMediaRealizationItems(
         crmOrder.realizations as CrmRealizationWithRelations[],
         crmOrder.dateFrom,
         crmOrder.createdAt
       );
+    } else if (crmOrder.workOrders && crmOrder.workOrders.length > 0) {
+      items = crmOrder.workOrders.map((wo) => {
+        const isDone = wo.status === 'DONE' || wo.status === 'HANDED_OVER' || crmOrder.status === 'ACTIVE' || crmOrder.status === 'COMPLETED';
+        return {
+          id: wo.id,
+          surfaceName: wo.title,
+          carrierCode: crmOrder.orderNumber,
+          mediaType: crmOrder.projectType,
+          status: isDone ? 'INSTALLED' : 'SCHEDULED',
+          isInstalled: isDone,
+          isPhotographed: isDone,
+          hasDefect: false,
+          photos: [],
+          plannedDate: wo.scheduledAt,
+          assignedUserId: wo.assignments[0]?.userId || crmOrder.assignedUserId || undefined,
+          assignedUserName: wo.assignments[0]?.workerName || crmOrder.assignedUser?.name || undefined,
+        };
+      });
+    } else if (crmOrder.projectType !== 'NAVIGATION') {
+      const isInstalled = crmOrder.status === 'ACTIVE' || crmOrder.status === 'COMPLETED';
+      const isPhotographed = crmOrder.status === 'COMPLETED' || crmOrder.status === 'ACTIVE';
+      items = [
+        {
+          id: crmOrder.id,
+          surfaceName: crmOrder.title || `Zakázka ${crmOrder.orderNumber}`,
+          carrierCode: crmOrder.orderNumber,
+          mediaType: crmOrder.projectType,
+          status: isInstalled ? 'INSTALLED' : 'SCHEDULED',
+          isInstalled,
+          isPhotographed,
+          hasDefect: false,
+          photos: [],
+          plannedDate: crmOrder.dateFrom || crmOrder.createdAt,
+          assignedUserId: crmOrder.assignedUserId || undefined,
+          assignedUserName: crmOrder.assignedUser?.name || undefined,
+          note: crmOrder.note || undefined,
+        },
+      ];
     }
 
     // 4. Map Tasks
@@ -821,6 +859,9 @@ export async function buildRealizationContext(
 
     const resolvedProfile = profile || { organizationId, ...DEFAULT_REALIZATION_PROFILE };
     const evaluation = evaluateRealization(baseContext, resolvedProfile);
+    if (crmOrder.totalPrice !== null && crmOrder.totalPrice !== undefined) {
+      evaluation.billingReadiness.totalPrice = Number(crmOrder.totalPrice);
+    }
 
     return {
       ...baseContext,
