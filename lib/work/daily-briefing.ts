@@ -114,6 +114,8 @@ export type WorkerDailyBriefing = {
   routeUrl?: string;
   myTasksUrl: string;
   ackAllUrl?: string;
+  completeAllTodayUrl?: string;
+  rescheduleAllTodayUrl?: string;
   vehicles: string[];
   crewMates: string[];
   todayOpenTasks?: TodayOpenTaskItem[];
@@ -540,17 +542,19 @@ function buildAckLink(
   return `${baseUrl}/api/work-orders/ack-email?token=${encodeURIComponent(token)}`;
 }
 
-function buildEmailActionLink(
+export function buildEmailActionLink(
   organizationId: string | undefined,
-  orderId: string,
+  orderIdsInput: string | string[],
   action: 'complete' | 'reschedule',
   recipient: WorkerRecipient,
-  baseUrl: string
+  baseUrl: string,
+  focusOrderId?: string
 ): string | undefined {
-  if (!organizationId || !orderId) return undefined;
+  const uniqueIds = [...new Set((Array.isArray(orderIdsInput) ? orderIdsInput : [orderIdsInput]).filter(Boolean))];
+  if (!organizationId || uniqueIds.length === 0) return undefined;
   const token = createBriefingAckToken({
     orgId: organizationId,
-    orderIds: [orderId],
+    orderIds: uniqueIds,
     action,
     userId: recipient.userId,
     employeeId: recipient.employeeId,
@@ -558,7 +562,8 @@ function buildEmailActionLink(
     email: recipient.email,
     ttlDays: 7,
   });
-  return `${baseUrl}/api/work-orders/email-action?token=${encodeURIComponent(token)}`;
+  const focusParam = focusOrderId ? `&focus=${encodeURIComponent(focusOrderId)}` : '';
+  return `${baseUrl}/api/work-orders/email-action?token=${encodeURIComponent(token)}${focusParam}`;
 }
 
 export function assembleWorkerBriefings(input: {
@@ -844,6 +849,32 @@ export function assembleWorkerBriefings(input: {
         .map((t) => t.workOrderId)
         .filter((id): id is string => Boolean(id));
 
+      const allTodayOrderIds = b.todayOpenTasks
+        .map((t) => t.workOrderId)
+        .filter((id): id is string => Boolean(id));
+
+      if (allTodayOrderIds.length > 1) {
+        b.todayOpenTasks = b.todayOpenTasks.map((t) => ({
+          ...t,
+          completeUrl: buildEmailActionLink(
+            input.organizationId,
+            allTodayOrderIds,
+            'complete',
+            b.recipient,
+            baseUrl,
+            t.workOrderId
+          ),
+          rescheduleUrl: buildEmailActionLink(
+            input.organizationId,
+            allTodayOrderIds,
+            'reschedule',
+            b.recipient,
+            baseUrl,
+            t.workOrderId
+          ),
+        }));
+      }
+
       return {
         recipient: b.recipient,
         targetDate: input.targetDate,
@@ -855,6 +886,14 @@ export function assembleWorkerBriefings(input: {
         ackAllUrl:
           allOrderIds.length > 0
             ? buildAckLink(input.organizationId, allOrderIds, b.recipient, baseUrl)
+            : undefined,
+        completeAllTodayUrl:
+          allTodayOrderIds.length > 0
+            ? buildEmailActionLink(input.organizationId, allTodayOrderIds, 'complete', b.recipient, baseUrl)
+            : undefined,
+        rescheduleAllTodayUrl:
+          allTodayOrderIds.length > 0
+            ? buildEmailActionLink(input.organizationId, allTodayOrderIds, 'reschedule', b.recipient, baseUrl)
             : undefined,
         vehicles: [...b.vehicles],
         crewMates: [...b.crewMates],
@@ -919,15 +958,37 @@ export function renderWorkerDailyBriefingEmail(
   if (briefing.vehicles.length > 0) summaryParts.push(`🚗 ${briefing.vehicles.join(', ')}`);
   if (briefing.crewMates.length > 0) summaryParts.push(`👥 Společně s: ${briefing.crewMates.join(', ')}`);
 
+  const batchTodayBarHtml =
+    todayOpen.length > 0 && (briefing.completeAllTodayUrl || briefing.rescheduleAllTodayUrl)
+      ? `<div style="margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#fef3c7;border:1px solid #f59e0b;">
+          <div style="font-size:12px;font-weight:800;color:#78350f;margin-bottom:8px;">
+            ⚡ Rychlé hromadné potvrzení (nemusíš klikat na každý úkol zvlášť):
+          </div>
+          <div>
+            ${
+              briefing.completeAllTodayUrl
+                ? `<a href="${escapeHtml(briefing.completeAllTodayUrl)}" style="display:inline-block;margin:0 8px 6px 0;padding:10px 16px;border-radius:10px;background:#059669;color:#ffffff;font-size:13px;font-weight:800;text-decoration:none;">✅ Označit vybrané / VŠECHNY jako HOTOVÉ (${todayOpen.length})</a>`
+                : ''
+            }
+            ${
+              briefing.rescheduleAllTodayUrl
+                ? `<a href="${escapeHtml(briefing.rescheduleAllTodayUrl)}" style="display:inline-block;margin:0 0 6px 0;padding:10px 14px;border-radius:10px;background:#d97706;color:#ffffff;font-size:12.5px;font-weight:800;text-decoration:none;">☑️ Vybrat více úkolů / Přesunout</a>`
+                : ''
+            }
+          </div>
+        </div>`
+      : '';
+
   const todaySectionHtml =
     todayOpen.length > 0
       ? `<div style="margin:0 0 18px;border:1px solid #fcd34d;border-radius:16px;padding:16px 16px 6px;background:#fffbeb;">
           <div style="font-size:11px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#b45309;margin-bottom:4px;">
             ⏳ Kontrola dneška${briefing.todayDateLabel ? ` · ${escapeHtml(briefing.todayDateLabel)}` : ''}
           </div>
-          <h2 style="margin:0 0 12px;font-size:16px;line-height:1.3;font-weight:900;color:#78350f;">
+          <h2 style="margin:0 0 10px;font-size:16px;line-height:1.3;font-weight:900;color:#78350f;">
             Stihli jste dnes tyto úkoly? Označte stav jedním kliknutím:
           </h2>
+          ${batchTodayBarHtml}
           ${todayOpen
             .map((t, idx) => {
               const metaParts = [escapeHtml(t.clientName), escapeHtml(t.workTypeLabel)];
@@ -1712,7 +1773,7 @@ export function assembleManagerMorningDigest(input: {
 export function renderManagerMorningDigestEmail(
   digest: ManagerMorningDigestData,
   organizationName: string,
-  options?: { isTest?: boolean }
+  options?: { isTest?: boolean; batchCompleteUrl?: string; batchRescheduleUrl?: string }
 ): { subject: string; html: string; text: string } {
   const prefix = options?.isTest ? '[TEST] ' : '';
   const openCount = digest.unfinishedItems.length;
@@ -1790,6 +1851,27 @@ export function renderManagerMorningDigestEmail(
     )
     .join('');
 
+  const managerBatchBarHtml =
+    openCount > 0 && (options?.batchCompleteUrl || options?.batchRescheduleUrl)
+      ? `<div style="margin:0 0 12px;padding:12px 14px;border-radius:12px;background:#fff1f2;border:1px solid #fecdd3;">
+          <div style="font-size:12px;font-weight:800;color:#881337;margin-bottom:8px;">
+            ⚡ Hromadná akce pro neuzavřené úkoly (vyber více úkolů najednou):
+          </div>
+          <div>
+            ${
+              options?.batchCompleteUrl
+                ? `<a href="${escapeHtml(options.batchCompleteUrl)}" style="display:inline-block;margin:0 8px 6px 0;padding:9px 14px;border-radius:9px;background:#059669;color:#ffffff;font-size:12.5px;font-weight:800;text-decoration:none;">✅ Hromadně označit vybrané jako HOTOVÉ (${openCount})</a>`
+                : ''
+            }
+            ${
+              options?.batchRescheduleUrl
+                ? `<a href="${escapeHtml(options.batchRescheduleUrl)}" style="display:inline-block;margin:0 0 6px 0;padding:9px 14px;border-radius:9px;background:#d97706;color:#ffffff;font-size:12.5px;font-weight:800;text-decoration:none;">⏳ Hromadně přesunout vybrané</a>`
+                : ''
+            }
+          </div>
+        </div>`
+      : '';
+
   const html = `
     <div style="margin:0;background:#f1f5f9;padding:24px 12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0f172a;">
       <div style="max-width:640px;margin:0 auto;border-radius:18px;overflow:hidden;background:#ffffff;border:1px solid #e2e8f0;box-shadow:0 4px 12px rgba(15,23,42,0.06);">
@@ -1816,6 +1898,7 @@ export function renderManagerMorningDigestEmail(
           ${
             openCount > 0
               ? `<h2 style="margin:0 0 10px;font-size:14px;font-weight:900;text-transform:uppercase;color:#be123c;">❗ Neuzavřeno za včerejšek (${openCount})</h2>
+                 ${managerBatchBarHtml}
                  ${digest.unfinishedItems
                    .map((i) =>
                      renderItemCard(i, {
@@ -1959,12 +2042,33 @@ export async function sendManagerMorningDigestForOrganization(
     baseUrl: options?.baseUrl,
   });
 
+  const baseUrl = (options?.baseUrl || resolvePublicAppUrl()).replace(/\/+$/, '');
+  const unfinishedOrderIds = digest.unfinishedItems.map((i) => i.workOrderId).filter(Boolean);
+
   if (options?.testRecipientEmail) {
     const testEmail = options.testRecipientEmail.trim().toLowerCase();
     if (!isValidEmailAddress(testEmail)) {
       throw new Error('Zadaný testovací e-mail nemá platný formát.');
     }
-    const rendered = renderManagerMorningDigestEmail(digest, organizationName, { isTest: true });
+    const testRecipient: WorkerRecipient = {
+      key: `test-${testEmail}`,
+      fullName: 'Manažer',
+      firstName: 'Manažer',
+      lastName: '',
+      email: testEmail,
+      role: 'MANAGER',
+    };
+    const rendered = renderManagerMorningDigestEmail(digest, organizationName, {
+      isTest: true,
+      batchCompleteUrl:
+        unfinishedOrderIds.length > 0
+          ? buildEmailActionLink(organizationId, unfinishedOrderIds, 'complete', testRecipient, baseUrl)
+          : undefined,
+      batchRescheduleUrl:
+        unfinishedOrderIds.length > 0
+          ? buildEmailActionLink(organizationId, unfinishedOrderIds, 'reschedule', testRecipient, baseUrl)
+          : undefined,
+    });
     const result = await sendTransactionalEmail({
       to: testEmail,
       bcc: [],
@@ -2030,7 +2134,6 @@ export async function sendManagerMorningDigestForOrganization(
     }
   }
 
-  const rendered = renderManagerMorningDigestEmail(digest, organizationName);
   let sentCount = 0;
   let skippedAlreadySentCount = 0;
 
@@ -2040,6 +2143,17 @@ export async function sendManagerMorningDigestForOrganization(
       skippedAlreadySentCount++;
       continue;
     }
+
+    const rendered = renderManagerMorningDigestEmail(digest, organizationName, {
+      batchCompleteUrl:
+        unfinishedOrderIds.length > 0
+          ? buildEmailActionLink(organizationId, unfinishedOrderIds, 'complete', manager, baseUrl)
+          : undefined,
+      batchRescheduleUrl:
+        unfinishedOrderIds.length > 0
+          ? buildEmailActionLink(organizationId, unfinishedOrderIds, 'reschedule', manager, baseUrl)
+          : undefined,
+    });
 
     const idempHash = crypto
       .createHash('sha256')
