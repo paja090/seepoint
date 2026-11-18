@@ -249,8 +249,8 @@ export async function GET(request: Request) {
     });
   }
 
-  const orderId = payload.orderIds[0];
-  const order = await runWithTenantContext(
+  const focusOrderId = url.searchParams.get('focus')?.trim() || '';
+  const ordersRaw = await runWithTenantContext(
     {
       organizationId: payload.orgId,
       userId: payload.userId ?? undefined,
@@ -258,14 +258,19 @@ export async function GET(request: Request) {
     },
     async () => {
       requireTenantContext();
-      return prisma.workOrder.findFirst({
-        where: { id: orderId, organizationId: payload.orgId },
+      return prisma.workOrder.findMany({
+        where: { id: { in: payload.orderIds }, organizationId: payload.orgId },
         include: { items: true },
       });
     }
   );
 
-  if (!order) {
+  const orderById = new Map(ordersRaw.map((o) => [o.id, o]));
+  const orders = payload.orderIds
+    .map((id) => orderById.get(id))
+    .filter((o): o is NonNullable<typeof o> => Boolean(o));
+
+  if (orders.length === 0) {
     return renderPage({
       title: 'Úkol nebyl nalezen',
       badgeEmoji: '⚠️',
@@ -278,26 +283,80 @@ export async function GET(request: Request) {
 
   const origin = getAppOrigin(request);
   const vocative = czechFirstNameVocative(buildRecipientFromPayload(payload).firstName);
+  const order = orders.find((o) => o.id === focusOrderId) || orders[0];
   const scheduledFormatted = order.scheduledAt.toLocaleDateString('cs-CZ', {
     timeZone: DEFAULT_BRIEFING_TIMEZONE,
   });
-  const detailUrl = `${origin}/work/${order.id}`;
+  const detailUrl = orders.length > 1 ? `${origin}/my-tasks` : `${origin}/work/${order.id}`;
 
-  const summaryBox = `<div class="summary">
-    <p class="summary-title">${escapeHtml(order.title)}</p>
-    <p class="summary-meta">${escapeHtml(order.clientName)} · Plánovaný termín: ${escapeHtml(
-    scheduledFormatted
-  )}</p>
-  </div>`;
+  const renderChecklistHtml = () => {
+    if (orders.length === 1) {
+      return `<div class="summary">
+        <input type="hidden" name="selectedOrderIds" value="${escapeHtml(order.id)}" />
+        <p class="summary-title">${escapeHtml(order.title)}</p>
+        <p class="summary-meta">${escapeHtml(order.clientName)} · Plánovaný termín: ${escapeHtml(
+          scheduledFormatted
+        )}</p>
+      </div>`;
+    }
+
+    const itemsHtml = orders
+      .map((o, idx) => {
+        const isDone = o.status === 'DONE';
+        const isChecked = !isDone && (!focusOrderId || o.id === focusOrderId);
+        const dateStr = o.scheduledAt.toLocaleDateString('cs-CZ', {
+          timeZone: DEFAULT_BRIEFING_TIMEZONE,
+        });
+        return `
+          <label style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;margin-bottom:8px;border-radius:12px;border:1px solid ${
+            isDone ? '#a7f3d0' : '#cbd5e1'
+          };background:${isDone ? '#f0fdf4' : '#ffffff'};cursor:pointer;">
+            <input
+              type="checkbox"
+              class="task-cb"
+              name="selectedOrderIds"
+              value="${escapeHtml(o.id)}"
+              ${isChecked ? 'checked' : ''}
+              style="width:20px;height:20px;margin-top:2px;accent-color:#059669;flex-shrink:0;"
+            />
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:14px;font-weight:800;color:#0f172a;line-height:1.35;">
+                ${idx + 1}. ${escapeHtml(o.title)}
+                ${
+                  isDone
+                    ? '<span style="display:inline-block;margin-left:6px;padding:2px 7px;border-radius:999px;background:#d1fae5;color:#065f46;font-size:10.5px;font-weight:800;">✓ Již hotovo</span>'
+                    : ''
+                }
+              </div>
+              <div style="font-size:12px;color:#64748b;margin-top:3px;">
+                ${escapeHtml(o.clientName)} · Termín: ${escapeHtml(dateStr)}
+              </div>
+            </div>
+          </label>`;
+      })
+      .join('');
+
+    return `
+      <div style="margin-bottom:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span class="label" style="margin:0;">Vyber úkoly (${orders.length}):</span>
+          <div style="display:flex;gap:6px;">
+            <button type="button" onclick="document.querySelectorAll('.task-cb').forEach(c => c.checked = true)" style="padding:5px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#f8fafc;font-size:11.5px;font-weight:800;color:#0f172a;cursor:pointer;">☑️ Vybrat vše</button>
+            <button type="button" onclick="document.querySelectorAll('.task-cb').forEach(c => c.checked = false)" style="padding:5px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#ffffff;font-size:11.5px;font-weight:700;color:#64748b;cursor:pointer;">⬜ Zrušit výběr</button>
+          </div>
+        </div>
+        ${itemsHtml}
+      </div>`;
+  };
 
   if (payload.action === 'complete') {
-    if (order.status === 'DONE') {
+    if (orders.length === 1 && order.status === 'DONE') {
       return renderPage({
         title: `Hotovo, ${vocative}!`,
         badgeEmoji: '✅',
         badgeBg: '#ecfdf5',
         bodyHtml: `<p class="subtitle" style="text-align:center;">Tento úkol už je v SeePoint OS označený jako <strong>HOTOVÝ</strong>.</p>
-          ${summaryBox}
+          ${renderChecklistHtml()}
           <a href="${escapeHtml(detailUrl)}" class="btn btn-dark">Otevřít detail úkolu →</a>`,
       });
     }
@@ -305,7 +364,7 @@ export async function GET(request: Request) {
     const allItemsDone =
       order.items.length > 0 &&
       order.items.every((i) => ['DONE', 'CANCELLED'].includes(i.executionStatus || ''));
-    if (usesItemExecution(order.items) && !order.navigationOrderId && !allItemsDone) {
+    if (orders.length === 1 && usesItemExecution(order.items) && !order.navigationOrderId && !allItemsDone) {
       const orderDay = dayInZone(order.scheduledAt, DEFAULT_BRIEFING_TIMEZONE);
       const routeUrl = `${origin}/my-route?date=${orderDay}`;
       return renderPage({
@@ -313,26 +372,32 @@ export async function GET(request: Request) {
         badgeEmoji: '🗺️',
         badgeBg: '#eff6ff',
         bodyHtml: `<p class="subtitle" style="text-align:center;">Tento výjezd obsahuje jednotlivé položky na trase, které je potřeba odkliknout v <strong>Moje trasa dnes</strong> (včetně případné fotodokumentace).</p>
-          ${summaryBox}
+          ${renderChecklistHtml()}
           <a href="${escapeHtml(routeUrl)}" class="btn btn-dark">Otevřít Moje trasa dnes →</a>`,
       });
     }
 
     return renderPage({
-      title: `Označit jako hotové`,
+      title: orders.length > 1 ? `Označit vybrané úkoly jako hotové` : `Označit jako hotové`,
       badgeEmoji: '✅',
       badgeBg: '#ecfdf5',
       bodyHtml: `<p class="subtitle" style="text-align:center;">Ahoj <strong>${escapeHtml(
         vocative
-      )}</strong>, potvrď jedním klepnutím, že je dnešní úkol hotový. Zároveň se automaticky zapíše do systému.</p>
-        ${summaryBox}
+      )}</strong>, ${
+        orders.length > 1
+          ? 'zaškrtni všechny úkoly, které máš hotové, a potvrď je jedním kliknutím najednou.'
+          : 'potvrď jedním klepnutím, že je dnešní úkol hotový. Zároveň se automaticky zapíše do systému.'
+      }</p>
         <form method="POST" action="/api/work-orders/email-action">
           <input type="hidden" name="token" value="${escapeHtml(token)}" />
+          ${renderChecklistHtml()}
           <label class="label" for="note">Volitelná poznámka k dokončení</label>
           <textarea id="note" name="note" rows="3" placeholder="Např. vše v pořádku předáno, polepeno čistě..."></textarea>
-          <button type="submit" class="btn btn-green">✅ Potvrdit jako HOTOVÉ</button>
+          <button type="submit" class="btn btn-green">✅ Potvrdit zaškrtnuté jako HOTOVÉ</button>
         </form>
-        <a href="${escapeHtml(detailUrl)}" class="btn btn-dark">Zobrazit detail v aplikaci →</a>`,
+        <a href="${escapeHtml(detailUrl)}" class="btn btn-dark">${
+        orders.length > 1 ? 'Otevřít moje úkoly v aplikaci →' : 'Zobrazit detail v aplikaci →'
+      }</a>`,
     });
   }
 
@@ -352,17 +417,21 @@ export async function GET(request: Request) {
   ).join('');
 
   return renderPage({
-    title: 'Nestihl jsem / Přesunout úkol',
+    title: orders.length > 1 ? 'Hromadný přesun / uzavření úkolů' : 'Nestihl jsem / Přesunout úkol',
     badgeEmoji: '⏳',
     badgeBg: '#fffbeb',
     bodyHtml: `<p class="subtitle" style="text-align:center;">Ahoj <strong>${escapeHtml(
       vocative
-    )}</strong>, vyber důvod a nový den. Zakázka se rovnou přesune v Plánu práce i v Planneru a poznámka se uloží pro dispečink.</p>
-      ${summaryBox}
+    )}</strong>, ${
+      orders.length > 1
+        ? 'zaškrtni úkoly, které chceš přesunout na jiný den (nebo je rovnou označ jako hotové).'
+        : 'vyber důvod a nový den. Zakázka se rovnou přesune v Plánu práce i v Planneru a poznámka se uloží pro dispečink.'
+    }</p>
       <form method="POST" action="/api/work-orders/email-action">
         <input type="hidden" name="token" value="${escapeHtml(token)}" />
+        ${renderChecklistHtml()}
 
-        <span class="label">1. Důvod (co se stalo)</span>
+        <span class="label">1. Důvod (pokud přesouváš)</span>
         <div class="chips">
           ${reasonChipsHtml}
           <label class="chip">
@@ -374,7 +443,7 @@ export async function GET(request: Request) {
         <label class="label" for="note">2. Krátká poznámka pro tým</label>
         <textarea id="note" name="note" rows="3" placeholder="Např. nestihlo se kvůli dešti, zbývají 2 ks na zítra ráno..."></textarea>
 
-        <span class="label">3. Na kdy úkol přesunout</span>
+        <span class="label">3. Na kdy zaškrtnuté úkoly přesunout</span>
         <div class="chips">
           <label class="chip">
             <input type="radio" name="dateChoice" value="${escapeHtml(tomorrowStr)}" checked />
@@ -392,9 +461,16 @@ export async function GET(request: Request) {
 
         <input type="date" name="customDate" value="${escapeHtml(tomorrowStr)}" min="${escapeHtml(todayStr)}" aria-label="Vlastní datum přesunu" />
 
-        <button type="submit" class="btn btn-amber">📅 Přesunout a uložit poznámku</button>
+        <button type="submit" name="actionOverride" value="reschedule" class="btn btn-amber">📅 Přesunout zaškrtnuté a uložit poznámku</button>
+        ${
+          orders.length > 1
+            ? `<button type="submit" name="actionOverride" value="complete" class="btn btn-green" style="margin-top:8px;">✅ Nebo zaškrtnuté označit jako HOTOVÉ</button>`
+            : ''
+        }
       </form>
-      <a href="${escapeHtml(detailUrl)}" class="btn btn-dark">Otevřít detail v aplikaci →</a>`,
+      <a href="${escapeHtml(detailUrl)}" class="btn btn-dark">${
+      orders.length > 1 ? 'Otevřít moje úkoly v aplikaci →' : 'Otevřít detail v aplikaci →'
+    }</a>`,
   });
 }
 
@@ -403,6 +479,8 @@ export async function POST(request: Request) {
   let note = '';
   let reason = '';
   let targetDate = '';
+  let actionOverride = '';
+  let rawSelectedIds: string[] = [];
 
   const contentType = request.headers.get('content-type') || '';
   if (contentType.includes('application/json')) {
@@ -411,12 +489,21 @@ export async function POST(request: Request) {
     note = typeof body?.note === 'string' ? body.note.trim() : '';
     reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
     targetDate = typeof body?.targetDate === 'string' ? body.targetDate.trim() : '';
+    actionOverride = typeof body?.actionOverride === 'string' ? body.actionOverride.trim() : '';
+    if (Array.isArray(body?.selectedOrderIds)) {
+      rawSelectedIds = body.selectedOrderIds.map((id) => String(id).trim()).filter(Boolean);
+    }
   } else {
     const formData = await request.formData().catch(() => null);
     if (formData) {
       token = String(formData.get('token') ?? '').trim();
       note = String(formData.get('note') ?? '').trim();
       reason = String(formData.get('reason') ?? '').trim();
+      actionOverride = String(formData.get('actionOverride') ?? '').trim();
+      rawSelectedIds = formData
+        .getAll('selectedOrderIds')
+        .map((id) => String(id).trim())
+        .filter(Boolean);
       const dateChoice = String(formData.get('dateChoice') ?? '').trim();
       const customDate = String(formData.get('customDate') ?? '').trim();
       targetDate =
@@ -446,11 +533,19 @@ export async function POST(request: Request) {
     });
   }
 
-  const orderId = payload.orderIds[0];
+  const allowedSet = new Set(payload.orderIds);
+  const selectedIds = rawSelectedIds.filter((id) => allowedSet.has(id));
+  const targetOrderIds = selectedIds.length > 0 ? selectedIds : [payload.orderIds[0]];
+  const effectiveAction =
+    actionOverride === 'complete' || actionOverride === 'reschedule'
+      ? actionOverride
+      : payload.action;
+
   const recipient = buildRecipientFromPayload(payload);
   const vocative = czechFirstNameVocative(recipient.firstName);
   const origin = getAppOrigin(request);
-  const detailUrl = `${origin}/work/${orderId}`;
+  const detailUrl =
+    targetOrderIds.length > 1 ? `${origin}/my-tasks` : `${origin}/work/${targetOrderIds[0]}`;
   const now = new Date();
   const timeFormatted = now.toLocaleString('cs-CZ', { timeZone: DEFAULT_BRIEFING_TIMEZONE });
 
@@ -458,8 +553,8 @@ export async function POST(request: Request) {
     matchWorkerAssignment(assignment, [recipient]).length > 0;
 
   try {
-    if (payload.action === 'complete') {
-      const result = await runWithTenantContext(
+    if (effectiveAction === 'complete') {
+      const completedOrders = await runWithTenantContext(
         {
           organizationId: payload.orgId,
           userId: payload.userId ?? undefined,
@@ -467,46 +562,62 @@ export async function POST(request: Request) {
         },
         async () => {
           requireTenantContext();
-          return updateWorkOrderStatusAction({
-            organizationId: payload.orgId,
-            workOrderId: orderId,
-            status: 'DONE',
-            note,
-            actor: {
-              userId: payload.userId,
-              employeeId: payload.employeeId,
-              email: payload.email,
-              name: payload.workerName,
-            },
-            viaEmail: true,
-            assignmentMatcher: matcher,
-            now,
-          });
+          const results: Array<{ id: string; title: string; clientName: string }> = [];
+          for (const oid of targetOrderIds) {
+            const res = await updateWorkOrderStatusAction({
+              organizationId: payload.orgId,
+              workOrderId: oid,
+              status: 'DONE',
+              note,
+              actor: {
+                userId: payload.userId,
+                employeeId: payload.employeeId,
+                email: payload.email,
+                name: payload.workerName,
+              },
+              viaEmail: true,
+              assignmentMatcher: matcher,
+              now,
+            });
+            results.push(res.order);
+          }
+          return results;
         }
       );
 
+      const summariesHtml = completedOrders
+        .map(
+          (o) => `<div class="summary" style="margin-bottom:10px;">
+            <p class="summary-title">✅ ${escapeHtml(o.title)}</p>
+            <p class="summary-meta">${escapeHtml(o.clientName)}${
+            note ? ` · Poznámka: ${escapeHtml(note)}` : ''
+          }</p>
+          </div>`
+        )
+        .join('');
+
       return renderPage({
-        title: `Díky, ${vocative}! Úkol je hotový.`,
+        title:
+          completedOrders.length > 1
+            ? `Díky, ${vocative}! Hotovo (${completedOrders.length}).`
+            : `Díky, ${vocative}! Úkol je hotový.`,
         badgeEmoji: '✅',
         badgeBg: '#ecfdf5',
-        bodyHtml: `<p class="subtitle" style="text-align:center;">Stav <strong>HOTOVO</strong> byl ihned uložen do SeePoint OS (${escapeHtml(
-          timeFormatted
-        )}).</p>
-          <div class="summary">
-            <p class="summary-title">${escapeHtml(result.order.title)}</p>
-            <p class="summary-meta">${escapeHtml(result.order.clientName)}${
-          note ? ` · Poznámka: ${escapeHtml(note)}` : ''
-        }</p>
-          </div>
-          <a href="${escapeHtml(detailUrl)}" class="btn btn-dark">Otevřít detail úkolu →</a>`,
+        bodyHtml: `<p class="subtitle" style="text-align:center;">Stav <strong>HOTOVO</strong> u ${
+          completedOrders.length > 1 ? `${completedOrders.length} úkolů` : 'úkolu'
+        } byl ihned uložen do SeePoint OS (${escapeHtml(timeFormatted)}).</p>
+          ${summariesHtml}
+          <a href="${escapeHtml(detailUrl)}" class="btn btn-dark">${
+          completedOrders.length > 1 ? 'Otevřít moje úkoly →' : 'Otevřít detail úkolu →'
+        }</a>`,
       });
     }
 
-    // payload.action === 'reschedule'
+    // effectiveAction === 'reschedule'
     const fallbackTomorrow = addCalendarDays(dayInZone(now, DEFAULT_BRIEFING_TIMEZONE), 1);
     const chosenDate = targetDate || fallbackTomorrow;
 
-    const result = await runWithTenantContext(
+    const movedOrders = await runWithTenantContext(
       {
         organizationId: payload.orgId,
         userId: payload.userId ?? undefined,
@@ -514,34 +625,62 @@ export async function POST(request: Request) {
       },
       async () => {
         requireTenantContext();
-        return rescheduleWorkOrderAction({
-          organizationId: payload.orgId,
-          workOrderId: orderId,
-          targetDate: chosenDate,
-          reason,
-          note,
-          actorName: payload.workerName,
-          viaEmail: true,
-          assignmentMatcher: matcher,
-          now,
-        });
+        const results: Array<{
+          title: string;
+          clientName: string;
+          newDateStr: string;
+          combinedReason: string | null;
+        }> = [];
+        for (const oid of targetOrderIds) {
+          const res = await rescheduleWorkOrderAction({
+            organizationId: payload.orgId,
+            workOrderId: oid,
+            targetDate: chosenDate,
+            reason,
+            note,
+            actorName: payload.workerName,
+            viaEmail: true,
+            assignmentMatcher: matcher,
+            now,
+          });
+          results.push({
+            title: res.workOrder.title,
+            clientName: res.workOrder.clientName,
+            newDateStr: res.newDateStr,
+            combinedReason: res.combinedReason,
+          });
+        }
+        return results;
       }
     );
 
+    const movedHtml = movedOrders
+      .map(
+        (m) => `<div class="summary" style="margin-bottom:10px;">
+          <p class="summary-title">📅 ${escapeHtml(m.title)}</p>
+          <p class="summary-meta">${escapeHtml(m.clientName)} · Nový termín: ${escapeHtml(
+          m.newDateStr
+        )}${m.combinedReason ? ` · Důvod: ${escapeHtml(m.combinedReason)}` : ''}</p>
+        </div>`
+      )
+      .join('');
+
     return renderPage({
-      title: `Uloženo, ${vocative}! Úkol přesunut.`,
+      title:
+        movedOrders.length > 1
+          ? `Uloženo, ${vocative}! Přesunuto (${movedOrders.length}).`
+          : `Uloženo, ${vocative}! Úkol přesunut.`,
       badgeEmoji: '📅',
       badgeBg: '#fffbeb',
-      bodyHtml: `<p class="subtitle" style="text-align:center;">Úkol byl přesunut na <strong>${escapeHtml(
-        result.newDateStr
+      bodyHtml: `<p class="subtitle" style="text-align:center;">${
+        movedOrders.length > 1 ? 'Vybrané úkoly byly přesunuty' : 'Úkol byl přesunut'
+      } na <strong>${escapeHtml(
+        movedOrders[0]?.newDateStr || chosenDate
       )}</strong> a poznámka byla uložena do SeePoint OS (${escapeHtml(timeFormatted)}).</p>
-        <div class="summary">
-          <p class="summary-title">${escapeHtml(result.workOrder.title)}</p>
-          <p class="summary-meta">${escapeHtml(result.workOrder.clientName)} · Nový termín: ${escapeHtml(
-        result.newDateStr
-      )}${result.combinedReason ? ` · Důvod: ${escapeHtml(result.combinedReason)}` : ''}</p>
-        </div>
-        <a href="${escapeHtml(detailUrl)}" class="btn btn-dark">Otevřít detail úkolu →</a>`,
+        ${movedHtml}
+        <a href="${escapeHtml(detailUrl)}" class="btn btn-dark">${
+        movedOrders.length > 1 ? 'Otevřít moje úkoly →' : 'Otevřít detail v aplikaci →'
+      }</a>`,
     });
   } catch (err) {
     if (err instanceof WorkOrderActionError) {
@@ -565,3 +704,4 @@ export async function POST(request: Request) {
     });
   }
 }
+

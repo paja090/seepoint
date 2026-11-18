@@ -498,10 +498,11 @@ function parseGooglePlanRows(
     const workers = parseWorkersList(rawWorker);
     const requestedBy = parseZadavatel(rawZadal);
 
+    const archiveCutoff = new Date(todayStart.getTime() - 7 * 24 * 60 * 60 * 1000);
     let status: WorkOrderStatus;
     if (isFtdSent || isCompletedByColor) {
       status = 'DONE';
-    } else if (scheduledDate.getTime() < todayStart.getTime()) {
+    } else if (scheduledDate.getTime() < archiveCutoff.getTime()) {
       status = 'DONE';
     } else if (isHandedOver) {
       status = 'HANDED_OVER';
@@ -841,17 +842,20 @@ export async function syncGooglePlanToWorkOrders(
         task.scheduledAt
       );
       const nextDateIso = nextScheduledAt.toISOString().slice(0, 10);
-      const wasOnlyAutoClosedByInvoice =
+      const wasOnlyAutoClosedWithoutEvidence =
         existing.status === 'DONE' &&
-        Boolean(existing.invoiced) &&
         !existing.ftdSent &&
         !prevPc.manualFtdSent &&
         !prevPc.completedBySheetColor &&
+        !prevPc.lastEmailAction &&
+        !prevPc.lastWorkerReportAt &&
+        !prevPc.completedViaEmailAt &&
+        existing._count.workEntries === 0 &&
         task.status !== 'DONE';
       const nextStatus: WorkOrderStatus =
         existing.status === 'CANCELLED'
           ? 'CANCELLED'
-          : existing.status === 'DONE' && !prevPc.completedBySheetColor && !wasOnlyAutoClosedByInvoice
+          : existing.status === 'DONE' && !prevPc.completedBySheetColor && !wasOnlyAutoClosedWithoutEvidence
           ? 'DONE'
           : task.status;
 
