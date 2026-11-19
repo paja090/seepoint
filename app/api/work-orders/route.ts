@@ -3,6 +3,7 @@ import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { syncWorkOrderTasks } from '@/lib/work-task-sync';
+import { writeBackNewWorkOrderToGoogleSheet } from '@/lib/work/google-sheets-writeback';
 
 type WorkOrderInput = Record<string, unknown>;
 
@@ -160,5 +161,13 @@ export async function POST(request: Request) {
     select: { id: true },
   });
   await syncWorkOrderTasks(order.id);
+  if (auth.organizationId) {
+    await writeBackNewWorkOrderToGoogleSheet({
+      organizationId: auth.organizationId,
+      workOrderId: order.id,
+    }).catch((err) => {
+      console.warn('[api/work-orders] Failed to write new work order to Google Sheet:', err);
+    });
+  }
   return NextResponse.json(order, { status: 201 });
 }

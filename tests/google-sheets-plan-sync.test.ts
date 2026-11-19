@@ -858,3 +858,64 @@ test('Google Sheets Sync: reopens future orders mistakenly closed solely by adva
   assert.equal(existingOrder.status, 'PLANNED');
   assert.equal(existingOrder.invoiced, true);
 });
+
+test('Google Sheets Writeback: extracts spreadsheetId/gid, locates shifted rows, and formats Czech dates and sheet keys', async () => {
+  const {
+    extractSpreadsheetTargetFromUrl,
+    columnIndexToLetter,
+    formatCzDateForSheet,
+    detectSheetColumns,
+    locateWorkOrderRowInSheet,
+    parseAppendedRowNumber,
+    extractPureZadaniFromWorkOrder,
+  } = await import('../lib/work/google-sheets-writeback');
+
+  const target = extractSpreadsheetTargetFromUrl(
+    'https://docs.google.com/spreadsheets/d/1VcssEXqBmRSV0xBkzP23Miadt2zTTR8lHhgHPQlLt6o/export?format=csv&gid=1725001912'
+  );
+  assert.equal(target.spreadsheetId, '1VcssEXqBmRSV0xBkzP23Miadt2zTTR8lHhgHPQlLt6o');
+  assert.equal(target.gid, 1725001912);
+
+  assert.equal(columnIndexToLetter(0), 'A');
+  assert.equal(columnIndexToLetter(5), 'F');
+  assert.equal(columnIndexToLetter(16), 'Q');
+
+  const formatted = formatCzDateForSheet(new Date(Date.UTC(2026, 10, 19, 10, 0, 0)));
+  assert.equal(formatted.dateStr, '19.11.2026');
+  assert.equal(formatted.dayName, 'čt');
+
+  assert.equal(parseAppendedRowNumber("'Plán'!A945:Q945"), 945);
+  assert.equal(parseAppendedRowNumber('Plán!A120'), 120);
+
+  const pureZadani = extractPureZadaniFromWorkOrder({
+    clientName: 'OVA JIH',
+    title: 'OVA JIH – Deinstalace 6 ks MT',
+    description: 'Deinstalace 6 ks MT Ova Jih',
+  });
+  assert.equal(pureZadani, 'Deinstalace 6 ks MT Ova Jih');
+
+  const rows = [
+    ['FTD odeslána', 'FAKT', 'Datum', 'Den', 'Zadal', 'Pracovník dílna', 'Předáno klukům', 'Klient', 'Zadání', 'Kontakt', 'Datum zahájení', 'Datum ukončení', 'Typ nosiče', 'KS', 'Práce'],
+    ['', '', '18.11.2026', 'st', 'M', 'Sonik', 'TRUE', 'Klient A', 'Polep výlohy Praha', '', '', '', 'CLV', '1', 'Polep'],
+    ['', '', '19.11.2026', 'čt', 'P', 'Štěpán', 'TRUE', 'OVA JIH', 'Deinstalace 6 ks MT Ova Jih', '', '', '', 'MT', '6', 'Demontáž'],
+  ];
+
+  const cols = detectSheetColumns(rows);
+  assert.ok(cols);
+  assert.equal(cols.pracovnik, 5);
+  assert.equal(cols.datum, 2);
+  assert.equal(cols.den, 3);
+
+  // Even if preferredSheetRow was 2 (shifted by 1 row), locateWorkOrderRowInSheet finds row 3 (1-based)
+  const foundRow = locateWorkOrderRowInSheet({
+    rows,
+    cols,
+    preferredSheetRow: 2,
+    clientName: 'OVA JIH',
+    title: 'OVA JIH – Deinstalace 6 ks MT Ova Jih',
+    description: 'Deinstalace 6 ks MT Ova Jih',
+    scheduledAt: new Date(Date.UTC(2026, 10, 19, 8, 0, 0)),
+  });
+  assert.equal(foundRow, 3);
+});
+

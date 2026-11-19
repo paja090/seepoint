@@ -8,6 +8,7 @@ type Connection = {
   connectedAt: string | null;
   lastCheckedAt: string | null;
   error: string | null;
+  scopes?: string[];
 } | null;
 
 function formatCheckedAt(value: string | null) {
@@ -26,6 +27,7 @@ export function GoogleIntegrationCard({ connection, configured }: { connection: 
   const [message, setMessage] = useState<string | null>(null);
   const connected = connection?.status === 'CONNECTED';
   const needsAttention = connection?.status === 'ERROR';
+  const hasSheetsScope = Boolean(connection?.scopes?.includes('https://www.googleapis.com/auth/spreadsheets'));
   const lastCheckedAt = formatCheckedAt(connection?.lastCheckedAt ?? null);
 
   async function disconnect() {
@@ -43,8 +45,8 @@ export function GoogleIntegrationCard({ connection, configured }: { connection: 
     <section className="card space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold">Google Drive</h2>
-          <p className="mt-1 text-sm text-slate-600">Tenantové úložiště fotografií a dokumentů s omezeným oprávněním Google Drive.</p>
+          <h2 className="text-xl font-bold">Google Drive & Google Tabulky</h2>
+          <p className="mt-1 text-sm text-slate-600">Úložiště fotografií a obousměrný zápis do sdílené Google Tabulky Plán.</p>
         </div>
         <span className={`rounded-full px-3 py-1 text-xs font-bold ${connected ? 'bg-emerald-100 text-emerald-800' : needsAttention ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>
           {connected ? 'Připojeno' : needsAttention ? 'Vyžaduje ověření' : 'Nepřipojeno'}
@@ -53,8 +55,23 @@ export function GoogleIntegrationCard({ connection, configured }: { connection: 
       {connected ? (
         <div className="space-y-3">
           <p className="text-sm">Účet: <strong>{connection.accountEmail}</strong></p>
+          <p className="text-xs font-semibold text-slate-600">
+            Zápis do Google Tabulek:{' '}
+            {hasSheetsScope ? (
+              <span className="text-emerald-700">✓ Aktivní (obousměrná synchronizace Plánu)</span>
+            ) : (
+              <span className="text-amber-700">Vyžaduje potvrzení oprávnění pro Google Tabulky</span>
+            )}
+          </p>
           {lastCheckedAt && <p className="text-xs text-slate-500">Naposledy ověřeno: {lastCheckedAt}</p>}
-          <button className="btn-secondary" disabled={busy} onClick={disconnect} type="button">{busy ? 'Odpojuji…' : 'Odpojit Google Drive'}</button>
+          <div className="flex flex-wrap gap-2">
+            {!hasSheetsScope && (
+              <a className="btn-primary inline-flex" href="/api/integrations/google/connect?provider=GOOGLE_DRIVE">
+                Povolit zápis do Google Tabulek
+              </a>
+            )}
+            <button className="btn-secondary" disabled={busy} onClick={disconnect} type="button">{busy ? 'Odpojuji…' : 'Odpojit Google Drive'}</button>
+          </div>
         </div>
       ) : configured ? (
         <div className="space-y-3">

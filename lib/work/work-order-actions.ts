@@ -3,6 +3,10 @@ import { prisma } from '../db';
 import { usesItemExecution } from '../field-planning/item-jobs';
 import { logCarrierHistoryEvent } from '../navigation/carrier-history-service';
 import { syncWorkOrderTasks } from '../work-task-sync';
+import {
+  writeBackWorkOrderCompletedToGoogleSheet,
+  writeBackWorkOrderRescheduledToGoogleSheet,
+} from './google-sheets-writeback';
 
 export class WorkOrderActionError extends Error {
   readonly statusCode: number;
@@ -213,6 +217,14 @@ export async function rescheduleWorkOrderAction(params: {
 
     await syncWorkOrderTasks(existing.id, tx);
     return order;
+  });
+
+  await writeBackWorkOrderRescheduledToGoogleSheet({
+    organizationId: existing.organizationId,
+    workOrderId: existing.id,
+    previousScheduledAt: existing.scheduledAt,
+  }).catch((err) => {
+    console.warn('[work-order-actions] Reschedule write-back to Google Sheet failed:', err);
   });
 
   return {
@@ -554,6 +566,16 @@ export async function updateWorkOrderStatusAction(params: {
         });
       }
     }
+  }
+
+  if (params.status === 'DONE' || wasAlreadyDone) {
+    await writeBackWorkOrderCompletedToGoogleSheet({
+      organizationId: existing.organizationId,
+      workOrderId: existing.id,
+      isCompleted: params.status === 'DONE',
+    }).catch((err) => {
+      console.warn('[work-order-actions] Status write-back to Google Sheet failed:', err);
+    });
   }
 
   return { order: updated, wasAlreadyDone };

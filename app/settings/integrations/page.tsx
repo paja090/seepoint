@@ -12,7 +12,7 @@ export default async function IntegrationsSettingsPage({ searchParams }: { searc
     organizationId
       ? prisma.integrationConnection.findFirst({
           where: { organizationId, provider: 'GOOGLE_DRIVE', status: { not: 'REVOKED' } },
-          select: { status: true, accountEmail: true, connectedAt: true, lastCheckedAt: true, error: true },
+          select: { status: true, accountEmail: true, connectedAt: true, lastCheckedAt: true, error: true, scopes: true },
         })
       : null,
     organizationId

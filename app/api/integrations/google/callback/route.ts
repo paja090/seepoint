@@ -16,7 +16,10 @@ import {
 import { assertGoogleTokenScopes } from '@/lib/integrations/google-oauth-policy';
 
 function integrationsRedirect(request: Request, result: 'connected' | 'cancelled' | 'error', reason?: string, returnToPath?: string) {
-  const basePath = returnToPath === '/ai-inbox' ? '/ai-inbox' : '/settings/integrations';
+  const basePath =
+    returnToPath === '/ai-inbox' || returnToPath === '/work'
+      ? returnToPath
+      : '/settings/integrations';
   const target = new URL(getAppUrl(request, `${basePath}?google=${result}`));
   if (reason) target.searchParams.set('reason', reason);
   return NextResponse.redirect(target.toString());
