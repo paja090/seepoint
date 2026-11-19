@@ -150,7 +150,14 @@ export function WorkModuleClient({
         setLatestSyncAt(new Date().toISOString());
       }
       const cleanedInfo = data.cleanedCount > 0 ? `, ${data.cleanedCount} osiřelých vyčištěno` : '';
-      setSyncNotice(`✓ Synchronizace dokončena: ${data.createdCount} nových, ${data.updatedCount} aktualizováno${cleanedInfo} (z ${data.totalParsed} řádků).`);
+      const flushedCount =
+        (data.writebackFlush?.flushedCompletedCount || 0) +
+        (data.writebackFlush?.flushedRescheduledCount || 0);
+      const flushedInfo = flushedCount > 0 ? `, ${flushedCount} zapsáno zpět do tabulky` : '';
+      setSyncNotice(`✓ Synchronizace dokončena: ${data.createdCount} nových, ${data.updatedCount} aktualizováno${flushedInfo}${cleanedInfo} (z ${data.totalParsed} řádků).`);
+      if (Array.isArray(data.writebackFlush?.errors) && data.writebackFlush.errors.length > 0) {
+        setSyncError(`Upozornění při zápisu do Google Tabulky: ${data.writebackFlush.errors[0]}`);
+      }
       lastRefreshRef.current = Date.now();
       router.refresh();
     } catch (err: unknown) {

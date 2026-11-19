@@ -8,7 +8,10 @@ import { extractOrderRouteMap } from '@/lib/field-planning/order-route-mapper';
 import { syncCrmOrderToWorkOrderInTransaction } from '@/lib/crm/crm-work-sync';
 import { syncUnlinkedDispatchPointsInTransaction } from '@/lib/dispatch/dispatch-work-sync';
 import { isSeePointOrganization } from '@/lib/work/google-sheets-sync';
-import { getGoogleSheetWritebackStatus } from '@/lib/work/google-sheets-writeback';
+import {
+  flushPendingGoogleSheetWritebacks,
+  getGoogleSheetWritebackStatus,
+} from '@/lib/work/google-sheets-writeback';
 import { extractWorkOrderConstraintFlags } from '@/lib/work';
 
 export const dynamic = 'force-dynamic';
@@ -245,6 +248,11 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
   const writebackStatus = isSeePointOrg
     ? await getGoogleSheetWritebackStatus(user.organizationId).catch(() => null)
     : null;
+  if (isSeePointOrg && writebackStatus?.hasSpreadsheetsScope) {
+    await flushPendingGoogleSheetWritebacks({
+      organizationId: user.organizationId,
+    }).catch(() => null);
+  }
   const googleOAuthResult = cleanParam(params.google) || null;
 
   return (
