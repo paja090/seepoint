@@ -220,7 +220,7 @@ export async function rescheduleWorkOrderAction(params: {
   });
 
   await writeBackWorkOrderRescheduledToGoogleSheet({
-    organizationId: existing.organizationId,
+    organizationId: params.organizationId,
     workOrderId: existing.id,
     previousScheduledAt: existing.scheduledAt,
   }).catch((err) => {

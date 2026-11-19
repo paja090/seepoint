@@ -18,7 +18,11 @@ export const GOOGLE_SHEET_DONE_GREEN_RGB = {
 
 const CZECH_SHORT_WEEKDAYS = ['ne', 'po', 'út', 'st', 'čt', 'pá', 'so'] as const;
 
-const WORK_TYPE_CZECH_LABELS: Record<WorkType, string> = {
+const WORK_TYPE_CZECH_LABELS: Record<string, string> = {
+  INSTALLATION: 'Montáž',
+  DEINSTALLATION: 'Demontáž',
+  PASTING: 'Výlep',
+  STICKERING: 'Polep',
   INSTALL: 'Montáž',
   UNINSTALL: 'Demontáž',
   PASTE: 'Výlep',
@@ -570,7 +574,7 @@ function buildRowValuesForOrder(
     title: string;
     description: string | null;
     clientName: string;
-    requestedBy: string;
+    requestedBy: string | null;
     scheduledAt: Date;
     campaignDateFrom: Date | null;
     campaignDateTo: Date | null;
