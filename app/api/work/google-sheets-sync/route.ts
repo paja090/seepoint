@@ -7,6 +7,7 @@ import {
   DEFAULT_GOOGLE_PLAN_SHEET_CSV_URL,
   isSeePointOrganization,
 } from '@/lib/work/google-sheets-sync';
+import { flushPendingGoogleSheetWritebacks } from '@/lib/work/google-sheets-writeback';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -73,6 +74,14 @@ export async function POST(request: Request) {
       );
     }
 
+    const writebackFlush = await flushPendingGoogleSheetWritebacks({
+      organizationId,
+    }).catch((err) => ({
+      flushedCompletedCount: 0,
+      flushedRescheduledCount: 0,
+      errors: [err instanceof Error ? err.message : 'FLUSH_ERROR'],
+    }));
+
     const result = await syncGooglePlanToWorkOrders({
       organizationId,
       csvUrl: targetCsvUrl || undefined,
@@ -83,6 +92,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       ...result,
+      writebackFlush,
       message: `Synchronizace dokončena: ${result.createdCount} vytvořeno, ${result.updatedCount} aktualizováno ze ${result.totalParsed} řádků.`,
     });
   } catch (error: unknown) {

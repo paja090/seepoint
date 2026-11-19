@@ -230,9 +230,11 @@ export function locateWorkOrderRowInSheet(params: {
       targetClient.includes(rowClient);
 
     const zadaniOk =
-      (targetZadaniSnippet.length >= 4 &&
-        (rowZadani.includes(targetZadaniSnippet) || targetZadaniSnippet.includes(rowZadani.slice(0, 28)))) ||
-      (targetTitleSnippet.length >= 4 && rowZadani.includes(targetTitleSnippet));
+      (targetZadaniSnippet.length > 0 &&
+        (rowZadani === targetZadaniSnippet ||
+          rowZadani.includes(targetZadaniSnippet) ||
+          targetZadaniSnippet.includes(rowZadani.slice(0, 28)))) ||
+      (targetTitleSnippet.length > 0 && rowZadani.includes(targetTitleSnippet));
 
     return Boolean(clientOk && (zadaniOk || (!rowZadani && rowClient === targetClient)));
   };
@@ -242,6 +244,13 @@ export function locateWorkOrderRowInSheet(params: {
     const exactIdx = preferredSheetRow - 1;
     if (rowMatchesOrder(exactIdx)) {
       return preferredSheetRow;
+    }
+    const exactRow = rows[exactIdx];
+    if (exactRow) {
+      const exactRowClient = normalizeForMatch(cols.klient !== -1 ? exactRow[cols.klient] : '');
+      if (exactRowClient && targetClient && (exactRowClient === targetClient || exactRowClient.includes(targetClient) || targetClient.includes(exactRowClient))) {
+        return preferredSheetRow;
+      }
     }
     for (let delta = 1; delta <= 5; delta++) {
       if (exactIdx - delta >= cols.headerRowNumber && rowMatchesOrder(exactIdx - delta)) {
@@ -446,9 +455,10 @@ async function loadSheetContext(
 
   const sheetTitle = matchedSheet.title;
   const sheetId = matchedSheet.sheetId;
+  const quotedRange = `'${sheetTitle.replace(/'/g, "''")}'!A1:R3000`;
 
   const valuesRes = await fetchImpl(
-    `https://sheets.googleapis.com/v4/spreadsheets/${target.spreadsheetId}/values/${encodeURIComponent(sheetTitle)}`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${target.spreadsheetId}/values/${encodeURIComponent(quotedRange)}`,
     {
       headers: { Authorization: `Bearer ${accessToken}` },
       cache: 'no-store',
@@ -878,16 +888,43 @@ export async function writeBackWorkOrderCompletedToGoogleSheet(params: {
           sheetRow: rowNumber,
           completedBySheetColor: isCompleted,
           sheetWritebackAt: new Date().toISOString(),
+          sheetWritebackError: null,
         } as Prisma.InputJsonValue,
       },
     });
 
     return { ok: true, sheetRow: rowNumber };
   } catch (error) {
-    console.warn('[google-sheets-writeback] writeBackWorkOrderCompletedToGoogleSheet failed:', error);
+    const errMsg = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
+    console.warn('[google-sheets-writeback] writeBackWorkOrderCompletedToGoogleSheet failed:', errMsg);
+    await prisma.workOrder
+      .findFirst({
+        where: { id: params.workOrderId, organizationId: params.organizationId },
+        select: { id: true, planningConstraints: true },
+      })
+      .then((ord) => {
+        if (!ord) return;
+        const pc =
+          ord.planningConstraints &&
+          typeof ord.planningConstraints === 'object' &&
+          !Array.isArray(ord.planningConstraints)
+            ? (ord.planningConstraints as Record<string, unknown>)
+            : {};
+        return prisma.workOrder.update({
+          where: { id: ord.id },
+          data: {
+            planningConstraints: {
+              ...pc,
+              sheetWritebackError: errMsg,
+              sheetWritebackAttemptAt: new Date().toISOString(),
+            } as Prisma.InputJsonValue,
+          },
+        });
+      })
+      .catch(() => undefined);
     return {
       ok: false,
-      reason: error instanceof Error ? error.message : 'UNKNOWN_ERROR',
+      reason: errMsg,
     };
   }
 }
@@ -996,16 +1033,107 @@ export async function writeBackWorkOrderRescheduledToGoogleSheet(params: {
           sheetKey: nextSheetKey,
           sheetScheduledDateAtReschedule: newDateIso,
           sheetWritebackAt: new Date().toISOString(),
+          sheetWritebackError: null,
         } as Prisma.InputJsonValue,
       },
     });
 
     return { ok: true, sheetRow: rowNumber };
   } catch (error) {
-    console.warn('[google-sheets-writeback] writeBackWorkOrderRescheduledToGoogleSheet failed:', error);
+    const errMsg = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
+    console.warn('[google-sheets-writeback] writeBackWorkOrderRescheduledToGoogleSheet failed:', errMsg);
     return {
       ok: false,
-      reason: error instanceof Error ? error.message : 'UNKNOWN_ERROR',
+      reason: errMsg,
     };
   }
 }
+
+/**
+ * Flushes any recently completed or rescheduled WorkOrders in SeePoint OS that have not yet been
+ * colored green or updated in the Google Sheet `Plán` (e.g. tasks completed before OAuth was connected).
+ */
+export async function flushPendingGoogleSheetWritebacks(params: {
+  organizationId: string;
+  fetchImpl?: typeof fetch;
+}): Promise<{
+  flushedCompletedCount: number;
+  flushedRescheduledCount: number;
+  errors: string[];
+}> {
+  const fetchImpl = params.fetchImpl ?? fetch;
+  let flushedCompletedCount = 0;
+  let flushedRescheduledCount = 0;
+  const errors: string[] = [];
+
+  try {
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentOrders = await prisma.workOrder.findMany({
+      where: {
+        organizationId: params.organizationId,
+        updatedAt: { gte: cutoff },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 40,
+      select: {
+        id: true,
+        status: true,
+        scheduledAt: true,
+        planningConstraints: true,
+      },
+    });
+
+    for (const ord of recentOrders) {
+      const pc =
+        ord.planningConstraints &&
+        typeof ord.planningConstraints === 'object' &&
+        !Array.isArray(ord.planningConstraints)
+          ? (ord.planningConstraints as Record<string, unknown>)
+          : {};
+
+      if (pc.source !== 'GOOGLE_SHEETS_PLAN') continue;
+
+      const needsCompletionColor =
+        ord.status === 'DONE' &&
+        pc.completedBySheetColor !== true &&
+        (pc.manualFtdSent === true || pc.lastEmailAction === 'COMPLETED');
+
+      if (needsCompletionColor) {
+        const res = await writeBackWorkOrderCompletedToGoogleSheet({
+          organizationId: params.organizationId,
+          workOrderId: ord.id,
+          isCompleted: true,
+          fetchImpl,
+        });
+        if (res.ok) {
+          flushedCompletedCount++;
+        } else if (res.reason && !errors.includes(res.reason)) {
+          errors.push(res.reason);
+        }
+      }
+
+      const needsRescheduleWriteback =
+        typeof pc.manualScheduledDateIso === 'string' &&
+        pc.manualScheduledDateIso.length > 0 &&
+        !pc.sheetWritebackAt;
+
+      if (needsRescheduleWriteback) {
+        const res = await writeBackWorkOrderRescheduledToGoogleSheet({
+          organizationId: params.organizationId,
+          workOrderId: ord.id,
+          fetchImpl,
+        });
+        if (res.ok) {
+          flushedRescheduledCount++;
+        } else if (res.reason && !errors.includes(res.reason)) {
+          errors.push(res.reason);
+        }
+      }
+    }
+  } catch (err) {
+    errors.push(err instanceof Error ? err.message : 'FLUSH_FAILED');
+  }
+
+  return { flushedCompletedCount, flushedRescheduledCount, errors };
+}
+

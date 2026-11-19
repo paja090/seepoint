@@ -8,6 +8,7 @@ import {
   isSeePointOrganization,
   syncGooglePlanToWorkOrders,
 } from '@/lib/work/google-sheets-sync';
+import { flushPendingGoogleSheetWritebacks } from '@/lib/work/google-sheets-writeback';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -78,9 +79,16 @@ async function handleCronExecution(request: Request) {
       async () => {
         requireTenantContext();
         try {
+          const writebackFlush = await flushPendingGoogleSheetWritebacks({
+            organizationId: org.id,
+          }).catch((err) => ({
+            flushedCompletedCount: 0,
+            flushedRescheduledCount: 0,
+            errors: [err instanceof Error ? err.message : 'FLUSH_ERROR'],
+          }));
           const syncResult = await syncGooglePlanToWorkOrders({ organizationId: org.id });
           console.log(
-            `[cron/google-sheet-plan] org=${org.id} parsed=${syncResult.totalParsed} created=${syncResult.createdCount} updated=${syncResult.updatedCount} cleaned=${syncResult.cleanedCount ?? 0} skipped=${syncResult.skippedCount}`
+            `[cron/google-sheet-plan] org=${org.id} flushedDone=${writebackFlush.flushedCompletedCount} parsed=${syncResult.totalParsed} created=${syncResult.createdCount} updated=${syncResult.updatedCount} cleaned=${syncResult.cleanedCount ?? 0} skipped=${syncResult.skippedCount}`
           );
           return {
             organizationId: org.id,
@@ -90,6 +98,7 @@ async function handleCronExecution(request: Request) {
             updatedCount: syncResult.updatedCount,
             skippedCount: syncResult.skippedCount,
             cleanedCount: syncResult.cleanedCount ?? 0,
+            writebackFlush,
           };
         } catch (err) {
           console.error(`[cron/google-sheet-plan] Sync failed for ${org.id}:`, err);

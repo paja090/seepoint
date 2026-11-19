@@ -898,6 +898,7 @@ test('Google Sheets Writeback: extracts spreadsheetId/gid, locates shifted rows,
     ['FTD odeslána', 'FAKT', 'Datum', 'Den', 'Zadal', 'Pracovník dílna', 'Předáno klukům', 'Klient', 'Zadání', 'Kontakt', 'Datum zahájení', 'Datum ukončení', 'Typ nosiče', 'KS', 'Práce'],
     ['', '', '18.11.2026', 'st', 'M', 'Sonik', 'TRUE', 'Klient A', 'Polep výlohy Praha', '', '', '', 'CLV', '1', 'Polep'],
     ['', '', '19.11.2026', 'čt', 'P', 'Štěpán', 'TRUE', 'OVA JIH', 'Deinstalace 6 ks MT Ova Jih', '', '', '', 'MT', '6', 'Demontáž'],
+    ['', '', '19.11.2026', 'čt', 'V', 'Pavel, Marek, Vlaďka', 'FALSE', 'Porada nový systém SP', '9:00', '', '', '', '', '', ''],
   ];
 
   const cols = detectSheetColumns(rows);
@@ -917,5 +918,17 @@ test('Google Sheets Writeback: extracts spreadsheetId/gid, locates shifted rows,
     scheduledAt: new Date(Date.UTC(2026, 10, 19, 8, 0, 0)),
   });
   assert.equal(foundRow, 3);
+
+  // Short Zadání like "9:00" (< 4 alphanumeric chars) must also be matched accurately
+  const poradaRow = locateWorkOrderRowInSheet({
+    rows,
+    cols,
+    preferredSheetRow: 4,
+    clientName: 'Porada nový systém SP',
+    title: 'Porada nový systém SP – 9:00',
+    description: '9:00',
+    scheduledAt: new Date(Date.UTC(2026, 10, 19, 7, 0, 0)),
+  });
+  assert.equal(poradaRow, 4);
 });
 
