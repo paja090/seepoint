@@ -6,6 +6,10 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { syncWorkOrderTasks } from '@/lib/work-task-sync';
 import { extractWorkOrderConstraintFlags } from '@/lib/work';
+import {
+  writeBackWorkOrderCompletedToGoogleSheet,
+  writeBackWorkOrderRescheduledToGoogleSheet,
+} from '@/lib/work/google-sheets-writeback';
 
 type UpdateInput = {
   status?: unknown;
@@ -173,6 +177,30 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       await syncWorkOrderTasks(id, tx);
       return updated;
     });
+    if (auth.organizationId) {
+      if (saved.status === 'DONE') {
+        await writeBackWorkOrderCompletedToGoogleSheet({
+          organizationId: auth.organizationId,
+          workOrderId: saved.id,
+          isCompleted: true,
+        }).catch((err) => {
+          console.warn('[api/work-orders/[id]] Status write-back to Google Sheet failed:', err);
+        });
+      }
+      if (
+        scheduledAt !== undefined ||
+        typeof input.ftdSent === 'boolean' ||
+        typeof input.invoiced === 'boolean' ||
+        typeof input.invoiceExempt === 'boolean'
+      ) {
+        await writeBackWorkOrderRescheduledToGoogleSheet({
+          organizationId: auth.organizationId,
+          workOrderId: saved.id,
+        }).catch((err) => {
+          console.warn('[api/work-orders/[id]] Field update write-back to Google Sheet failed:', err);
+        });
+      }
+    }
     const flags = extractWorkOrderConstraintFlags(saved.planningConstraints);
     return NextResponse.json({
       id: saved.id,
@@ -304,6 +332,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: err.message.replace('NELZE_ODEBRAT_PRACOVNIKA: ', '').replace('NELZE_ODEBRAT_PRACOVNIKA:', '') }, { status: 400 });
     }
     throw err;
+  }
+  if (auth.organizationId) {
+    await writeBackWorkOrderRescheduledToGoogleSheet({
+      organizationId: auth.organizationId,
+      workOrderId: id,
+    }).catch((err) => {
+      console.warn('[api/work-orders/[id]] PATCH write-back to Google Sheet failed:', err);
+    });
   }
   return NextResponse.json({ id });
 }

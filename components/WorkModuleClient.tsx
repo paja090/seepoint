@@ -51,6 +51,8 @@ export type WorkModuleClientProps = {
   categories?: WorkCategory[];
   isSeePointOrg?: boolean;
   lastSheetSyncAt?: string | null;
+  googleSheetWritebackReady?: boolean;
+  googleOAuthResult?: string | null;
 };
 
 export function WorkModuleClient({
@@ -68,6 +70,8 @@ export function WorkModuleClient({
   categories,
   isSeePointOrg = false,
   lastSheetSyncAt = null,
+  googleSheetWritebackReady = false,
+  googleOAuthResult = null,
 }: WorkModuleClientProps) {
   const router = useRouter();
   // Open create modal automatically if redirected with initial carrier or client
@@ -318,21 +322,31 @@ export function WorkModuleClient({
 
           {isSeePointOrg && (
             <div className="flex flex-col items-start gap-0.5">
-              <button
-                type="button"
-                onClick={handleSyncGoogleSheet}
-                disabled={syncingGoogle}
-                className="flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-xs font-black text-emerald-900 shadow-sm hover:bg-emerald-100 transition disabled:opacity-60 cursor-pointer"
-                title="Synchronizuje Google Tabulku okamžitě (jinak běží automaticky každých 15 min, včetně zeleného označení hotových úkolů a odkazů na Disk)"
-              >
-                <RefreshCw size={15} className={`text-emerald-700 ${syncingGoogle ? 'animate-spin' : ''}`} />
-                <span>{syncingGoogle ? 'Synchronizuji...' : '🔄 Google Tabulka'}</span>
-              </button>
-              {formattedLastSync && (
-                <span suppressHydrationWarning className="pl-2 text-[10px] font-semibold text-emerald-800/80">
-                  Auto-sync 15 min · Naposledy: {formattedLastSync}
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSyncGoogleSheet}
+                  disabled={syncingGoogle}
+                  className="flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-xs font-black text-emerald-900 shadow-sm hover:bg-emerald-100 transition disabled:opacity-60 cursor-pointer"
+                  title="Synchronizuje Google Tabulku okamžitě (jinak běží automaticky každých 15 min, včetně obousměrného zápisu nových, přeplánovaných a hotových úkolů)"
+                >
+                  <RefreshCw size={15} className={`text-emerald-700 ${syncingGoogle ? 'animate-spin' : ''}`} />
+                  <span>{syncingGoogle ? 'Synchronizuji...' : '🔄 Google Tabulka'}</span>
+                </button>
+                {canCreateWorkOrder && !googleSheetWritebackReady && (
+                  <a
+                    href="/api/integrations/google/connect?provider=GOOGLE_DRIVE&returnTo=/work"
+                    className="flex items-center gap-1.5 rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs font-extrabold text-amber-900 shadow-sm hover:bg-amber-100 transition"
+                    title="Autorizovat zápis do sdílené Google Tabulky Plán (obarvení hotových úkolů zeleně, změna termínu a přidání nových úkolů)"
+                  >
+                    <span>🔗 Povolit zápis do Tabulky</span>
+                  </a>
+                )}
+              </div>
+              <span suppressHydrationWarning className="pl-2 text-[10px] font-semibold text-emerald-800/80">
+                {googleSheetWritebackReady ? '✓ Obousměrný zápis aktivní' : 'Auto-sync 15 min'}
+                {formattedLastSync ? ` · Naposledy: ${formattedLastSync}` : ''}
+              </span>
             </div>
           )}
 
@@ -366,6 +380,12 @@ export function WorkModuleClient({
           )}
         </div>
       </div>
+
+      {googleOAuthResult === 'connected' && (
+        <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-xs font-bold text-emerald-900 shadow-sm">
+          ✓ Obousměrný zápis do Google Tabulky Plán byl úspěšně aktivován! Každý nově vytvořený, přeplánovaný nebo potvrzený úkol se nyní automaticky propíše i do sdílené tabulky.
+        </div>
+      )}
 
       {syncNotice && (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-bold text-emerald-800 shadow-sm flex items-center justify-between">

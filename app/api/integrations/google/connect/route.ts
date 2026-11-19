@@ -17,9 +17,10 @@ export async function GET(request: Request) {
     const provider = requestedProvider === 'GMAIL' ? 'GMAIL' : 'GOOGLE_DRIVE';
     const context = provider === 'GMAIL'
       ? await requireOrganizationRole('ADMIN', 'MANAGER', 'SALES')
-      : await requireOrganizationRole('ADMIN');
+      : await requireOrganizationRole('ADMIN', 'MANAGER');
     const gmailSend = provider === 'GMAIL' && url.searchParams.get('send') === 'true';
-    const returnTo = url.searchParams.get('returnTo') === '/ai-inbox' ? '/ai-inbox' : '';
+    const rawReturnTo = url.searchParams.get('returnTo');
+    const returnTo = rawReturnTo === '/ai-inbox' || rawReturnTo === '/work' ? rawReturnTo : '';
     if (gmailSend && context.organizationId === 'org_seepoint_default') {
       return NextResponse.json({ error: 'SeePoint používá stávající odesílací konfiguraci. Nové tenantové odesílání ji nemění.' }, { status: 409 });
     }

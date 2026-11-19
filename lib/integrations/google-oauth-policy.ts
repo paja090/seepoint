@@ -5,6 +5,7 @@ const ALLOWED_GOOGLE_DRIVE_TOKEN_SCOPES = new Set([
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
   'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/spreadsheets',
 ]);
 
 const ALLOWED_GMAIL_TOKEN_SCOPES = new Set([

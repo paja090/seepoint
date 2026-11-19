@@ -1,9 +1,9 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { IntegrationProvider } from '@prisma/client';
-import { getAppUrl } from '@/lib/app-url';
-import { prisma } from '@/lib/db';
-import { getTenantContext, requireTenantContext } from '@/lib/tenant-context';
-import { resolveRequestTenantContext } from '@/lib/tenant-request-context';
+import { getAppUrl } from '../app-url';
+import { prisma } from '../db';
+import { getTenantContext, requireTenantContext } from '../tenant-context';
+import { resolveRequestTenantContext } from '../tenant-request-context';
 import { decryptIntegrationSecret, encryptIntegrationSecret } from './integration-crypto';
 
 export const GOOGLE_OAUTH_STATE_COOKIE = 'seepoint_google_oauth_state';
@@ -11,10 +11,17 @@ export const GOOGLE_OAUTH_VERIFIER_COOKIE = 'seepoint_google_oauth_verifier';
 
 type GoogleCredentials = { refreshToken: string };
 
-export async function connectedGoogleAccessToken(provider: IntegrationProvider, connectionId?: string) {
-  const context = getTenantContext() ?? await resolveRequestTenantContext();
-  if (!context) throw new Error('Pro přístup k připojení je vyžadována organizace.');
-  const { organizationId } = context;
+export async function connectedGoogleAccessToken(
+  provider: IntegrationProvider,
+  connectionId?: string,
+  explicitOrganizationId?: string
+) {
+  let organizationId = explicitOrganizationId;
+  if (!organizationId) {
+    const context = getTenantContext() ?? await resolveRequestTenantContext();
+    if (!context) throw new Error('Pro přístup k připojení je vyžadována organizace.');
+    organizationId = context.organizationId;
+  }
   const connection = await prisma.integrationConnection.findFirst({
     where: { organizationId, provider, ...(connectionId ? { id: connectionId } : {}) },
     select: { id: true, status: true, credentialsEncrypted: true, provider: true },
@@ -122,7 +129,7 @@ export function googleOAuthRedirectUri(request: Request) {
 
 export function googleScopes(provider: IntegrationProvider, gmailSend = false) {
   if (provider === 'GOOGLE_DRIVE') {
-    return ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/drive.file'];
+    return ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/spreadsheets'];
   }
   if (provider === 'GMAIL') {
     return ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/gmail.readonly', ...(gmailSend ? ['https://www.googleapis.com/auth/gmail.send'] : [])];
