@@ -25,6 +25,7 @@ import {
   Calendar,
   Maximize2,
   Eye,
+  Package,
 } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { canDownloadInstallationSheet, canDownloadOfferPdf } from '@/lib/offers/navigation-document-access';
@@ -749,6 +750,31 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
             >
               <ClipboardList size={18} className="text-amber-400" /> Montážní list
             </a> : null}
+
+            {(isInternalOfferPage && offer.id) || effectiveProposalKey ? (() => {
+              const hasSubset = selectedPointIds.length > 0 && selectedPointIds.length < navigation.points.length;
+              const baseExportUrl =
+                isInternalOfferPage && offer.id
+                  ? `/api/offers/${encodeURIComponent(offer.id)}/navigation-export-zip`
+                  : `/api/proposals/${encodeURIComponent(effectiveProposalKey!)}/navigation-export-zip`;
+              const exportHref = hasSubset
+                ? `${baseExportUrl}?pointIds=${encodeURIComponent(selectedPointIds.join(','))}`
+                : baseExportUrl;
+              return (
+                <a
+                  href={exportHref}
+                  className="inline-flex items-center gap-2.5 rounded-2xl border border-emerald-400/50 bg-emerald-600 px-4 py-3.5 text-xs font-black text-white shadow-lg hover:bg-emerald-500 transition cursor-pointer shrink-0"
+                  title="Stáhnout ZIP balíček pro agenturu / klienta: vizualizace pojmenované P01, P02… + mapa pozic (PNG, PDF, KMZ, KML, GeoJSON, HTML) + Excel/CSV/JSON"
+                >
+                  <Package size={17} />
+                  <span>
+                    {hasSubset
+                      ? `Export pro agenturu – vybrané (${selectedPointIds.length}) ZIP`
+                      : 'Export pro agenturu (ZIP: fotky + mapa)'}
+                  </span>
+                </a>
+              );
+            })() : null}
           </div>
         </div>
       </div>
