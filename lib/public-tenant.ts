@@ -106,6 +106,15 @@ export async function enterPublicCampaignAlbumTenant(slug: string) {
   return campaign;
 }
 
+async function findActiveOrganization(organizationId: string) {
+  const organization = await platformPrisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { id: true, isActive: true },
+  });
+  if (!organization || organization.isActive === false) return null;
+  return organization;
+}
+
 export async function enterPublicSurfaceAlbumTenant(slug: string) {
   if (!slug || typeof slug !== 'string') return null;
   const clean = slug.trim();
@@ -113,14 +122,25 @@ export async function enterPublicSurfaceAlbumTenant(slug: string) {
   const verified = verifySurfaceAlbumSlug(clean);
   if (!verified) return null;
 
-  const organization = await platformPrisma.organization.findUnique({
-    where: { id: verified.organizationId },
-    select: { id: true, isActive: true },
-  });
-
-  if (!organization || organization.isActive === false) return null;
+  const organization = await findActiveOrganization(verified.organizationId);
+  if (!organization) return null;
 
   enterTenantContext({ organizationId: organization.id, source: 'public-token' });
   return { organizationId: organization.id, clientName: verified.clientName };
 }
+
+export async function enterPublicWorkOrderAlbumTenant(slug: string) {
+  if (!slug || typeof slug !== 'string') return null;
+  const clean = slug.trim();
+  const { verifyWorkOrderAlbumSlug } = await import('@/lib/election-removal/album-token');
+  const verified = verifyWorkOrderAlbumSlug(clean);
+  if (!verified) return null;
+
+  const organization = await findActiveOrganization(verified.organizationId);
+  if (!organization) return null;
+
+  enterTenantContext({ organizationId: organization.id, source: 'public-token' });
+  return { organizationId: organization.id, workOrderId: verified.workOrderId };
+}
+
 

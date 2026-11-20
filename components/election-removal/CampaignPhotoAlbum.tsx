@@ -23,9 +23,11 @@ import {
   Trash2,
   Loader2,
   Image as ImageIcon,
+  FolderUp,
 } from 'lucide-react';
 import { compressImageFile } from '@/lib/image-compress';
 import { PhotoAlbumShareModal } from '@/components/fotodokumentace/PhotoAlbumShareModal';
+import { ExportToDriveModal } from '@/components/fotodokumentace/ExportToDriveModal';
 
 export interface InternalPhotoItem {
   id: string;
@@ -61,6 +63,11 @@ export interface CampaignPhotoAlbumProps {
   publicShareUrl?: string;
   downloadZipUrl?: string;
   createdAt?: string | Date;
+  albumSource?: string;
+  workOrderId?: string | null;
+  defaultDriveFolderUrl?: string | null;
+  driveExportedCount?: number;
+  driveLastFolderUrl?: string | null;
   onPhotosUpdated?: (campaignId: string, updatedPoints: InternalPointWithPhotos[]) => void;
 }
 
@@ -106,6 +113,11 @@ export function CampaignPhotoAlbum({
   publicShareUrl,
   downloadZipUrl,
   createdAt,
+  albumSource,
+  workOrderId,
+  defaultDriveFolderUrl,
+  driveExportedCount,
+  driveLastFolderUrl,
   onPhotosUpdated,
 }: CampaignPhotoAlbumProps) {
   const [pointsState, setPointsState] = useState<InternalPointWithPhotos[]>(points);
@@ -129,8 +141,9 @@ export function CampaignPhotoAlbum({
   const [nameInput, setNameInput] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
 
-  // Share Modal & Toast state
+  // Share & Google Drive Export Modal & Toast state
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showDriveExportModal, setShowDriveExportModal] = useState(false);
   const [shareToast, setShareToast] = useState<string | null>(null);
 
   // Extract all available periods across all photos
@@ -565,6 +578,19 @@ export function CampaignPhotoAlbum({
                   {`Stáhnout ZIP (${flatPhotosWithPoint.length})`}
                 </span>
               </AlbumZipDownload>
+
+              <button
+                type="button"
+                onClick={() => setShowDriveExportModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition text-xs font-bold shadow-xs"
+                title="Odeslat fotografie z tohoto alba do složky na Google Disku"
+              >
+                <FolderUp className="w-4 h-4" />
+                <span>
+                  Odeslat na Google Disk
+                  {driveExportedCount && driveExportedCount > 0 ? ` (${driveExportedCount})` : ''}
+                </span>
+              </button>
             </>
           )}
         </div>
@@ -1176,6 +1202,25 @@ export function CampaignPhotoAlbum({
           photosCount: totalPhotosCount,
           publicShareUrl: clientShareUrl,
           sourceLabel: 'Fotoalbum zakázky',
+        }}
+      />
+
+      {/* Export to Google Drive Modal */}
+      <ExportToDriveModal
+        isOpen={showDriveExportModal}
+        onClose={() => setShowDriveExportModal(false)}
+        title={campaignName || (clientName ? `${clientName} — Fotoalbum` : 'Fotoalbum zakázky')}
+        clientName={selectedClient !== 'ALL' ? selectedClient : clientName}
+        photosCount={flatPhotosWithPoint.length}
+        photoIds={flatPhotosWithPoint.map(({ photo }) => photo.id)}
+        workOrderId={workOrderId}
+        albumId={campaignId}
+        source={albumSource}
+        defaultTargetUrl={defaultDriveFolderUrl}
+        lastExportedFolderUrl={driveLastFolderUrl}
+        onExported={(res) => {
+          setShareToast(`✅ ${res.message}`);
+          setTimeout(() => setShareToast(null), 5000);
         }}
       />
 

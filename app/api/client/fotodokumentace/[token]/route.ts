@@ -1,7 +1,11 @@
-import { readAlbumTitle, campaignAlbumKey, surfaceAlbumKey } from '@/lib/fotodokumentace/album-title';
+import { readAlbumTitle, campaignAlbumKey, surfaceAlbumKey, workOrderAlbumKey } from '@/lib/fotodokumentace/album-title';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { enterPublicCampaignAlbumTenant, enterPublicSurfaceAlbumTenant } from '@/lib/public-tenant';
+import {
+  enterPublicCampaignAlbumTenant,
+  enterPublicSurfaceAlbumTenant,
+  enterPublicWorkOrderAlbumTenant,
+} from '@/lib/public-tenant';
 import { runWithTenantContext } from '@/lib/tenant-context';
 
 export const runtime = 'nodejs';
@@ -16,6 +20,117 @@ export async function GET(
     const url = new URL(req.url);
     const monthFilter = url.searchParams.get('month'); // "2026-10"
     const typeFilter = url.searchParams.get('type'); // "INSTALLATION", "DEINSTALLATION", etc.
+
+    if (token.startsWith('workorder.')) {
+      const woMeta = await enterPublicWorkOrderAlbumTenant(token);
+      if (!woMeta) {
+        return NextResponse.json({ error: 'Fotodokumentace nebyla nalezena.' }, { status: 404 });
+      }
+
+      const workOrder = await runWithTenantContext(
+        { organizationId: woMeta.organizationId, source: 'public-token' },
+        () =>
+          prisma.workOrder.findFirst({
+            where: { id: woMeta.workOrderId, organizationId: woMeta.organizationId },
+            include: {
+              items: {
+                include: {
+                  carrier: true,
+                  surface: true,
+                  photos: {
+                    where: { isPrivate: false },
+                    select: {
+                      id: true,
+                      type: true,
+                      fileName: true,
+                      mimeType: true,
+                      size: true,
+                      createdAt: true,
+                      capturedLatitude: true,
+                      capturedLongitude: true,
+                      capturedByWorkerName: true,
+                      fieldWorkStepId: true,
+                    },
+                    orderBy: { createdAt: 'desc' },
+                  },
+                },
+                orderBy: { createdAt: 'asc' },
+              },
+            },
+          })
+      );
+
+      if (!workOrder) {
+        return NextResponse.json({ error: 'Fotodokumentace nebyla nalezena.' }, { status: 404 });
+      }
+
+      const periodsSet = new Set<string>();
+      for (const item of workOrder.items) {
+        for (const photo of item.photos) {
+          const d = new Date(photo.createdAt);
+          if (!Number.isNaN(d.getTime())) {
+            periodsSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+          }
+        }
+      }
+      const availablePeriods = Array.from(periodsSet).sort().reverse();
+
+      const points = workOrder.items.map((it) => {
+        const filteredPhotos = it.photos.filter((photo) => {
+          if (monthFilter) {
+            const d = new Date(photo.createdAt);
+            const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            if (ym !== monthFilter) return false;
+          }
+          if (typeFilter && photo.type !== typeFilter) return false;
+          return true;
+        });
+
+        const carrierLat = it.carrier?.latitude != null && !Number.isNaN(Number(it.carrier.latitude)) && Number(it.carrier.latitude) !== 0 ? Number(it.carrier.latitude) : null;
+        const carrierLng = it.carrier?.longitude != null && !Number.isNaN(Number(it.carrier.longitude)) && Number(it.carrier.longitude) !== 0 ? Number(it.carrier.longitude) : null;
+        const photoWithGps = it.photos.find(
+          (ph) => ph.capturedLatitude != null && ph.capturedLongitude != null && (ph.capturedLatitude !== 0 || ph.capturedLongitude !== 0)
+        );
+        return {
+          id: it.id,
+          label: it.carrier
+            ? `${it.carrier.code} · ${it.surface?.name || it.description || workOrder.title}`
+            : (it.description || workOrder.title),
+          description: [workOrder.locationNote, workOrder.mediaLabel, workOrder.description].filter(Boolean).join(' · ') || null,
+          mediaType: workOrder.mediaLabel || 'REALIZATION',
+          objectType: 'REALIZACE',
+          quantity: it.quantity || workOrder.quantity || 1,
+          latitude: carrierLat ?? (photoWithGps?.capturedLatitude ? Number(photoWithGps.capturedLatitude) : 0),
+          longitude: carrierLng ?? (photoWithGps?.capturedLongitude ? Number(photoWithGps.capturedLongitude) : 0),
+          operationType: workOrder.workType === 'DEINSTALLATION' ? 'REMOVAL' : workOrder.workType === 'CHECK' ? 'INSPECTION' : 'INSTALLATION',
+          photos: filteredPhotos.map((ph) => ({
+            ...ph,
+            url: `/api/client/fotodokumentace/${encodeURIComponent(token)}/photos/${encodeURIComponent(ph.id)}`,
+          })),
+          steps: [],
+        };
+      });
+
+      const totalPhotos = workOrder.items.reduce((sum, it) => sum + it.photos.length, 0);
+      return NextResponse.json({
+        success: true,
+        campaign: {
+          id: workOrder.id,
+          name: await readAlbumTitle(woMeta.organizationId, workOrderAlbumKey(workOrder.id), workOrder.title),
+          clientName: workOrder.clientName,
+          description: workOrder.description,
+          targetDate: workOrder.scheduledAt,
+          totalPoints: points.length,
+          completedPoints: points.filter((p) => p.photos.length > 0).length,
+        },
+        stats: {
+          totalRealizedPoints: points.filter((p) => p.photos.length > 0).length,
+          totalPhotos,
+          availablePeriods,
+        },
+        points,
+      });
+    }
 
     if (token.startsWith('surface.')) {
       const surfaceMeta = await enterPublicSurfaceAlbumTenant(token);

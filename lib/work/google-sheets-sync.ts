@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { Prisma, WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
 import { syncWorkOrderTasks } from '@/lib/work-task-sync';
 import { resolvePersonAliasDisplay } from '@/lib/planner/work-projection';
+import { isWorkOrderEligibleForPhotoApp } from '@/lib/work/photo-folder';
 
 export const DEFAULT_GOOGLE_PLAN_SHEET_CSV_URL =
   process.env.GOOGLE_PLAN_SHEET_CSV_URL ||
@@ -980,6 +981,21 @@ export async function syncGooglePlanToWorkOrders(
       });
     } else {
       // Create new work order
+      const shouldCreatePhotoItem = isWorkOrderEligibleForPhotoApp({
+        id: 'new',
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        workType: task.workType,
+        ftdUrl: task.ftdUrl,
+        mediaLabel: task.mediaLabel,
+        planningConstraints: {
+          source: 'GOOGLE_SHEETS_PLAN',
+          ftdSkipped: Boolean(task.isFtdSkipped),
+        },
+        hasCarrierItems: false,
+      });
+
       const created = await client.workOrder.create({
         data: {
           organizationId,
@@ -1015,6 +1031,17 @@ export async function syncGooglePlanToWorkOrders(
               workerName,
             })),
           },
+          ...(shouldCreatePhotoItem
+            ? {
+                items: {
+                  create: {
+                    organizationId,
+                    description: task.title,
+                    quantity: task.quantity || 1,
+                  },
+                },
+              }
+            : {}),
         },
       });
       matchedOrderIds.add(created.id);

@@ -1,7 +1,11 @@
 import { readZipSelection } from '@/lib/fotodokumentace/zip-selection';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { enterPublicCampaignAlbumTenant, enterPublicSurfaceAlbumTenant } from '@/lib/public-tenant';
+import {
+  enterPublicCampaignAlbumTenant,
+  enterPublicSurfaceAlbumTenant,
+  enterPublicWorkOrderAlbumTenant,
+} from '@/lib/public-tenant';
 import { runWithTenantContext } from '@/lib/tenant-context';
 import { resolvePointClientName } from '@/lib/election-removal/point-metadata';
 import { downloadPhotoFromGoogleDrive } from '@/lib/google-drive';
@@ -110,6 +114,104 @@ export async function GET(
     const typeFilter = url.searchParams.get('type');
     const clientFilter = url.searchParams.get('client')?.trim() || null;
     const photoIdSet = await readZipSelection(req);
+
+    if (token.startsWith('workorder.')) {
+      const woMeta = await enterPublicWorkOrderAlbumTenant(token);
+      if (!woMeta) {
+        return NextResponse.json({ error: 'Album nebylo nalezeno.' }, { status: 404 });
+      }
+
+      const workOrder = await runWithTenantContext(
+        { organizationId: woMeta.organizationId, source: 'public-token' },
+        () =>
+          prisma.workOrder.findFirst({
+            where: { id: woMeta.workOrderId, organizationId: woMeta.organizationId },
+            include: {
+              items: {
+                include: {
+                  carrier: true,
+                  surface: true,
+                  photos: {
+                    where: { isPrivate: false },
+                    orderBy: { createdAt: 'desc' },
+                  },
+                },
+                orderBy: { createdAt: 'asc' },
+              },
+            },
+          })
+      );
+
+      if (!workOrder) {
+        return NextResponse.json({ error: 'Album nebylo nalezeno.' }, { status: 404 });
+      }
+
+      const zipFiles: Array<{ name: string; data: Buffer }> = [];
+      let fileIndex = 1;
+
+      for (const item of workOrder.items) {
+        for (const photo of item.photos) {
+          if (photoIdSet && !photoIdSet.has(photo.id)) continue;
+
+          if (monthFilter) {
+            const d = new Date(photo.createdAt);
+            const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            if (ym !== monthFilter) continue;
+          }
+
+          let photoBuffer: Buffer | null = null;
+          if (photo.content && photo.content.length > 0) {
+            photoBuffer = Buffer.from(photo.content);
+          } else if (photo.url && photo.url.startsWith('data:')) {
+            const match = photo.url.match(/^data:([^;]+);base64,(.+)$/);
+            if (match) photoBuffer = Buffer.from(match[2], 'base64');
+          } else {
+            const file = await readStoredPhoto(photo);
+            if (file?.body) {
+              if (Buffer.isBuffer(file.body)) photoBuffer = file.body;
+              else if (file.body instanceof ArrayBuffer) photoBuffer = Buffer.from(file.body);
+              else if (file.body instanceof Uint8Array) photoBuffer = Buffer.from(file.body);
+              else photoBuffer = Buffer.from(await new Response(file.body as BodyInit).arrayBuffer());
+            } else if (photo.driveFileId) {
+              try {
+                const driveRes = await downloadPhotoFromGoogleDrive(photo.driveFileId);
+                if (driveRes.ok && driveRes.body) {
+                  photoBuffer = Buffer.from(await driveRes.arrayBuffer());
+                }
+              } catch {
+                // ignore individual photo fetch error
+              }
+            }
+          }
+
+          if (!photoBuffer || photoBuffer.length === 0) continue;
+
+          const orderPrefix = String(fileIndex++).padStart(2, '0');
+          const cleanLabel = sanitizeFileName(item.carrier?.code || item.description || workOrder.title || 'realizace');
+          const cleanName = `${orderPrefix}_${cleanLabel}.jpg`;
+          zipFiles.push({ name: cleanName, data: photoBuffer });
+        }
+      }
+
+      if (zipFiles.length === 0) {
+        return NextResponse.json({ error: 'Nebyly nalezeny žádné fotografie pro vybrané období.' }, { status: 404 });
+      }
+
+      const zipBuffer = buildZipArchive(zipFiles);
+      const safeTitle = sanitizeFileName(workOrder.title || 'Realizace');
+      const periodSlug = monthFilter ? `-${monthFilter}` : '';
+      const filename = `Fotodokumentace-${safeTitle}${periodSlug}.zip`;
+
+      return new Response(new Uint8Array(zipBuffer), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/zip',
+          'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+          'Cache-Control': 'private, no-store',
+          'Content-Length': String(zipBuffer.length),
+        },
+      });
+    }
 
     if (token.startsWith('surface.')) {
       const surfaceMeta = await enterPublicSurfaceAlbumTenant(token);

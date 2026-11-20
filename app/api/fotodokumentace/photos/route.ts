@@ -56,57 +56,141 @@ export async function POST(req: Request) {
     let surfaceId: string | null = null;
     let electionRemovalPointId: string | null = null;
     let navigationDocumentationItemId: string | null = null;
+    let workOrderItemId: string | null = null;
+    let resolvedWorkOrderId: string | null = null;
 
-    // Check if pointId is ElectionRemovalPoint
+    // Check if pointId is ElectionRemovalPoint, AdvertisingSurface, NavigationDocumentationItem, or WorkOrderItem
     if (pointId) {
-      const electionPoint = await prisma.electionRemovalPoint.findFirst({
-        where: { id: pointId, organizationId },
-        select: { id: true, carrierId: true, surfaceId: true },
-      });
-      if (electionPoint) {
-        electionRemovalPointId = electionPoint.id;
-        carrierId = electionPoint.carrierId;
-        surfaceId = electionPoint.surfaceId;
+      if (pointId.startsWith('wo-item-placeholder::')) {
+        const placeholderWoId = pointId.replace('wo-item-placeholder::', '').trim();
+        if (placeholderWoId) {
+          const wo = await prisma.workOrder.findFirst({
+            where: { id: placeholderWoId, organizationId },
+            select: { id: true, title: true, quantity: true, status: true },
+          });
+          if (wo) {
+            resolvedWorkOrderId = wo.id;
+            const existingItem = await prisma.workOrderItem.findFirst({
+              where: { workOrderId: wo.id, organizationId },
+              select: { id: true, carrierId: true, surfaceId: true },
+              orderBy: { createdAt: 'asc' },
+            });
+            if (existingItem) {
+              workOrderItemId = existingItem.id;
+              carrierId = existingItem.carrierId;
+              surfaceId = existingItem.surfaceId;
+            } else {
+              const createdItem = await prisma.workOrderItem.create({
+                data: {
+                  organizationId,
+                  workOrderId: wo.id,
+                  description: wo.title,
+                  quantity: wo.quantity || 1,
+                },
+                select: { id: true },
+              });
+              workOrderItemId = createdItem.id;
+            }
+          }
+        }
       } else {
-        // Check if surface
-        const cleanSurfaceId = pointId.startsWith('surface-') ? pointId.replace('surface-', '') : pointId;
-        const surf = await prisma.advertisingSurface.findFirst({
-          where: { id: cleanSurfaceId, organizationId },
-          select: { id: true, carrierId: true },
+        const electionPoint = await prisma.electionRemovalPoint.findFirst({
+          where: { id: pointId, organizationId },
+          select: { id: true, carrierId: true, surfaceId: true },
         });
-        if (surf) {
-          surfaceId = surf.id;
-          carrierId = surf.carrierId;
+        if (electionPoint) {
+          electionRemovalPointId = electionPoint.id;
+          carrierId = electionPoint.carrierId;
+          surfaceId = electionPoint.surfaceId;
         } else {
-          // Check if navigation item
-          const navItem = await prisma.navigationDocumentationItem.findFirst({
-            where: { id: pointId, organizationId },
+          // Check if surface
+          const cleanSurfaceId = pointId.startsWith('surface-') ? pointId.replace('surface-', '') : pointId;
+          const surf = await prisma.advertisingSurface.findFirst({
+            where: { id: cleanSurfaceId, organizationId },
             select: { id: true, carrierId: true },
           });
-          if (navItem) {
-            navigationDocumentationItemId = navItem.id;
-            carrierId = navItem.carrierId;
+          if (surf) {
+            surfaceId = surf.id;
+            carrierId = surf.carrierId;
+          } else {
+            // Check if navigation item
+            const navItem = await prisma.navigationDocumentationItem.findFirst({
+              where: { id: pointId, organizationId },
+              select: { id: true, carrierId: true },
+            });
+            if (navItem) {
+              navigationDocumentationItemId = navItem.id;
+              carrierId = navItem.carrierId;
+            } else {
+              // Check if WorkOrderItem
+              const woItem = await prisma.workOrderItem.findFirst({
+                where: { id: pointId, organizationId },
+                select: { id: true, workOrderId: true, carrierId: true, surfaceId: true },
+              });
+              if (woItem) {
+                workOrderItemId = woItem.id;
+                resolvedWorkOrderId = woItem.workOrderId;
+                carrierId = woItem.carrierId;
+                surfaceId = woItem.surfaceId;
+              }
+            }
           }
         }
       }
     }
 
     // If pointId wasn't matched or wasn't provided, try resolving from albumId
-    if (!electionRemovalPointId && !surfaceId && !navigationDocumentationItemId && albumId) {
-      const cleanCampaignId = albumId.includes('::client::') ? albumId.split('::client::')[0] : albumId;
-      const campaign = await prisma.electionCampaign.findFirst({
-        where: { id: cleanCampaignId, organizationId },
-        select: {
-          points: {
-            take: 1,
-            select: { id: true, carrierId: true, surfaceId: true },
+    if (!electionRemovalPointId && !surfaceId && !navigationDocumentationItemId && !workOrderItemId && albumId) {
+      if (albumId.startsWith('wo::')) {
+        const cleanWoId = albumId.replace(/^wo::/, '').trim();
+        const wo = await prisma.workOrder.findFirst({
+          where: { id: cleanWoId, organizationId },
+          select: {
+            id: true,
+            title: true,
+            quantity: true,
+            items: {
+              take: 1,
+              orderBy: { createdAt: 'asc' },
+              select: { id: true, carrierId: true, surfaceId: true },
+            },
           },
-        },
-      });
-      if (campaign && campaign.points.length > 0) {
-        electionRemovalPointId = campaign.points[0].id;
-        carrierId = campaign.points[0].carrierId;
-        surfaceId = campaign.points[0].surfaceId;
+        });
+        if (wo) {
+          resolvedWorkOrderId = wo.id;
+          if (wo.items.length > 0) {
+            workOrderItemId = wo.items[0].id;
+            carrierId = wo.items[0].carrierId;
+            surfaceId = wo.items[0].surfaceId;
+          } else {
+            const createdItem = await prisma.workOrderItem.create({
+              data: {
+                organizationId,
+                workOrderId: wo.id,
+                description: wo.title,
+                quantity: wo.quantity || 1,
+              },
+              select: { id: true },
+            });
+            workOrderItemId = createdItem.id;
+          }
+        }
+      } else {
+        const cleanCampaignId = albumId.includes('::client::') ? albumId.split('::client::')[0] : albumId;
+        const campaign = await prisma.electionCampaign.findFirst({
+          where: { id: cleanCampaignId, organizationId },
+          select: {
+            points: {
+              take: 1,
+              select: { id: true, carrierId: true, surfaceId: true },
+            },
+          },
+        });
+        if (campaign && campaign.points.length > 0) {
+          electionRemovalPointId = campaign.points[0].id;
+          carrierId = campaign.points[0].carrierId;
+          surfaceId = campaign.points[0].surfaceId;
+        }
       }
     }
 
@@ -121,6 +205,7 @@ export async function POST(req: Request) {
         carrierId,
         surfaceId,
         electionRemovalPointId,
+        workOrderItemId,
         type: photoType,
         url: `/api/photos/${photoId}/file`,
         fileName,
@@ -142,6 +227,13 @@ export async function POST(req: Request) {
       },
     });
 
+    if (resolvedWorkOrderId) {
+      await prisma.workOrder.updateMany({
+        where: { id: resolvedWorkOrderId, organizationId, status: { in: ['NEW', 'PLANNED'] } },
+        data: { status: 'IN_PROGRESS' },
+      });
+    }
+
     return NextResponse.json({
       ok: true,
       photo: {
@@ -151,7 +243,11 @@ export async function POST(req: Request) {
         fileName: created.fileName,
         createdAt: created.createdAt.toISOString(),
         capturedByWorkerName: created.capturedByWorkerName,
-        pointId: electionRemovalPointId || (surfaceId ? `surface-${surfaceId}` : null) || navigationDocumentationItemId,
+        pointId:
+          electionRemovalPointId ||
+          workOrderItemId ||
+          (surfaceId ? `surface-${surfaceId}` : null) ||
+          navigationDocumentationItemId,
       },
       warning: stored.warning,
     });

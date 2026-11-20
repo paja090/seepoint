@@ -10,6 +10,8 @@ import { requirePageAccess } from '@/lib/page-auth';
 import { WorkOrderActions } from '@/components/WorkOrderActions';
 import { WorkOrderEditForm } from '@/components/WorkOrderEditForm';
 import { WorkOrderAcknowledgeButton } from '@/components/WorkOrderAcknowledgeButton';
+import { WorkOrderPhotosDriveBar } from '@/components/work/WorkOrderPhotosDriveBar';
+import { isWorkOrderEligibleForPhotoApp, readWorkOrderDriveExports } from '@/lib/work/photo-folder';
 import { prisma, ensureWorkOrderSchema } from '@/lib/db';
 import {
   extractWorkOrderConstraintFlags,
@@ -81,7 +83,24 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
         client: true,
         assignments: true,
         workTasks: { include: { assignedTo: true } },
-        items: { include: { carrier: true, surface: true, crmRealization: true } },
+        items: {
+          include: {
+            carrier: true,
+            surface: true,
+            crmRealization: true,
+            photos: {
+              where: { isPrivate: false },
+              orderBy: { createdAt: 'desc' },
+              select: {
+                id: true,
+                fileName: true,
+                type: true,
+                createdAt: true,
+                capturedByWorkerName: true,
+              },
+            },
+          },
+        },
         navigationOrder: {
           include: {
             targets: true,
@@ -437,6 +456,47 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
                 </div>
               )}
             </section>
+
+            {/* Fotodokumentace realizace & Export do složky na Google Disku */}
+            {(() => {
+              const workOrderPhotos = order.items.flatMap((it) =>
+                it.photos.map((ph) => ({
+                  id: ph.id,
+                  fileName: ph.fileName,
+                  type: ph.type,
+                  createdAt: ph.createdAt.toISOString(),
+                  capturedByWorkerName: ph.capturedByWorkerName,
+                }))
+              );
+              const driveMeta = readWorkOrderDriveExports(order.planningConstraints);
+              const eligible = isWorkOrderEligibleForPhotoApp({
+                id: order.id,
+                title: order.title,
+                description: order.description,
+                status: order.status,
+                workType: order.workType,
+                ftdUrl: order.ftdUrl,
+                mediaLabel: order.mediaLabel,
+                locationNote: order.locationNote,
+                crmOrderId: order.crmOrderId,
+                navigationOrderId: order.navigationOrderId,
+                planningConstraints: order.planningConstraints,
+                hasCarrierItems: order.items.some((it) => Boolean(it.carrierId)),
+              });
+              if (!eligible && workOrderPhotos.length === 0 && !order.ftdUrl) return null;
+              return (
+                <WorkOrderPhotosDriveBar
+                  workOrderId={order.id}
+                  title={order.title}
+                  clientName={order.client?.name || order.clientName}
+                  ftdUrl={order.ftdUrl}
+                  photos={workOrderPhotos}
+                  exportedCount={Object.keys(driveMeta.photos).length}
+                  lastExportedFolderUrl={driveMeta.lastFolderUrl || null}
+                  isEligibleForPhotoApp={eligible}
+                />
+              );
+            })()}
 
             {/* Field Dispatch & Route Integration */}
             <WorkOrderDispatchCard

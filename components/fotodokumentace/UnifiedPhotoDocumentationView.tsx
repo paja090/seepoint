@@ -23,6 +23,7 @@ import {
   Image as ImageIcon,
   Trash2,
   Loader2,
+  FolderUp,
 } from 'lucide-react';
 import {
   CampaignPhotoAlbum,
@@ -30,10 +31,11 @@ import {
 } from '@/components/election-removal/CampaignPhotoAlbum';
 import { AlbumTitleEditor } from './AlbumTitleEditor';
 import { PhotoAlbumShareModal } from './PhotoAlbumShareModal';
+import { ExportToDriveModal } from './ExportToDriveModal';
 
 export interface UnifiedAlbumItem {
   id: string;
-  source: 'FIELD_WORK' | 'NAVIGATION';
+  source: 'FIELD_WORK' | 'NAVIGATION' | 'WORK_ORDER';
   sourceLabel: string;
   title: string;
   displayTitle?: string;
@@ -55,6 +57,10 @@ export interface UnifiedAlbumItem {
   points: InternalPointWithPhotos[];
   latestPhotoAt?: string | Date | null;
   isDraft?: boolean;
+  workOrderId?: string | null;
+  ftdUrl?: string | null;
+  driveExportedCount?: number;
+  driveLastFolderUrl?: string | null;
 }
 
 export interface RecentPhotoItem {
@@ -96,8 +102,10 @@ export function UnifiedPhotoDocumentationView({
   }, [albums]);
 
   const [activeTab, setActiveTab] = useState<'ALBUMS' | 'FEED' | 'MAP'>('ALBUMS');
-  const [sourceFilter, setSourceFilter] = useState<'ALL' | 'FIELD_WORK' | 'NAVIGATION'>(
-    initialSource === 'FIELD_WORK'
+  const [sourceFilter, setSourceFilter] = useState<'ALL' | 'WORK_ORDER' | 'FIELD_WORK' | 'NAVIGATION'>(
+    initialSource === 'WORK_ORDER'
+      ? 'WORK_ORDER'
+      : initialSource === 'FIELD_WORK'
       ? 'FIELD_WORK'
       : initialSource === 'NAVIGATION'
       ? 'NAVIGATION'
@@ -111,6 +119,7 @@ export function UnifiedPhotoDocumentationView({
   const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(initialAlbumId || null);
   const [lightboxPhoto, setLightboxPhoto] = useState<RecentPhotoItem | null>(null);
   const [sharingAlbum, setSharingAlbum] = useState<UnifiedAlbumItem | null>(null);
+  const [exportingAlbum, setExportingAlbum] = useState<UnifiedAlbumItem | null>(null);
 
   // Available filter options dynamically extracted from albums
   const availableYears = useMemo(() => {
@@ -582,6 +591,17 @@ export function UnifiedPhotoDocumentationView({
           <Share2 className="w-4 h-4 text-sky-600" />
         </button>
 
+        {album.photosCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setExportingAlbum(album)}
+            title="Odeslat fotografie do složky na Google Disku"
+            className="p-2 rounded-xl border border-emerald-200 bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 transition"
+          >
+            <FolderUp className="w-4 h-4" />
+          </button>
+        )}
+
         <AlbumZipDownload
           action={album.downloadZipUrl}
           ids={album.points.flatMap(point => point.photos.map(photo => photo.id))}
@@ -699,9 +719,9 @@ export function UnifiedPhotoDocumentationView({
         </div>
 
         {/* Global Source Filter */}
-        <div className="flex items-center gap-1.5 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
+        <div className="flex flex-wrap items-center gap-1.5 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
           <span className="text-[11px] font-semibold text-slate-400 pl-1">Zdroj:</span>
-          {(['ALL', 'FIELD_WORK', 'NAVIGATION'] as const).map((sourceKey) => (
+          {(['ALL', 'WORK_ORDER', 'FIELD_WORK', 'NAVIGATION'] as const).map((sourceKey) => (
             <button
               key={sourceKey}
               type="button"
@@ -714,6 +734,8 @@ export function UnifiedPhotoDocumentationView({
             >
               {sourceKey === 'ALL'
                 ? 'Vše'
+                : sourceKey === 'WORK_ORDER'
+                ? 'Plán práce'
                 : sourceKey === 'FIELD_WORK'
                 ? 'Terénní práce'
                 : 'Navigace VO'}
@@ -881,13 +903,21 @@ export function UnifiedPhotoDocumentationView({
                   <span>Zpět na přehled všech alb</span>
                 </button>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs font-semibold text-slate-500">
                     Zdroj: <strong className="text-slate-800">{activeAlbum.sourceLabel}</strong>
                   </span>
-                  {activeAlbum.source === 'FIELD_WORK' && (
+                  {activeAlbum.source === 'WORK_ORDER' && activeAlbum.workOrderId && (
                     <Link
-                      href={`/election-removal/${activeAlbum.id}`}
+                      href={`/work/${activeAlbum.workOrderId}`}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900 underline"
+                    >
+                      Detail v Plánu práce →
+                    </Link>
+                  )}
+                  {activeAlbum.source === 'FIELD_WORK' && !activeAlbum.id.startsWith('carrier-surfaces::') && (
+                    <Link
+                      href={`/election-removal/${activeAlbum.id.split('::client::')[0]}`}
                       className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-sky-700 underline"
                     >
                       Detail zakázky →
@@ -900,6 +930,17 @@ export function UnifiedPhotoDocumentationView({
                     >
                       Správa reportů →
                     </Link>
+                  )}
+                  {activeAlbum.photosCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setExportingAlbum(activeAlbum)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold transition shadow-xs"
+                      title="Odeslat fotografie z alba do složky na Google Disku"
+                    >
+                      <FolderUp className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Odeslat na Disk</span>
+                    </button>
                   )}
                   <button
                     type="button"
@@ -937,6 +978,11 @@ export function UnifiedPhotoDocumentationView({
                 publicShareUrl={activeAlbum.publicShareUrl}
                 downloadZipUrl={activeAlbum.downloadZipUrl}
                 createdAt={activeAlbum.createdAt}
+                albumSource={activeAlbum.source}
+                workOrderId={activeAlbum.workOrderId}
+                defaultDriveFolderUrl={activeAlbum.ftdUrl}
+                driveExportedCount={activeAlbum.driveExportedCount}
+                driveLastFolderUrl={activeAlbum.driveLastFolderUrl}
                 onPhotosUpdated={handlePhotosUpdated}
               />
             </div>
@@ -1196,6 +1242,42 @@ export function UnifiedPhotoDocumentationView({
               }
             : null
         }
+      />
+
+      {/* Export to Google Drive Modal */}
+      <ExportToDriveModal
+        isOpen={!!exportingAlbum}
+        onClose={() => setExportingAlbum(null)}
+        title={exportingAlbum ? exportingAlbum.displayTitle || exportingAlbum.title : ''}
+        clientName={exportingAlbum?.clientName}
+        photosCount={exportingAlbum?.photosCount ?? 0}
+        photoIds={
+          exportingAlbum
+            ? exportingAlbum.points.flatMap((pt) => pt.photos.map((ph) => ph.id))
+            : []
+        }
+        workOrderId={exportingAlbum?.workOrderId}
+        albumId={exportingAlbum?.id}
+        source={exportingAlbum?.source}
+        defaultTargetUrl={exportingAlbum?.ftdUrl}
+        lastExportedFolderUrl={exportingAlbum?.driveLastFolderUrl}
+        onExported={(res) => {
+          if (exportingAlbum) {
+            setAlbumItems((prev) =>
+              prev.map((a) =>
+                a.id === exportingAlbum.id
+                  ? {
+                      ...a,
+                      ftdUrl: res.updatedWorkOrderFtdUrl || a.ftdUrl,
+                      driveExportedCount: Math.max(a.driveExportedCount || 0, res.uploadedCount + res.skippedCount),
+                      driveLastFolderUrl: res.folderUrl || a.driveLastFolderUrl,
+                    }
+                  : a
+              )
+            );
+          }
+          router.refresh();
+        }}
       />
     </div>
   );

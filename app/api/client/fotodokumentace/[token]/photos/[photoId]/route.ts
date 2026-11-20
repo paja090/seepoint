@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { enterPublicCampaignAlbumTenant, enterPublicSurfaceAlbumTenant } from '@/lib/public-tenant';
+import {
+  enterPublicCampaignAlbumTenant,
+  enterPublicSurfaceAlbumTenant,
+  enterPublicWorkOrderAlbumTenant,
+} from '@/lib/public-tenant';
 import { runWithTenantContext } from '@/lib/tenant-context';
 import { readStoredPhoto } from '@/lib/storage/photo-storage';
 import { generateWebpThumbnail, getCachedThumbnail } from '@/lib/storage/thumbnail-cache';
@@ -17,7 +21,35 @@ export async function GET(
     let organizationId: string;
     let allowed = false;
 
-    if (token.startsWith('surface.')) {
+    if (token.startsWith('workorder.')) {
+      const woMeta = await enterPublicWorkOrderAlbumTenant(token);
+      if (!woMeta) {
+        return NextResponse.json({ error: 'Album nebylo nalezeno.' }, { status: 404 });
+      }
+      organizationId = woMeta.organizationId;
+
+      const photoMeta = await runWithTenantContext(
+        { organizationId: woMeta.organizationId, source: 'public-token' },
+        () =>
+          prisma.photo.findFirst({
+            where: {
+              id: photoId,
+              organizationId: woMeta.organizationId,
+              isPrivate: false,
+            },
+            select: {
+              id: true,
+              workOrderItem: {
+                select: { workOrderId: true },
+              },
+            },
+          })
+      );
+
+      if (photoMeta?.workOrderItem?.workOrderId === woMeta.workOrderId) {
+        allowed = true;
+      }
+    } else if (token.startsWith('surface.')) {
       const surfaceMeta = await enterPublicSurfaceAlbumTenant(token);
       if (!surfaceMeta) {
         return NextResponse.json({ error: 'Album nebylo nalezeno.' }, { status: 404 });

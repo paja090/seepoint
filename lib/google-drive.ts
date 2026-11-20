@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { getTenantContext, requireTenantContext } from './tenant-context';
+import { extractGoogleDriveFolderId } from './work/photo-folder';
 
 const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive';
 const DRIVE_FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
@@ -707,6 +708,450 @@ export async function verifyFileInFolder(fileId: string, folderId: string): Prom
   if (!response.ok) return false;
   const data = (await response.json()) as { parents?: string[] };
   return data.parents?.includes(folderId) ?? false;
+}
+
+export class GoogleDriveTargetAccessError extends Error {
+  readonly code: 'NOT_FOUND_OR_FORBIDDEN' | 'FOLDER_NAME_NOT_FOUND' | 'NOT_CONFIGURED';
+  readonly serviceAccountEmail: string | null;
+  readonly canCreateNewFolder: boolean;
+
+  constructor(
+    code: 'NOT_FOUND_OR_FORBIDDEN' | 'FOLDER_NAME_NOT_FOUND' | 'NOT_CONFIGURED',
+    message: string,
+    options?: { serviceAccountEmail?: string | null; canCreateNewFolder?: boolean }
+  ) {
+    super(message);
+    this.name = 'GoogleDriveTargetAccessError';
+    this.code = code;
+    this.serviceAccountEmail = options?.serviceAccountEmail ?? null;
+    this.canCreateNewFolder = options?.canCreateNewFolder ?? true;
+  }
+}
+
+export function getConfiguredDriveServiceAccountEmail(): string | null {
+  const email = (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL || '').trim();
+  return email || null;
+}
+
+async function getCandidateDriveAccessTokens(): Promise<
+  Array<{ source: 'tenant-oauth' | 'env-oauth' | 'service-account'; token: string }>
+> {
+  const tokens: Array<{ source: 'tenant-oauth' | 'env-oauth' | 'service-account'; token: string }> = [];
+
+  if (getTenantContext()?.organizationId) {
+    try {
+      const { connectedGoogleAccessToken } = await import('./integrations/google-oauth');
+      const tenantToken = await connectedGoogleAccessToken('GOOGLE_DRIVE');
+      if (tenantToken) tokens.push({ source: 'tenant-oauth', token: tenantToken });
+    } catch {
+      // Continue to fallback credentials
+    }
+  }
+
+  const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
+  if (clientId && clientSecret && refreshToken) {
+    try {
+      const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          refresh_token: refreshToken,
+          grant_type: 'refresh_token',
+        }),
+        cache: 'no-store',
+      });
+      const data = (await response.json()) as { access_token?: string };
+      if (response.ok && data.access_token) {
+        tokens.push({ source: 'env-oauth', token: data.access_token });
+      }
+    } catch {
+      // Continue
+    }
+  }
+
+  const email = getConfiguredDriveServiceAccountEmail();
+  const configuredPrivateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_PRIVATE_KEY;
+  if (email && configuredPrivateKey) {
+    try {
+      const privateKey = configuredPrivateKey.replace(/\\n/g, '\n');
+      const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+      const now = Math.floor(Date.now() / 1000);
+      const claimSet = Buffer.from(
+        JSON.stringify({
+          iss: email,
+          scope: DRIVE_FILE_SCOPE,
+          aud: 'https://oauth2.googleapis.com/token',
+          exp: now + 3600,
+          iat: now,
+        }),
+      ).toString('base64url');
+      const sign = crypto.createSign('RSA-SHA256');
+      sign.update(`${header}.${claimSet}`);
+      const signature = sign.sign(privateKey, 'base64url');
+      const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+          assertion: `${header}.${claimSet}.${signature}`,
+        }),
+        cache: 'no-store',
+      });
+      const data = (await response.json()) as { access_token?: string };
+      if (response.ok && data.access_token) {
+        tokens.push({ source: 'service-account', token: data.access_token });
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  return tokens;
+}
+
+export type ResolvedTargetDriveFolder = {
+  id: string;
+  name: string;
+  webViewLink: string;
+  accessToken: string;
+  tokenSource: 'tenant-oauth' | 'env-oauth' | 'service-account' | 'mock';
+};
+
+/**
+ * Resolves a target Google Drive folder from either a Drive folder URL/ID
+ * or a plain folder name (from WorkOrder.ftdUrl).
+ * Tries tenant OAuth first, then falls back to configured full-Drive credentials
+ * (such as Service Account) so human-created folders shared with the agency work cleanly.
+ */
+export async function resolveTargetDriveFolder(folderInput: string): Promise<ResolvedTargetDriveFolder> {
+  const trimmed = folderInput.trim();
+  if (!trimmed) {
+    throw new GoogleDriveTargetAccessError(
+      'FOLDER_NAME_NOT_FOUND',
+      'Zadejte odkaz nebo název cílové složky na Google Disku.',
+      { serviceAccountEmail: getConfiguredDriveServiceAccountEmail(), canCreateNewFolder: true }
+    );
+  }
+
+  const parsedId = extractGoogleDriveFolderId(trimmed);
+
+  if (isGoogleDriveMockEnabled()) {
+    const id = parsedId || `mock-target-${crypto.createHash('sha1').update(trimmed).digest('hex').slice(0, 12)}`;
+    return {
+      id,
+      name: parsedId ? `Složka ${parsedId.slice(0, 8)}` : trimmed,
+      webViewLink: `https://drive.google.com/drive/folders/${id}`,
+      accessToken: 'mock-token',
+      tokenSource: 'mock',
+    };
+  }
+
+  const candidates = await getCandidateDriveAccessTokens();
+  const serviceAccountEmail = getConfiguredDriveServiceAccountEmail();
+  if (candidates.length === 0) {
+    throw new GoogleDriveTargetAccessError(
+      'NOT_CONFIGURED',
+      'Google Disk není pro tuto organizaci připojen. Připojte ho v Nastavení → Integrace.',
+      { serviceAccountEmail, canCreateNewFolder: false }
+    );
+  }
+
+  if (parsedId) {
+    for (const candidate of candidates) {
+      try {
+        const res = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(parsedId)}?fields=id,name,mimeType,webViewLink,trashed,capabilities(canAddChildren)&supportsAllDrives=true`,
+          {
+            headers: { Authorization: `Bearer ${candidate.token}` },
+            cache: 'no-store',
+          }
+        );
+        if (!res.ok) continue;
+        const data = (await res.json()) as {
+          id?: string;
+          name?: string;
+          mimeType?: string;
+          webViewLink?: string;
+          trashed?: boolean;
+          capabilities?: { canAddChildren?: boolean };
+        };
+        if (data.id && data.mimeType === DRIVE_FOLDER_MIME_TYPE && !data.trashed && data.capabilities?.canAddChildren !== false) {
+          return {
+            id: data.id,
+            name: data.name || parsedId,
+            webViewLink: data.webViewLink || `https://drive.google.com/drive/folders/${data.id}`,
+            accessToken: candidate.token,
+            tokenSource: candidate.source,
+          };
+        }
+      } catch {
+        // Try next token
+      }
+    }
+
+    const shareHint = serviceAccountEmail
+      ? ` Sdílejte prosím tuto složku na Google Disku s oprávněním Editor pro účet ${serviceAccountEmail}, nebo použijte tlačítko „Vytvořit novou složku na Disku“ níže.`
+      : ' Připojený Google Disk v bezpečném režimu (drive.file) může zapisovat pouze do složek vytvořených SeePointem – můžete jedním kliknutím vytvořit novou složku přímo na svém Disku a fotky do ní nahrát.';
+    throw new GoogleDriveTargetAccessError(
+      'NOT_FOUND_OR_FORBIDDEN',
+      `Do zadané složky na Google Disku se nepodařilo zapsat (není dostupná nebo chybí oprávnění zápisu).${shareHint}`,
+      { serviceAccountEmail, canCreateNewFolder: true }
+    );
+  }
+
+  // Search by folder name across available tokens
+  const escapedName = trimmed.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  for (const exact of [true, false]) {
+    const nameFilter = exact ? `name = '${escapedName}'` : `name contains '${escapedName}'`;
+    const q = `mimeType = '${DRIVE_FOLDER_MIME_TYPE}' and ${nameFilter} and trashed = false`;
+    const params = new URLSearchParams({
+      q,
+      pageSize: '5',
+      fields: 'files(id,name,webViewLink,capabilities(canAddChildren))',
+      supportsAllDrives: 'true',
+      includeItemsFromAllDrives: 'true',
+    });
+
+    for (const candidate of candidates) {
+      try {
+        const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+          headers: { Authorization: `Bearer ${candidate.token}` },
+          cache: 'no-store',
+        });
+        if (!res.ok) continue;
+        const data = (await res.json()) as {
+          files?: Array<{
+            id: string;
+            name: string;
+            webViewLink?: string;
+            capabilities?: { canAddChildren?: boolean };
+          }>;
+        };
+        const writable = (data.files || []).find((f) => f.capabilities?.canAddChildren !== false);
+        if (writable) {
+          return {
+            id: writable.id,
+            name: writable.name,
+            webViewLink: writable.webViewLink || `https://drive.google.com/drive/folders/${writable.id}`,
+            accessToken: candidate.token,
+            tokenSource: candidate.source,
+          };
+        }
+      } catch {
+        // Try next token
+      }
+    }
+  }
+
+  throw new GoogleDriveTargetAccessError(
+    'FOLDER_NAME_NOT_FOUND',
+    `Složka „${trimmed}“ nebyla na Google Disku nalezena (nebo do ní nemá SeePoint oprávnění). Vložte přímý odkaz složky z Disku, nebo ji nechte jedním kliknutím vytvořit přímo ze SeePointu.`,
+    { serviceAccountEmail, canCreateNewFolder: true }
+  );
+}
+
+/**
+ * Creates a new realization folder on the connected Google Drive (works even with least-privilege drive.file scope!).
+ */
+export async function createRealizationDriveFolder(folderName: string): Promise<ResolvedTargetDriveFolder> {
+  const cleanName = folderName.trim().replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').slice(0, 120) || 'SeePoint Realizace';
+
+  if (isGoogleDriveMockEnabled()) {
+    const id = `mock-realization-${crypto.randomUUID().slice(0, 12)}`;
+    return {
+      id,
+      name: cleanName,
+      webViewLink: `https://drive.google.com/drive/folders/${id}`,
+      accessToken: 'mock-token',
+      tokenSource: 'mock',
+    };
+  }
+
+  const accessToken = await getAccessToken();
+  const organizationId = getTenantContext()?.organizationId || requireTenantContext().organizationId;
+
+  // Find or create top-level "SeePoint Realizace" parent folder on connected Drive
+  let parentFolderId: string | undefined;
+  try {
+    const q = [
+      `mimeType = '${DRIVE_FOLDER_MIME_TYPE}'`,
+      "appProperties has { key='seepointRealizationsRoot' and value='true' }",
+      'trashed = false',
+    ].join(' and ');
+    const listRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?${new URLSearchParams({ q, spaces: 'drive', pageSize: '1', fields: 'files(id)' })}`,
+      { headers: { Authorization: `Bearer ${accessToken}` }, cache: 'no-store' }
+    );
+    if (listRes.ok) {
+      const listData = (await listRes.json()) as { files?: Array<{ id: string }> };
+      parentFolderId = listData.files?.[0]?.id;
+    }
+    if (!parentFolderId) {
+      const rootRes = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'SeePoint Realizace (FTD)',
+          mimeType: DRIVE_FOLDER_MIME_TYPE,
+          appProperties: { seepointRealizationsRoot: 'true', seepointOrganizationId: organizationId },
+        }),
+      });
+      if (rootRes.ok) {
+        const rootData = (await rootRes.json()) as { id?: string };
+        parentFolderId = rootData.id;
+      }
+    }
+  } catch {
+    // Fall back to Drive root if parent lookup fails
+  }
+
+  const createRes = await fetch('https://www.googleapis.com/drive/v3/files?fields=id,name,webViewLink', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: cleanName,
+      mimeType: DRIVE_FOLDER_MIME_TYPE,
+      ...(parentFolderId ? { parents: [parentFolderId] } : {}),
+      appProperties: { seepointRealizationFolder: 'true', seepointOrganizationId: organizationId },
+    }),
+  });
+  const created = (await createRes.json()) as { id?: string; name?: string; webViewLink?: string; error?: { message?: string } };
+  if (!createRes.ok || !created.id) {
+    throw new Error(`Vytvoření složky na Google Disku selhalo: ${created.error?.message ?? createRes.statusText}`);
+  }
+
+  return {
+    id: created.id,
+    name: created.name || cleanName,
+    webViewLink: created.webViewLink || `https://drive.google.com/drive/folders/${created.id}`,
+    accessToken,
+    tokenSource: 'tenant-oauth',
+  };
+}
+
+/**
+ * Idempotently uploads a photo Buffer into an arbitrary target Google Drive folder.
+ * Skips uploading if a file with the same seepointPhotoId already exists in that folder.
+ */
+export async function uploadPhotoBufferToDriveFolder(params: {
+  accessToken?: string;
+  targetFolderId: string;
+  buffer: Buffer;
+  mimeType: string;
+  fileName: string;
+  photoId: string;
+}): Promise<{ id: string; name: string; webViewLink: string; alreadyExisted: boolean }> {
+  const organizationId = getTenantContext()?.organizationId || requireTenantContext().organizationId;
+
+  if (isGoogleDriveMockEnabled()) {
+    const map = getMockDriveFiles();
+    for (const existing of map.values()) {
+      if (existing.parents.includes(params.targetFolderId) && existing.name === params.fileName) {
+        return {
+          id: existing.id,
+          name: existing.name,
+          webViewLink: `https://drive.google.com/file/d/${existing.id}/view`,
+          alreadyExisted: true,
+        };
+      }
+    }
+    const mockId = `mock-export-${crypto.randomUUID().slice(0, 12)}`;
+    map.set(mockId, {
+      id: mockId,
+      name: params.fileName,
+      mimeType: params.mimeType,
+      size: params.buffer.length,
+      content: params.buffer,
+      parents: [params.targetFolderId],
+      organizationId,
+    });
+    return {
+      id: mockId,
+      name: params.fileName,
+      webViewLink: `https://drive.google.com/file/d/${mockId}/view`,
+      alreadyExisted: false,
+    };
+  }
+
+  const accessToken = params.accessToken || (await getAccessToken());
+  const escapedFolderId = params.targetFolderId.replaceAll("'", '');
+  const escapedPhotoId = params.photoId.replaceAll("'", '');
+
+  // Deduplication check inside target folder
+  try {
+    const checkQ = `'${escapedFolderId}' in parents and appProperties has { key='seepointPhotoId' and value='${escapedPhotoId}' } and trashed = false`;
+    const checkRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?${new URLSearchParams({
+        q: checkQ,
+        pageSize: '1',
+        fields: 'files(id,name,webViewLink)',
+        supportsAllDrives: 'true',
+        includeItemsFromAllDrives: 'true',
+      })}`,
+      { headers: { Authorization: `Bearer ${accessToken}` }, cache: 'no-store' }
+    );
+    if (checkRes.ok) {
+      const checkData = (await checkRes.json()) as { files?: Array<{ id: string; name: string; webViewLink?: string }> };
+      const existing = checkData.files?.[0];
+      if (existing) {
+        return {
+          id: existing.id,
+          name: existing.name,
+          webViewLink: existing.webViewLink || `https://drive.google.com/file/d/${existing.id}/view`,
+          alreadyExisted: true,
+        };
+      }
+    }
+  } catch {
+    // Proceed to upload if check fails
+  }
+
+  const boundary = `seepoint-export-${crypto.randomUUID()}`;
+  const metadata = JSON.stringify({
+    name: params.fileName,
+    parents: [params.targetFolderId],
+    appProperties: {
+      seepointPhotoId: params.photoId,
+      seepointOrganizationId: organizationId,
+      seepointExportedToTarget: 'true',
+    },
+  });
+  const body = new Blob(
+    [
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`,
+      `--${boundary}\r\nContent-Type: ${params.mimeType}\r\n\r\n`,
+      new Uint8Array(params.buffer),
+      `\r\n--${boundary}--`,
+    ],
+    { type: `multipart/related; boundary=${boundary}` },
+  );
+
+  const response = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,webViewLink',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': body.type,
+      },
+      body,
+    }
+  );
+  const data = (await response.json()) as { id?: string; name?: string; webViewLink?: string; error?: { message?: string } };
+  if (!response.ok || !data.id) {
+    throw new Error(`Nahrání fotografie „${params.fileName}“ na Google Disk selhalo: ${data.error?.message ?? response.statusText}`);
+  }
+
+  return {
+    id: data.id,
+    name: data.name ?? params.fileName,
+    webViewLink: data.webViewLink || `https://drive.google.com/file/d/${data.id}/view`,
+    alreadyExisted: false,
+  };
 }
 
 export const googleDriveScope = DRIVE_FILE_SCOPE;
