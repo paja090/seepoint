@@ -516,22 +516,36 @@ async function fetchBackgroundMapBuffer(
 
       if (tileJobs.length > 0 && tileJobs.length <= 24) {
         const tileSizePx = 256 * scale;
-        const subdomains = ['a', 'b', 'c', 'd'];
         const fetched = await Promise.all(
           tileJobs.map(async (job, idx) => {
-            const sub = subdomains[idx % subdomains.length];
-            const url =
+            const mtIdx = idx % 4;
+            const tileUrls = [
               scale === 2
-                ? `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/${z}/${job.tx}/${job.ty}@2x.png`
-                : `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/${z}/${job.tx}/${job.ty}.png`;
+                ? `https://mt${mtIdx}.google.com/vt/lyrs=m&hl=cs&scale=2&x=${job.tx}&y=${job.ty}&z=${z}`
+                : `https://mt${mtIdx}.google.com/vt/lyrs=m&hl=cs&x=${job.tx}&y=${job.ty}&z=${z}`,
+              `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${z}/${job.ty}/${job.tx}`,
+            ];
+            let raw: Buffer | null = null;
+            for (const url of tileUrls) {
+              try {
+                const res = await fetch(url, {
+                  headers: { 'User-Agent': 'Mozilla/5.0' },
+                  signal: AbortSignal.timeout(5000),
+                  cache: 'no-store',
+                });
+                if (res.ok) {
+                  const candidate = Buffer.from(await res.arrayBuffer());
+                  if (candidate.length > 500) {
+                    raw = candidate;
+                    break;
+                  }
+                }
+              } catch {
+                // Try next tile provider
+              }
+            }
+            if (!raw) return null;
             try {
-              const res = await fetch(url, {
-                headers: { 'User-Agent': 'SeePOINT-OfferExport/1.0' },
-                signal: AbortSignal.timeout(5000),
-                cache: 'no-store',
-              });
-              if (!res.ok) return null;
-              const raw = Buffer.from(await res.arrayBuffer());
               // Crop tile to canvas bounds so sharp composite never overflows
               const cropLeft = Math.max(0, -job.left);
               const cropTop = Math.max(0, -job.top);
@@ -1346,10 +1360,26 @@ export function generateNavigationInteractiveMapHtml(params: {
   <script>
     const DATA = ${safeJson(payload)};
     const map = L.map('map');
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
+    const googleStreets = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&hl=cs&x={x}&y={y}&z={z}', {
+      subdomains: ['0', '1', '2', '3'],
+      attribution: '&copy; Google Maps',
+      maxZoom: 20
+    });
+    const googleHybrid = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&hl=cs&x={x}&y={y}&z={z}', {
+      subdomains: ['0', '1', '2', '3'],
+      attribution: '&copy; Google Maps',
+      maxZoom: 20
+    });
+    const esriStreets = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri',
       maxZoom: 19
-    }).addTo(map);
+    });
+    googleStreets.addTo(map);
+    L.control.layers({
+      'Mapa (Google)': googleStreets,
+      'Satelitní + ulice': googleHybrid,
+      'Základní mapa (Esri)': esriStreets
+    }, null, { position: 'topright' }).addTo(map);
 
     const bounds = [];
     const markerByCode = {};
