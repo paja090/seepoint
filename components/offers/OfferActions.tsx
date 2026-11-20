@@ -8,6 +8,7 @@ import {
   ExternalLink,
   FilePenLine,
   Link2,
+  Package,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -50,6 +51,9 @@ export function OfferActions({
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [customToken, setCustomToken] = useState<string | null>(null);
+  const [exportWithPrices, setExportWithPrices] = useState(
+    () => !(Boolean(isNoPriceConcept) || (offerType === 'NAVIGATION' && navigationProposalMode !== 'PRICED_QUOTE'))
+  );
 
   const effectiveToken = customToken || portalToken || null;
   const linkExists = Boolean(hasPublicLink || effectiveToken);
@@ -198,6 +202,36 @@ export function OfferActions({
           <Eye aria-hidden="true" size={17} />
           Zkontrolovat klientský náhled
         </a>
+
+        {offerType === 'NAVIGATION' && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/75 p-3.5 space-y-2.5 shadow-sm">
+            <div className="flex items-start gap-2">
+              <Package size={16} className="text-emerald-700 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-extrabold text-emerald-950">Export pro agenturu / klienta (ZIP)</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-emerald-900/85">
+                  Fotky z vizualizací pojmenované <strong>P01, P02…</strong> + přehledová mapa (PNG, PDF s legendou, KMZ/KML, GeoJSON, interaktivní HTML) + Excel/CSV/JSON.
+                </p>
+              </div>
+            </div>
+            <label className="flex items-center gap-2 text-xs font-semibold text-emerald-950 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={exportWithPrices}
+                onChange={(e) => setExportWithPrices(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-emerald-400 text-emerald-600 focus:ring-emerald-500"
+              />
+              Zahrnout ceny do Excelu / CSV
+            </label>
+            <a
+              href={`/api/offers/${offerId}/navigation-export-zip?includePrices=${exportWithPrices ? '1' : '0'}`}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3.5 py-2.5 text-xs font-extrabold text-white shadow-xs transition hover:bg-emerald-700"
+            >
+              <Package aria-hidden="true" size={15} />
+              Stáhnout balíček (fotky + mapa + data)
+            </a>
+          </div>
+        )}
 
         {offerType === 'STANDARD_MEDIA' && (
           <button

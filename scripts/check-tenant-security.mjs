@@ -95,6 +95,7 @@ const API_ROUTE_EXCEPTIONS = new Set([
   'app/api/proposals/[token]/artwork/route.ts',
   'app/api/proposals/[token]/installation-sheet/route.ts',
   'app/api/proposals/[token]/logo/route.ts',
+  'app/api/proposals/[token]/navigation-export-zip/route.ts',
   'app/api/proposals/[token]/pdf/route.ts',
   'app/api/proposals/[token]/photos/[photoId]/route.ts',
   'app/api/proposals/[token]/respond/route.ts',

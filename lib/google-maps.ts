@@ -372,6 +372,7 @@ export function getSignedStaticMapUrl(params: {
   centerLng?: number;
   zoom?: number;
   size?: string; // e.g. "600x400"
+  scale?: 1 | 2;
   markers?: Array<{ lat: number; lng: number; color?: string; label?: string }>;
   polyline?: string;
 }): string {
@@ -383,9 +384,10 @@ export function getSignedStaticMapUrl(params: {
   }
 
   const mapSize = params.size || '600x350';
-  let pathAndQuery = `/maps/api/staticmap?size=${mapSize}&maptype=roadmap&key=${apiKey}`;
+  const scaleParam = params.scale === 2 ? '&scale=2' : '';
+  let pathAndQuery = `/maps/api/staticmap?size=${mapSize}${scaleParam}&maptype=roadmap&key=${apiKey}`;
 
-  if (params.centerLat && params.centerLng) {
+  if (params.centerLat !== undefined && params.centerLng !== undefined) {
     pathAndQuery += `&center=${params.centerLat},${params.centerLng}&zoom=${params.zoom || 14}`;
   }
 
