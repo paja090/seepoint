@@ -1137,3 +1137,93 @@ export async function flushPendingGoogleSheetWritebacks(params: {
   return { flushedCompletedCount, flushedRescheduledCount, errors };
 }
 
+/**
+ * Updates `Odkaz FTD` and/or `FTD odeslána` on the matching row in the Google Sheet `Plán`
+ * after photos are exported to Google Drive from SeePoint OS.
+ */
+export async function writeBackWorkOrderFtdToGoogleSheet(params: {
+  organizationId: string;
+  workOrderId: string;
+  ftdUrl?: string | null;
+  ftdSent?: boolean;
+  fetchImpl?: typeof fetch;
+}): Promise<{ ok: boolean; sheetRow?: number; reason?: string }> {
+  const fetchImpl = params.fetchImpl ?? fetch;
+  try {
+    const target = await resolveOrganizationSheetTarget(params.organizationId);
+    if (!target) return { ok: false, reason: 'NOT_ENABLED' };
+
+    const order = await prisma.workOrder.findFirst({
+      where: { id: params.workOrderId, organizationId: params.organizationId },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        clientName: true,
+        scheduledAt: true,
+        ftdUrl: true,
+        ftdSent: true,
+        planningConstraints: true,
+      },
+    });
+    if (!order) return { ok: false, reason: 'ORDER_NOT_FOUND' };
+
+    const accessToken = await resolveGoogleSheetsAccessToken(params.organizationId, fetchImpl);
+    if (!accessToken) {
+      return { ok: false, reason: 'MISSING_GOOGLE_TOKEN' };
+    }
+
+    const prevPc =
+      order.planningConstraints &&
+      typeof order.planningConstraints === 'object' &&
+      !Array.isArray(order.planningConstraints)
+        ? (order.planningConstraints as Record<string, unknown>)
+        : {};
+
+    const ctx = await loadSheetContext(target, accessToken, fetchImpl);
+    const preferredSheetRow = typeof prevPc.sheetRow === 'number' ? prevPc.sheetRow : null;
+
+    const rowNumber = locateWorkOrderRowInSheet({
+      rows: ctx.rows,
+      cols: ctx.cols,
+      preferredSheetRow,
+      clientName: order.clientName,
+      title: order.title,
+      description: order.description,
+      scheduledAt: order.scheduledAt,
+    });
+
+    if (!rowNumber) {
+      return { ok: false, reason: 'ROW_NOT_FOUND' };
+    }
+
+    const updates: Array<{ colIndex: number; value: string }> = [];
+    const nextUrl = typeof params.ftdUrl === 'string' && params.ftdUrl.trim() ? params.ftdUrl.trim() : null;
+    if (nextUrl && ctx.cols.odkazFtd !== -1) {
+      updates.push({ colIndex: ctx.cols.odkazFtd, value: nextUrl });
+    }
+    if (params.ftdSent === true && ctx.cols.ftdOdeslana !== -1) {
+      updates.push({ colIndex: ctx.cols.ftdOdeslana, value: 'ANO' });
+    }
+
+    if (updates.length === 0) {
+      return { ok: true, sheetRow: rowNumber };
+    }
+
+    await updateCellsOnRow({
+      ctx,
+      rowNumber,
+      updates,
+      accessToken,
+      fetchImpl,
+    });
+
+    return { ok: true, sheetRow: rowNumber };
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : 'UNKNOWN_ERROR';
+    console.warn('[google-sheets-writeback] writeBackWorkOrderFtdToGoogleSheet failed:', errMsg);
+    return { ok: false, reason: errMsg };
+  }
+}
+
+
