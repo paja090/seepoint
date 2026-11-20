@@ -231,10 +231,13 @@ test('Navigation Agency Export: builds complete ZIP with aligned P01/P02 visuali
   assert.equal(ws.getRow(2).getCell(1).value, 'P01');
   assert.equal(ws.getRow(2).getCell(14).value, p01PhotoPath);
 
-  // Verify interactive HTML map links relative local visualization photos
+  // Verify interactive HTML map links relative local visualization photos and uses zero-API-key map tiles
   const html = entries.get('mapa/interaktivni_mapa.html')!.toString('utf8');
   assert.ok(html.includes(`../${p01PhotoPath}`));
   assert.ok(html.includes(`../${p02PhotoPath}`));
+  assert.ok(!html.includes('cartocdn.com'), 'Must never use Carto basemaps which require an API key');
+  assert.ok(html.includes('mt{s}.google.com/vt/lyrs=m&hl=cs'));
+  assert.ok(html.includes('server.arcgisonline.com'));
 });
 
 test('Navigation Agency Export: supports pointIds subset filtering and includePrices=true', async () => {
