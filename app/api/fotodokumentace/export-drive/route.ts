@@ -16,6 +16,8 @@ import {
   type WorkOrderDriveExportEntry,
 } from '@/lib/work/photo-folder';
 import { resolvePointClientName } from '@/lib/election-removal/point-metadata';
+import { isSeePointOrganization } from '@/lib/work/google-sheets-sync';
+import { writeBackWorkOrderFtdToGoogleSheet } from '@/lib/work/google-sheets-writeback';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -122,8 +124,8 @@ async function readPhotoBytes(photo: {
 /**
  * POST /api/fotodokumentace/export-drive
  * Manual export of realization/album photos from SeePoint OS Fotodokumentace
- * into a target Google Drive folder (e.g. linked in Plán práce ftdUrl) or into
- * a newly created folder on the organization's connected Google Drive.
+ * into a target Google Drive folder (e.g. linked in Plán práce ftdUrl on the company Drive)
+ * or into a newly created folder on the company/connected Google Drive.
  */
 export async function POST(req: Request) {
   const auth = await requireApiAccess(['photoDocumentation', 'work']);
@@ -138,12 +140,19 @@ export async function POST(req: Request) {
       albumId?: string | null;
       source?: string | null;
       targetFolderUrl?: string | null;
+      parentFolderUrl?: string | null;
       mode?: 'EXISTING_OR_SEARCH' | 'CREATE_NEW';
       newFolderName?: string | null;
       photoIds?: string[] | null;
       saveTargetUrlToWorkOrder?: boolean;
       markFtdSent?: boolean;
     };
+
+    const org = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true, name: true, slug: true },
+    });
+    const allowCompanyServiceAccount = Boolean(org && isSeePointOrganization(org));
 
     const mode = body.mode === 'CREATE_NEW' ? 'CREATE_NEW' : 'EXISTING_OR_SEARCH';
     const albumId = typeof body.albumId === 'string' ? body.albumId.trim() : null;
@@ -217,7 +226,6 @@ export async function POST(req: Request) {
           storageProvider: true,
           storageKey: true,
           driveFileId: true,
-          organizationId: true,
         },
       });
     } else if (workOrder) {
@@ -292,7 +300,10 @@ export async function POST(req: Request) {
         typeof body.newFolderName === 'string' && body.newFolderName.trim()
           ? body.newFolderName.trim()
           : fallbackName;
-      targetFolder = await createRealizationDriveFolder(requestedName);
+      targetFolder = await createRealizationDriveFolder(requestedName, {
+        allowCompanyServiceAccount,
+        parentFolderUrl: typeof body.parentFolderUrl === 'string' ? body.parentFolderUrl : null,
+      });
     } else {
       const targetInput =
         (typeof body.targetFolderUrl === 'string' && body.targetFolderUrl.trim()) ||
@@ -309,7 +320,7 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
-      targetFolder = await resolveTargetDriveFolder(targetInput);
+      targetFolder = await resolveTargetDriveFolder(targetInput, { allowCompanyServiceAccount });
     }
 
     let uploadedCount = 0;
@@ -364,6 +375,7 @@ export async function POST(req: Request) {
     }
 
     let updatedWorkOrderFtdUrl = workOrder?.ftdUrl || null;
+    let sheetSynced = false;
     if (workOrder) {
       const nextConstraints = mergeWorkOrderDriveExports(workOrder.planningConstraints, {
         folderId: targetFolder.id,
@@ -389,6 +401,17 @@ export async function POST(req: Request) {
           ...(body.markFtdSent === true ? { ftdSent: true } : {}),
         },
       });
+
+      // Mirror updated FTD URL / FTD sent flag back to Google Sheet Plán when enabled
+      if (shouldUpdateFtdUrl || body.markFtdSent === true) {
+        const wb = await writeBackWorkOrderFtdToGoogleSheet({
+          organizationId,
+          workOrderId: workOrder.id,
+          ftdUrl: shouldUpdateFtdUrl ? targetFolder.webViewLink : undefined,
+          ftdSent: body.markFtdSent === true ? true : undefined,
+        }).catch(() => ({ ok: false }));
+        sheetSynced = Boolean(wb.ok);
+      }
     }
 
     await prisma.crmAuditLog.create({
@@ -401,6 +424,8 @@ export async function POST(req: Request) {
         action: 'PHOTOS_EXPORTED_TO_DRIVE',
         detailsJson: JSON.stringify({
           mode,
+          tokenSource: targetFolder.tokenSource,
+          isSharedDrive: targetFolder.isSharedDrive ?? false,
           folderId: targetFolder.id,
           folderName: targetFolder.name,
           folderUrl: targetFolder.webViewLink,
@@ -408,6 +433,7 @@ export async function POST(req: Request) {
           uploadedCount,
           skippedCount,
           failedCount,
+          sheetSynced,
         }),
       },
     });
@@ -417,6 +443,10 @@ export async function POST(req: Request) {
       folderId: targetFolder.id,
       folderName: targetFolder.name,
       folderUrl: targetFolder.webViewLink,
+      tokenSource: targetFolder.tokenSource,
+      isSharedDrive: targetFolder.isSharedDrive ?? false,
+      driveLabel: targetFolder.driveLabel || null,
+      sheetSynced,
       totalPhotos: uniquePhotos.length,
       uploadedCount,
       skippedCount,
@@ -453,3 +483,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

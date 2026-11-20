@@ -17,6 +17,10 @@ export interface ExportToDriveResult {
   folderId: string;
   folderName: string;
   folderUrl: string;
+  tokenSource?: 'service-account' | 'env-oauth' | 'tenant-oauth' | 'mock';
+  isSharedDrive?: boolean;
+  driveLabel?: string | null;
+  sheetSynced?: boolean;
   totalPhotos: number;
   uploadedCount: number;
   skippedCount: number;
@@ -125,6 +129,10 @@ export function ExportToDriveModal({
         folderId: data.folderId || '',
         folderName: data.folderName || newFolderName,
         folderUrl: data.folderUrl || '',
+        tokenSource: data.tokenSource,
+        isSharedDrive: data.isSharedDrive,
+        driveLabel: data.driveLabel,
+        sheetSynced: data.sheetSynced,
         totalPhotos: data.totalPhotos ?? photosCount,
         uploadedCount: data.uploadedCount ?? 0,
         skippedCount: data.skippedCount ?? 0,
@@ -173,7 +181,7 @@ export function ExportToDriveModal({
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-emerald-700 font-black text-xs uppercase tracking-wider">
               <FolderUp className="w-4 h-4" />
-              <span>Export do Google Disku</span>
+              <span>Export do firemního Google Disku</span>
             </div>
             <h3 className="text-base font-black text-slate-900 mt-0.5 truncate">{title}</h3>
             <p className="text-xs text-slate-500">
@@ -202,7 +210,7 @@ export function ExportToDriveModal({
             <>
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-slate-800">
-                  Cílová složka na Google Disku (odkaz URL, ID nebo název z Plánu práce)
+                  Cílová složka na firemním Google Disku (odkaz URL, ID nebo název z Plánu práce)
                 </label>
                 <input
                   type="text"
@@ -213,7 +221,7 @@ export function ExportToDriveModal({
                   className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-50"
                 />
                 <p className="text-[11px] text-slate-500">
-                  Duplicitní fotky se kontrolují automaticky — stejná fotka se do složky nenahraje dvakrát.
+                  Přednostně se zapisuje přímo do složky z Plánu práce na firemním Disku. Duplicitní fotky se automaticky přeskakují.
                 </p>
               </div>
 
@@ -227,7 +235,7 @@ export function ExportToDriveModal({
                       disabled={isBusy}
                       className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                     />
-                    <span>Uložit odkaz na cílovou složku k zakázce v Plánu práce (FTD / Google Disk)</span>
+                    <span>Uložit odkaz na cílovou složku k zakázce i do Google Tabulky Plán (Odkaz FTD)</span>
                   </label>
                   <label className="flex items-start gap-2 cursor-pointer text-slate-700">
                     <input
@@ -237,7 +245,7 @@ export function ExportToDriveModal({
                       disabled={isBusy}
                       className="mt-0.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                     />
-                    <span>Označit zakázku jako „FTD nahráno / odesláno“ (připraveno k fakturaci)</span>
+                    <span>Označit zakázku jako „FTD odesláno = ANO“ (připraveno k fakturaci + zápis do Plánu)</span>
                   </label>
                 </div>
               )}
@@ -247,8 +255,21 @@ export function ExportToDriveModal({
                 <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3.5 space-y-2">
                   <div className="flex items-start gap-2 text-emerald-900">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <div className="text-xs space-y-0.5">
+                    <div className="text-xs space-y-1">
                       <p className="font-bold">{result.message}</p>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {result.driveLabel && (
+                          <span className="inline-flex items-center rounded-md bg-white/90 border border-emerald-200 px-2 py-0.5 text-[11px] font-semibold text-emerald-900">
+                            {result.tokenSource === 'service-account' || result.isSharedDrive ? '🏢 ' : '👤 '}
+                            {result.driveLabel}
+                          </span>
+                        )}
+                        {result.sheetSynced && (
+                          <span className="inline-flex items-center rounded-md bg-emerald-100 border border-emerald-300 px-2 py-0.5 text-[11px] font-semibold text-emerald-900">
+                            ✓ Zapsáno i do Google Tabulky Plán
+                          </span>
+                        )}
+                      </div>
                       {result.failedCount > 0 && (
                         <p className="text-amber-800">
                           {result.failedCount} fotografií se nepodařilo přenést.
