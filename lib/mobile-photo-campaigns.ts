@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/db';
 import { recoverPortalToken } from '@/lib/offers/token';
+import { isWorkOrderEligibleForPhotoApp } from '@/lib/work/photo-folder';
+import { workTypeLabels } from '@/lib/work';
 
 export type MobilePhotoTargetKind =
   | 'STANDARD_SURFACE'
@@ -25,10 +27,14 @@ export type MobilePhotoCampaignSurface = {
   isInstalled: boolean;
   installedPhotoUrl: string | null;
   crmRealizationId?: string | null;
+  workOrderId?: string | null;
   workOrderItemId?: string | null;
   navigationOrderId?: string | null;
   navigationPointId?: string | null;
   electionRemovalPointId?: string | null;
+  allowMultiplePhotos?: boolean;
+  photosCount?: number;
+  recentPhotoUrls?: string[];
 };
 
 export type MobilePhotoCampaign = {
@@ -38,6 +44,10 @@ export type MobilePhotoCampaign = {
   clientName: string;
   status: string;
   publicToken?: string | null;
+  workOrderId?: string | null;
+  ftdUrl?: string | null;
+  allowMultiplePhotos?: boolean;
+  totalPhotosCount?: number;
   totalSurfaces: number;
   installedCount: number;
   progressPercent: number;
@@ -61,6 +71,7 @@ const COMPLETED_REALIZATION_STATUSES = new Set([
 
 /**
  * Computes progress counters and hides campaigns that have 0 items or are 100% photographed.
+ * Multi-photo realizations (standalone WorkOrders without catalog carriers) stay open until the WorkOrder is marked DONE.
  */
 export function finalizeMobilePhotoCampaigns(
   raw: Array<Omit<MobilePhotoCampaign, 'totalSurfaces' | 'installedCount' | 'progressPercent'>>
@@ -76,7 +87,11 @@ export function finalizeMobilePhotoCampaigns(
         progressPercent: totalSurfaces > 0 ? Math.round((installedCount / totalSurfaces) * 100) : 0,
       };
     })
-    .filter((campaign) => campaign.totalSurfaces > 0 && campaign.installedCount < campaign.totalSurfaces);
+    .filter(
+      (campaign) =>
+        campaign.totalSurfaces > 0 &&
+        (campaign.allowMultiplePhotos === true || campaign.installedCount < campaign.totalSurfaces)
+    );
 }
 
 /**
@@ -356,13 +371,21 @@ export async function loadMobilePhotoCampaigns(
         navigationOrderId: null,
       },
       orderBy: { scheduledAt: 'asc' },
-      take: 30,
+      take: 60,
       select: {
         id: true,
         title: true,
+        description: true,
         clientName: true,
         status: true,
+        workType: true,
         scheduledAt: true,
+        ftdUrl: true,
+        mediaLabel: true,
+        locationNote: true,
+        quantity: true,
+        crmOrderId: true,
+        navigationOrderId: true,
         planningConstraints: true,
         items: {
           select: {
@@ -391,9 +414,15 @@ export async function loadMobilePhotoCampaigns(
               },
             },
             photos: {
+              where: { isPrivate: false },
               orderBy: { createdAt: 'desc' },
-              take: 1,
+              take: 8,
               select: { id: true, url: true },
+            },
+            _count: {
+              select: {
+                photos: { where: { isPrivate: false } },
+              },
             },
           },
         },
@@ -581,40 +610,125 @@ export async function loadMobilePhotoCampaigns(
     if (pcMeta?.dispatchCampaign === true) continue;
 
     const carrierItems = wo.items.filter((item) => item.carrier && !item.crmRealizationId);
-    if (carrierItems.length === 0) continue;
 
-    const surfaces: MobilePhotoCampaignSurface[] = carrierItems.map((item) => {
-      const carrier = item.carrier!;
-      const photo = item.photos[0] ?? null;
-      const isInstalled = item.executionStatus === 'DONE' || Boolean(photo);
-      return {
-        targetKind: 'WORK_ORDER_ITEM',
-        itemId: item.id,
-        surfaceId: item.surface?.id || '',
-        surfaceName: item.surface?.name || item.description || carrier.name,
-        side: surfaceSide(item.surface),
-        carrierId: carrier.id,
-        carrierCode: carrier.code,
-        carrierName: carrier.name,
-        address: carrier.address || carrier.street || carrier.name,
-        city: carrier.city,
-        latitude: carrier.latitude,
-        longitude: carrier.longitude,
-        dateFrom: wo.scheduledAt ? wo.scheduledAt.toISOString().slice(0, 10) : null,
-        dateTo: null,
-        isInstalled,
-        installedPhotoUrl: photo?.url || null,
-        workOrderItemId: item.id,
-      };
-    });
+    if (carrierItems.length > 0) {
+      const surfaces: MobilePhotoCampaignSurface[] = carrierItems.map((item) => {
+        const carrier = item.carrier!;
+        const photo = item.photos[0] ?? null;
+        const isInstalled = item.executionStatus === 'DONE' || Boolean(photo);
+        return {
+          targetKind: 'WORK_ORDER_ITEM',
+          itemId: item.id,
+          surfaceId: item.surface?.id || '',
+          surfaceName: item.surface?.name || item.description || carrier.name,
+          side: surfaceSide(item.surface),
+          carrierId: carrier.id,
+          carrierCode: carrier.code,
+          carrierName: carrier.name,
+          address: carrier.address || carrier.street || carrier.name,
+          city: carrier.city,
+          latitude: carrier.latitude,
+          longitude: carrier.longitude,
+          dateFrom: wo.scheduledAt ? wo.scheduledAt.toISOString().slice(0, 10) : null,
+          dateTo: null,
+          isInstalled,
+          installedPhotoUrl: photo?.url || null,
+          workOrderId: wo.id,
+          workOrderItemId: item.id,
+        };
+      });
+
+      rawCampaigns.push({
+        id: `wo-${wo.id}`,
+        sourceType: 'WORK_ORDER',
+        title: wo.title,
+        clientName: wo.clientName || 'Interní zakázka',
+        status: wo.status,
+        workOrderId: wo.id,
+        ftdUrl: wo.ftdUrl,
+        surfaces,
+      });
+      continue;
+    }
+
+    // Variant 1A: Realization / field WorkOrder without catalog carriers (or with ftdUrl Drive folder)
+    if (
+      !isWorkOrderEligibleForPhotoApp({
+        id: wo.id,
+        title: wo.title,
+        description: wo.description,
+        status: wo.status,
+        workType: wo.workType,
+        ftdUrl: wo.ftdUrl,
+        mediaLabel: wo.mediaLabel,
+        locationNote: wo.locationNote,
+        crmOrderId: wo.crmOrderId,
+        navigationOrderId: wo.navigationOrderId,
+        planningConstraints: wo.planningConstraints,
+        hasCarrierItems: false,
+      })
+    ) {
+      continue;
+    }
+
+    const realizationItem = wo.items.find((item) => !item.carrier && !item.crmRealizationId) ?? null;
+    const allPhotos = wo.items.flatMap((item) => item.photos);
+    const totalPhotosCount = wo.items.reduce((sum, item) => sum + (item._count?.photos ?? item.photos.length), 0);
+    const directLat =
+      typeof pcMeta?.latitude === 'number'
+        ? pcMeta.latitude
+        : typeof (pcMeta?.location as { latitude?: unknown } | undefined)?.latitude === 'number'
+          ? (pcMeta!.location as { latitude: number }).latitude
+          : null;
+    const directLng =
+      typeof pcMeta?.longitude === 'number'
+        ? pcMeta.longitude
+        : typeof (pcMeta?.location as { longitude?: unknown } | undefined)?.longitude === 'number'
+          ? (pcMeta!.location as { longitude: number }).longitude
+          : null;
+    const locationAddress =
+      typeof pcMeta?.locationAddress === 'string' && pcMeta.locationAddress.trim()
+        ? pcMeta.locationAddress.trim()
+        : null;
+
+    const workTypeBadge = workTypeLabels[wo.workType] || 'Realizace';
+    const mediaBadge = wo.mediaLabel?.trim() || workTypeBadge;
 
     rawCampaigns.push({
       id: `wo-${wo.id}`,
       sourceType: 'WORK_ORDER',
       title: wo.title,
-      clientName: wo.clientName || 'Interní zakázka',
+      clientName: wo.clientName || 'Realizace',
       status: wo.status,
-      surfaces,
+      workOrderId: wo.id,
+      ftdUrl: wo.ftdUrl,
+      allowMultiplePhotos: true,
+      totalPhotosCount,
+      surfaces: [
+        {
+          targetKind: 'WORK_ORDER_ITEM',
+          itemId: realizationItem?.id || `wo-default-${wo.id}`,
+          surfaceId: '',
+          surfaceName: wo.title,
+          side: wo.ftdUrl ? `${workTypeBadge} · složka na Disku` : workTypeBadge,
+          carrierId: '',
+          carrierCode: mediaBadge,
+          carrierName: wo.title,
+          address: locationAddress || wo.locationNote || wo.description?.split('\n')[0]?.slice(0, 140) || wo.title,
+          city: '',
+          latitude: directLat,
+          longitude: directLng,
+          dateFrom: wo.scheduledAt ? wo.scheduledAt.toISOString().slice(0, 10) : null,
+          dateTo: null,
+          isInstalled: totalPhotosCount > 0,
+          installedPhotoUrl: allPhotos[0]?.url || null,
+          workOrderId: wo.id,
+          workOrderItemId: realizationItem?.id ?? null,
+          allowMultiplePhotos: true,
+          photosCount: totalPhotosCount,
+          recentPhotoUrls: allPhotos.slice(0, 4).map((p) => p.url),
+        },
+      ],
     });
   }
 

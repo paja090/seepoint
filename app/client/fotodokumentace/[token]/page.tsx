@@ -1,8 +1,12 @@
-import { readAlbumTitle, campaignAlbumKey, surfaceAlbumKey } from '@/lib/fotodokumentace/album-title';
+import { readAlbumTitle, campaignAlbumKey, surfaceAlbumKey, workOrderAlbumKey } from '@/lib/fotodokumentace/album-title';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { resolvePointClientName } from '@/lib/election-removal/point-metadata';
-import { enterPublicCampaignAlbumTenant, enterPublicSurfaceAlbumTenant } from '@/lib/public-tenant';
+import {
+  enterPublicCampaignAlbumTenant,
+  enterPublicSurfaceAlbumTenant,
+  enterPublicWorkOrderAlbumTenant,
+} from '@/lib/public-tenant';
 import { runWithTenantContext } from '@/lib/tenant-context';
 import {
   PublicCampaignAlbumView,
@@ -20,6 +24,109 @@ export default async function PublicFotodokumentacePage({
 }) {
   const { token } = await params;
   const { month, client } = await searchParams;
+
+  if (token.startsWith('workorder.')) {
+    const woMeta = await enterPublicWorkOrderAlbumTenant(token);
+    if (!woMeta) notFound();
+
+    const workOrder = await runWithTenantContext(
+      { organizationId: woMeta.organizationId, source: 'public-token' },
+      () =>
+        prisma.workOrder.findFirst({
+          where: { id: woMeta.workOrderId, organizationId: woMeta.organizationId },
+          include: {
+            items: {
+              include: {
+                carrier: true,
+                surface: true,
+                photos: {
+                  where: { isPrivate: false },
+                  select: {
+                    id: true,
+                    type: true,
+                    fileName: true,
+                    createdAt: true,
+                    capturedLatitude: true,
+                    capturedLongitude: true,
+                    capturedByWorkerName: true,
+                  },
+                  orderBy: { createdAt: 'desc' },
+                },
+              },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+        })
+    );
+
+    if (!workOrder) notFound();
+
+    const publicTitle = await readAlbumTitle(
+      woMeta.organizationId,
+      workOrderAlbumKey(workOrder.id),
+      workOrder.title
+    );
+
+    const periodsSet = new Set<string>();
+    for (const item of workOrder.items) {
+      for (const photo of item.photos) {
+        const d = new Date(photo.createdAt);
+        if (!Number.isNaN(d.getTime())) {
+          periodsSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+        }
+      }
+    }
+    const availablePeriods = Array.from(periodsSet).sort().reverse();
+
+    const points: PublicPointItem[] = workOrder.items.map((it) => {
+      const carrierLat = it.carrier?.latitude != null && !Number.isNaN(Number(it.carrier.latitude)) && Number(it.carrier.latitude) !== 0 ? Number(it.carrier.latitude) : null;
+      const carrierLng = it.carrier?.longitude != null && !Number.isNaN(Number(it.carrier.longitude)) && Number(it.carrier.longitude) !== 0 ? Number(it.carrier.longitude) : null;
+      const photoWithGps = it.photos.find(
+        (ph) => ph.capturedLatitude != null && ph.capturedLongitude != null && (ph.capturedLatitude !== 0 || ph.capturedLongitude !== 0)
+      );
+      return {
+        id: it.id,
+        label: it.carrier
+          ? `${it.carrier.code} · ${it.surface?.name || it.description || workOrder.title}`
+          : (it.description || workOrder.title),
+        description: [workOrder.locationNote, workOrder.mediaLabel, workOrder.description].filter(Boolean).join(' · ') || null,
+        mediaType: workOrder.mediaLabel || 'REALIZATION',
+        objectType: 'REALIZACE',
+        quantity: it.quantity || workOrder.quantity || 1,
+        latitude: carrierLat ?? (photoWithGps?.capturedLatitude ? Number(photoWithGps.capturedLatitude) : 0),
+        longitude: carrierLng ?? (photoWithGps?.capturedLongitude ? Number(photoWithGps.capturedLongitude) : 0),
+        operationType: workOrder.workType === 'DEINSTALLATION' ? 'REMOVAL' : workOrder.workType === 'CHECK' ? 'INSPECTION' : 'INSTALLATION',
+        photos: it.photos.map((ph) => ({
+          id: ph.id,
+          type: ph.type,
+          fileName: ph.fileName,
+          createdAt: ph.createdAt.toISOString(),
+          capturedLatitude: ph.capturedLatitude != null ? Number(ph.capturedLatitude) : null,
+          capturedLongitude: ph.capturedLongitude != null ? Number(ph.capturedLongitude) : null,
+          capturedByWorkerName: ph.capturedByWorkerName,
+          url: `/api/client/fotodokumentace/${encodeURIComponent(token)}/photos/${encodeURIComponent(ph.id)}`,
+        })),
+      };
+    });
+
+    return (
+      <PublicCampaignAlbumView
+        token={token}
+        campaign={{
+          id: workOrder.id,
+          name: publicTitle,
+          clientName: workOrder.clientName || null,
+          description: [workOrder.locationNote, workOrder.description].filter(Boolean).join(' · ') || null,
+          targetDate: workOrder.scheduledAt ? workOrder.scheduledAt.toISOString() : null,
+          totalPoints: points.length,
+          completedPoints: points.filter((p) => p.photos.length > 0).length,
+        }}
+        points={points}
+        availablePeriods={availablePeriods}
+        initialPeriod={month}
+      />
+    );
+  }
 
   if (token.startsWith('surface.')) {
     const surfaceMeta = await enterPublicSurfaceAlbumTenant(token);

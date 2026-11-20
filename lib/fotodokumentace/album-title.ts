@@ -6,8 +6,12 @@ import { resolvePointClientName } from '../election-removal/point-metadata';
 export const campaignAlbumKey = (id: string, client?: string | null) => JSON.stringify(['campaign',id,client?.trim().toLocaleLowerCase('cs') || '']);
 export const surfaceAlbumKey = (client: string) => JSON.stringify(['surfaces',client.trim().toLocaleLowerCase('cs')]);
 export const navigationAlbumKey = (id: string) => JSON.stringify(['navigation',id]);
+export const workOrderAlbumKey = (workOrderId: string) => JSON.stringify(['workorder',workOrderId.trim()]);
 export function albumItemKey(album: { id: string; source: string; albumSlug: string; clientName?: string | null }) {
   if (album.source === 'NAVIGATION') return navigationAlbumKey(album.id);
+  if (album.source === 'WORK_ORDER' || album.albumSlug.startsWith('workorder.') || album.id.startsWith('wo::')) {
+    return workOrderAlbumKey(album.id.replace(/^wo::/, ''));
+  }
   if (album.albumSlug.startsWith('surface.')) return surfaceAlbumKey(album.clientName || 'Vlastní síť nosičů');
   const [id,client] = album.id.split('::client::');
   return campaignAlbumKey(id,client);
@@ -28,6 +32,10 @@ export async function saveAlbumTitle(id: string, input: {title:unknown;source:un
     if (input.source==='NAVIGATION') {
       if (!await tx.navigationDocumentationReport.findFirst({where:{id,organizationId},select:{id:true}})) throw new Error('Album nebylo nalezeno.');
       key=navigationAlbumKey(id);
+    } else if (input.source==='WORK_ORDER' || id.startsWith('wo::')) {
+      const cleanWorkOrderId = id.replace(/^wo::/, '').trim();
+      if (!cleanWorkOrderId || !await tx.workOrder.findFirst({where:{id:cleanWorkOrderId,organizationId},select:{id:true}})) throw new Error('Album nebylo nalezeno.');
+      key=workOrderAlbumKey(cleanWorkOrderId);
     } else if (input.source==='FIELD_WORK' && typeof input.albumSlug==='string' && input.albumSlug.startsWith('surface.')) {
       const album=verifySurfaceAlbumSlug(input.albumSlug);
       if (!album || album.organizationId!==organizationId) throw new Error('Album nebylo nalezeno.');

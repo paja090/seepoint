@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { requirePageAccess } from '@/lib/page-auth';
 import { prisma } from '@/lib/db';
 import { AppShell } from '@/components/AppShell';
-import { buildCampaignAlbumSlug, buildSurfaceAlbumSlug } from '@/lib/election-removal/album-token';
+import { buildCampaignAlbumSlug, buildSurfaceAlbumSlug, buildWorkOrderAlbumSlug } from '@/lib/election-removal/album-token';
 import {
   UnifiedPhotoDocumentationView,
   type UnifiedAlbumItem,
@@ -13,6 +13,7 @@ import type { InternalPointWithPhotos } from '@/components/election-removal/Camp
 import { formatAlbumDisplay } from '@/lib/fotodokumentace/format';
 import { resolvePointClientName } from '@/lib/election-removal/point-metadata';
 import { getDeterministicReportToken } from '@/lib/navigation-documentation';
+import { isWorkOrderEligibleForPhotoDoc, readWorkOrderDriveExports } from '@/lib/work/photo-folder';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,8 +28,8 @@ export default async function PhotoDocumentationHubPage({
   const organizationId = user.organizationId;
   if (!organizationId) notFound();
 
-  // Load Field Work campaigns, Navigation Documentation reports, and Recent Photos in parallel
-  const [electionCampaigns, navigationReports, carrierSurfaces, rawRecentPhotos] = await Promise.all([
+  // Load Field Work campaigns, Navigation Documentation reports, Carrier Surfaces, WorkOrders, and Recent Photos in parallel
+  const [electionCampaigns, navigationReports, carrierSurfaces, rawRecentPhotos, workOrders] = await Promise.all([
     prisma.electionCampaign.findMany({
       where: { organizationId, status: { not: 'ARCHIVED' } },
       include: {
@@ -194,6 +195,19 @@ export default async function PhotoDocumentationHubPage({
             campaign: { select: { id: true, name: true, clientName: true } },
           },
         },
+        workOrderItem: {
+          select: {
+            id: true,
+            description: true,
+            workOrder: {
+              select: {
+                id: true,
+                title: true,
+                clientName: true,
+              },
+            },
+          },
+        },
         carrier: {
           select: {
             id: true,
@@ -220,6 +234,58 @@ export default async function PhotoDocumentationHubPage({
       },
       orderBy: { createdAt: 'desc' },
       take: 60,
+    }),
+    prisma.workOrder.findMany({
+      where: {
+        organizationId,
+        status: { not: 'CANCELLED' },
+        crmOrderId: null,
+        navigationOrderId: null,
+        OR: [
+          { status: { notIn: ['DONE', 'CANCELLED'] } },
+          { items: { some: { photos: { some: { isPrivate: false } } } } },
+        ],
+      },
+      include: {
+        items: {
+          include: {
+            carrier: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                address: true,
+                city: true,
+                latitude: true,
+                longitude: true,
+              },
+            },
+            surface: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            photos: {
+              where: { isPrivate: false },
+              select: {
+                id: true,
+                type: true,
+                fileName: true,
+                createdAt: true,
+                capturedLatitude: true,
+                capturedLongitude: true,
+                capturedByWorkerName: true,
+                fieldWorkStepId: true,
+              },
+              orderBy: { createdAt: 'desc' },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 100,
     }),
   ]);
 
@@ -536,8 +602,142 @@ export default async function PhotoDocumentationHubPage({
     });
   }
 
+  // Transform eligible Plán práce (WorkOrder) realizations into Unified Albums
+  const workOrderAlbums: UnifiedAlbumItem[] = [];
+  for (const wo of workOrders) {
+    const rawPhotoCount = wo.items.reduce((sum, it) => sum + it.photos.length, 0);
+    const hasCarrierItems = wo.items.some((it) => Boolean(it.carrierId));
+    if (
+      !isWorkOrderEligibleForPhotoDoc(
+        {
+          id: wo.id,
+          title: wo.title,
+          description: wo.description,
+          status: wo.status,
+          workType: wo.workType,
+          ftdUrl: wo.ftdUrl,
+          mediaLabel: wo.mediaLabel,
+          locationNote: wo.locationNote,
+          crmOrderId: wo.crmOrderId,
+          navigationOrderId: wo.navigationOrderId,
+          planningConstraints: wo.planningConstraints,
+          hasCarrierItems,
+        },
+        rawPhotoCount
+      )
+    ) {
+      continue;
+    }
+
+    const opType: 'INSTALLATION' | 'REMOVAL' | 'INSPECTION' =
+      wo.workType === 'DEINSTALLATION' ? 'REMOVAL' : wo.workType === 'CHECK' ? 'INSPECTION' : 'INSTALLATION';
+    const baseDescription = [wo.locationNote, wo.mediaLabel, wo.description].filter(Boolean).join(' · ') || null;
+
+    const points: InternalPointWithPhotos[] =
+      wo.items.length > 0
+        ? wo.items.map((it) => {
+            const carrierLat =
+              it.carrier?.latitude != null && !Number.isNaN(Number(it.carrier.latitude)) && Number(it.carrier.latitude) !== 0
+                ? Number(it.carrier.latitude)
+                : null;
+            const carrierLng =
+              it.carrier?.longitude != null && !Number.isNaN(Number(it.carrier.longitude)) && Number(it.carrier.longitude) !== 0
+                ? Number(it.carrier.longitude)
+                : null;
+            const photoWithGps = it.photos.find(
+              (ph) =>
+                ph.capturedLatitude != null &&
+                ph.capturedLongitude != null &&
+                (ph.capturedLatitude !== 0 || ph.capturedLongitude !== 0)
+            );
+            return {
+              id: it.id,
+              label: it.carrier
+                ? `${it.carrier.code} · ${it.surface?.name || it.description || wo.title}`
+                : it.description || wo.title,
+              description: baseDescription,
+              clientName: wo.clientName || undefined,
+              quantity: it.quantity || wo.quantity || 1,
+              operationType: opType,
+              latitude: carrierLat ?? (photoWithGps?.capturedLatitude ? Number(photoWithGps.capturedLatitude) : 0),
+              longitude: carrierLng ?? (photoWithGps?.capturedLongitude ? Number(photoWithGps.capturedLongitude) : 0),
+              photos: it.photos.map((ph) => ({
+                id: ph.id,
+                url: `/api/photos/${encodeURIComponent(ph.id)}/file`,
+                type: ph.type,
+                fileName: ph.fileName,
+                createdAt: ph.createdAt,
+                capturedLatitude: ph.capturedLatitude,
+                capturedLongitude: ph.capturedLongitude,
+                capturedByWorkerName: ph.capturedByWorkerName,
+                fieldWorkStepId: ph.fieldWorkStepId,
+              })),
+            };
+          })
+        : [
+            {
+              id: `wo-item-placeholder::${wo.id}`,
+              label: wo.title,
+              description: baseDescription,
+              clientName: wo.clientName || undefined,
+              quantity: wo.quantity || 1,
+              operationType: opType,
+              latitude: 0,
+              longitude: 0,
+              photos: [],
+            },
+          ];
+
+    const allPhotos = points.flatMap((p) => p.photos);
+    const latestPhoto = getLatestPhoto(allPhotos);
+    const referenceDate = new Date(latestPhoto?.createdAt || wo.scheduledAt || wo.createdAt);
+    const year = Number.isNaN(referenceDate.getTime()) ? new Date().getFullYear() : referenceDate.getFullYear();
+    const month = Number.isNaN(referenceDate.getTime()) ? new Date().getMonth() + 1 : referenceDate.getMonth() + 1;
+    const quarter = Math.ceil(month / 3);
+    const periodLabel = `${quarter}. čtvrtletí ${year}`;
+    const coverPhotoUrl = latestPhoto
+      ? `/api/photos/${encodeURIComponent(latestPhoto.id)}/thumbnail`
+      : null;
+    const slug = buildWorkOrderAlbumSlug(organizationId, wo.id);
+    const driveMeta = readWorkOrderDriveExports(wo.planningConstraints);
+    const exportedCount = Object.keys(driveMeta.photos).length;
+
+    workOrderAlbums.push({
+      id: `wo::${wo.id}`,
+      source: 'WORK_ORDER',
+      sourceLabel: 'Plán práce · Realizace',
+      title: wo.title,
+      displayTitle: wo.title,
+      displaySubtitle: [wo.clientName, wo.locationNote].filter(Boolean).join(' · ') || null,
+      displayBadge: wo.ftdUrl ? `Plán práce • 📁 Disk` : `Plán práce • ${periodLabel}`,
+      clientName: wo.clientName || null,
+      createdAt: wo.createdAt,
+      year,
+      month,
+      quarter,
+      periodLabel,
+      photosCount: allPhotos.length,
+      pointsCount: points.length,
+      coverPhotoUrl,
+      albumSlug: slug,
+      publicShareUrl: `/client/fotodokumentace/${encodeURIComponent(slug)}`,
+      downloadZipUrl: `/api/client/fotodokumentace/${encodeURIComponent(slug)}/download-zip`,
+      points,
+      latestPhotoAt: latestPhoto?.createdAt ?? null,
+      workOrderId: wo.id,
+      ftdUrl: wo.ftdUrl || null,
+      driveExportedCount: exportedCount,
+      driveLastFolderUrl: driveMeta.lastFolderUrl || null,
+    });
+  }
+
   // Merge and sort all albums by photo capture date (newest first), falling back to creation date
-  const unifiedAlbums: UnifiedAlbumItem[] = [...fieldWorkAlbums, ...navigationAlbums, ...carrierSurfaceAlbums].sort((a, b) => {
+  const unifiedAlbums: UnifiedAlbumItem[] = [
+    ...workOrderAlbums,
+    ...fieldWorkAlbums,
+    ...navigationAlbums,
+    ...carrierSurfaceAlbums,
+  ].sort((a, b) => {
     const timeA = a.latestPhotoAt ? new Date(a.latestPhotoAt).getTime() : new Date(a.createdAt).getTime();
     const timeB = b.latestPhotoAt ? new Date(b.latestPhotoAt).getTime() : new Date(b.createdAt).getTime();
     if (timeB !== timeA) {
@@ -559,6 +759,10 @@ export default async function PhotoDocumentationHubPage({
         p.electionRemovalPoint.campaign?.clientName ||
         null;
       pointLabel = p.electionRemovalPoint.label;
+    } else if (p.workOrderItem?.workOrder) {
+      sourceTitle = p.workOrderItem.workOrder.title || 'Plán práce · Realizace';
+      clientName = p.workOrderItem.workOrder.clientName || null;
+      pointLabel = p.workOrderItem.description || p.workOrderItem.workOrder.title;
     } else if (p.surface) {
       sourceTitle = (p.type === 'CONTROL' || p.type === 'CHECK')
         ? 'Kontrola reklamní plochy'

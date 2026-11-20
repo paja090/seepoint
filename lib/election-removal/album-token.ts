@@ -88,3 +88,41 @@ export function verifySurfaceAlbumSlug(slug: string): { organizationId: string; 
   }
   return null;
 }
+
+/**
+ * Generates deterministic HMAC signature for a WorkOrder realization album.
+ */
+export function getWorkOrderAlbumToken(organizationId: string, workOrderId: string, secret = getSecret()): string {
+  return crypto
+    .createHmac('sha256', secret)
+    .update(`workorder-album:${organizationId}:${workOrderId.trim()}`)
+    .digest('hex');
+}
+
+/**
+ * Builds the URL slug for a Plán práce (WorkOrder) realization photo album:
+ * workorder.<organizationId>.<workOrderId>.<signature>
+ */
+export function buildWorkOrderAlbumSlug(organizationId: string, workOrderId: string): string {
+  const cleanWorkOrderId = workOrderId.trim();
+  const token = getWorkOrderAlbumToken(organizationId, cleanWorkOrderId);
+  return `workorder.${organizationId}.${cleanWorkOrderId}.${token.slice(0, 32)}`;
+}
+
+/**
+ * Verifies a WorkOrder album slug and returns { organizationId, workOrderId } or null.
+ */
+export function verifyWorkOrderAlbumSlug(slug: string): { organizationId: string; workOrderId: string } | null {
+  if (!slug || typeof slug !== 'string' || !slug.startsWith('workorder.')) return null;
+  const parts = slug.split('.');
+  if (parts.length !== 4) return null;
+  const [, organizationId, workOrderId, signature] = parts;
+  if (!organizationId || !workOrderId || !signature) return null;
+  if (!/^[a-z0-9_-]{8,60}$/i.test(workOrderId)) return null;
+  for (const secret of getCandidateSecrets()) {
+    const expectedToken = getWorkOrderAlbumToken(organizationId, workOrderId, secret);
+    if (signature === expectedToken.slice(0, 32)) return { organizationId, workOrderId };
+  }
+  return null;
+}
+

@@ -86,7 +86,7 @@ const SOURCE_TYPE_LABELS: Record<MobilePhotoCampaign['sourceType'], { label: str
   CRM_ORDER: { label: 'Zakázka', className: 'bg-sky-100 text-sky-800' },
   NAVIGATION: { label: 'Navigace', className: 'bg-indigo-100 text-indigo-800' },
   FIELD_WORK: { label: 'Terénní práce', className: 'bg-amber-100 text-amber-900' },
-  WORK_ORDER: { label: 'Montáž', className: 'bg-teal-100 text-teal-800' },
+  WORK_ORDER: { label: 'Plán práce · Realizace', className: 'bg-teal-100 text-teal-800' },
 };
 
 type ClientMismatch = {
@@ -110,6 +110,7 @@ export function MobilePhotoFieldAppView() {
   const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
   const [campaignSearch, setCampaignSearch] = useState('');
   const [quickUploadingItemKey, setQuickUploadingItemKey] = useState<string | null>(null);
+  const [completingWorkOrderId, setCompletingWorkOrderId] = useState<string | null>(null);
   const [quickBanner, setQuickBanner] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
   // Carriers State
@@ -275,6 +276,7 @@ export function MobilePhotoFieldAppView() {
         fd.append('surfaceId', surface.surfaceId);
       }
       if (surface.crmRealizationId) fd.append('crmRealizationId', surface.crmRealizationId);
+      if (surface.workOrderId) fd.append('workOrderId', surface.workOrderId);
       if (surface.workOrderItemId) fd.append('workOrderItemId', surface.workOrderItemId);
       if (surface.navigationOrderId) fd.append('navigationOrderId', surface.navigationOrderId);
       if (surface.navigationPointId) fd.append('navigationPointId', surface.navigationPointId);
@@ -296,6 +298,8 @@ export function MobilePhotoFieldAppView() {
         error?: string;
         message?: string;
         photo?: { id: string; url: string };
+        workOrderItemId?: string;
+        totalPhotos?: number;
       }>(res);
 
       if (!parsed.ok || !parsed.data) {
@@ -303,31 +307,48 @@ export function MobilePhotoFieldAppView() {
       }
 
       const uploadedUrl = parsed.data.photo?.url || null;
+      const returnedWorkOrderItemId = parsed.data.workOrderItemId || null;
+      const returnedTotalPhotos = typeof parsed.data.totalPhotos === 'number' ? parsed.data.totalPhotos : null;
       let completedWholeCampaign = false;
       let nextInstalledCount = campaign.installedCount;
+      let nextMultiPhotoCount = returnedTotalPhotos ?? ((surface.photosCount ?? 0) + 1);
 
       setCampaigns((prev) => {
         const updated = prev.map((c) => {
           if (c.id !== campaign.id) return c;
-          const nextSurfaces = c.surfaces.map((s) =>
-            s.itemId === surface.itemId
-              ? { ...s, isInstalled: true, installedPhotoUrl: uploadedUrl || s.installedPhotoUrl }
-              : s
-          );
+          const nextSurfaces = c.surfaces.map((s) => {
+            if (s.itemId !== surface.itemId) return s;
+            const nextPhotos = returnedTotalPhotos ?? ((s.photosCount ?? 0) + 1);
+            nextMultiPhotoCount = nextPhotos;
+            const nextRecent = uploadedUrl
+              ? [uploadedUrl, ...(s.recentPhotoUrls || []).filter((u) => u !== uploadedUrl)].slice(0, 4)
+              : s.recentPhotoUrls;
+            return {
+              ...s,
+              isInstalled: true,
+              installedPhotoUrl: uploadedUrl || s.installedPhotoUrl,
+              workOrderItemId: returnedWorkOrderItemId || s.workOrderItemId,
+              photosCount: nextPhotos,
+              recentPhotoUrls: nextRecent,
+            };
+          });
           const count = nextSurfaces.filter((s) => s.isInstalled).length;
           nextInstalledCount = count;
-          if (count >= c.totalSurfaces) {
+          if (!c.allowMultiplePhotos && count >= c.totalSurfaces) {
             completedWholeCampaign = true;
           }
           return {
             ...c,
             surfaces: nextSurfaces,
             installedCount: count,
+            totalPhotosCount: c.allowMultiplePhotos ? nextMultiPhotoCount : c.totalPhotosCount,
             progressPercent: c.totalSurfaces > 0 ? Math.round((count / c.totalSurfaces) * 100) : 100,
           };
         });
 
-        const remaining = updated.filter((c) => c.installedCount < c.totalSurfaces);
+        const remaining = updated.filter(
+          (c) => c.allowMultiplePhotos === true || c.installedCount < c.totalSurfaces
+        );
         if (completedWholeCampaign) {
           setExpandedCampaignId(remaining[0]?.id ?? null);
         }
@@ -336,9 +357,11 @@ export function MobilePhotoFieldAppView() {
 
       setQuickBanner({
         tone: 'success',
-        text: completedWholeCampaign
-          ? `✅ Zakázka „${campaign.title}“ (${campaign.clientName}) je kompletně nafocená a byla uzavřena!`
-          : `📸 Fotka uložena (${nextInstalledCount}/${campaign.totalSurfaces}) — ${surface.carrierCode} (${campaign.clientName})`,
+        text: campaign.allowMultiplePhotos
+          ? `📸 Fotka #${nextMultiPhotoCount} uložena do zakázky „${campaign.title}“ (najdete ji i ve Fotodokumentaci). Můžete přidat další fotku nebo zakázku dokončit.`
+          : completedWholeCampaign
+            ? `✅ Zakázka „${campaign.title}“ (${campaign.clientName}) je kompletně nafocená a byla uzavřena!`
+            : `📸 Fotka uložena (${nextInstalledCount}/${campaign.totalSurfaces}) — ${surface.carrierCode} (${campaign.clientName})`,
       });
 
       void fetchCampaigns();
@@ -350,6 +373,38 @@ export function MobilePhotoFieldAppView() {
       });
     } finally {
       setQuickUploadingItemKey(null);
+    }
+  };
+
+  const handleCompleteWorkOrder = async (campaign: MobilePhotoCampaign) => {
+    if (!campaign.workOrderId) return;
+    if (!window.confirm(`Označit zakázku „${campaign.title}“ jako hotovou? Fotky zůstanou uložené ve Fotodokumentaci.`)) {
+      return;
+    }
+    setCompletingWorkOrderId(campaign.workOrderId);
+    setQuickBanner(null);
+    try {
+      const res = await fetch(`/api/work-orders/${encodeURIComponent(campaign.workOrderId)}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'DONE', note: 'Dokončeno a nafoceno v mobilní fotodokumentaci' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Zakázku se nepodařilo uzavřít.');
+
+      setCampaigns((prev) => prev.filter((c) => c.id !== campaign.id));
+      setQuickBanner({
+        tone: 'success',
+        text: `✅ Zakázka „${campaign.title}“ byla označena jako hotová. Fotky najdete ve Fotodokumentaci i v Plánu práce.`,
+      });
+      void fetchCampaigns();
+    } catch (err) {
+      setQuickBanner({
+        tone: 'error',
+        text: err instanceof Error ? err.message : 'Zakázku se nepodařilo uzavřít.',
+      });
+    } finally {
+      setCompletingWorkOrderId(null);
     }
   };
 
@@ -869,6 +924,8 @@ export function MobilePhotoFieldAppView() {
           {filteredCampaigns.map((camp) => {
             const isExpanded = expandedCampaignId === camp.id;
             const sourceBadge = SOURCE_TYPE_LABELS[camp.sourceType];
+            const isMultiPhoto = camp.allowMultiplePhotos === true;
+            const isCompletingThis = Boolean(camp.workOrderId && completingWorkOrderId === camp.workOrderId);
             return (
               <div key={camp.id} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
                 <div
@@ -883,17 +940,30 @@ export function MobilePhotoFieldAppView() {
                       <span className="text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-800 px-2 py-0.5 rounded-md">
                         {camp.clientName}
                       </span>
-                      <span className="text-[10px] font-bold text-slate-500">
-                        {camp.installedCount}/{camp.totalSurfaces} hotovo
-                      </span>
+                      {isMultiPhoto ? (
+                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md">
+                          📸 {camp.totalPhotosCount ?? 0} fotek
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-slate-500">
+                          {camp.installedCount}/{camp.totalSurfaces} hotovo
+                        </span>
+                      )}
+                      {camp.ftdUrl && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                          📁 Složka na Disku
+                        </span>
+                      )}
                     </div>
                     <h3 className="text-base font-black text-slate-900 mt-1 truncate">{camp.title}</h3>
-                    <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                      <div
-                        className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
-                        style={{ width: `${camp.progressPercent}%` }}
-                      />
-                    </div>
+                    {!isMultiPhoto && (
+                      <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
+                          style={{ width: `${camp.progressPercent}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
                   <button type="button" className="p-1 text-slate-400 hover:text-slate-700 mt-1">
                     {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -902,75 +972,164 @@ export function MobilePhotoFieldAppView() {
 
                 {isExpanded && (
                   <div className="pt-2 border-t border-slate-100 space-y-2.5">
-                    <div className="text-[11px] font-black uppercase text-slate-400 px-1">
-                      Položky k nafocení ({camp.surfaces.length}):
+                    <div className="flex items-center justify-between gap-2 px-1">
+                      <span className="text-[11px] font-black uppercase text-slate-400">
+                        {isMultiPhoto ? 'Realizace k nafocení (možno více fotek):' : `Položky k nafocení (${camp.surfaces.length}):`}
+                      </span>
+                      {camp.workOrderId && (
+                        <Link
+                          href={`/fotodokumentace?albumId=${encodeURIComponent(`wo::${camp.workOrderId}`)}`}
+                          className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1"
+                        >
+                          Album ve Fotodokumentaci <ExternalLink size={11} />
+                        </Link>
+                      )}
                     </div>
                     {camp.surfaces.map((surf) => {
                       const itemKey = `${camp.id}:${surf.itemId}`;
                       const isUploadingThis = quickUploadingItemKey === itemKey;
-                      const isBusy = quickUploadingItemKey !== null;
+                      const isBusy = quickUploadingItemKey !== null || isCompletingThis;
+                      const surfMulti = surf.allowMultiplePhotos === true || isMultiPhoto;
+                      const photoCount = surf.photosCount ?? (surf.isInstalled ? 1 : 0);
+                      const thumbs =
+                        surf.recentPhotoUrls && surf.recentPhotoUrls.length > 0
+                          ? surf.recentPhotoUrls.slice(0, 4)
+                          : surf.installedPhotoUrl
+                            ? [surf.installedPhotoUrl]
+                            : [];
                       return (
                         <div
                           key={surf.itemId}
-                          className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                          className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3 flex flex-col gap-3"
                         >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="bg-slate-900 text-white font-black text-xs px-2 py-0.5 rounded-md">
-                                {surf.carrierCode}
-                              </span>
-                              <span className="text-xs font-bold text-slate-700">{surf.side}</span>
-                              {surf.isInstalled && (
-                                <span className="text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-300">
-                                  ✓ Nafoceno
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="bg-slate-900 text-white font-black text-xs px-2 py-0.5 rounded-md">
+                                  {surf.carrierCode}
+                                </span>
+                                <span className="text-xs font-bold text-slate-700">{surf.side}</span>
+                                {surfMulti ? (
+                                  photoCount > 0 ? (
+                                    <span className="text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-300">
+                                      ✓ {photoCount} {photoCount === 1 ? 'fotka' : photoCount >= 2 && photoCount <= 4 ? 'fotky' : 'fotek'}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-bold uppercase bg-amber-50 text-amber-800 px-2 py-0.5 rounded border border-amber-200">
+                                      Čeká na fotky
+                                    </span>
+                                  )
+                                ) : surf.isInstalled ? (
+                                  <span className="text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-300">
+                                    ✓ Nafoceno
+                                  </span>
+                                ) : null}
+                              </div>
+                              <p className="text-xs font-semibold text-slate-800 mt-1 truncate">{surf.address}</p>
+                              {surf.city ? <p className="text-[11px] text-slate-500">{surf.city}</p> : null}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 shrink-0">
+                              {!surfMulti && surf.installedPhotoUrl && (
+                                <a
+                                  href={toPhotoFullUrl(surf.installedPhotoUrl)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="relative w-11 h-11 rounded-xl overflow-hidden border border-slate-200 shrink-0 block"
+                                >
+                                  <Image src={toPhotoThumbnailUrl(surf.installedPhotoUrl)} alt="Foto" fill unoptimized className="object-cover" />
+                                </a>
+                              )}
+                              <label
+                                className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-black shadow-xs transition select-none ${
+                                  isBusy
+                                    ? 'opacity-60 cursor-wait bg-slate-300 text-slate-700'
+                                    : !surfMulti && surf.isInstalled
+                                    ? 'cursor-pointer bg-slate-200 hover:bg-slate-300 text-slate-800 active:scale-95'
+                                    : 'cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20 active:scale-95'
+                                }`}
+                              >
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  capture="environment"
+                                  disabled={isBusy}
+                                  onChange={(e) => void handleInstantCampaignCapture(camp, surf, e)}
+                                  className="hidden"
+                                />
+                                {isUploadingThis ? (
+                                  <>
+                                    <RefreshCw size={14} className="animate-spin" />
+                                    <span>Ukládám…</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Camera size={15} />
+                                    <span>
+                                      {surfMulti
+                                        ? photoCount > 0
+                                          ? '+ Další fotka'
+                                          : 'Vyfotit realizaci'
+                                        : surf.isInstalled
+                                          ? 'Přefotit'
+                                          : 'Vyfotit'}
+                                    </span>
+                                  </>
+                                )}
+                              </label>
+                              {surfMulti && (
+                                <label
+                                  className={`inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold border border-slate-200 bg-white transition select-none ${
+                                    isBusy
+                                      ? 'opacity-60 cursor-wait text-slate-400'
+                                      : 'cursor-pointer text-slate-700 hover:bg-slate-100 active:scale-95'
+                                  }`}
+                                >
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    disabled={isBusy}
+                                    onChange={(e) => void handleInstantCampaignCapture(camp, surf, e)}
+                                    className="hidden"
+                                  />
+                                  <Upload size={14} />
+                                  <span>Z galerie</span>
+                                </label>
+                              )}
+                              {surfMulti && photoCount > 0 && camp.workOrderId && (
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => void handleCompleteWorkOrder(camp)}
+                                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-500 text-white shadow-xs transition active:scale-95 disabled:opacity-60"
+                                >
+                                  <CheckCircle2 size={14} />
+                                  <span>{isCompletingThis ? 'Ukládám…' : 'Hotovo'}</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {surfMulti && thumbs.length > 0 && (
+                            <div className="flex items-center gap-2 pt-1 overflow-x-auto">
+                              {thumbs.map((url, idx) => (
+                                <a
+                                  key={`${url}-${idx}`}
+                                  href={toPhotoFullUrl(url)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="relative w-14 h-14 rounded-xl overflow-hidden border border-slate-200 shrink-0 block bg-slate-100"
+                                >
+                                  <Image src={toPhotoThumbnailUrl(url)} alt={`Foto ${idx + 1}`} fill unoptimized className="object-cover" />
+                                </a>
+                              ))}
+                              {photoCount > thumbs.length && (
+                                <span className="text-[11px] font-bold text-slate-500 px-1.5">
+                                  +{photoCount - thumbs.length} dalších
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs font-semibold text-slate-800 mt-1 truncate">{surf.address}</p>
-                            {surf.city ? <p className="text-[11px] text-slate-500">{surf.city}</p> : null}
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            {surf.installedPhotoUrl && (
-                              <a
-                                href={toPhotoFullUrl(surf.installedPhotoUrl)}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="relative w-11 h-11 rounded-xl overflow-hidden border border-slate-200 shrink-0 block"
-                              >
-                                <Image src={toPhotoThumbnailUrl(surf.installedPhotoUrl)} alt="Foto" fill unoptimized className="object-cover" />
-                              </a>
-                            )}
-                            <label
-                              className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-black shadow-xs transition select-none ${
-                                isBusy
-                                  ? 'opacity-60 cursor-wait bg-slate-300 text-slate-700'
-                                  : surf.isInstalled
-                                  ? 'cursor-pointer bg-slate-200 hover:bg-slate-300 text-slate-800 active:scale-95'
-                                  : 'cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20 active:scale-95'
-                              }`}
-                            >
-                              <input
-                                type="file"
-                                accept="image/*"
-                                capture="environment"
-                                disabled={isBusy}
-                                onChange={(e) => void handleInstantCampaignCapture(camp, surf, e)}
-                                className="hidden"
-                              />
-                              {isUploadingThis ? (
-                                <>
-                                  <RefreshCw size={14} className="animate-spin" />
-                                  <span>Ukládám…</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Camera size={15} />
-                                  <span>{surf.isInstalled ? 'Přefotit' : 'Vyfotit'}</span>
-                                </>
-                              )}
-                            </label>
-                          </div>
+                          )}
                         </div>
                       );
                     })}

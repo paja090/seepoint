@@ -82,6 +82,52 @@ export async function DELETE(
       return NextResponse.json({ success: true, message: 'Album navigační reklamy bylo úspěšně odstraněno.' });
     }
 
+    if (source === 'WORK_ORDER' || decodedId.startsWith('wo::')) {
+      const workOrderId = decodedId.replace(/^wo::/, '').trim();
+      const existingOrder = await prisma.workOrder.findFirst({
+        where: { id: workOrderId, organizationId },
+        select: { id: true, title: true, planningConstraints: true },
+      });
+
+      if (!existingOrder) {
+        return NextResponse.json({ error: 'Album z Plánu práce nebylo nalezeno.' }, { status: 404 });
+      }
+
+      const currentConstraints =
+        existingOrder.planningConstraints &&
+        typeof existingOrder.planningConstraints === 'object' &&
+        !Array.isArray(existingOrder.planningConstraints)
+          ? (existingOrder.planningConstraints as Record<string, unknown>)
+          : {};
+
+      await prisma.workOrder.update({
+        where: { id: existingOrder.id },
+        data: {
+          planningConstraints: {
+            ...currentConstraints,
+            hiddenFromPhotoDoc: true,
+          },
+        },
+      });
+
+      await prisma.crmAuditLog.create({
+        data: {
+          organizationId,
+          entityType: 'WorkOrder',
+          entityId: existingOrder.id,
+          userId: user.id,
+          userEmail: user.email,
+          action: 'ALBUM_HIDDEN',
+          detailsJson: JSON.stringify({ source: 'WORK_ORDER', permanent }),
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: 'Album z Plánu práce bylo skryto z přehledu Fotodokumentace (úkol i fotky zůstávají zachovány).',
+      });
+    }
+
     // Terénní práce (FIELD_WORK) nebo nerozpoznaný zdroj (výchozí kampaň)
     const [campaignId, rawClientKey] = decodedId.includes('::client::')
       ? decodedId.split('::client::')

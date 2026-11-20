@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { syncWorkOrderTasks } from '@/lib/work-task-sync';
 import { writeBackNewWorkOrderToGoogleSheet } from '@/lib/work/google-sheets-writeback';
+import { isWorkOrderEligibleForPhotoApp } from '@/lib/work/photo-folder';
 
 type WorkOrderInput = Record<string, unknown>;
 
@@ -120,6 +121,35 @@ export async function POST(request: Request) {
 
   const locationAddress = text(input, 'locationAddress') || text(input, 'locationNote');
 
+  const mediaLabel = text(input, 'mediaLabel');
+  const resolvedLocationNote = text(input, 'locationNote') || locationAddress;
+  const planningConstraintsObj = {
+    scope,
+    ...(hasGps
+      ? {
+          latitude,
+          longitude,
+          location: { latitude, longitude },
+          ...(locationAddress ? { locationAddress } : {}),
+        }
+      : {}),
+  };
+
+  const shouldCreateRealizationFolder =
+    !carrier &&
+    isWorkOrderEligibleForPhotoApp({
+      id: 'new',
+      title,
+      description,
+      status: 'PLANNED',
+      workType,
+      ftdUrl,
+      mediaLabel,
+      locationNote: resolvedLocationNote,
+      planningConstraints: planningConstraintsObj,
+      hasCarrierItems: false,
+    });
+
   const order = await prisma.workOrder.create({
     data: {
       title,
@@ -137,26 +167,20 @@ export async function POST(request: Request) {
       requestedBy,
       contactName: text(input, 'contactName'),
       contactPhone: text(input, 'contactPhone'),
-      locationNote: text(input, 'locationNote') || locationAddress,
+      locationNote: resolvedLocationNote,
       estimatedHours,
-      planningConstraints: {
-        scope,
-        ...(hasGps
-          ? {
-              latitude,
-              longitude,
-              location: { latitude, longitude },
-              ...(locationAddress ? { locationAddress } : {}),
-            }
-          : {}),
-      },
+      planningConstraints: planningConstraintsObj,
       pdfUrl,
-      mediaLabel: text(input, 'mediaLabel'),
+      mediaLabel,
       quantity,
       referenceUrl: text(input, 'referenceUrl'),
       ftdUrl,
       assignments: workerNames.length ? { create: workerNames.map((workerName) => ({ workerName })) } : undefined,
-      items: carrier ? { create: { carrierId: carrier.id, quantity: quantity || 1 } } : undefined,
+      items: carrier
+        ? { create: { carrierId: carrier.id, quantity: quantity || 1 } }
+        : shouldCreateRealizationFolder
+          ? { create: { description: title, quantity: quantity || 1 } }
+          : undefined,
     },
     select: { id: true },
   });

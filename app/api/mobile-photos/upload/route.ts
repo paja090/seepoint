@@ -72,6 +72,7 @@ export async function POST(req: Request) {
     const validCarrierId = trimString(formData.get('carrierId'));
     const requestedSurfaceId = trimString(formData.get('surfaceId'));
     const requestedCrmRealizationId = trimString(formData.get('crmRealizationId'));
+    const requestedWorkOrderId = trimString(formData.get('workOrderId'));
     const requestedWorkOrderItemId = trimString(formData.get('workOrderItemId'));
     const navigationOrderId = trimString(formData.get('navigationOrderId'));
     const navigationPointId = trimString(formData.get('navigationPointId'));
@@ -273,6 +274,135 @@ export async function POST(req: Request) {
         },
         warnings: stored.warning ? [stored.warning] : [],
         message: 'Terénní bod byl nafocen a označen jako hotový.',
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    // 2b. Realizace z Plánu práce (WorkOrder bez konkrétního nosiče z katalogu)
+    // -----------------------------------------------------------------------
+    if (!isSurveyUpload && !validCarrierId && (requestedWorkOrderId || requestedWorkOrderItemId)) {
+      let targetItem = requestedWorkOrderItemId
+        ? await prisma.workOrderItem.findFirst({
+            where: { id: requestedWorkOrderItemId, organizationId },
+            select: {
+              id: true,
+              workOrderId: true,
+              carrierId: true,
+              description: true,
+              workOrder: { select: { id: true, title: true, clientName: true, status: true, quantity: true } },
+            },
+          })
+        : null;
+
+      let targetOrder = targetItem?.workOrder ?? null;
+      if (!targetOrder && requestedWorkOrderId) {
+        targetOrder = await prisma.workOrder.findFirst({
+          where: { id: requestedWorkOrderId, organizationId },
+          select: { id: true, title: true, clientName: true, status: true, quantity: true },
+        });
+      }
+
+      if (!targetOrder) {
+        return jsonError('WORK_ORDER_NOT_FOUND', 'Zakázka v Plánu práce nebyla nalezena.', 404);
+      }
+
+      if (!targetItem) {
+        const existingItem = await prisma.workOrderItem.findFirst({
+          where: { workOrderId: targetOrder.id, organizationId, carrierId: null, crmRealizationId: null },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, workOrderId: true, carrierId: true, description: true },
+        });
+        if (existingItem) {
+          targetItem = { ...existingItem, workOrder: targetOrder };
+        } else {
+          const createdItem = await prisma.workOrderItem.create({
+            data: {
+              organizationId,
+              workOrderId: targetOrder.id,
+              description: targetOrder.title,
+              quantity: targetOrder.quantity || 1,
+            },
+            select: { id: true, workOrderId: true, carrierId: true, description: true },
+          });
+          targetItem = { ...createdItem, workOrder: targetOrder };
+        }
+      }
+
+      const photoId = `photo-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+      const safeTitleSlug = targetOrder.title
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9_-]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 40) || 'REALIZACE';
+      const fileName = `PHOTO_${safeTitleSlug}_${now.toISOString().slice(0, 10)}_${photoId.slice(-6)}.${extension}`;
+      const stored = await storeTenantPhoto({ organizationId, photoId, fileName, file });
+      const photoUrl = stablePhotoUrl(photoId);
+
+      let photo;
+      try {
+        photo = await prisma.photo.create({
+          data: {
+            id: photoId,
+            organizationId,
+            workOrderItemId: targetItem.id,
+            carrierId: targetItem.carrierId || null,
+            url: photoUrl,
+            driveFileId: stored.driveFileId,
+            content: stored.storageProvider === 'DATABASE' ? Buffer.from(stored.bytes) : undefined,
+            storageKey: stored.storageKey,
+            contentChecksum: stored.contentChecksum,
+            fileName,
+            mimeType,
+            size: stored.bytes.byteLength,
+            type: purpose === 'DAMAGE' ? 'DAMAGE' : purpose === 'INSPECTION' ? 'CONTROL' : 'INSTALLATION',
+            note: rawNote || `Realizace z Plánu práce: ${targetOrder.title}`,
+            isClientVisible: true,
+            isPrivate: false,
+            storageProvider: stored.storageProvider,
+            capturedLatitude: clientCoordinates?.lat ?? null,
+            capturedLongitude: clientCoordinates?.lng ?? null,
+            capturedAccuracyMeters: accuracy,
+            capturedByWorkerUserId: workerUserId,
+            capturedByWorkerName: workerName,
+            aiStatus: 'SKIPPED',
+          },
+        });
+
+        await prisma.$transaction(async (tx) => {
+          await tx.workOrderItem.updateMany({
+            where: { id: targetItem!.id, organizationId, executionStatus: null },
+            data: { executionStatus: 'IN_PROGRESS', startedAt: now },
+          });
+          if (['NEW', 'PLANNED', 'HANDED_OVER'].includes(targetOrder!.status)) {
+            await tx.workOrder.updateMany({
+              where: { id: targetOrder!.id, organizationId, status: { in: ['NEW', 'PLANNED', 'HANDED_OVER'] } },
+              data: { status: 'IN_PROGRESS' },
+            });
+          }
+        });
+      } catch (error) {
+        await deleteStoredPhoto(stored).catch(() => undefined);
+        throw error;
+      }
+
+      const totalPhotos = await prisma.photo.count({
+        where: { organizationId, workOrderItem: { workOrderId: targetOrder.id }, isPrivate: false },
+      });
+
+      return NextResponse.json({
+        success: true,
+        photo: {
+          id: photo.id,
+          url: photo.url,
+          fileName: photo.fileName,
+          storageProvider: photo.storageProvider,
+        },
+        workOrderId: targetOrder.id,
+        workOrderItemId: targetItem.id,
+        totalPhotos,
+        warnings: stored.warning ? [stored.warning] : [],
+        message: `Fotografie #${totalPhotos} uložena do zakázky „${targetOrder.title}“.`,
       });
     }
 
