@@ -9,6 +9,7 @@ import {
   saveManagerDigestSettings,
   loadDailyBriefingsForOrganization,
   loadManagerMorningDigestForOrganization,
+  loadOrganizationWorkerDirectory,
   sendDailyBriefingsForOrganization,
   sendManagerMorningDigestForOrganization,
 } from '@/lib/work/daily-briefing';
@@ -28,18 +29,22 @@ export async function GET(request: Request) {
       getManagerDigestSettings(organizationId),
     ]);
 
-    const [preview, managerPreview, recentLogs] = await Promise.all([
+    const [preview, managerPreview, directory, recentLogs] = await Promise.all([
       loadDailyBriefingsForOrganization(organizationId, { baseUrl }),
       loadManagerMorningDigestForOrganization(organizationId, { baseUrl }),
+      loadOrganizationWorkerDirectory(organizationId),
       prisma.emailLog.findMany({
         where: {
           organizationId,
-          template: { in: ['worker-daily-briefing', 'manager-morning-digest'] },
+          template: {
+            in: ['worker-daily-briefing', 'worker-plan-change', 'manager-morning-digest'],
+          },
         },
         orderBy: { sentAt: 'desc' },
         take: 25,
         select: {
           id: true,
+          template: true,
           recipient: true,
           subject: true,
           status: true,
@@ -52,6 +57,13 @@ export async function GET(request: Request) {
     return NextResponse.json({
       settings,
       managerSettings,
+      directory: directory
+        .map((d) => ({
+          fullName: d.fullName,
+          email: d.email,
+          role: d.role,
+        }))
+        .sort((a, b) => a.fullName.localeCompare(b.fullName, 'cs')),
       managerPreview: {
         auditedDate: managerPreview.auditedDate,
         auditedDateLabel: managerPreview.auditedDateLabel,
@@ -82,6 +94,7 @@ export async function GET(request: Request) {
       },
       recentLogs: recentLogs.map((l) => ({
         id: l.id,
+        template: l.template,
         recipient: l.recipient,
         subject: l.subject,
         status: l.status,
@@ -103,6 +116,9 @@ export async function PUT(request: Request) {
       sendHourLocal?: number;
       timezone?: string;
       skipWeekends?: boolean;
+      recipientMode?: 'ALL' | 'SELECTED';
+      allowedRecipientEmails?: string[];
+      notifyChanges?: boolean;
       managerSettings?: {
         enabled?: boolean;
         sendHourLocal?: number;

@@ -236,6 +236,105 @@ export async function rescheduleWorkOrderAction(params: {
   };
 }
 
+/**
+ * Records a worker's unfinished report / note for the dispatcher/requester
+ * WITHOUT changing scheduledAt or deadlineAt (only zadavatel changes dates).
+ */
+export async function reportWorkOrderUnfinishedAction(params: {
+  organizationId: string;
+  workOrderId: string;
+  reason?: string | null;
+  note?: string | null;
+  actorName: string;
+  viaEmail?: boolean;
+  assignmentMatcher?: (assignment: { userId: string | null; workerName: string }) => boolean;
+  now?: Date;
+}) {
+  const now = params.now ?? new Date();
+  const existing = await prisma.workOrder.findFirst({
+    where: { id: params.workOrderId, organizationId: params.organizationId },
+    select: {
+      id: true,
+      title: true,
+      clientName: true,
+      scheduledAt: true,
+      status: true,
+      locationNote: true,
+      planningConstraints: true,
+      assignments: { select: { id: true, userId: true, workerName: true, note: true } },
+    },
+  });
+
+  if (!existing) {
+    throw new WorkOrderActionError('Pracovní zakázka nebyla nalezena.', 404);
+  }
+
+  const combinedReason = [params.reason?.trim(), params.note?.trim()]
+    .filter((part, idx, arr): part is string => Boolean(part) && arr.indexOf(part) === idx)
+    .join(' – ')
+    .slice(0, 500);
+
+  const dateStr = now.toLocaleDateString('cs-CZ', { timeZone: 'Europe/Prague' });
+  const reportLog = `[Hlášení (${params.actorName}, ${dateStr}): Nestihlo se${
+    combinedReason ? ` – ${combinedReason}` : ''
+  }]`;
+  const nextLocationNote = existing.locationNote
+    ? `${existing.locationNote}\n${reportLog}`
+    : reportLog;
+
+  const prevPc =
+    existing.planningConstraints &&
+    typeof existing.planningConstraints === 'object' &&
+    !Array.isArray(existing.planningConstraints)
+      ? (existing.planningConstraints as Record<string, unknown>)
+      : {};
+
+  const saved = await prisma.$transaction(async (tx) => {
+    const order = await tx.workOrder.update({
+      where: { id: existing.id },
+      data: {
+        locationNote: nextLocationNote,
+        planningConstraints: {
+          ...prevPc,
+          lastWorkerReportBy: params.actorName,
+          lastWorkerReportAt: now.toISOString(),
+          lastWorkerReason: combinedReason || 'Nestihlo se',
+          ...(params.viaEmail ? { lastEmailAction: 'REPORTED_UNFINISHED' } : {}),
+        } as Prisma.InputJsonValue,
+      },
+      select: {
+        id: true,
+        title: true,
+        clientName: true,
+        scheduledAt: true,
+        status: true,
+        locationNote: true,
+      },
+    });
+
+    if (params.assignmentMatcher) {
+      const assignmentNote = combinedReason
+        ? `Nestihlo se: ${combinedReason}`
+        : 'Nestihlo se (čeká na nový termín od zadavatele)';
+      for (const a of existing.assignments) {
+        if (params.assignmentMatcher({ userId: a.userId, workerName: a.workerName })) {
+          await tx.workAssignment.update({
+            where: { id: a.id },
+            data: { note: assignmentNote },
+          });
+        }
+      }
+    }
+
+    return order;
+  });
+
+  return {
+    workOrder: saved,
+    combinedReason: combinedReason || null,
+  };
+}
+
 export async function updateWorkOrderStatusAction(params: {
   organizationId: string;
   workOrderId: string;

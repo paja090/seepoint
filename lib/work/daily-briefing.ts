@@ -21,6 +21,9 @@ export type DailyBriefingSettings = {
   sendHourLocal: number;
   timezone: string;
   skipWeekends: boolean;
+  recipientMode: 'ALL' | 'SELECTED';
+  allowedRecipientEmails: string[];
+  notifyChanges: boolean;
 };
 
 export type WorkerRecipient = {
@@ -202,7 +205,7 @@ function sanitizeScheduleSettings(
   input: unknown,
   organizationId: string | undefined,
   defaultHour: number
-): DailyBriefingSettings {
+): ManagerDigestSettings {
   const obj =
     input && typeof input === 'object' && !Array.isArray(input)
       ? (input as Record<string, unknown>)
@@ -236,7 +239,42 @@ export function sanitizeDailyBriefingSettings(
   input: unknown,
   organizationId?: string
 ): DailyBriefingSettings {
-  return sanitizeScheduleSettings(input, organizationId, DEFAULT_BRIEFING_HOUR);
+  const base = sanitizeScheduleSettings(input, organizationId, DEFAULT_BRIEFING_HOUR);
+  const obj =
+    input && typeof input === 'object' && !Array.isArray(input)
+      ? (input as Record<string, unknown>)
+      : {};
+
+  const recipientMode: 'ALL' | 'SELECTED' =
+    obj.recipientMode === 'SELECTED' ? 'SELECTED' : 'ALL';
+
+  const rawEmails = Array.isArray(obj.allowedRecipientEmails) ? obj.allowedRecipientEmails : [];
+  const allowedRecipientEmails = [
+    ...new Set(
+      rawEmails
+        .filter((e): e is string => typeof e === 'string')
+        .map((e) => e.trim().toLowerCase())
+        .filter((e) => isValidEmailAddress(e))
+    ),
+  ].sort();
+
+  const notifyChanges = typeof obj.notifyChanges === 'boolean' ? obj.notifyChanges : true;
+
+  return {
+    ...base,
+    recipientMode,
+    allowedRecipientEmails,
+    notifyChanges,
+  };
+}
+
+export function isBriefingRecipientAllowed(
+  email: string,
+  settings: Pick<DailyBriefingSettings, 'recipientMode' | 'allowedRecipientEmails'>
+): boolean {
+  if (settings.recipientMode !== 'SELECTED') return true;
+  const normalized = email.trim().toLowerCase();
+  return settings.allowedRecipientEmails.includes(normalized);
 }
 
 export function sanitizeManagerDigestSettings(
@@ -962,7 +1000,7 @@ export function renderWorkerDailyBriefingEmail(
     todayOpen.length > 0 && (briefing.completeAllTodayUrl || briefing.rescheduleAllTodayUrl)
       ? `<div style="margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#fef3c7;border:1px solid #f59e0b;">
           <div style="font-size:12px;font-weight:800;color:#78350f;margin-bottom:8px;">
-            ⚡ Rychlé hromadné potvrzení (nemusíš klikat na každý úkol zvlášť):
+            ⚡ Rychlé uzavření dneška:
           </div>
           <div>
             ${
@@ -972,7 +1010,7 @@ export function renderWorkerDailyBriefingEmail(
             }
             ${
               briefing.rescheduleAllTodayUrl
-                ? `<a href="${escapeHtml(briefing.rescheduleAllTodayUrl)}" style="display:inline-block;margin:0 0 6px 0;padding:10px 14px;border-radius:10px;background:#d97706;color:#ffffff;font-size:12.5px;font-weight:800;text-decoration:none;">☑️ Vybrat více úkolů / Přesunout</a>`
+                ? `<a href="${escapeHtml(briefing.rescheduleAllTodayUrl)}" style="display:inline-block;margin:0 0 6px 0;padding:10px 14px;border-radius:10px;background:#d97706;color:#ffffff;font-size:12.5px;font-weight:800;text-decoration:none;">📝 Nahlásit nedokončené zadavateli</a>`
                 : ''
             }
           </div>
@@ -1002,7 +1040,7 @@ export function renderWorkerDailyBriefingEmail(
               }
               if (t.rescheduleUrl) {
                 btns.push(
-                  `<a href="${escapeHtml(t.rescheduleUrl)}" style="display:inline-block;margin:6px 6px 0 0;padding:9px 14px;border-radius:9px;background:#d97706;color:#ffffff;font-size:12.5px;font-weight:800;text-decoration:none;">⏳ Nestihl jsem / Přesunout</a>`
+                  `<a href="${escapeHtml(t.rescheduleUrl)}" style="display:inline-block;margin:6px 6px 0 0;padding:9px 14px;border-radius:9px;background:#d97706;color:#ffffff;font-size:12.5px;font-weight:800;text-decoration:none;">📝 Nestihlo se / Poznámka</a>`
                 );
               }
               btns.push(
@@ -1074,11 +1112,6 @@ export function renderWorkerDailyBriefingEmail(
           : '';
 
       const actionButtons: string[] = [];
-      if (task.ackUrl) {
-        actionButtons.push(
-          `<a href="${escapeHtml(task.ackUrl)}" style="display:inline-block;margin:4px 6px 0 0;padding:8px 13px;border-radius:8px;background:#059669;color:#ffffff;font-size:12px;font-weight:800;text-decoration:none;">✅ Vím o úkolu (Potvrdit)</a>`
-        );
-      }
       if (task.mapsUrl) {
         actionButtons.push(
           `<a href="${escapeHtml(task.mapsUrl)}" style="display:inline-block;margin:4px 6px 0 0;padding:8px 12px;border-radius:8px;background:#f0f9ff;border:1px solid #bae6fd;color:#0369a1;font-size:12px;font-weight:700;text-decoration:none;">🗺️ Navigovat</a>`
@@ -1125,7 +1158,7 @@ export function renderWorkerDailyBriefingEmail(
     todayOpen.length > 0 && briefing.tasks.length > 0
       ? `tady máš prosím rychlé uzavření dneška a zároveň přehled úkolů na zítřek:`
       : todayOpen.length > 0
-      ? `prosíme o rychlé označení dnešních neuzavřených úkolů (hotovo / přesunout na zítra):`
+      ? `prosíme o rychlé označení dnešních neuzavřených úkolů (hotovo nebo poznámka zadavateli):`
       : `tady máš přehled svých úkolů na zítřek, ať si můžeš vše v klidu připravit:`;
 
   const tomorrowBlockHtml =
@@ -1162,7 +1195,6 @@ export function renderWorkerDailyBriefingEmail(
             ${escapeHtml(summaryParts.join('  ·  '))}
           </div>
           <div style="margin-top:12px;">
-            ${briefing.ackAllUrl ? `<a href="${escapeHtml(briefing.ackAllUrl)}" style="display:inline-block;margin:6px 8px 0 0;padding:11px 17px;border-radius:10px;background:#059669;color:#ffffff;font-size:13px;font-weight:800;text-decoration:none;">✅ Vím o všem – Potvrdit všechny (${briefing.tasks.length})</a>` : ''}
             <a href="${escapeHtml(primaryActionUrl)}" style="display:inline-block;margin:6px 0 0 0;padding:11px 17px;border-radius:10px;background:#0284c7;color:#ffffff;font-size:13px;font-weight:800;text-decoration:none;">
               📱 ${escapeHtml(primaryActionLabel)} →
             </a>
@@ -1175,11 +1207,10 @@ export function renderWorkerDailyBriefingEmail(
         <div style="padding:14px 24px 22px;font-size:11.5px;line-height:1.5;color:#64748b;text-align:center;">
           ${
             todayOpen.length > 0
-              ? 'U dnešních úkolů prosím klikni na <strong>„Hotovo“</strong> nebo <strong>„Nestihl jsem / Přesunout“</strong>.<br>'
+              ? 'U dnešních úkolů stačí kliknout na <strong>„Hotovo“</strong> nebo poslat krátkou <strong>poznámku zadavateli</strong> (termíny mění zadavatel).<br>'
               : ''
           }
-          Kliknutím na zelené tlačítko <strong>„Vím o úkolu“</strong> potvrdíš převzetí zítřejší práce přímo do SeePoint OS.<br>
-          Případné ranní změny vždy uvidíš aktuálně v aplikaci.
+          Úkoly není potřeba nijak potvrzovat. Případné pozdější změny plánu ti automaticky přijdou e-mailem a vždy je uvidíš aktuálně v aplikaci.
         </div>
       </div>
     </div>
@@ -1196,13 +1227,12 @@ export function renderWorkerDailyBriefingEmail(
           ...todayOpen.flatMap((t, idx) => [
             `${idx + 1}. ${t.title} (${t.clientName})`,
             t.completeUrl ? `   Hotovo: ${t.completeUrl}` : null,
-            t.rescheduleUrl ? `   Nestihl jsem / Přesunout: ${t.rescheduleUrl}` : null,
+            t.rescheduleUrl ? `   Nestihlo se / Poznámka zadavateli: ${t.rescheduleUrl}` : null,
             `   Detail: ${t.detailUrl}`,
             '',
           ]),
         ]
       : []),
-    briefing.ackAllUrl ? `Potvrdit všechny zítřejší úkoly jedním kliknutím: ${briefing.ackAllUrl}` : null,
     '',
     ...(briefing.tasks.length > 0
       ? [
@@ -1213,7 +1243,6 @@ export function renderWorkerDailyBriefingEmail(
             task.contactPhone ? `   Kontakt: ${task.contactName || ''} ${task.contactPhone}` : null,
             task.mapsUrl ? `   Mapa: ${task.mapsUrl}` : null,
             task.driveUrl ? `   Disk: ${task.driveUrl}` : null,
-            task.ackUrl ? `   Potvrdit úkol: ${task.ackUrl}` : null,
             `   Detail: ${task.detailUrl}`,
             '',
           ]),
@@ -1320,7 +1349,12 @@ const BRIEFING_ORDER_SELECT = {
 
 export async function loadDailyBriefingsForOrganization(
   organizationId: string,
-  options?: { targetDate?: string; timezone?: string; baseUrl?: string }
+  options?: {
+    targetDate?: string;
+    timezone?: string;
+    baseUrl?: string;
+    ignoreRecipientFilter?: boolean;
+  }
 ): Promise<BriefingAssemblyResult> {
   const settings = await getDailyBriefingSettings(organizationId);
   const timezone = options?.timezone || settings.timezone || DEFAULT_BRIEFING_TIMEZONE;
@@ -1366,7 +1400,7 @@ export async function loadDailyBriefingsForOrganization(
     loadOrganizationWorkerDirectory(organizationId),
   ]);
 
-  return assembleWorkerBriefings({
+  const assembled = assembleWorkerBriefings({
     organizationId,
     targetDate,
     todayDate,
@@ -1377,6 +1411,17 @@ export async function loadDailyBriefingsForOrganization(
     baseUrl: options?.baseUrl,
     timezone,
   });
+
+  if (options?.ignoreRecipientFilter) {
+    return assembled;
+  }
+
+  return {
+    ...assembled,
+    briefings: assembled.briefings.filter((b) =>
+      isBriefingRecipientAllowed(b.recipient.email, settings)
+    ),
+  };
 }
 
 export type SendBriefingsResult = {
@@ -1474,7 +1519,7 @@ export async function sendDailyBriefingsForOrganization(
             {
               id: 'sample-today-1',
               workOrderId: 'sample-today-1',
-              title: 'Ukázkový dnešní úkol k uzavření (Hotovo / Přesunout)',
+              title: 'Ukázkový dnešní úkol k uzavření (Hotovo / Poznámka)',
               clientName: organizationName,
               workTypeLabel: 'Instalace',
               priority: 'NORMAL',
@@ -1600,6 +1645,7 @@ export async function sendDailyBriefingsForOrganization(
     }
 
     const rendered = renderWorkerDailyBriefingEmail(briefing, organizationName);
+    const planSnapshot = buildWorkerDayPlanSnapshot(briefing.tasks);
     const idempHash = crypto
       .createHash('sha256')
       .update(`${organizationId}:${assembly.targetDate}:${emailLower}`)
@@ -1625,6 +1671,8 @@ export async function sendDailyBriefingsForOrganization(
           userId: briefing.recipient.userId ?? null,
           recipientName: briefing.recipient.fullName,
           taskCount: briefing.tasks.length,
+          planSnapshotHash: planSnapshot.hash,
+          planSnapshotTasks: planSnapshot.tasks,
           isTest: false,
         },
       });
@@ -1667,6 +1715,646 @@ export async function sendDailyBriefingsForOrganization(
     skippedEnvCount,
     failedCount,
     unmatchedWorkerNames: assembly.unmatchedWorkerNames,
+    deliveries,
+  };
+}
+
+export type WorkerDayPlanTaskSnapshot = {
+  id: string;
+  title: string;
+  clientName: string;
+  scheduledTimeLabel: string | null;
+  address: string | null;
+  priority: string;
+  workTypeLabel: string;
+  description: string | null;
+  crewNames: string[];
+  detailUrl: string;
+  mapsUrl: string | null;
+  driveUrl: string | null;
+};
+
+export type WorkerDayPlanSnapshot = {
+  hash: string;
+  tasks: WorkerDayPlanTaskSnapshot[];
+};
+
+export type WorkerPlanUpdatedTask = {
+  task: WorkerDayPlanTaskSnapshot;
+  changes: string[];
+};
+
+export type WorkerPlanDiff = {
+  added: WorkerDayPlanTaskSnapshot[];
+  updated: WorkerPlanUpdatedTask[];
+  removed: WorkerDayPlanTaskSnapshot[];
+};
+
+export function buildWorkerDayPlanSnapshot(
+  tasks: BriefingTaskItem[]
+): WorkerDayPlanSnapshot {
+  const normalized: WorkerDayPlanTaskSnapshot[] = tasks
+    .map((task) => ({
+      id: task.workOrderId || task.id,
+      title: task.title.trim(),
+      clientName: task.clientName.trim(),
+      scheduledTimeLabel: task.scheduledTimeLabel?.trim() || null,
+      address: task.address?.trim() || null,
+      priority: task.priority,
+      workTypeLabel: task.workTypeLabel,
+      description: task.description?.trim().slice(0, 300) || null,
+      crewNames: [...new Set((task.crewNames || []).map((n) => n.trim()).filter(Boolean))].sort(
+        (a, b) => a.localeCompare(b, 'cs')
+      ),
+      detailUrl: task.detailUrl,
+      mapsUrl: task.mapsUrl || null,
+      driveUrl: task.driveUrl || null,
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  // Hash only schedule-relevant fields (exclude baseUrl-dependent links so origin differences never cause false alerts)
+  const canonicalForHash = normalized.map((t) => ({
+    id: t.id,
+    title: t.title,
+    clientName: t.clientName,
+    scheduledTimeLabel: t.scheduledTimeLabel,
+    address: t.address,
+    priority: t.priority,
+    workTypeLabel: t.workTypeLabel,
+    description: t.description,
+    crewNames: t.crewNames,
+  }));
+
+  const hash = crypto
+    .createHash('sha256')
+    .update(JSON.stringify(canonicalForHash))
+    .digest('hex')
+    .slice(0, 20);
+
+  return { hash, tasks: normalized };
+}
+
+export function diffWorkerDayPlanSnapshots(
+  previous: WorkerDayPlanTaskSnapshot[],
+  current: WorkerDayPlanTaskSnapshot[]
+): WorkerPlanDiff {
+  const prevById = new Map(previous.map((t) => [t.id, t]));
+  const currById = new Map(current.map((t) => [t.id, t]));
+
+  const added: WorkerDayPlanTaskSnapshot[] = [];
+  const updated: WorkerPlanUpdatedTask[] = [];
+  const removed: WorkerDayPlanTaskSnapshot[] = [];
+
+  for (const curr of current) {
+    const prev = prevById.get(curr.id);
+    if (!prev) {
+      added.push(curr);
+      continue;
+    }
+
+    const changes: string[] = [];
+    if (prev.title !== curr.title) changes.push('Změněn název');
+    if (prev.clientName !== curr.clientName) changes.push('Změněn klient');
+    if ((prev.scheduledTimeLabel || null) !== (curr.scheduledTimeLabel || null)) {
+      changes.push(
+        curr.scheduledTimeLabel
+          ? `Změněn čas (${curr.scheduledTimeLabel})`
+          : 'Odebrán konkrétní čas'
+      );
+    }
+    if ((prev.address || null) !== (curr.address || null)) changes.push('Změněno místo');
+    if (prev.priority !== curr.priority) changes.push('Změněna priorita');
+    if (prev.workTypeLabel !== curr.workTypeLabel) changes.push('Změněn typ práce');
+    if ((prev.description || null) !== (curr.description || null)) changes.push('Upraveno zadání');
+    if ((prev.crewNames || []).join('|') !== (curr.crewNames || []).join('|')) {
+      changes.push('Změněn tým');
+    }
+
+    if (changes.length > 0) {
+      updated.push({ task: curr, changes });
+    }
+  }
+
+  for (const prev of previous) {
+    if (!currById.has(prev.id)) {
+      removed.push(prev);
+    }
+  }
+
+  return { added, updated, removed };
+}
+
+function parseStoredSnapshotTasks(raw: unknown): WorkerDayPlanTaskSnapshot[] | null {
+  if (!Array.isArray(raw)) return null;
+  const parsed: WorkerDayPlanTaskSnapshot[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const obj = item as Record<string, unknown>;
+    if (typeof obj.id !== 'string' || typeof obj.title !== 'string') continue;
+    parsed.push({
+      id: obj.id,
+      title: obj.title,
+      clientName: typeof obj.clientName === 'string' ? obj.clientName : 'Bez klienta',
+      scheduledTimeLabel:
+        typeof obj.scheduledTimeLabel === 'string' ? obj.scheduledTimeLabel : null,
+      address: typeof obj.address === 'string' ? obj.address : null,
+      priority: typeof obj.priority === 'string' ? obj.priority : 'NORMAL',
+      workTypeLabel: typeof obj.workTypeLabel === 'string' ? obj.workTypeLabel : 'Práce',
+      description: typeof obj.description === 'string' ? obj.description : null,
+      crewNames: Array.isArray(obj.crewNames)
+        ? obj.crewNames.filter((n): n is string => typeof n === 'string')
+        : [],
+      detailUrl: typeof obj.detailUrl === 'string' ? obj.detailUrl : '',
+      mapsUrl: typeof obj.mapsUrl === 'string' ? obj.mapsUrl : null,
+      driveUrl: typeof obj.driveUrl === 'string' ? obj.driveUrl : null,
+    });
+  }
+  return parsed;
+}
+
+export function renderWorkerPlanChangeEmail(input: {
+  recipient: Pick<WorkerRecipient, 'firstName' | 'fullName' | 'email'>;
+  organizationName: string;
+  targetDate: string;
+  targetDateLabel: string;
+  isToday: boolean;
+  diff: WorkerPlanDiff;
+  totalCurrentTasks: number;
+  myTasksUrl: string;
+}): { subject: string; html: string; text: string } {
+  const dayWord = input.isToday ? 'dnes' : 'zítra';
+  const vocativeName = czechFirstNameVocative(input.recipient.firstName);
+
+  const summaryBits: string[] = [];
+  if (input.diff.added.length > 0) summaryBits.push(`+${input.diff.added.length} nový`);
+  if (input.diff.updated.length > 0) summaryBits.push(`${input.diff.updated.length} upraveno`);
+  if (input.diff.removed.length > 0) summaryBits.push(`${input.diff.removed.length} odebráno/přesunuto`);
+
+  const subject = `🔄 Změna v plánu na ${dayWord} (${input.targetDateLabel}): ${summaryBits.join(', ')}`;
+
+  const renderTaskCard = (
+    task: WorkerDayPlanTaskSnapshot,
+    badge: { text: string; bg: string; border: string; color: string },
+    extraLine?: string
+  ) => {
+    const meta: string[] = [`Klient: <strong>${escapeHtml(task.clientName)}</strong>`];
+    if (task.scheduledTimeLabel) meta.push(`⏰ ${escapeHtml(task.scheduledTimeLabel)}`);
+    if (task.address) meta.push(`📍 ${escapeHtml(task.address)}`);
+    if (task.crewNames.length > 0) meta.push(`👥 ${escapeHtml(task.crewNames.join(', '))}`);
+
+    const buttons: string[] = [];
+    if (task.mapsUrl) {
+      buttons.push(
+        `<a href="${escapeHtml(task.mapsUrl)}" style="display:inline-block;margin:4px 6px 0 0;padding:7px 11px;border-radius:8px;background:#f0f9ff;border:1px solid #bae6fd;color:#0369a1;font-size:12px;font-weight:700;text-decoration:none;">🗺️ Navigovat</a>`
+      );
+    }
+    if (task.driveUrl) {
+      buttons.push(
+        `<a href="${escapeHtml(task.driveUrl)}" style="display:inline-block;margin:4px 6px 0 0;padding:7px 11px;border-radius:8px;background:#ecfdf5;border:1px solid #a7f3d0;color:#047857;font-size:12px;font-weight:700;text-decoration:none;">📁 Složka na Disku</a>`
+      );
+    }
+    if (task.detailUrl) {
+      buttons.push(
+        `<a href="${escapeHtml(task.detailUrl)}" style="display:inline-block;margin:4px 0 0 0;padding:7px 11px;border-radius:8px;background:#0f172a;color:#ffffff;font-size:12px;font-weight:700;text-decoration:none;">Detail úkolu →</a>`
+      );
+    }
+
+    return `
+      <div style="margin:0 0 12px;border:1px solid ${badge.border};border-radius:12px;padding:14px 16px;background:${badge.bg};">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:${badge.color};margin-bottom:4px;">
+          ${escapeHtml(badge.text)}
+        </div>
+        <div style="font-size:15px;font-weight:800;color:#0f172a;margin:0 0 4px;">
+          ${escapeHtml(task.title)}
+        </div>
+        <div style="font-size:12.5px;color:#475569;line-height:1.5;">
+          ${meta.join(' · ')}
+        </div>
+        ${
+          extraLine
+            ? `<div style="margin-top:6px;padding:6px 10px;border-radius:8px;background:#ffffff;border:1px solid #e2e8f0;font-size:12px;color:#334155;font-weight:600;">${escapeHtml(extraLine)}</div>`
+            : ''
+        }
+        ${
+          task.description && task.description !== task.title
+            ? `<div style="margin-top:8px;font-size:12px;color:#475569;line-height:1.45;">${escapeHtml(task.description)}</div>`
+            : ''
+        }
+        ${buttons.length > 0 ? `<div style="margin-top:8px;">${buttons.join('')}</div>` : ''}
+      </div>
+    `;
+  };
+
+  const sectionsHtml = [
+    ...input.diff.added.map((t) =>
+      renderTaskCard(t, {
+        text: '➕ Nový úkol v plánu',
+        bg: '#f0fdf4',
+        border: '#bbf7d0',
+        color: '#047857',
+      })
+    ),
+    ...input.diff.updated.map((u) =>
+      renderTaskCard(
+        u.task,
+        {
+          text: '✏️ Upravený úkol',
+          bg: '#eff6ff',
+          border: '#bfdbfe',
+          color: '#1d4ed8',
+        },
+        `Co se změnilo: ${u.changes.join(' · ')}`
+      )
+    ),
+    ...input.diff.removed.map((t) =>
+      renderTaskCard(
+        { ...t, mapsUrl: null, driveUrl: null, detailUrl: '' },
+        {
+          text: '🚫 Odebráno / přesunuto na jiný den',
+          bg: '#fffbeb',
+          border: '#fde68a',
+          color: '#b45309',
+        }
+      )
+    ),
+  ].join('');
+
+  const totalLabel = `${input.totalCurrentTasks} ${czechTaskCountLabel(input.totalCurrentTasks)}`;
+
+  const html = `
+    <div style="margin:0;background:#f1f5f9;padding:24px 12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#0f172a;">
+      <div style="max-width:640px;margin:0 auto;border-radius:18px;overflow:hidden;background:#ffffff;border:1px solid #e2e8f0;box-shadow:0 4px 12px rgba(15,23,42,0.06);">
+        <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 100%);padding:22px 24px;color:#ffffff;">
+          <div style="font-size:11px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#38bdf8;margin-bottom:6px;">
+            ${escapeHtml(input.organizationName)} · Aktualizace plánu práce
+          </div>
+          <h1 style="margin:0 0 8px;font-size:20px;line-height:1.25;font-weight:900;color:#ffffff;">
+            Změna v plánu na ${escapeHtml(dayWord)} (${escapeHtml(input.targetDateLabel)})
+          </h1>
+          <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:#cbd5e1;">
+            Ahoj <strong style="color:#ffffff;">${escapeHtml(vocativeName)}</strong>, v tvém plánu na ${escapeHtml(dayWord)} došlo ke změně. Aktuálně máš na tento den celkem <strong style="color:#ffffff;">${escapeHtml(totalLabel)}</strong>.
+          </p>
+          <a href="${escapeHtml(input.myTasksUrl)}" style="display:inline-block;padding:10px 16px;border-radius:10px;background:#0284c7;color:#ffffff;font-size:13px;font-weight:800;text-decoration:none;">
+            📱 Otevřít aktuální plán v aplikaci →
+          </a>
+        </div>
+        <div style="padding:18px 20px 10px;">
+          ${sectionsHtml}
+        </div>
+        <div style="padding:12px 24px 20px;font-size:11.5px;line-height:1.5;color:#64748b;text-align:center;">
+          Úkoly není potřeba potvrzovat. Aktuální přehled najdeš vždy v aplikaci SeePoint OS.
+        </div>
+      </div>
+    </div>
+  `;
+
+  const textLines = [
+    subject,
+    `Ahoj ${vocativeName}, v tvém plánu na ${dayWord} (${input.targetDateLabel}) došlo ke změně. Celkem máš nyní ${totalLabel}.`,
+    '',
+    ...input.diff.added.map(
+      (t) =>
+        `[NOVÝ ÚKOL] ${t.title} (${t.clientName})${t.scheduledTimeLabel ? ` | ${t.scheduledTimeLabel}` : ''}${
+          t.address ? ` | ${t.address}` : ''
+        }${t.detailUrl ? ` | ${t.detailUrl}` : ''}`
+    ),
+    ...input.diff.updated.map(
+      (u) =>
+        `[UPRAVENO: ${u.changes.join(', ')}] ${u.task.title} (${u.task.clientName})${
+          u.task.detailUrl ? ` | ${u.task.detailUrl}` : ''
+        }`
+    ),
+    ...input.diff.removed.map(
+      (t) => `[ODEBRÁNO / PŘESUNUTO] ${t.title} (${t.clientName})`
+    ),
+    '',
+    `Aktuální plán: ${input.myTasksUrl}`,
+  ];
+
+  return { subject, html, text: textLines.join('\n') };
+}
+
+export type NotifyPlanChangesResult = {
+  checkedDates: string[];
+  sentCount: number;
+  skippedNoChangeCount: number;
+  skippedNotEligibleCount: number;
+  failedCount: number;
+  deliveries: Array<{
+    targetDate: string;
+    recipientEmail: string;
+    recipientName: string;
+    added: number;
+    updated: number;
+    removed: number;
+    status: 'sent' | 'skipped_env' | 'failed';
+    error?: string;
+  }>;
+};
+
+export async function notifyWorkerPlanChangesForOrganization(
+  organizationId: string,
+  options?: {
+    dates?: string[];
+    baseUrl?: string;
+    now?: Date;
+    changedOrderIds?: string[];
+  }
+): Promise<NotifyPlanChangesResult> {
+  const settings = await getDailyBriefingSettings(organizationId);
+  if (!settings.enabled || !settings.notifyChanges) {
+    return {
+      checkedDates: [],
+      sentCount: 0,
+      skippedNoChangeCount: 0,
+      skippedNotEligibleCount: 0,
+      failedCount: 0,
+      deliveries: [],
+    };
+  }
+
+  const now = options?.now ?? new Date();
+  const timezone = settings.timezone || DEFAULT_BRIEFING_TIMEZONE;
+  const todayDate = dayInZone(now, timezone);
+  const tomorrowDate = addCalendarDays(todayDate, 1);
+  const localHour = getLocalHour(now, timezone);
+  const baseUrl = (options?.baseUrl || resolvePublicAppUrl()).replace(/\/+$/, '');
+
+  const requestedDates = options?.dates?.length
+    ? [...new Set(options.dates.filter((d) => d === todayDate || d === tomorrowDate))]
+    : [todayDate, tomorrowDate];
+
+  if (requestedDates.length === 0) {
+    return {
+      checkedDates: [],
+      sentCount: 0,
+      skippedNoChangeCount: 0,
+      skippedNotEligibleCount: 0,
+      failedCount: 0,
+      deliveries: [],
+    };
+  }
+
+  const [org, recentLogs, directory] = await Promise.all([
+    prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { name: true },
+    }),
+    prisma.emailLog.findMany({
+      where: {
+        organizationId,
+        template: { in: ['worker-daily-briefing', 'worker-plan-change'] },
+        status: 'SENT',
+        sentAt: { gte: new Date(now.getTime() - 48 * 60 * 60 * 1000) },
+      },
+      select: {
+        recipient: true,
+        template: true,
+        sentAt: true,
+        metadata: true,
+      },
+      orderBy: { sentAt: 'desc' },
+    }),
+    loadOrganizationWorkerDirectory(organizationId),
+  ]);
+
+  const organizationName = org?.name || 'SeePoint OS';
+  const directoryByEmail = new Map(directory.map((d) => [d.email.toLowerCase(), d]));
+  const changedIdsSet = new Set((options?.changedOrderIds || []).filter(Boolean));
+
+  const checkedDates: string[] = [];
+  const deliveries: NotifyPlanChangesResult['deliveries'] = [];
+  let sentCount = 0;
+  let skippedNoChangeCount = 0;
+  let skippedNotEligibleCount = 0;
+  let failedCount = 0;
+
+  for (const targetDate of requestedDates) {
+    if (settings.skipWeekends && isWeekendDate(targetDate)) {
+      skippedNotEligibleCount++;
+      continue;
+    }
+
+    const isToday = targetDate === todayDate;
+    const isTomorrow = targetDate === tomorrowDate;
+
+    const latestLogByEmail = new Map<
+      string,
+      {
+        hash: string | null;
+        tasks: WorkerDayPlanTaskSnapshot[] | null;
+        recipientName: string | null;
+      }
+    >();
+    let hasAnyBriefingForDate = false;
+
+    for (const log of recentLogs) {
+      const meta = asPcObj(log.metadata);
+      if (meta.targetDate !== targetDate || meta.isTest === true) continue;
+      if (log.template === 'worker-daily-briefing') {
+        hasAnyBriefingForDate = true;
+      }
+      const emailLower = log.recipient.trim().toLowerCase();
+      if (!latestLogByEmail.has(emailLower)) {
+        latestLogByEmail.set(emailLower, {
+          hash: typeof meta.planSnapshotHash === 'string' ? meta.planSnapshotHash : null,
+          tasks: parseStoredSnapshotTasks(meta.planSnapshotTasks),
+          recipientName: typeof meta.recipientName === 'string' ? meta.recipientName : null,
+        });
+      }
+    }
+
+    if (isTomorrow) {
+      const tomorrowWindowOpen = hasAnyBriefingForDate || localHour > settings.sendHourLocal;
+      if (!tomorrowWindowOpen) {
+        skippedNotEligibleCount++;
+        continue;
+      }
+    } else if (isToday) {
+      if (localHour >= 19) {
+        skippedNotEligibleCount++;
+        continue;
+      }
+      if (!hasAnyBriefingForDate && changedIdsSet.size === 0) {
+        skippedNotEligibleCount++;
+        continue;
+      }
+    }
+
+    checkedDates.push(targetDate);
+
+    const assembly = await loadDailyBriefingsForOrganization(organizationId, {
+      targetDate,
+      timezone,
+      baseUrl,
+    });
+
+    const briefingByEmail = new Map(
+      assembly.briefings.map((b) => [b.recipient.email.toLowerCase(), b])
+    );
+
+    const candidateEmails = new Set<string>();
+    for (const email of briefingByEmail.keys()) {
+      candidateEmails.add(email);
+    }
+    for (const email of latestLogByEmail.keys()) {
+      if (isBriefingRecipientAllowed(email, settings)) {
+        candidateEmails.add(email);
+      }
+    }
+
+    for (const email of candidateEmails) {
+      const briefing = briefingByEmail.get(email);
+      const currentTasks = briefing?.tasks ?? [];
+      const currentSnap = buildWorkerDayPlanSnapshot(currentTasks);
+      const prevLog = latestLogByEmail.get(email);
+
+      let diff: WorkerPlanDiff;
+
+      if (prevLog) {
+        if (!prevLog.tasks) {
+          // Legacy briefing log sent prior to snapshot tracking — skip to avoid false full-plan resend
+          skippedNotEligibleCount++;
+          continue;
+        }
+        if (prevLog.hash && prevLog.hash === currentSnap.hash) {
+          skippedNoChangeCount++;
+          continue;
+        }
+        diff = diffWorkerDayPlanSnapshots(prevLog.tasks, currentSnap.tasks);
+      } else {
+        // Worker had no prior briefing for this date (e.g. had 0 tasks at 17:00 and got a new task later)
+        if (currentSnap.tasks.length === 0) {
+          skippedNoChangeCount++;
+          continue;
+        }
+        const relevantAdded =
+          !hasAnyBriefingForDate && isToday && changedIdsSet.size > 0
+            ? currentSnap.tasks.filter((t) => changedIdsSet.has(t.id))
+            : currentSnap.tasks;
+
+        if (relevantAdded.length === 0) {
+          skippedNoChangeCount++;
+          continue;
+        }
+        diff = { added: relevantAdded, updated: [], removed: [] };
+      }
+
+      // Never treat tasks that were simply marked DONE as "removed / cancelled" change alerts
+      if (diff.removed.length > 0) {
+        const removedIds = diff.removed.map((t) => t.id);
+        const statuses = await prisma.workOrder.findMany({
+          where: { organizationId, id: { in: removedIds } },
+          select: { id: true, status: true },
+        });
+        const doneIds = new Set(statuses.filter((s) => s.status === 'DONE').map((s) => s.id));
+        if (doneIds.size > 0) {
+          diff = {
+            ...diff,
+            removed: diff.removed.filter((t) => !doneIds.has(t.id)),
+          };
+        }
+      }
+
+      if (diff.added.length === 0 && diff.updated.length === 0 && diff.removed.length === 0) {
+        skippedNoChangeCount++;
+        continue;
+      }
+
+      const dirEntry = directoryByEmail.get(email);
+      const fallbackName = prevLog?.recipientName || dirEntry?.fullName || email.split('@')[0];
+      const recipientInfo = briefing?.recipient ??
+        dirEntry ?? {
+          firstName: fallbackName.split(/\s+/)[0] || 'kolega',
+          fullName: fallbackName,
+          email,
+        };
+
+      const rendered = renderWorkerPlanChangeEmail({
+        recipient: recipientInfo,
+        organizationName,
+        targetDate,
+        targetDateLabel: assembly.targetDateLabel,
+        isToday,
+        diff,
+        totalCurrentTasks: currentSnap.tasks.length,
+        myTasksUrl: briefing?.myTasksUrl || `${baseUrl}/my-tasks`,
+      });
+
+      const emailHash = crypto
+        .createHash('sha256')
+        .update(`${organizationId}:${targetDate}:${email}`)
+        .digest('hex')
+        .slice(0, 12);
+
+      try {
+        const result = await sendTransactionalEmail({
+          to: email,
+          bcc: [],
+          subject: rendered.subject,
+          message: rendered.text,
+          customHtml: rendered.html,
+          template: 'worker-plan-change',
+          organizationId,
+          allowPlatformFallback: true,
+          idempotencyKey: `plan-change/${targetDate}/${emailHash}/${currentSnap.hash}`,
+          metadata: {
+            targetDate,
+            recipientName: recipientInfo.fullName,
+            taskCount: currentSnap.tasks.length,
+            planSnapshotHash: currentSnap.hash,
+            planSnapshotTasks: currentSnap.tasks,
+            addedCount: diff.added.length,
+            updatedCount: diff.updated.length,
+            removedCount: diff.removed.length,
+            isTest: false,
+          },
+        });
+
+        if (result.status === 'sent') {
+          sentCount++;
+          deliveries.push({
+            targetDate,
+            recipientEmail: email,
+            recipientName: recipientInfo.fullName,
+            added: diff.added.length,
+            updated: diff.updated.length,
+            removed: diff.removed.length,
+            status: 'sent',
+          });
+        } else {
+          deliveries.push({
+            targetDate,
+            recipientEmail: email,
+            recipientName: recipientInfo.fullName,
+            added: diff.added.length,
+            updated: diff.updated.length,
+            removed: diff.removed.length,
+            status: 'skipped_env',
+          });
+        }
+      } catch (err) {
+        failedCount++;
+        deliveries.push({
+          targetDate,
+          recipientEmail: email,
+          recipientName: recipientInfo.fullName,
+          added: diff.added.length,
+          updated: diff.updated.length,
+          removed: diff.removed.length,
+          status: 'failed',
+          error: err instanceof Error ? err.message : 'Odeslání změny selhalo.',
+        });
+      }
+    }
+  }
+
+  return {
+    checkedDates,
+    sentCount,
+    skippedNoChangeCount,
+    skippedNotEligibleCount,
+    failedCount,
     deliveries,
   };
 }
@@ -1736,6 +2424,14 @@ export function assembleManagerMorningDigest(input: {
     if (rescheduledMap.has(order.id)) continue;
 
     const pc = asPcObj(order.planningConstraints);
+    const preferredReason =
+      pc.lastEmailAction === 'REPORTED_UNFINISHED' && typeof pc.lastWorkerReason === 'string'
+        ? pc.lastWorkerReason
+        : typeof pc.lastWorkerNote === 'string'
+        ? pc.lastWorkerNote
+        : typeof pc.lastWorkerReason === 'string'
+        ? pc.lastWorkerReason
+        : null;
     const item: ManagerMorningDigestItem = {
       workOrderId: order.id,
       title: order.title,
@@ -1743,12 +2439,7 @@ export function assembleManagerMorningDigest(input: {
       workerNames: order.assignments.map((a) => a.workerName.trim()).filter(Boolean),
       status: order.status,
       detailUrl: `${baseUrl}/work/${order.id}`,
-      workerReason:
-        typeof pc.lastWorkerNote === 'string'
-          ? pc.lastWorkerNote
-          : typeof pc.lastWorkerReason === 'string'
-          ? pc.lastWorkerReason
-          : null,
+      workerReason: preferredReason,
       reportBy: typeof pc.lastWorkerReportBy === 'string' ? pc.lastWorkerReportBy : null,
     };
 

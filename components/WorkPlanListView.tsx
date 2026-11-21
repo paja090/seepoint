@@ -510,23 +510,25 @@ export function WorkPlanListView({
                         </button>
                       )}
 
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          if (onOpenReschedule) {
-                            onOpenReschedule(order);
-                          } else {
-                            setRescheduleTarget(order);
-                          }
-                        }}
-                        className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-black text-sky-800 hover:bg-sky-100 transition shadow-2xs cursor-pointer"
-                        title="Přeplánovat zakázku na jiný den"
-                      >
-                        <Calendar size={12} className="text-sky-600" />
-                        <span>Přeplánovat</span>
-                      </button>
+                      {(onOpenReschedule || canCleanup) && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (onOpenReschedule) {
+                              onOpenReschedule(order);
+                            } else {
+                              setRescheduleTarget(order);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-black text-sky-800 hover:bg-sky-100 transition shadow-2xs cursor-pointer"
+                          title="Přeplánovat zakázku na jiný den"
+                        >
+                          <Calendar size={12} className="text-sky-600" />
+                          <span>Přeplánovat</span>
+                        </button>
+                      )}
 
                       {canCleanup && (
                         <button

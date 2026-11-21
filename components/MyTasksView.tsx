@@ -13,7 +13,6 @@ import {
   ChevronUp,
   History,
 } from 'lucide-react';
-import { WorkOrderAcknowledgeButton } from './WorkOrderAcknowledgeButton';
 import { resolveGoogleDriveUrl, formatGoogleDriveLabel } from '@/lib/work';
 
 export type MyTaskItem = {
@@ -50,14 +49,13 @@ export type MyTaskItem = {
 
 export function MyTasksView({
   tasks,
-  currentUserId,
   currentUserName,
 }: {
   tasks: MyTaskItem[];
-  currentUserId: string;
+  currentUserId?: string;
   currentUserName: string;
 }) {
-  const [activeFilter, setActiveFilter] = useState<'ACTIVE' | 'ALL' | 'PENDING_ACK' | 'IN_PROGRESS' | 'DONE'>('ACTIVE');
+  const [activeFilter, setActiveFilter] = useState<'ACTIVE' | 'ALL' | 'IN_PROGRESS' | 'DONE'>('ACTIVE');
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [completionNote, setCompletionNote] = useState('');
@@ -67,9 +65,6 @@ export function MyTasksView({
 
   const filteredTasks = tasks.filter((t) => {
     if (activeFilter === 'ACTIVE') return t.status !== 'DONE';
-    if (activeFilter === 'PENDING_ACK') {
-      return t.assignments.some((a) => !a.acknowledgedAt) && t.status !== 'DONE';
-    }
     if (activeFilter === 'IN_PROGRESS') return t.status === 'IN_PROGRESS';
     if (activeFilter === 'DONE') return t.status === 'DONE';
     return true;
@@ -121,12 +116,6 @@ export function MyTasksView({
             Aktivní zakázky ({tasks.filter((t) => t.status !== 'DONE').length})
           </button>
           <button
-            onClick={() => setActiveFilter('PENDING_ACK')}
-            className={`rounded-xl px-3 py-1.5 transition ${activeFilter === 'PENDING_ACK' ? 'bg-amber-500 text-slate-950 shadow-sm font-black' : 'text-slate-700 hover:text-slate-900'}`}
-          >
-            K převzetí ({tasks.filter((t) => t.assignments.some((a) => !a.acknowledgedAt) && t.status !== 'DONE').length})
-          </button>
-          <button
             onClick={() => setActiveFilter('IN_PROGRESS')}
             className={`rounded-xl px-3 py-1.5 transition ${activeFilter === 'IN_PROGRESS' ? 'bg-sky-600 text-white shadow-sm font-black' : 'text-slate-700 hover:text-slate-900'}`}
           >
@@ -172,7 +161,6 @@ export function MyTasksView({
       ) : (
         <div className="space-y-4">
           {filteredTasks.map((t) => {
-            const isAcknowledged = t.assignments.some((a) => Boolean(a.acknowledgedAt));
             const isExpanded = expandedTaskId === t.id;
             const isDone = t.status === 'DONE';
             const isInProgress = t.status === 'IN_PROGRESS';
@@ -185,8 +173,6 @@ export function MyTasksView({
                     ? 'border-emerald-200 bg-emerald-50/20'
                     : isInProgress
                     ? 'border-sky-300 ring-2 ring-sky-100'
-                    : !isAcknowledged
-                    ? 'border-amber-300 bg-amber-50/30 ring-2 ring-amber-100'
                     : 'border-slate-200 hover:border-slate-300'
                 }`}
               >
@@ -208,12 +194,6 @@ export function MyTasksView({
                     <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600">
                       {t.workType}
                     </span>
-
-                    {!isAcknowledged && !isDone && (
-                      <span className="rounded-full bg-amber-500 px-2.5 py-0.5 text-xs font-black text-slate-950 animate-pulse">
-                        ⚠️ Čeká na vaše odsouhlasení
-                      </span>
-                    )}
                   </div>
 
                   <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
@@ -284,17 +264,9 @@ export function MyTasksView({
                   )}
                 </div>
 
-                {/* Worker Acknowledgment & Status Action Buttons */}
+                {/* Status Action Buttons */}
                 <div className="mt-4 border-t border-slate-100 pt-3 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    {/* Worker Acknowledgment Button */}
-                    {!isDone && (
-                      <WorkOrderAcknowledgeButton
-                        workOrderId={t.id}
-                        initialAcknowledged={isAcknowledged}
-                      />
-                    )}
-
                     {/* Start Task Button */}
                     {!isDone && !isInProgress && (
                       <button
@@ -348,11 +320,6 @@ export function MyTasksView({
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-slate-800">📅 Vytvořeno:</span> {new Date(t.scheduledAt).toLocaleDateString('cs-CZ')} zadavatelem {t.requestedBy || 'neuveden'}
                         </div>
-                        {isAcknowledged && (
-                          <div className="flex items-center gap-2 text-emerald-700 font-bold">
-                            <span>✅ Odsouhlaseno převzetí pracovníkem</span>
-                          </div>
-                        )}
                         {isDone && (
                           <div className="flex items-center gap-2 text-emerald-800 font-bold">
                             <span>🎉 Dokončeno & zapsáno do Odvedené práce</span>

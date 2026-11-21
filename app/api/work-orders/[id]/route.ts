@@ -2,10 +2,17 @@ import { enterTenantContext } from '@/lib/tenant-context';
 import { usesItemExecution } from '@/lib/field-planning/item-jobs';
 import { Prisma, WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
+import { canManageWorkOrderSchedule } from '@/lib/rbac';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { getAppOrigin } from '@/lib/app-url';
+import { dayInZone } from '@/lib/field-planning/profile';
 import { syncWorkOrderTasks } from '@/lib/work-task-sync';
 import { extractWorkOrderConstraintFlags } from '@/lib/work';
+import {
+  DEFAULT_BRIEFING_TIMEZONE,
+  notifyWorkerPlanChangesForOrganization,
+} from '@/lib/work/daily-briefing';
 import {
   writeBackWorkOrderCompletedToGoogleSheet,
   writeBackWorkOrderRescheduledToGoogleSheet,
@@ -76,14 +83,23 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (typeof input.status !== 'string' || !Object.values(WorkOrderStatus).includes(input.status as WorkOrderStatus)) {
     return NextResponse.json({ error: 'Vybraný stav není platný.' }, { status: 400 });
   }
-  if (input.priority !== undefined && (typeof input.priority !== 'string' || !Object.values(WorkPriority).includes(input.priority as WorkPriority))) {
+
+  const canManage = canManageWorkOrderSchedule(auth.role);
+  if (!canManage && (input.scheduledAt !== undefined || input.deadlineAt !== undefined)) {
+    return NextResponse.json(
+      { error: 'Termín zakázky může měnit pouze zadavatel nebo manažer.' },
+      { status: 403 }
+    );
+  }
+
+  if (canManage && input.priority !== undefined && (typeof input.priority !== 'string' || !Object.values(WorkPriority).includes(input.priority as WorkPriority))) {
     return NextResponse.json({ error: 'Vybraná priorita není platná.' }, { status: 400 });
   }
-  const price = parsePrice(input.price);
+  const price = canManage ? parsePrice(input.price) : undefined;
   if (price === false) return NextResponse.json({ error: 'Cena musí být kladné číslo s nejvýše dvěma desetinnými místy.' }, { status: 400 });
 
   let scheduledAt: Date | undefined;
-  if (input.scheduledAt !== undefined) {
+  if (canManage && input.scheduledAt !== undefined) {
     if (typeof input.scheduledAt === 'string') {
       const d = new Date(input.scheduledAt);
       if (!Number.isNaN(d.getTime())) {
@@ -93,7 +109,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 
   let deadlineAt: Date | undefined;
-  if (input.deadlineAt !== undefined) {
+  if (canManage && input.deadlineAt !== undefined) {
     if (typeof input.deadlineAt === 'string') {
       const d = new Date(input.deadlineAt);
       if (!Number.isNaN(d.getTime())) {
@@ -103,7 +119,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const { id } = await params;
-  const existing = await prisma.workOrder.findUnique({ where: { id }, select: { id: true } });
+  const existing = await prisma.workOrder.findUnique({ where: { id }, select: { id: true, scheduledAt: true } });
   if (!existing) return NextResponse.json({ error: 'Pracovní úkol nebyl nalezen.' }, { status: 404 });
   
   try {
@@ -127,8 +143,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         });
       }
       const hasFtdChange = typeof input.ftdSent === 'boolean';
-      const hasInvoicedChange = typeof input.invoiced === 'boolean';
-      const hasExemptChange = typeof input.invoiceExempt === 'boolean';
+      const hasInvoicedChange = canManage && typeof input.invoiced === 'boolean';
+      const hasExemptChange = canManage && typeof input.invoiceExempt === 'boolean';
       const prevPc =
         current.planningConstraints &&
         typeof current.planningConstraints === 'object' &&
@@ -136,7 +152,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           ? { ...(current.planningConstraints as Record<string, unknown>) }
           : {};
       const nextPc: Record<string, unknown> = { ...prevPc };
-      let effectiveInvoiced = typeof input.invoiced === 'boolean' ? input.invoiced : undefined;
+      let effectiveInvoiced = hasInvoicedChange ? (input.invoiced as boolean) : undefined;
 
       if (hasFtdChange) {
         nextPc.manualFtdSent = input.ftdSent;
@@ -162,7 +178,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         where: { id },
         data: {
           status: input.status as WorkOrderStatus,
-          priority: input.priority as WorkPriority | undefined,
+          priority: canManage ? (input.priority as WorkPriority | undefined) : undefined,
           price,
           ftdSent: typeof input.ftdSent === 'boolean' ? input.ftdSent : undefined,
           invoiced: effectiveInvoiced,
@@ -190,14 +206,27 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       if (
         scheduledAt !== undefined ||
         typeof input.ftdSent === 'boolean' ||
-        typeof input.invoiced === 'boolean' ||
-        typeof input.invoiceExempt === 'boolean'
+        (canManage && typeof input.invoiced === 'boolean') ||
+        (canManage && typeof input.invoiceExempt === 'boolean')
       ) {
         await writeBackWorkOrderRescheduledToGoogleSheet({
           organizationId: auth.organizationId,
           workOrderId: saved.id,
         }).catch((err) => {
           console.warn('[api/work-orders/[id]] Field update write-back to Google Sheet failed:', err);
+        });
+      }
+      if (scheduledAt !== undefined || saved.status === 'CANCELLED' || (canManage && input.priority !== undefined)) {
+        const affectedDates = [
+          dayInZone(existing.scheduledAt, DEFAULT_BRIEFING_TIMEZONE),
+          dayInZone(saved.scheduledAt, DEFAULT_BRIEFING_TIMEZONE),
+        ];
+        await notifyWorkerPlanChangesForOrganization(auth.organizationId, {
+          dates: affectedDates,
+          baseUrl: getAppOrigin(request),
+          changedOrderIds: [saved.id],
+        }).catch((err) => {
+          console.warn('[api/work-orders/[id]] Plan change notification failed:', err);
         });
       }
     }
@@ -224,6 +253,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('work'); if (isApiDenied(auth)) return auth;
+  if (!canManageWorkOrderSchedule(auth.role)) {
+    return NextResponse.json(
+      { error: 'Upravovat zadání a termíny zakázky může pouze zadavatel nebo manažer.' },
+      { status: 403 }
+    );
+  }
   enterTenantContext({ organizationId: auth.organizationId!, userId: auth.id, source: 'session' });
   const input = await request.json().catch(() => null) as EditInput | null;
   if (!input) return NextResponse.json({ error: 'Požadavek neobsahuje platná data.' }, { status: 400 });
@@ -264,7 +299,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!validDriveUrl(ftdUrl)) return NextResponse.json({ error: 'Odkaz na fotodokumentaci musí být platná adresa složky na Google Disku.' }, { status: 400 });
   const workerNames = (text(input, 'workerNames') || '').split(',').map((name) => name.trim()).filter(Boolean);
   const { id } = await params;
-  const existing = await prisma.workOrder.findUnique({ where: { id }, select: { id: true } });
+  const existing = await prisma.workOrder.findUnique({ where: { id }, select: { id: true, scheduledAt: true } });
   if (!existing) return NextResponse.json({ error: 'Pracovní úkol nebyl nalezen.' }, { status: 404 });
 
   try {
@@ -340,13 +375,30 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }).catch((err) => {
       console.warn('[api/work-orders/[id]] PATCH write-back to Google Sheet failed:', err);
     });
+    const affectedDates = [
+      dayInZone(existing.scheduledAt, DEFAULT_BRIEFING_TIMEZONE),
+      dayInZone(scheduledAt, DEFAULT_BRIEFING_TIMEZONE),
+    ];
+    await notifyWorkerPlanChangesForOrganization(auth.organizationId, {
+      dates: affectedDates,
+      baseUrl: getAppOrigin(request),
+      changedOrderIds: [id],
+    }).catch((err) => {
+      console.warn('[api/work-orders/[id]] PATCH plan change notification failed:', err);
+    });
   }
   return NextResponse.json({ id });
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiAccess('work');
   if (isApiDenied(auth)) return auth;
+  if (!canManageWorkOrderSchedule(auth.role)) {
+    return NextResponse.json(
+      { error: 'Odebrat zakázku může pouze zadavatel nebo manažer.' },
+      { status: 403 }
+    );
+  }
   enterTenantContext({ organizationId: auth.organizationId!, userId: auth.id, source: 'session' });
   const { id } = await params;
   const existing = await prisma.workOrder.findUnique({
@@ -354,13 +406,32 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     include: { workEntries: { select: { id: true } }, items: { include: { photos: { select: { id: true } } } } },
   });
   if (!existing) return NextResponse.json({ error: 'Pracovní zakázka nebyla nalezena.' }, { status: 404 });
+  const affectedDate = dayInZone(existing.scheduledAt, DEFAULT_BRIEFING_TIMEZONE);
   if (existing.workEntries.length > 0 || usesItemExecution(existing.items) || existing.items.some(i => i.photos.length)) {
     await prisma.workOrder.update({
       where: { id },
       data: { status: 'CANCELLED' },
     });
+    if (auth.organizationId) {
+      await notifyWorkerPlanChangesForOrganization(auth.organizationId, {
+        dates: [affectedDate],
+        baseUrl: getAppOrigin(request),
+        changedOrderIds: [id],
+      }).catch((err) => {
+        console.warn('[api/work-orders/[id]] DELETE(cancel) plan change notification failed:', err);
+      });
+    }
     return NextResponse.json({ ok: true, cancelled: true, message: 'Zakázka má již vykázanou práci a byla proto označena jako ZRUŠENÁ.' });
   }
   await prisma.workOrder.delete({ where: { id } });
+  if (auth.organizationId) {
+    await notifyWorkerPlanChangesForOrganization(auth.organizationId, {
+      dates: [affectedDate],
+      baseUrl: getAppOrigin(request),
+      changedOrderIds: [id],
+    }).catch((err) => {
+      console.warn('[api/work-orders/[id]] DELETE plan change notification failed:', err);
+    });
+  }
   return NextResponse.json({ ok: true, deleted: true });
 }

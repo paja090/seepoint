@@ -1,8 +1,15 @@
 import { WorkPriority, WorkType } from '@prisma/client';
 import { isApiDenied, requireApiAccess } from '@/lib/api-auth';
+import { canManageWorkOrderSchedule } from '@/lib/rbac';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { getAppOrigin } from '@/lib/app-url';
+import { dayInZone } from '@/lib/field-planning/profile';
 import { syncWorkOrderTasks } from '@/lib/work-task-sync';
+import {
+  DEFAULT_BRIEFING_TIMEZONE,
+  notifyWorkerPlanChangesForOrganization,
+} from '@/lib/work/daily-briefing';
 import { writeBackNewWorkOrderToGoogleSheet } from '@/lib/work/google-sheets-writeback';
 import { isWorkOrderEligibleForPhotoApp } from '@/lib/work/photo-folder';
 
@@ -40,6 +47,12 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const auth = await requireApiAccess('work'); if (isApiDenied(auth)) return auth;
+  if (!canManageWorkOrderSchedule(auth.role)) {
+    return NextResponse.json(
+      { error: 'Novou zakázku do plánu může zadávat pouze zadavatel nebo manažer.' },
+      { status: 403 }
+    );
+  }
   const input = await request.json().catch(() => null) as WorkOrderInput | null;
   if (!input) return NextResponse.json({ error: 'Požadavek neobsahuje platná data.' }, { status: 400 });
   const title = text(input, 'title');
@@ -191,6 +204,14 @@ export async function POST(request: Request) {
       workOrderId: order.id,
     }).catch((err) => {
       console.warn('[api/work-orders] Failed to write new work order to Google Sheet:', err);
+    });
+    const scheduledDayStr = dayInZone(scheduledAt, DEFAULT_BRIEFING_TIMEZONE);
+    await notifyWorkerPlanChangesForOrganization(auth.organizationId, {
+      dates: [scheduledDayStr],
+      baseUrl: getAppOrigin(request),
+      changedOrderIds: [order.id],
+    }).catch((err) => {
+      console.warn('[api/work-orders] Failed to send plan change alert:', err);
     });
   }
   return NextResponse.json(order, { status: 201 });

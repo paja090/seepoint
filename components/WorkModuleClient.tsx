@@ -861,11 +861,15 @@ export function WorkModuleClient({
         <WorkDayView
           orders={filteredOrders}
           todayRoutes={todayRoutes}
-          onOpenReschedule={(order) => setRescheduleOrder(order)}
-          onOpenCreateModal={(dateStr) => {
-            setCreateTargetDate(dateStr);
-            setCreateModalOpen(true);
-          }}
+          onOpenReschedule={canCreateWorkOrder ? (order) => setRescheduleOrder(order) : undefined}
+          onOpenCreateModal={
+            canCreateWorkOrder
+              ? (dateStr) => {
+                  setCreateTargetDate(dateStr);
+                  setCreateModalOpen(true);
+                }
+              : undefined
+          }
           onOrderUpdated={handleOrderUpdated}
         />
       )}
@@ -893,10 +897,14 @@ export function WorkModuleClient({
             mediaLabel: o.mediaLabel,
             locationNote: o.locationNote,
           }))}
-          onOpenReschedule={(weekOrder) => {
-            const found = ordersList.find((o) => o.id === weekOrder.id);
-            if (found) setRescheduleOrder(found);
-          }}
+          onOpenReschedule={
+            canCreateWorkOrder
+              ? (weekOrder) => {
+                  const found = ordersList.find((o) => o.id === weekOrder.id);
+                  if (found) setRescheduleOrder(found);
+                }
+              : undefined
+          }
           onOrderUpdated={handleOrderUpdated}
         />
       )}
@@ -907,7 +915,7 @@ export function WorkModuleClient({
           orders={filteredOrders}
           canCleanup={canCreateWorkOrder}
           preferredTab={selectedFilter === 'history' ? 'HISTORY' : undefined}
-          onOpenReschedule={(order) => setRescheduleOrder(order)}
+          onOpenReschedule={canCreateWorkOrder ? (order) => setRescheduleOrder(order) : undefined}
           onOrderUpdated={handleOrderUpdated}
           onOrderDeleted={handleOrderDeleted}
         />
@@ -922,13 +930,15 @@ export function WorkModuleClient({
       )}
 
       {/* RESCHEDULE MODAL */}
-      <RescheduleOrderModal
-        order={rescheduleOrder}
-        onClose={() => setRescheduleOrder(null)}
-        onSuccess={(orderId, newDate) => {
-          handleOrderUpdated(orderId, { scheduledAt: newDate });
-        }}
-      />
+      {canCreateWorkOrder && (
+        <RescheduleOrderModal
+          order={rescheduleOrder}
+          onClose={() => setRescheduleOrder(null)}
+          onSuccess={(orderId, newDate) => {
+            handleOrderUpdated(orderId, { scheduledAt: newDate });
+          }}
+        />
+      )}
 
       {/* MODAL DIALOG: ADD NEW TASK (WorkOrderForm) */}
       {createModalOpen && canCreateWorkOrder && (

@@ -35,6 +35,7 @@ type PreviewWorker = {
 
 type BriefingLogItem = {
   id: string;
+  template?: string;
   recipient: string;
   subject: string;
   status: string;
@@ -48,9 +49,16 @@ type BriefingLogItem = {
   } | null;
 };
 
+type DirectoryWorker = {
+  fullName: string;
+  email: string;
+  role: string;
+};
+
 type ApiResponse = {
   settings: DailyBriefingSettings;
   managerSettings?: ManagerDigestSettings;
+  directory?: DirectoryWorker[];
   managerPreview?: {
     auditedDate: string;
     auditedDateLabel: string;
@@ -83,6 +91,9 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
     sendHourLocal: 17,
     timezone: 'Europe/Prague',
     skipWeekends: false,
+    recipientMode: 'ALL',
+    allowedRecipientEmails: [],
+    notifyChanges: true,
   });
   const [managerSettings, setManagerSettings] = useState<ManagerDigestSettings>({
     enabled: true,
@@ -90,6 +101,7 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
     timezone: 'Europe/Prague',
     skipWeekends: false,
   });
+  const [directory, setDirectory] = useState<DirectoryWorker[]>([]);
   const [managerPreview, setManagerPreview] = useState<ApiResponse['managerPreview'] | null>(null);
   const [preview, setPreview] = useState<ApiResponse['preview'] | null>(null);
   const [recentLogs, setRecentLogs] = useState<BriefingLogItem[]>([]);
@@ -104,6 +116,7 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
       if (!res.ok) throw new Error(data.error || 'Načtení selhalo.');
       setSettings(data.settings);
       if (data.managerSettings) setManagerSettings(data.managerSettings);
+      setDirectory(data.directory || []);
       setManagerPreview(data.managerPreview ?? null);
       setPreview(data.preview);
       setRecentLogs(data.recentLogs || []);
@@ -119,6 +132,19 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  function toggleAllowedRecipient(email: string) {
+    const normalized = email.trim().toLowerCase();
+    setSettings((prev) => {
+      const exists = prev.allowedRecipientEmails.includes(normalized);
+      return {
+        ...prev,
+        allowedRecipientEmails: exists
+          ? prev.allowedRecipientEmails.filter((e) => e !== normalized)
+          : [...prev.allowedRecipientEmails, normalized].sort(),
+      };
+    });
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -139,11 +165,16 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
       if (!res.ok || !data.ok) throw new Error(data.error || 'Uložení selhalo.');
       if (data.settings) setSettings(data.settings);
       if (data.managerSettings) setManagerSettings(data.managerSettings);
+      const recipientsLabel =
+        data.settings?.recipientMode === 'SELECTED'
+          ? `vybraní (${data.settings.allowedRecipientEmails.length})`
+          : 'všichni pracovníci';
       setNotice(
         data.settings?.enabled
-          ? `Automatický rozesílač uložen (pracovníci ${data.settings.sendHourLocal}:00, ranní kontrola manažerovi ${data.managerSettings?.enabled ? `${data.managerSettings.sendHourLocal}:00` : 'vypnuta'}).`
+          ? `Automatický rozesílač uložen (${recipientsLabel}, ${data.settings.sendHourLocal}:00, upozornění na změny ${data.settings.notifyChanges ? 'zapnuta' : 'vypnuta'}).`
           : 'Nastavení rozesílače bylo uloženo.'
       );
+      await loadData();
       setTimeout(() => setNotice(''), 5000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Uložení se nepodařilo.');
@@ -264,11 +295,11 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
               <Mail size={18} />
             </span>
             <h2 className="text-xl font-black text-slate-950">
-              Automatický denní plán práce e-mailem (den předem)
+              Automatický denní plán práce e-mailem (den předem + změny)
             </h2>
           </div>
           <p className="mt-1.5 text-sm text-slate-600 max-w-2xl">
-            Systém každý den ve zvolenou hodinu automaticky projde zítřejší zakázky a naplánované trasy a každému pracovníkovi pošle přehled jeho zítřejších úkolů, adres, navigace a podkladů na Disku, aby se mohl předem připravit.
+            Systém každý den ve zvolenou hodinu automaticky pošle pracovníkům přehled jejich zítřejších úkolů, adres, navigace a podkladů na Disku. Pokud se plán později upraví, pošle dotčeným pracovníkům i krátké upozornění na změnu.
           </p>
         </div>
 
@@ -316,7 +347,7 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
                     Odpolední e-mail pracovníkům
                   </span>
                   <span className="block text-xs text-slate-500 mt-0.5">
-                    V jednom e-mailu pošle dnešní neuzavřené úkoly (Hotovo / Přesunout) i plán na zítřek.
+                    V jednom e-mailu pošle dnešní neuzavřené úkoly (Hotovo / Poznámka zadavateli) i plán na zítřek bez zbytečného potvrzování.
                   </span>
                 </div>
               </label>
@@ -363,6 +394,146 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
               </label>
             </div>
 
+            {/* Automatic later-change alerts + recipient scope */}
+            <div className="space-y-3 border-t border-slate-200/80 pt-4">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.notifyChanges}
+                  onChange={(e) =>
+                    setSettings((prev) => ({ ...prev, notifyChanges: e.target.checked }))
+                  }
+                  className="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600"
+                />
+                <div>
+                  <span className="block text-sm font-bold text-slate-900">
+                    Automaticky posílat pozdější změny plánu
+                  </span>
+                  <span className="block text-xs text-slate-500 mt-0.5">
+                    Když se po odeslání denního přehledu přidá, upraví, přesune nebo zruší úkol na dnes či zítra (v tabulce i v SeePoint OS), dotčený pracovník dostane stručné upozornění e-mailem.
+                  </span>
+                </div>
+              </label>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-3.5 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span className="block text-xs font-black uppercase tracking-wider text-slate-700">
+                      Příjemci denního plánu a změn
+                    </span>
+                    <span className="block text-xs text-slate-500">
+                      Výchozí režim posílá plán všem pracovníkům. V případě potřeby lze dočasně omezit jen na vybrané.
+                    </span>
+                  </div>
+                  <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setSettings((prev) => ({ ...prev, recipientMode: 'ALL' }))}
+                      className={`rounded-lg px-3 py-1.5 transition ${
+                        settings.recipientMode !== 'SELECTED'
+                          ? 'bg-sky-600 text-white shadow-xs font-black'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Všichni pracovníci
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSettings((prev) => ({ ...prev, recipientMode: 'SELECTED' }))
+                      }
+                      className={`rounded-lg px-3 py-1.5 transition ${
+                        settings.recipientMode === 'SELECTED'
+                          ? 'bg-slate-900 text-white shadow-xs font-black'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Jen vybraní ({settings.allowedRecipientEmails.length})
+                    </button>
+                  </div>
+                </div>
+
+                {settings.recipientMode === 'SELECTED' && (
+                  <div className="space-y-2 border-t border-slate-100 pt-2.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-600">
+                        Zaškrtněte pracovníky, kterým se má denní plán odesílat:
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSettings((prev) => ({
+                              ...prev,
+                              allowedRecipientEmails: directory
+                                .map((d) => d.email.toLowerCase())
+                                .sort(),
+                            }))
+                          }
+                          className="font-bold text-sky-700 hover:underline"
+                        >
+                          Vybrat všechny
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSettings((prev) => ({ ...prev, allowedRecipientEmails: [] }))
+                          }
+                          className="font-bold text-slate-500 hover:underline"
+                        >
+                          Zrušit výběr
+                        </button>
+                      </div>
+                    </div>
+
+                    {directory.length === 0 ? (
+                      <p className="text-xs text-slate-500">
+                        V adresáři zatím nejsou žádní aktivní pracovníci s platným e-mailem.
+                      </p>
+                    ) : (
+                      <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                        {directory.map((worker) => {
+                          const emailLower = worker.email.toLowerCase();
+                          const checked = settings.allowedRecipientEmails.includes(emailLower);
+                          return (
+                            <label
+                              key={emailLower}
+                              className={`flex items-start gap-2.5 rounded-xl border p-2.5 text-xs cursor-pointer transition ${
+                                checked
+                                  ? 'border-sky-300 bg-sky-50/70 text-slate-900'
+                                  : 'border-slate-200 bg-slate-50/40 text-slate-600 hover:border-slate-300'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleAllowedRecipient(emailLower)}
+                                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600"
+                              />
+                              <div className="min-w-0">
+                                <div className="font-bold text-slate-900 truncate">
+                                  {worker.fullName}
+                                </div>
+                                <div className="text-[11px] font-mono text-slate-500 truncate">
+                                  {worker.email}
+                                </div>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {settings.allowedRecipientEmails.length === 0 && (
+                      <p className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                        Není vybraný žádný pracovník — dokud někoho nezaškrtnete nebo nepřepnete zpět na „Všichni pracovníci“, denní plány se nikomu neodešlou.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="grid gap-4 border-t border-slate-200/80 pt-4 sm:grid-cols-3">
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
@@ -378,7 +549,7 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
                     Ranní kontrolní souhrn manažerům
                   </span>
                   <span className="block text-xs text-slate-500 mt-0.5">
-                    Ráno shrne včerejší neuzavřené úkoly a důvody/poznámky k přesunu od pracovníků.
+                    Ráno shrne včerejší neuzavřené úkoly a případné poznámky od pracovníků.
                   </span>
                 </div>
               </label>
@@ -566,7 +737,7 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
           {recentLogs.length > 0 && (
             <div className="space-y-2 border-t border-slate-200 pt-4">
               <h4 className="text-xs font-black uppercase tracking-wider text-slate-500">
-                Poslední odeslané denní plány
+                Poslední odeslané plány a upozornění na změny
               </h4>
               <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100 text-xs">
                 {recentLogs.map((log) => (
@@ -574,11 +745,16 @@ export function DailyBriefingSettingsCard({ currentUserEmail }: { currentUserEma
                     key={log.id}
                     className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-white"
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex flex-wrap items-center gap-1.5">
+                      {log.template === 'worker-plan-change' && (
+                        <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-black text-sky-800">
+                          🔄 Změna
+                        </span>
+                      )}
                       <span className="font-bold text-slate-800">
                         {log.metadata?.recipientName || log.recipient}
                       </span>
-                      <span className="text-slate-400 mx-1.5">·</span>
+                      <span className="text-slate-400">·</span>
                       <span className="text-slate-600 truncate">{log.subject}</span>
                     </div>
                     <span className="text-[11px] text-slate-500 shrink-0 tabular-nums">

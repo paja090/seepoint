@@ -9,6 +9,7 @@ import {
   syncGooglePlanToWorkOrders,
 } from '@/lib/work/google-sheets-sync';
 import { flushPendingGoogleSheetWritebacks } from '@/lib/work/google-sheets-writeback';
+import { notifyWorkerPlanChangesForOrganization } from '@/lib/work/daily-briefing';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -61,6 +62,11 @@ async function handleCronExecution(request: Request) {
     updatedCount?: number;
     skippedCount?: number;
     cleanedCount?: number;
+    planChangeNotifications?: {
+      checkedDates: string[];
+      sentCount: number;
+      failedCount: number;
+    };
     status: string;
     error?: string;
   }> = [];
@@ -87,8 +93,14 @@ async function handleCronExecution(request: Request) {
             errors: [err instanceof Error ? err.message : 'FLUSH_ERROR'],
           }));
           const syncResult = await syncGooglePlanToWorkOrders({ organizationId: org.id });
+          const changeResult = await notifyWorkerPlanChangesForOrganization(org.id).catch(
+            (err) => {
+              console.warn(`[cron/google-sheet-plan] Plan change alerts failed for ${org.id}:`, err);
+              return null;
+            }
+          );
           console.log(
-            `[cron/google-sheet-plan] org=${org.id} flushedDone=${writebackFlush.flushedCompletedCount} parsed=${syncResult.totalParsed} created=${syncResult.createdCount} updated=${syncResult.updatedCount} cleaned=${syncResult.cleanedCount ?? 0} skipped=${syncResult.skippedCount}`
+            `[cron/google-sheet-plan] org=${org.id} flushedDone=${writebackFlush.flushedCompletedCount} parsed=${syncResult.totalParsed} created=${syncResult.createdCount} updated=${syncResult.updatedCount} cleaned=${syncResult.cleanedCount ?? 0} skipped=${syncResult.skippedCount} changeEmails=${changeResult?.sentCount ?? 0}`
           );
           return {
             organizationId: org.id,
@@ -99,6 +111,15 @@ async function handleCronExecution(request: Request) {
             skippedCount: syncResult.skippedCount,
             cleanedCount: syncResult.cleanedCount ?? 0,
             writebackFlush,
+            ...(changeResult
+              ? {
+                  planChangeNotifications: {
+                    checkedDates: changeResult.checkedDates,
+                    sentCount: changeResult.sentCount,
+                    failedCount: changeResult.failedCount,
+                  },
+                }
+              : {}),
           };
         } catch (err) {
           console.error(`[cron/google-sheet-plan] Sync failed for ${org.id}:`, err);
