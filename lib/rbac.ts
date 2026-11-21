@@ -227,6 +227,15 @@ export function canEditShoppingList(role: AppRole | string) {
   return roles.includes(role as AppRole) && role !== 'VIEWER';
 }
 
+/**
+ * Only order creators / dispatchers / managers (ADMIN, MANAGER, SALES) may change
+ * WorkOrder scheduled dates, deadlines, assignments, invoicing, or delete orders.
+ * Field executors (WORKER, TECHNICIAN) do not reschedule orders.
+ */
+export function canManageWorkOrderSchedule(role: AppRole | string) {
+  return role === 'ADMIN' || role === 'MANAGER' || role === 'SALES';
+}
+
 export function roleLabel(role: AppRole | string) {
   const labels: Record<string, string> = {
     ADMIN: 'Administrátor',

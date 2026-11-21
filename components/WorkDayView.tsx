@@ -29,8 +29,8 @@ import {
 export type WorkDayViewProps = {
   orders: WorkOrderData[];
   todayRoutes?: TodayCrewRouteSummary[];
-  onOpenReschedule: (order: WorkOrderData) => void;
-  onOpenCreateModal: (targetDateStr: string) => void;
+  onOpenReschedule?: (order: WorkOrderData) => void;
+  onOpenCreateModal?: (targetDateStr: string) => void;
   onOrderUpdated?: (orderId: string, patch: Partial<WorkOrderData>) => void;
 };
 
@@ -303,14 +303,16 @@ export function WorkDayView({
             />
           </div>
 
-          <button
-            type="button"
-            onClick={() => onOpenCreateModal(selectedDateStr)}
-            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-sky-600 to-emerald-600 px-3.5 py-2 text-xs font-black text-white hover:from-sky-500 hover:to-emerald-500 shadow-sm transition transform hover:-translate-y-0.5 active:translate-y-0"
-          >
-            <Plus size={15} strokeWidth={2.5} />
-            <span>Přidat úkol na tento den</span>
-          </button>
+          {onOpenCreateModal && (
+            <button
+              type="button"
+              onClick={() => onOpenCreateModal(selectedDateStr)}
+              className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-sky-600 to-emerald-600 px-3.5 py-2 text-xs font-black text-white hover:from-sky-500 hover:to-emerald-500 shadow-sm transition transform hover:-translate-y-0.5 active:translate-y-0"
+            >
+              <Plus size={15} strokeWidth={2.5} />
+              <span>Přidat úkol na tento den</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -330,7 +332,9 @@ export function WorkDayView({
                   </span>
                 </h3>
                 <p className="text-[11px] font-semibold text-amber-800">
-                  Tyto zakázky nebyly dokončeny v původním termínu. Můžete je jedním kliknutím přesunout na vybraný den nebo přeplánovat.
+                  {onOpenReschedule
+                    ? 'Tyto zakázky nebyly dokončeny v původním termínu. Můžete je jedním kliknutím přesunout na vybraný den nebo přeplánovat.'
+                    : 'Tyto zakázky nebyly dokončeny v původním termínu. Můžete je označit jako hotové (termíny mění zadavatel).'}
                 </p>
               </div>
             </div>
@@ -366,36 +370,41 @@ export function WorkDayView({
                   </Link>
 
                   <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={(e) => handleQuickRescheduleToCurrentDay(e, order.id)}
-                      disabled={isReschedulingThis || isCompletingThis}
-                      className="flex-1 flex items-center justify-center gap-1 rounded-xl bg-amber-500 px-2.5 py-1.5 text-[11px] font-black text-slate-950 hover:bg-amber-400 shadow-2xs transition disabled:opacity-50 cursor-pointer"
-                      title={`Přesunout zakázku na vybraný den (${selectedDate.toLocaleDateString('cs-CZ')})`}
-                    >
-                      <RotateCw size={12} className={isReschedulingThis ? 'animate-spin' : ''} />
-                      <span>{isReschedulingThis ? 'Přesouvám…' : '⚡ Přesunout na dnes'}</span>
-                    </button>
+                    {onOpenReschedule && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => handleQuickRescheduleToCurrentDay(e, order.id)}
+                          disabled={isReschedulingThis || isCompletingThis}
+                          className="flex-1 flex items-center justify-center gap-1 rounded-xl bg-amber-500 px-2.5 py-1.5 text-[11px] font-black text-slate-950 hover:bg-amber-400 shadow-2xs transition disabled:opacity-50 cursor-pointer"
+                          title={`Přesunout zakázku na vybraný den (${selectedDate.toLocaleDateString('cs-CZ')})`}
+                        >
+                          <RotateCw size={12} className={isReschedulingThis ? 'animate-spin' : ''} />
+                          <span>{isReschedulingThis ? 'Přesouvám…' : '⚡ Přesunout na dnes'}</span>
+                        </button>
 
-                    <button
-                      type="button"
-                      onClick={() => onOpenReschedule(order)}
-                      disabled={isReschedulingThis || isCompletingThis}
-                      className="flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs disabled:opacity-50"
-                      title="Zvolit jiné datum přeplánování"
-                    >
-                      <Calendar size={12} />
-                      <span>Jiné datum…</span>
-                    </button>
+                        <button
+                          type="button"
+                          onClick={() => onOpenReschedule(order)}
+                          disabled={isReschedulingThis || isCompletingThis}
+                          className="flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs disabled:opacity-50"
+                          title="Zvolit jiné datum přeplánování"
+                        >
+                          <Calendar size={12} />
+                          <span>Jiné datum…</span>
+                        </button>
+                      </>
+                    )}
 
                     <button
                       type="button"
                       onClick={(e) => handleCompleteOrder(e, order.id)}
                       disabled={isCompletingThis}
-                      className="flex items-center justify-center rounded-xl border border-emerald-300 bg-emerald-50 px-2 py-1.5 text-[11px] font-black text-emerald-800 hover:bg-emerald-100 transition shadow-2xs"
+                      className="flex items-center justify-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-black text-emerald-800 hover:bg-emerald-100 transition shadow-2xs"
                       title="Označit jako hotové"
                     >
                       <CheckCircle2 size={13} className="text-emerald-600" />
+                      {!onOpenReschedule && <span>Hotovo</span>}
                     </button>
                   </div>
                 </div>
@@ -529,17 +538,21 @@ export function WorkDayView({
               <p className="text-xs font-semibold text-slate-500 mt-1 max-w-sm mx-auto">
                 {scopeFilter !== 'ALL'
                   ? 'V této kategorii není pro vybraný den žádný úkol. Zkuste přepnout filtr.'
-                  : 'Můžete přidat nový úkol nebo přeplánovat úkol z jiného dne.'}
+                  : onOpenCreateModal
+                  ? 'Můžete přidat nový úkol nebo přeplánovat úkol z jiného dne.'
+                  : 'Na vybraný den zatím nejsou v plánu žádné zakázky.'}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => onOpenCreateModal(selectedDateStr)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2 text-xs font-black text-white hover:bg-sky-500 shadow-sm transition"
-            >
-              <Plus size={14} />
-              <span>Přidat úkol na tento den</span>
-            </button>
+            {onOpenCreateModal && (
+              <button
+                type="button"
+                onClick={() => onOpenCreateModal(selectedDateStr)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2 text-xs font-black text-white hover:bg-sky-500 shadow-sm transition"
+              >
+                <Plus size={14} />
+                <span>Přidat úkol na tento den</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
@@ -656,18 +669,8 @@ export function WorkDayView({
                             order.assignments.map((a, idx) => (
                               <span
                                 key={`${a.workerName}-${idx}`}
-                                className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                                  a.acknowledgedAt
-                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                    : 'bg-slate-100 text-slate-700'
-                                }`}
-                                title={
-                                  a.acknowledgedAt
-                                    ? `Potvrzeno: ${new Date(a.acknowledgedAt).toLocaleString('cs-CZ', { timeZone: 'Europe/Prague' })}`
-                                    : 'Čeká na potvrzení pracovníkem'
-                                }
+                                className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold bg-slate-100 text-slate-700"
                               >
-                                {a.acknowledgedAt && <span className="text-emerald-600">✓</span>}
                                 <span>{a.workerName}</span>
                               </span>
                             ))
@@ -693,15 +696,17 @@ export function WorkDayView({
                           </button>
                         )}
 
-                        <button
-                          type="button"
-                          onClick={() => onOpenReschedule(order)}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-black text-sky-900 hover:bg-sky-100 shadow-2xs transition"
-                          title="Přeplánovat zakázku na jiný den"
-                        >
-                          <Calendar size={13} className="text-sky-700" />
-                          <span>Přeplánovat</span>
-                        </button>
+                        {onOpenReschedule && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenReschedule(order)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-black text-sky-900 hover:bg-sky-100 shadow-2xs transition"
+                            title="Přeplánovat zakázku na jiný den"
+                          >
+                            <Calendar size={13} className="text-sky-700" />
+                            <span>Přeplánovat</span>
+                          </button>
+                        )}
 
                         <Link
                           href={`/work/${order.id}`}

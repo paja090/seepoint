@@ -1,18 +1,21 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getAppOrigin } from '@/lib/app-url';
+import { canManageWorkOrderSchedule } from '@/lib/rbac';
 import { runWithTenantContext, requireTenantContext } from '@/lib/tenant-context';
 import { dayInZone } from '@/lib/field-planning/profile';
 import { usesItemExecution } from '@/lib/field-planning/item-jobs';
 import { czechFirstNameVocative, verifyBriefingAckToken } from '@/lib/work/briefing-ack';
 import {
-  addCalendarDays,
   DEFAULT_BRIEFING_TIMEZONE,
+  addCalendarDays,
   formatCzechFullDate,
   matchWorkerAssignment,
+  notifyWorkerPlanChangesForOrganization,
   type WorkerRecipient,
 } from '@/lib/work/daily-briefing';
 import {
+  reportWorkOrderUnfinishedAction,
   rescheduleWorkOrderAction,
   updateWorkOrderStatusAction,
   WorkOrderActionError,
@@ -50,6 +53,39 @@ function buildRecipientFromPayload(payload: NonNullable<ReturnType<typeof verify
     email: payload.email,
     role: 'WORKER',
   };
+}
+
+async function resolveActorCanManageSchedule(
+  payload: NonNullable<ReturnType<typeof verifyBriefingAckToken>>
+): Promise<boolean> {
+  const member = payload.userId
+    ? await prisma.organizationMember.findFirst({
+        where: { organizationId: payload.orgId, userId: payload.userId },
+        select: { role: true },
+      })
+    : await prisma.organizationMember.findFirst({
+        where: {
+          organizationId: payload.orgId,
+          user: { email: { equals: payload.email, mode: 'insensitive' } },
+        },
+        select: { role: true },
+      });
+
+  if (member && canManageWorkOrderSchedule(member.role)) {
+    return true;
+  }
+
+  const employee = await prisma.employee.findFirst({
+    where: {
+      organizationId: payload.orgId,
+      ...(payload.employeeId
+        ? { id: payload.employeeId }
+        : { email: { equals: payload.email, mode: 'insensitive' } }),
+    },
+    select: { role: true },
+  });
+
+  return employee ? canManageWorkOrderSchedule(employee.role) : false;
 }
 
 function renderPage(input: {
@@ -250,7 +286,7 @@ export async function GET(request: Request) {
   }
 
   const focusOrderId = url.searchParams.get('focus')?.trim() || '';
-  const ordersRaw = await runWithTenantContext(
+  const { ordersRaw, canManageSchedule } = await runWithTenantContext(
     {
       organizationId: payload.orgId,
       userId: payload.userId ?? undefined,
@@ -258,10 +294,14 @@ export async function GET(request: Request) {
     },
     async () => {
       requireTenantContext();
-      return prisma.workOrder.findMany({
-        where: { id: { in: payload.orderIds }, organizationId: payload.orgId },
-        include: { items: true },
-      });
+      const [foundOrders, canManage] = await Promise.all([
+        prisma.workOrder.findMany({
+          where: { id: { in: payload.orderIds }, organizationId: payload.orgId },
+          include: { items: true },
+        }),
+        resolveActorCanManageSchedule(payload),
+      ]);
+      return { ordersRaw: foundOrders, canManageSchedule: canManage };
     }
   );
 
@@ -402,12 +442,6 @@ export async function GET(request: Request) {
   }
 
   // payload.action === 'reschedule'
-  const todayStr = dayInZone(new Date(), DEFAULT_BRIEFING_TIMEZONE);
-  const tomorrowStr = addCalendarDays(todayStr, 1);
-  const dayAfterStr = addCalendarDays(todayStr, 2);
-  const tomorrowLabel = formatCzechFullDate(tomorrowStr);
-  const dayAfterLabel = formatCzechFullDate(dayAfterStr);
-
   const reasonChipsHtml = REASON_PRESETS.map(
     (preset, index) => `
       <label class="chip">
@@ -416,8 +450,55 @@ export async function GET(request: Request) {
       </label>`
   ).join('');
 
+  // Workers report unfinished reason/note without changing dates (termín mění zadavatel)
+  if (!canManageSchedule) {
+    return renderPage({
+      title: orders.length > 1 ? 'Nestihlo se / Poznámka zadavateli' : 'Nahlásit nedokončení / Poznámka',
+      badgeEmoji: '📝',
+      badgeBg: '#fffbeb',
+      bodyHtml: `<p class="subtitle" style="text-align:center;">Ahoj <strong>${escapeHtml(
+        vocative
+      )}</strong>, termín v plánu mění zadavatel. Vyber prosím důvod nebo napiš krátkou poznámku, aby zadavatel věděl co dál${
+        orders.length > 1 ? ' (nebo rovnou označ dokončené úkoly jako hotové)' : ''
+      }.</p>
+        <form method="POST" action="/api/work-orders/email-action">
+          <input type="hidden" name="token" value="${escapeHtml(token)}" />
+          ${renderChecklistHtml()}
+
+          <span class="label">1. Důvod</span>
+          <div class="chips">
+            ${reasonChipsHtml}
+            <label class="chip">
+              <input type="radio" name="reason" value="" />
+              <span>Jiný důvod (v poznámce)</span>
+            </label>
+          </div>
+
+          <label class="label" for="note">2. Krátká poznámka pro zadavatele</label>
+          <textarea id="note" name="note" rows="3" placeholder="Např. nestihlo se kvůli dešti, zbývají 2 ks..."></textarea>
+
+          <button type="submit" name="actionOverride" value="reschedule" class="btn btn-amber">📝 Odeslat poznámku zadavateli</button>
+          ${
+            orders.length > 1
+              ? `<button type="submit" name="actionOverride" value="complete" class="btn btn-green" style="margin-top:8px;">✅ Nebo zaškrtnuté označit jako HOTOVÉ</button>`
+              : ''
+          }
+        </form>
+        <a href="${escapeHtml(detailUrl)}" class="btn btn-dark">${
+        orders.length > 1 ? 'Otevřít moje úkoly v aplikaci →' : 'Otevřít detail v aplikaci →'
+      }</a>`,
+    });
+  }
+
+  // Managers / zadavatelé can pick a new date directly
+  const todayStr = dayInZone(new Date(), DEFAULT_BRIEFING_TIMEZONE);
+  const tomorrowStr = addCalendarDays(todayStr, 1);
+  const dayAfterStr = addCalendarDays(todayStr, 2);
+  const tomorrowLabel = formatCzechFullDate(tomorrowStr);
+  const dayAfterLabel = formatCzechFullDate(dayAfterStr);
+
   return renderPage({
-    title: orders.length > 1 ? 'Hromadný přesun / uzavření úkolů' : 'Nestihl jsem / Přesunout úkol',
+    title: orders.length > 1 ? 'Hromadný přesun / uzavření úkolů' : 'Přesunout úkol',
     badgeEmoji: '⏳',
     badgeBg: '#fffbeb',
     bodyHtml: `<p class="subtitle" style="text-align:center;">Ahoj <strong>${escapeHtml(
@@ -425,7 +506,7 @@ export async function GET(request: Request) {
     )}</strong>, ${
       orders.length > 1
         ? 'zaškrtni úkoly, které chceš přesunout na jiný den (nebo je rovnou označ jako hotové).'
-        : 'vyber důvod a nový den. Zakázka se rovnou přesune v Plánu práce i v Planneru a poznámka se uloží pro dispečink.'
+        : 'vyber důvod a nový den. Zakázka se rovnou přesune v Plánu práce i v Planneru.'
     }</p>
       <form method="POST" action="/api/work-orders/email-action">
         <input type="hidden" name="token" value="${escapeHtml(token)}" />
@@ -617,7 +698,7 @@ export async function POST(request: Request) {
     const fallbackTomorrow = addCalendarDays(dayInZone(now, DEFAULT_BRIEFING_TIMEZONE), 1);
     const chosenDate = targetDate || fallbackTomorrow;
 
-    const movedOrders = await runWithTenantContext(
+    const actionResult = await runWithTenantContext(
       {
         organizationId: payload.orgId,
         userId: payload.userId ?? undefined,
@@ -625,7 +706,43 @@ export async function POST(request: Request) {
       },
       async () => {
         requireTenantContext();
-        const results: Array<{
+        const canManageSchedule = await resolveActorCanManageSchedule(payload);
+
+        if (!canManageSchedule) {
+          const reported: Array<{
+            title: string;
+            clientName: string;
+            combinedReason: string;
+          }> = [];
+          for (const oid of targetOrderIds) {
+            const res = await reportWorkOrderUnfinishedAction({
+              organizationId: payload.orgId,
+              workOrderId: oid,
+              reason,
+              note,
+              actorName: payload.workerName,
+              viaEmail: true,
+              assignmentMatcher: matcher,
+              now,
+            });
+            reported.push({
+              title: res.workOrder.title,
+              clientName: res.workOrder.clientName,
+              combinedReason: res.combinedReason || 'Nedokončeno (bez upřesnění)',
+            });
+          }
+          return { mode: 'reported' as const, reported };
+        }
+
+        const beforeOrders = await prisma.workOrder.findMany({
+          where: { id: { in: targetOrderIds }, organizationId: payload.orgId },
+          select: { id: true, scheduledAt: true },
+        });
+        const affectedDates = new Set<string>(
+          beforeOrders.map((o) => dayInZone(o.scheduledAt, DEFAULT_BRIEFING_TIMEZONE))
+        );
+
+        const moved: Array<{
           title: string;
           clientName: string;
           newDateStr: string;
@@ -643,17 +760,57 @@ export async function POST(request: Request) {
             assignmentMatcher: matcher,
             now,
           });
-          results.push({
+          affectedDates.add(dayInZone(res.workOrder.scheduledAt, DEFAULT_BRIEFING_TIMEZONE));
+          moved.push({
             title: res.workOrder.title,
             clientName: res.workOrder.clientName,
             newDateStr: res.newDateStr,
             combinedReason: res.combinedReason,
           });
         }
-        return results;
+
+        await notifyWorkerPlanChangesForOrganization(payload.orgId, {
+          dates: [...affectedDates],
+          baseUrl: origin,
+          changedOrderIds: targetOrderIds,
+        }).catch((err) => {
+          console.warn('[work-orders/email-action] Plan change alert failed:', err);
+        });
+
+        return { mode: 'moved' as const, moved };
       }
     );
 
+    if (actionResult.mode === 'reported') {
+      const reportedHtml = actionResult.reported
+        .map(
+          (r) => `<div class="summary" style="margin-bottom:10px;">
+            <p class="summary-title">📝 ${escapeHtml(r.title)}</p>
+            <p class="summary-meta">${escapeHtml(r.clientName)} · Poznámka: ${escapeHtml(
+            r.combinedReason
+          )}</p>
+          </div>`
+        )
+        .join('');
+
+      return renderPage({
+        title:
+          actionResult.reported.length > 1
+            ? `Díky, ${vocative}! Poznámky uloženy (${actionResult.reported.length}).`
+            : `Díky, ${vocative}! Poznámka uložena.`,
+        badgeEmoji: '📝',
+        badgeBg: '#fffbeb',
+        bodyHtml: `<p class="subtitle" style="text-align:center;">Poznámka byla uložena pro zadavatele (${escapeHtml(
+          timeFormatted
+        )}). Termín zůstává beze změny — zadavatel úkol případně přeplánuje.</p>
+          ${reportedHtml}
+          <a href="${escapeHtml(detailUrl)}" class="btn btn-dark">${
+          actionResult.reported.length > 1 ? 'Otevřít moje úkoly →' : 'Otevřít detail v aplikaci →'
+        }</a>`,
+      });
+    }
+
+    const movedOrders = actionResult.moved;
     const movedHtml = movedOrders
       .map(
         (m) => `<div class="summary" style="margin-bottom:10px;">

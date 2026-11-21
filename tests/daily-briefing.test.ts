@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   sanitizeDailyBriefingSettings,
+  isBriefingRecipientAllowed,
   sanitizeManagerDigestSettings,
   normalizeCzechName,
   isDeliverableWorkerEmail,
@@ -14,15 +15,20 @@ import {
   matchWorkerAssignment,
   assembleWorkerBriefings,
   renderWorkerDailyBriefingEmail,
+  buildWorkerDayPlanSnapshot,
+  diffWorkerDayPlanSnapshots,
+  renderWorkerPlanChangeEmail,
   assembleManagerMorningDigest,
   renderManagerMorningDigestEmail,
   type WorkerRecipient,
+  type BriefingTaskItem,
 } from '../lib/work/daily-briefing';
 import {
   czechFirstNameVocative,
   createBriefingAckToken,
   verifyBriefingAckToken,
 } from '../lib/work/briefing-ack';
+import { canManageWorkOrderSchedule } from '../lib/rbac';
 
 const DIRECTORY: WorkerRecipient[] = [
   {
@@ -94,18 +100,34 @@ test('sanitizeDailyBriefingSettings applies tenant-safe defaults and bounds', ()
     sendHourLocal: 17,
     timezone: 'Europe/Prague',
     skipWeekends: false,
+    recipientMode: 'ALL',
+    allowedRecipientEmails: [],
+    notifyChanges: true,
   });
 
   const otherTenantDefault = sanitizeDailyBriefingSettings(undefined, 'org_other');
   assert.equal(otherTenantDefault.enabled, false);
+  assert.equal(otherTenantDefault.recipientMode, 'ALL');
+  assert.equal(otherTenantDefault.notifyChanges, true);
 
   const clamped = sanitizeDailyBriefingSettings(
-    { enabled: true, sendHourLocal: 29, timezone: 'Invalid/Zone', skipWeekends: true },
+    {
+      enabled: true,
+      sendHourLocal: 29,
+      timezone: 'Invalid/Zone',
+      skipWeekends: true,
+      recipientMode: 'SELECTED',
+      allowedRecipientEmails: ['  MIREK.MEC@SeePoint.cz ', 'not-an-email', 'mirek.mec@seepoint.cz'],
+      notifyChanges: false,
+    },
     'org_other'
   );
   assert.equal(clamped.sendHourLocal, 23);
   assert.equal(clamped.timezone, 'Europe/Prague');
   assert.equal(clamped.skipWeekends, true);
+  assert.equal(clamped.recipientMode, 'SELECTED');
+  assert.deepEqual(clamped.allowedRecipientEmails, ['mirek.mec@seepoint.cz']);
+  assert.equal(clamped.notifyChanges, false);
 });
 
 test('date helpers compute Prague tomorrow date, local hour, and DST-aware bounds accurately', () => {
@@ -299,7 +321,9 @@ test('assembleWorkerBriefings merges FieldPlan crew stops with standalone WorkOr
   const rendered = renderWorkerDailyBriefingEmail(pavelBriefing, 'SeePOINT s.r.o.');
   assert.match(rendered.subject, /Plán práce na zítra/);
   assert.match(rendered.html, /Ahoj <strong[^>]*>Pavle<\/strong>/);
-  assert.match(rendered.html, /Vím o úkolu \(Potvrdit\)/);
+  assert.doesNotMatch(rendered.html, /Vím o úkolu/);
+  assert.doesNotMatch(rendered.html, /Potvrdit všechny/);
+  assert.match(rendered.html, /Úkoly není potřeba nijak potvrzovat/);
   assert.match(rendered.html, /Porada nový systém SP/);
   assert.match(rendered.html, /&lt;test&gt;/); // Escaped HTML
   assert.doesNotMatch(rendered.html, /<test>/);
@@ -484,7 +508,7 @@ test('assembleWorkerBriefings combines today unfinished tasks with tomorrow plan
   assert.match(renderedMirek.subject, /Uzavření dneška \(1\) & plán na zítra/);
   assert.match(renderedMirek.html, /Kontrola dneška/);
   assert.match(renderedMirek.html, /✅ Hotovo/);
-  assert.match(renderedMirek.html, /⏳ Nestihl jsem \/ Přesunout/);
+  assert.match(renderedMirek.html, /📝 Nestihlo se \/ Poznámka/);
   assert.match(renderedMirek.html, /Plán práce na zítřek/);
 
   const pavel = result.briefings.find((b) => b.recipient.email === 'subert.pvel@gmail.com')!;
@@ -517,6 +541,21 @@ test('sanitizeManagerDigestSettings and assembleManagerMorningDigest track unfin
         updatedAt: new Date('2026-11-11T07:00:00.000Z'),
         planningConstraints: null,
         assignments: [{ workerName: 'Jirka' }],
+      },
+      {
+        id: 'wo-reported-unfinished',
+        title: 'Polep výlohy – nestihlo se',
+        clientName: 'Klient D',
+        status: 'PLANNED',
+        scheduledAt: new Date('2026-11-11T07:00:00.000Z'),
+        updatedAt: new Date('2026-11-11T17:15:00.000Z'),
+        planningConstraints: {
+          lastEmailAction: 'REPORTED_UNFINISHED',
+          lastWorkerReason: 'Počasí / déšť – Silný vítr na místě',
+          lastWorkerReportBy: 'Mirek',
+          lastWorkerReportAt: '2026-11-11T17:15:00.000Z',
+        },
+        assignments: [{ workerName: 'Mirek' }],
       },
       {
         id: 'wo-done',
@@ -565,16 +604,144 @@ test('sanitizeManagerDigestSettings and assembleManagerMorningDigest track unfin
     ],
   });
 
-  assert.equal(digest.unfinishedItems.length, 1);
+  assert.equal(digest.unfinishedItems.length, 2);
   assert.equal(digest.completedItems.length, 1);
   assert.equal(digest.rescheduledItems.length, 1);
   assert.equal(digest.rescheduledItems[0].workOrderId, 'wo-moved-from-yesterday');
   assert.equal(digest.rescheduledItems[0].workerReason, 'Počasí / déšť – Pršelo');
 
+  const reportedUnfinished = digest.unfinishedItems.find((i) => i.workOrderId === 'wo-reported-unfinished');
+  assert.ok(reportedUnfinished);
+  assert.equal(reportedUnfinished.workerReason, 'Počasí / déšť – Silný vítr na místě');
+  assert.equal(reportedUnfinished.reportBy, 'Mirek');
+
   const rendered = renderManagerMorningDigestEmail(digest, 'SeePOINT s.r.o.');
-  assert.match(rendered.subject, /1 neuzavřeno, 1 přesunuto/);
+  assert.match(rendered.subject, /2 neuzavřeno, 1 přesunuto/);
   assert.match(rendered.html, /Odložená montáž/);
   assert.match(rendered.html, /Počasí \/ déšť – Pršelo/);
+  assert.match(rendered.html, /Silný vítr na místě/);
   assert.match(rendered.html, /Nedodělaný polep/);
   assert.doesNotMatch(rendered.html, /Starší přesun z minulého týdne/);
+});
+
+test('isBriefingRecipientAllowed allows everyone in ALL mode and restricts to selected emails in SELECTED mode', () => {
+  const allMode = sanitizeDailyBriefingSettings({ recipientMode: 'ALL' }, 'org_seepoint_default');
+  assert.equal(isBriefingRecipientAllowed('mirek.mec@seepoint.cz', allMode), true);
+  assert.equal(isBriefingRecipientAllowed('anyone@seepoint.cz', allMode), true);
+
+  const selectedMode = sanitizeDailyBriefingSettings(
+    {
+      recipientMode: 'SELECTED',
+      allowedRecipientEmails: ['Mirek.Mec@SeePoint.cz'],
+    },
+    'org_seepoint_default'
+  );
+  assert.equal(isBriefingRecipientAllowed('mirek.mec@seepoint.cz', selectedMode), true);
+  assert.equal(isBriefingRecipientAllowed('MIREK.MEC@SEEPOINT.CZ', selectedMode), true);
+  assert.equal(isBriefingRecipientAllowed('marek.slapn@gmail.com', selectedMode), false);
+});
+
+test('buildWorkerDayPlanSnapshot, diffWorkerDayPlanSnapshots, and renderWorkerPlanChangeEmail detect later changes accurately', () => {
+  const taskA: BriefingTaskItem = {
+    id: 'wo-a',
+    workOrderId: 'wo-a',
+    title: 'Výměna plachet na věži',
+    clientName: 'MOaP',
+    workTypeLabel: 'Reinstalace',
+    priority: 'NORMAL',
+    priorityLabel: 'Normální',
+    scheduledTimeLabel: '08:00',
+    crewNames: ['Marek'],
+    address: 'Ostrava Centrum',
+    mapsUrl: 'https://maps.google.com/?q=Ostrava',
+    driveUrl: 'https://drive.google.com/drive/folders/abc',
+    detailUrl: 'https://seepoint.cz/work/wo-a',
+    description: 'Vyměnit 4 plachty',
+  };
+
+  const taskB: BriefingTaskItem = {
+    id: 'wo-b',
+    workOrderId: 'wo-b',
+    title: 'Instalace CLV Poruba',
+    clientName: 'Klient B',
+    workTypeLabel: 'Instalace',
+    priority: 'HIGH',
+    priorityLabel: 'Vysoká',
+    scheduledTimeLabel: '11:00',
+    crewNames: [],
+    address: 'Hlavní třída, Poruba',
+    detailUrl: 'https://seepoint.cz/work/wo-b',
+    description: '2 ks CityLight',
+  };
+
+  const snap1 = buildWorkerDayPlanSnapshot([taskA, taskB]);
+  // Reordering tasks and changing detailUrl origin must NOT change the snapshot hash
+  const snap1DifferentOrderAndOrigin = buildWorkerDayPlanSnapshot([
+    { ...taskB, detailUrl: 'http://localhost:3000/work/wo-b' },
+    { ...taskA, detailUrl: 'http://localhost:3000/work/wo-a' },
+  ]);
+  assert.equal(snap1.hash, snap1DifferentOrderAndOrigin.hash);
+
+  const noDiff = diffWorkerDayPlanSnapshots(snap1.tasks, snap1DifferentOrderAndOrigin.tasks);
+  assert.equal(noDiff.added.length, 0);
+  assert.equal(noDiff.updated.length, 0);
+  assert.equal(noDiff.removed.length, 0);
+
+  // Now simulate later edits: taskA updated (time + address), taskB removed/moved, taskC added
+  const taskAEdited: BriefingTaskItem = {
+    ...taskA,
+    scheduledTimeLabel: '09:30',
+    address: 'Nová adresa 42, Ostrava',
+  };
+  const taskC: BriefingTaskItem = {
+    id: 'wo-c',
+    workOrderId: 'wo-c',
+    title: 'Urgentní servis billboardu',
+    clientName: 'Klient C',
+    workTypeLabel: 'Servis',
+    priority: 'URGENT',
+    priorityLabel: 'Urgentní',
+    scheduledTimeLabel: '14:00',
+    crewNames: [],
+    address: 'Opavská 10',
+    detailUrl: 'https://seepoint.cz/work/wo-c',
+    description: 'Připevnit uvolněný roh',
+  };
+
+  const snap2 = buildWorkerDayPlanSnapshot([taskAEdited, taskC]);
+  assert.notEqual(snap1.hash, snap2.hash);
+
+  const diff = diffWorkerDayPlanSnapshots(snap1.tasks, snap2.tasks);
+  assert.deepEqual(diff.added.map((t) => t.id), ['wo-c']);
+  assert.deepEqual(diff.removed.map((t) => t.id), ['wo-b']);
+  assert.equal(diff.updated.length, 1);
+  assert.equal(diff.updated[0].task.id, 'wo-a');
+  assert.ok(diff.updated[0].changes.includes('Změněn čas (09:30)'));
+  assert.ok(diff.updated[0].changes.includes('Změněno místo'));
+
+  const email = renderWorkerPlanChangeEmail({
+    recipient: { firstName: 'Mirek', fullName: 'Miroslav Mec', email: 'mirek.mec@seepoint.cz' },
+    organizationName: 'SeePOINT s.r.o.',
+    targetDate: '2026-11-12',
+    targetDateLabel: 'Čtvrtek 12. 11. 2026',
+    isToday: false,
+    diff,
+    totalCurrentTasks: snap2.tasks.length,
+    myTasksUrl: 'https://seepoint.cz/my-tasks',
+  });
+  assert.match(email.subject, /Změna v plánu na zítra/);
+  assert.match(email.html, /Ahoj <strong[^>]*>Mirku<\/strong>/);
+  assert.match(email.html, /Urgentní servis billboardu/);
+  assert.match(email.html, /Změněn čas \(09:30\)/);
+  assert.match(email.html, /Instalace CLV Poruba/);
+  assert.match(email.html, /Úkoly není potřeba potvrzovat/);
+});
+
+test('canManageWorkOrderSchedule restricts schedule/deadline changes to zadavatel roles only', () => {
+  assert.equal(canManageWorkOrderSchedule('ADMIN'), true);
+  assert.equal(canManageWorkOrderSchedule('MANAGER'), true);
+  assert.equal(canManageWorkOrderSchedule('SALES'), true);
+  assert.equal(canManageWorkOrderSchedule('WORKER'), false);
+  assert.equal(canManageWorkOrderSchedule('TECHNICIAN'), false);
+  assert.equal(canManageWorkOrderSchedule('USER'), false);
 });

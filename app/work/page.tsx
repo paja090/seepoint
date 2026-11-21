@@ -1,5 +1,6 @@
 import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
+import { canManageWorkOrderSchedule } from '@/lib/rbac';
 import { WorkModuleClient } from '@/components/WorkModuleClient';
 import { prisma, ensureWorkOrderSchema } from '@/lib/db';
 import { overlapsAbsence } from '@/lib/work-absence-conflicts';
@@ -200,7 +201,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
     name: `${emp.firstName} ${emp.lastName}`.trim(),
   }));
 
-  const canCreateWorkOrder = !['WORKER', 'TECHNICIAN'].includes(user.role);
+  const canCreateWorkOrder = canManageWorkOrderSchedule(user.role);
   const assignedIds = [...new Set(orders.flatMap(order => order.workTasks.map(task => task.assignedToEmployeeId).filter((id): id is string => Boolean(id))))];
   const absences = canCreateWorkOrder && assignedIds.length ? await prisma.employeeAbsence.findMany({
     where: { organizationId: user.organizationId, employeeId: { in: assignedIds }, status: 'APPROVED' },

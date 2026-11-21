@@ -7,9 +7,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppShell } from '@/components/AppShell';
 import { requirePageAccess } from '@/lib/page-auth';
+import { canManageWorkOrderSchedule } from '@/lib/rbac';
 import { WorkOrderActions } from '@/components/WorkOrderActions';
 import { WorkOrderEditForm } from '@/components/WorkOrderEditForm';
-import { WorkOrderAcknowledgeButton } from '@/components/WorkOrderAcknowledgeButton';
 import { WorkOrderPhotosDriveBar } from '@/components/work/WorkOrderPhotosDriveBar';
 import { isWorkOrderEligibleForPhotoApp, readWorkOrderDriveExports } from '@/lib/work/photo-folder';
 import { prisma, ensureWorkOrderSchema } from '@/lib/db';
@@ -267,6 +267,8 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
     googleMapsRouteUrl = `https://www.google.com/maps/dir/?${params.toString()}`;
   }
 
+  const canManageOrder = canManageWorkOrderSchedule(user.role);
+
   return (
     <AppShell>
       <div className="mx-auto max-w-6xl space-y-6">
@@ -300,12 +302,14 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
               </Link>
             ) : null}
 
-            <Link
-              href={`/work?carrierCode=${order.items[0]?.carrier?.code || ''}&clientName=${encodeURIComponent(order.clientName)}`}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
-            >
-              <Copy size={14} /> Duplikovat zakázku
-            </Link>
+            {canManageOrder && (
+              <Link
+                href={`/work?carrierCode=${order.items[0]?.carrier?.code || ''}&clientName=${encodeURIComponent(order.clientName)}`}
+                className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
+              >
+                <Copy size={14} /> Duplikovat zakázku
+              </Link>
+            )}
           </div>
         </div>
 
@@ -784,6 +788,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
               invoiced={order.invoiced}
               invoiceExempt={flags.invoiceExempt}
               requestedBy={order.requestedBy}
+              canManageOrder={canManageOrder}
             />
 
             {/* Assigned Workers Card */}
@@ -801,34 +806,13 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
                   {order.assignments.map((assignment) => (
                     <span
                       key={assignment.id}
-                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${
-                        assignment.acknowledgedAt
-                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                          : 'bg-white text-slate-700 border border-slate-200'
-                      }`}
-                      title={
-                        assignment.acknowledgedAt
-                          ? `Potvrzeno: ${new Date(assignment.acknowledgedAt).toLocaleString('cs-CZ', { timeZone: 'Europe/Prague' })}`
-                          : 'Čeká na potvrzení'
-                      }
+                      className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold bg-white text-slate-700 border border-slate-200"
                     >
-                      {assignment.acknowledgedAt ? (
-                        <span className="text-emerald-600">✓</span>
-                      ) : (
-                        <span className="text-slate-400">○</span>
-                      )}
                       <span>{assignment.workerName}</span>
                     </span>
                   ))}
                 </div>
               )}
-              <WorkOrderAcknowledgeButton
-                workOrderId={order.id}
-                initialAcknowledged={order.assignments.some((a) => Boolean(a.acknowledgedAt))}
-                initialAcknowledgedAt={order.assignments
-                  .find((a) => Boolean(a.acknowledgedAt))
-                  ?.acknowledgedAt?.toISOString()}
-              />
             </section>
 
             {/* Vehicle & Trailer Reservation Info Card */}
@@ -969,41 +953,43 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
         </div>
 
         {!order.navigationOrderId && hasModuleAccess(user, 'workRoute', 'work') && ['ADMIN', 'MANAGER'].includes(user.role) && <WorkItemsEditor workOrderId={order.id} carriers={carriers} realizations={realizations} items={order.items.map(i => ({ id: i.id, carrierId: i.carrierId, surfaceId: i.surfaceId, crmRealizationId: i.crmRealizationId, description: i.description, estimatedMinutes: i.estimatedMinutes, status: itemStatus(i), issue: i.issueNote ?? i.crmRealization?.claimNote ?? null }))} />}
-        {/* Edit Form Accordion at bottom */}
-        <WorkOrderEditForm
-          clients={clients.map((client) => ({ id: client.id, label: client.name }))}
-          carriers={carriers.map((carrier) => ({
-            id: carrier.id,
-            code: carrier.code,
-            label: `${carrier.city} · ${carrier.name}`,
-          }))}
-          order={{
-            id: order.id,
-            title: order.title,
-            description: order.description,
-            scheduledAt: dateTimeInput(order.scheduledAt),
-            deadlineAt: dateTimeInput(order.deadlineAt),
-            campaignDateFrom: dateInput(order.campaignDateFrom),
-            campaignDateTo: dateInput(order.campaignDateTo),
-            workType: order.workType,
-            priority: order.priority,
-            price: order.price?.toString() ?? '',
-            clientId: order.clientId ?? '',
-            clientName: order.clientName,
-            requestedBy: order.requestedBy ?? '',
-            workerNames: order.assignments.map((assignment) => assignment.workerName).join(', '),
-            carrierCode: order.items[0]?.carrier?.code ?? '',
-            mediaLabel: order.mediaLabel ?? '',
-            quantity: order.quantity?.toString() ?? '',
-            contactName: order.contactName ?? '',
-            contactPhone: order.contactPhone ?? '',
-            locationNote: order.locationNote ?? '',
-            latitude: initialLatitude,
-            longitude: initialLongitude,
-            referenceUrl: order.referenceUrl ?? '',
-            ftdUrl: order.ftdUrl ?? '',
-          }}
-        />
+        {/* Edit Form Accordion at bottom (only for zadavatel / manager) */}
+        {canManageOrder && (
+          <WorkOrderEditForm
+            clients={clients.map((client) => ({ id: client.id, label: client.name }))}
+            carriers={carriers.map((carrier) => ({
+              id: carrier.id,
+              code: carrier.code,
+              label: `${carrier.city} · ${carrier.name}`,
+            }))}
+            order={{
+              id: order.id,
+              title: order.title,
+              description: order.description,
+              scheduledAt: dateTimeInput(order.scheduledAt),
+              deadlineAt: dateTimeInput(order.deadlineAt),
+              campaignDateFrom: dateInput(order.campaignDateFrom),
+              campaignDateTo: dateInput(order.campaignDateTo),
+              workType: order.workType,
+              priority: order.priority,
+              price: order.price?.toString() ?? '',
+              clientId: order.clientId ?? '',
+              clientName: order.clientName,
+              requestedBy: order.requestedBy ?? '',
+              workerNames: order.assignments.map((assignment) => assignment.workerName).join(', '),
+              carrierCode: order.items[0]?.carrier?.code ?? '',
+              mediaLabel: order.mediaLabel ?? '',
+              quantity: order.quantity?.toString() ?? '',
+              contactName: order.contactName ?? '',
+              contactPhone: order.contactPhone ?? '',
+              locationNote: order.locationNote ?? '',
+              latitude: initialLatitude,
+              longitude: initialLongitude,
+              referenceUrl: order.referenceUrl ?? '',
+              ftdUrl: order.ftdUrl ?? '',
+            }}
+          />
+        )}
       </div>
     </AppShell>
   );

@@ -16,6 +16,7 @@ type WorkOrderActionsProps = {
   invoiced: boolean;
   invoiceExempt?: boolean;
   requestedBy?: string | null;
+  canManageOrder?: boolean;
 };
 
 export function WorkOrderActions({
@@ -28,6 +29,7 @@ export function WorkOrderActions({
   invoiced,
   invoiceExempt = false,
   requestedBy,
+  canManageOrder = true,
 }: WorkOrderActionsProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -40,17 +42,20 @@ export function WorkOrderActions({
     const form = new FormData(formElement);
     setSaving(true);
     setError('');
+    const payload: Record<string, unknown> = {
+      status: form.get('status'),
+      ftdSent: form.get('ftdSent') === 'on',
+    };
+    if (canManageOrder) {
+      payload.priority = form.get('priority');
+      payload.price = form.get('price');
+      payload.invoiced = form.get('invoiced') === 'on';
+      payload.invoiceExempt = form.get('invoiceExempt') === 'on';
+    }
     const response = await fetch(`/api/work-orders/${id}`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        status: form.get('status'),
-        priority: form.get('priority'),
-        price: form.get('price'),
-        ftdSent: form.get('ftdSent') === 'on',
-        invoiced: form.get('invoiced') === 'on',
-        invoiceExempt: form.get('invoiceExempt') === 'on',
-      }),
+      body: JSON.stringify(payload),
     });
     const result = (await response.json().catch(() => null)) as { error?: string } | null;
     setSaving(false);
@@ -104,43 +109,45 @@ export function WorkOrderActions({
         </label>
       </div>
 
-      <div className="space-y-3 rounded-xl border border-slate-200 p-3 bg-slate-50">
-        <p className="text-xs font-bold uppercase tracking-wider text-slate-600">
-          Zadavatel: {requestedBy || 'neuveden'}
-        </p>
-        <label className="block text-xs font-bold text-slate-700">
-          Priorita
-          <select className="input mt-1 font-semibold" defaultValue={priority} name="priority">
-            {Object.entries(workPriorityLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
+      {canManageOrder && (
+        <div className="space-y-3 rounded-xl border border-slate-200 p-3 bg-slate-50">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-600">
+            Zadavatel: {requestedBy || 'neuveden'}
+          </p>
+          <label className="block text-xs font-bold text-slate-700">
+            Priorita
+            <select className="input mt-1 font-semibold" defaultValue={priority} name="priority">
+              {Object.entries(workPriorityLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <input type="hidden" name="price" value={price || ''} />
+          <input type="hidden" name="price" value={price || ''} />
 
-        <label className="flex items-center gap-3 text-xs font-extrabold text-slate-800 cursor-pointer">
-          <input
-            defaultChecked={invoiced}
-            name="invoiced"
-            type="checkbox"
-            className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
-          />
-          Faktura vystavena
-        </label>
+          <label className="flex items-center gap-3 text-xs font-extrabold text-slate-800 cursor-pointer">
+            <input
+              defaultChecked={invoiced}
+              name="invoiced"
+              type="checkbox"
+              className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
+            />
+            Faktura vystavena
+          </label>
 
-        <label className="flex items-center gap-3 text-xs font-semibold text-slate-700 cursor-pointer">
-          <input
-            defaultChecked={invoiceExempt}
-            name="invoiceExempt"
-            type="checkbox"
-            className="rounded border-slate-300 text-slate-600 focus:ring-slate-500 h-4 w-4"
-          />
-          Bez fakturace (interní / neúčtuje se)
-        </label>
-      </div>
+          <label className="flex items-center gap-3 text-xs font-semibold text-slate-700 cursor-pointer">
+            <input
+              defaultChecked={invoiceExempt}
+              name="invoiceExempt"
+              type="checkbox"
+              className="rounded border-slate-300 text-slate-600 focus:ring-slate-500 h-4 w-4"
+            />
+            Bez fakturace (interní / neúčtuje se)
+          </label>
+        </div>
+      )}
 
       {error && <p className="text-xs font-bold text-rose-700">{error}</p>}
 
@@ -153,14 +160,16 @@ export function WorkOrderActions({
           {saving ? 'Ukládám…' : '💾 Uložit změny'}
         </button>
 
-        <button
-          type="button"
-          onClick={handleDelete}
-          disabled={deleting}
-          className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-extrabold text-rose-800 hover:bg-rose-100 transition disabled:opacity-50"
-        >
-          <Trash2 size={14} /> {deleting ? 'Odebírám…' : '🗑️ Odebrat zakázku'}
-        </button>
+        {canManageOrder && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-extrabold text-rose-800 hover:bg-rose-100 transition disabled:opacity-50"
+          >
+            <Trash2 size={14} /> {deleting ? 'Odebírám…' : '🗑️ Odebrat zakázku'}
+          </button>
+        )}
       </div>
     </form>
   );

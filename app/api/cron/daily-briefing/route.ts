@@ -11,6 +11,7 @@ import {
   getLocalHour,
   getTomorrowDateStr,
   isWeekendDate,
+  notifyWorkerPlanChangesForOrganization,
   sendDailyBriefingsForOrganization,
   sendManagerMorningDigestForOrganization,
 } from '@/lib/work/daily-briefing';
@@ -29,6 +30,7 @@ export const maxDuration = 300;
  * Automated Cron Endpoint for:
  * 1) Combined Next-Day Worker Daily Plan + Today Check-out E-mails (default 17:00 Prague)
  * 2) Morning Manager Recap Digest of yesterday's open/rescheduled/completed tasks (default 07:00 Prague)
+ * 3) Hourly plan-change alerts for later edits to today's/tomorrow's work plan
  *
  * Scheduled hourly in vercel.json ("0 * * * *") and stays idempotent via EmailLog.
  */
@@ -85,6 +87,11 @@ async function handleCronExecution(request: Request) {
     skippedAlreadySentCount?: number;
     recipientsCount?: number;
     targetDate?: string;
+    planChanges?: {
+      checkedDates: string[];
+      sentCount: number;
+      failedCount: number;
+    };
     managerDigest?: {
       auditedDate: string;
       sentCount: number;
@@ -160,14 +167,32 @@ async function handleCronExecution(request: Request) {
             ownerLocalHour === ownerEmailSettings.sendHourLocal &&
             !(ownerEmailSettings.skipWeekends && isWeekendDate(ownerTodayDate));
 
+        const shouldCheckPlanChanges =
+          canWork && !isForceRun && settings.enabled && settings.notifyChanges;
+
         if (!shouldRunWorkers && !shouldRunManager && !shouldRunOwner) {
+          const changeSummary = shouldCheckPlanChanges
+            ? await notifyWorkerPlanChangesForOrganization(org.id, { now }).catch((err) => {
+                console.warn('[cron/daily-briefing] Plan change alerts failed:', err);
+                return null;
+              })
+            : null;
           return {
             organizationId: org.id,
             organizationName: org.name,
-            status: 'skipped',
+            status: changeSummary && changeSummary.sentCount > 0 ? 'plan_changes_notified' : 'skipped',
             reason: !settings.enabled && !managerSettings.enabled && !ownerEmailSettings.enabled
               ? 'briefing_disabled'
               : `outside_hour_${workerLocalHour}_expected_${settings.sendHourLocal}`,
+            ...(changeSummary
+              ? {
+                  planChanges: {
+                    checkedDates: changeSummary.checkedDates,
+                    sentCount: changeSummary.sentCount,
+                    failedCount: changeSummary.failedCount,
+                  },
+                }
+              : {}),
           };
         }
 
@@ -207,6 +232,13 @@ async function handleCronExecution(request: Request) {
             })
           : undefined;
 
+        const changeSummary = shouldCheckPlanChanges
+          ? await notifyWorkerPlanChangesForOrganization(org.id, { now }).catch((err) => {
+              console.warn('[cron/daily-briefing] Post-briefing plan change alerts failed:', err);
+              return null;
+            })
+          : null;
+
         return {
           organizationId: org.id,
           organizationName: org.name,
@@ -217,6 +249,15 @@ async function handleCronExecution(request: Request) {
                 recipientsCount: workerSummary.recipientsCount,
                 sentCount: workerSummary.sentCount,
                 skippedAlreadySentCount: workerSummary.skippedAlreadySentCount,
+              }
+            : {}),
+          ...(changeSummary
+            ? {
+                planChanges: {
+                  checkedDates: changeSummary.checkedDates,
+                  sentCount: changeSummary.sentCount,
+                  failedCount: changeSummary.failedCount,
+                },
               }
             : {}),
           ...(managerSummary
