@@ -21,6 +21,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const photo = await prisma.photo.findUnique({
       where: { id, organizationId: auth.organizationId! },
+      // PATCH needs only photo metadata; never transfer a database-stored image.
+      omit: { content: true },
     });
     if (!photo) {
       return NextResponse.json({ error: 'Fotografie nebyla nalezena.' }, { status: 404 });
@@ -67,11 +69,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             id: { not: photo.id },
           },
           orderBy: { sortOrder: 'asc' },
+          select: { id: true },
         });
         if (sibling) {
           await tx.photo.update({
             where: { id: sibling.id },
             data: { isPrimary: true },
+            select: { id: true },
           });
           dataToUpdate.isPrimary = false;
         }
@@ -85,6 +89,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             surfaceId: photo.surfaceId,
           },
           orderBy: { sortOrder: 'asc' },
+          select: { id: true },
         });
 
         // Filter out current photo, then insert at target index
@@ -100,6 +105,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             await tx.photo.update({
               where: { id: remaining[i].id },
               data: { sortOrder: i },
+              select: { id: true },
             });
           }
         }
@@ -109,10 +115,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       await tx.photo.update({
         where: { id, organizationId: auth.organizationId! },
         data: dataToUpdate,
+        select: { id: true },
       });
     });
 
-    const updated = await prisma.photo.findUnique({ where: { id } });
+    const updated = await prisma.photo.findUnique({ where: { id }, omit: { content: true } });
     return NextResponse.json(updated);
   } catch (error) {
     console.error('Photo update failed:', error);
