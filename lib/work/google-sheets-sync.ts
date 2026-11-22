@@ -843,20 +843,27 @@ export async function syncGooglePlanToWorkOrders(
         task.scheduledAt
       );
       const nextDateIso = nextScheduledAt.toISOString().slice(0, 10);
+      const wasExplicitlyCompletedInSystem =
+        Boolean(prevPc.manualCompleted) ||
+        Boolean(prevPc.sheetColoredByWriteback) ||
+        Boolean(prevPc.manualFtdSent) ||
+        prevPc.lastEmailAction === 'COMPLETED' ||
+        Boolean(prevPc.lastWorkerReportAt) ||
+        Boolean(prevPc.completedViaEmailAt);
+
       const wasOnlyAutoClosedWithoutEvidence =
         existing.status === 'DONE' &&
         !existing.ftdSent &&
-        !prevPc.manualFtdSent &&
+        !wasExplicitlyCompletedInSystem &&
         !prevPc.completedBySheetColor &&
-        !prevPc.lastEmailAction &&
-        !prevPc.lastWorkerReportAt &&
-        !prevPc.completedViaEmailAt &&
         existing._count.workEntries === 0 &&
         task.status !== 'DONE';
+
       const nextStatus: WorkOrderStatus =
         existing.status === 'CANCELLED'
           ? 'CANCELLED'
-          : existing.status === 'DONE' && !prevPc.completedBySheetColor && !wasOnlyAutoClosedWithoutEvidence
+          : wasExplicitlyCompletedInSystem ||
+            (existing.status === 'DONE' && !prevPc.completedBySheetColor && !wasOnlyAutoClosedWithoutEvidence)
           ? 'DONE'
           : task.status;
 
@@ -872,6 +879,9 @@ export async function syncGooglePlanToWorkOrders(
         existing as { assignments?: Array<{ workerName: string }> }
       ).assignments;
 
+      const nextCompletedByColor =
+        Boolean(task.isCompletedByColor) || Boolean(prevPc.sheetColoredByWriteback);
+
       const isUnchanged =
         existing.status === nextStatus &&
         existing.priority === task.priority &&
@@ -886,7 +896,7 @@ export async function syncGooglePlanToWorkOrders(
         (existing.referenceUrl ?? null) === (task.referenceUrl ?? null) &&
         prevPc.sheetKey === task.sheetKey &&
         prevPc.sheetRow === task.sheetRowIndex &&
-        Boolean(prevPc.completedBySheetColor) === Boolean(task.isCompletedByColor) &&
+        Boolean(prevPc.completedBySheetColor) === nextCompletedByColor &&
         Array.isArray(existingAssignments) &&
         sameWorkersList(
           existingAssignments.map((a) => a.workerName),
@@ -922,13 +932,13 @@ export async function syncGooglePlanToWorkOrders(
             source: 'GOOGLE_SHEETS_PLAN',
             sheetKey: task.sheetKey,
             sheetRow: task.sheetRowIndex,
-            completedBySheetColor: Boolean(task.isCompletedByColor),
+            completedBySheetColor: nextCompletedByColor,
             invoiceExempt: nextInvoiceExempt,
             ftdSkipped: nextFtdSkipped,
             ...(!preservedManualReschedule
               ? { manualScheduledDateIso: null, sheetScheduledDateAtReschedule: null }
               : {}),
-            ...(task.isFtdSent || task.isFtdSkipped ? { manualFtdSent: false } : {}),
+            ...(task.isFtdSent ? { manualFtdSent: false } : {}),
             ...(task.isInvoiced || task.isInvoiceExempt ? { manualInvoiced: false } : {}),
             ...(task.isInvoiced || task.isInvoiceExempt ? { manualInvoiceExempt: false } : {}),
           },

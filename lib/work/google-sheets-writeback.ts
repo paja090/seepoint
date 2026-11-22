@@ -9,11 +9,11 @@ import {
 
 export const GOOGLE_SPREADSHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 
-// Standard Google Sheets "light green 3" (#B6D7A8) recognized by isGreenRgbHex
+// Pure bright green (#00FF00) matching the exact worker cell fill in "Plan práce 2026"
 export const GOOGLE_SHEET_DONE_GREEN_RGB = {
-  red: 0.7137255,
-  green: 0.84313726,
-  blue: 0.65882355,
+  red: 0,
+  green: 1,
+  blue: 0,
 };
 
 const CZECH_SHORT_WEEKDAYS = ['ne', 'po', 'út', 'st', 'čt', 'pá', 'so'] as const;
@@ -882,11 +882,14 @@ export async function writeBackWorkOrderCompletedToGoogleSheet(params: {
     await prisma.workOrder.update({
       where: { id: order.id },
       data: {
+        ...(isCompleted && order.status !== 'DONE' ? { status: 'DONE' } : {}),
         planningConstraints: {
           ...prevPc,
           source: 'GOOGLE_SHEETS_PLAN',
           sheetRow: rowNumber,
+          manualCompleted: isCompleted,
           completedBySheetColor: isCompleted,
+          sheetColoredByWriteback: isCompleted,
           sheetWritebackAt: new Date().toISOString(),
           sheetWritebackError: null,
         } as Prisma.InputJsonValue,
@@ -1067,14 +1070,16 @@ export async function flushPendingGoogleSheetWritebacks(params: {
   const errors: string[] = [];
 
   try {
-    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const cutoff = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+    const scheduledCutoff = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
     const recentOrders = await prisma.workOrder.findMany({
       where: {
         organizationId: params.organizationId,
         updatedAt: { gte: cutoff },
+        scheduledAt: { gte: scheduledCutoff },
       },
-      orderBy: { updatedAt: 'desc' },
-      take: 40,
+      orderBy: [{ scheduledAt: 'desc' }, { updatedAt: 'desc' }],
+      take: 200,
       select: {
         id: true,
         status: true,
@@ -1093,10 +1098,19 @@ export async function flushPendingGoogleSheetWritebacks(params: {
 
       if (pc.source !== 'GOOGLE_SHEETS_PLAN') continue;
 
+      const wasCompletedInSystem =
+        ord.status === 'DONE' ||
+        pc.manualCompleted === true ||
+        pc.manualFtdSent === true ||
+        pc.lastEmailAction === 'COMPLETED';
+
       const needsCompletionColor =
-        ord.status === 'DONE' &&
-        pc.completedBySheetColor !== true &&
-        (pc.manualFtdSent === true || pc.lastEmailAction === 'COMPLETED');
+        wasCompletedInSystem &&
+        (pc.completedBySheetColor !== true || Boolean(pc.sheetWritebackError)) &&
+        (pc.manualCompleted === true ||
+          pc.manualFtdSent === true ||
+          pc.lastEmailAction === 'COMPLETED' ||
+          Boolean(pc.sheetWritebackError));
 
       if (needsCompletionColor) {
         const res = await writeBackWorkOrderCompletedToGoogleSheet({
