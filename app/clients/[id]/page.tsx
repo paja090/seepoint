@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { requirePageAccess } from '@/lib/page-auth';
 import { AppShell } from '@/components/AppShell';
+import { prisma } from '@/lib/db';
 import { getClientProfile } from '@/lib/crm/client-service';
 import { ClientHeader } from '@/components/crm/ClientHeader';
 import { ClientOverviewTab } from '@/components/crm/ClientOverviewTab';
@@ -18,7 +19,7 @@ import { ClientDocumentsTab } from '@/components/crm/ClientDocumentsTab';
 import { ClientAuditTab } from '@/components/crm/ClientAuditTab';
 import { ClientAiEnrichCard } from '@/components/clients/ClientAiEnrichCard';
 import { ClientCrmIntelligenceCard } from '@/components/crm/ClientCrmIntelligenceCard';
-import { ClientProfileData } from '@/lib/crm/types';
+import { ClientProfileData, type CrmAgencyOption } from '@/lib/crm/types';
 import { canConvertOfferRole } from '@/lib/offers/domain';
 
 export const dynamic = 'force-dynamic';
@@ -39,7 +40,20 @@ export default async function ClientProfilePage({
   const { id } = await params;
   const { tab = 'overview' } = await searchParams;
 
-  const rawClient = await getClientProfile(id);
+  const [rawClient, agencyOptions] = await Promise.all([
+    getClientProfile(id),
+    prisma.client.findMany({
+      where: { active: true },
+      orderBy: { name: 'asc' },
+      take: 500,
+      select: {
+        id: true,
+        name: true,
+        clientType: true,
+        companyId: true,
+      },
+    }),
+  ]);
   if (!rawClient) {
     notFound();
   }
@@ -53,13 +67,16 @@ export default async function ClientProfilePage({
     })),
   } as unknown as ClientProfileData;
 
+  const totalOrdersCount = (client.crmOrders?.length || 0) + (client.agencyCrmOrders?.length || 0);
+  const realizationsCount = (client.crmOrders || []).reduce((sum, o) => sum + (o.realizations?.length || 0), 0);
+
   const tabs = [
     { id: 'overview', icon: '📊', name: 'Přehled' },
     { id: 'contacts', icon: '👥', name: 'Kontakty', count: client.contacts?.length || 0 },
     { id: 'branches', icon: '🏬', name: 'Pobočky', count: client.branches?.length || 0 },
     { id: 'offers', icon: '📄', name: 'Nabídky', count: client.offers?.length || 0 },
-    { id: 'orders', icon: '🛒', name: 'Zakázky', count: client.crmOrders?.length || 0 },
-    { id: 'realizations', icon: '🛠️', name: 'Realizace' },
+    { id: 'orders', icon: '🛒', name: 'Zakázky', count: totalOrdersCount },
+    { id: 'realizations', icon: '🛠️', name: 'Realizace', count: realizationsCount },
     { id: 'surfaces', icon: '🪧', name: 'Reklamní Plochy', count: client.occupancies?.length || 0 },
     { id: 'contracts', icon: '📜', name: 'Smlouvy', count: client.contracts?.length || 0 },
     { id: 'invoices', icon: '💶', name: 'Fakturace', count: client.invoices?.length || 0 },
@@ -128,7 +145,7 @@ export default async function ClientProfilePage({
         {tab === 'contacts' && <ClientContactsTab client={client} />}
         {tab === 'branches' && <ClientBranchesTab client={client} />}
         {tab === 'offers' && <ClientOffersTab client={client} canConvert={canConvertOfferRole(user.role)} />}
-        {tab === 'orders' && <ClientOrdersTab client={client} />}
+        {tab === 'orders' && <ClientOrdersTab client={client} agencyOptions={agencyOptions as CrmAgencyOption[]} />}
         {tab === 'realizations' && <ClientRealizationsTab client={client} />}
         {tab === 'surfaces' && <ClientSurfacesTab client={client} />}
         {tab === 'contracts' && <ClientContractsTab client={client} />}

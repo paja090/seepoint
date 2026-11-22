@@ -96,6 +96,7 @@ export async function syncCrmOrderToWorkOrderInTransaction(
 
     const carrierId = realization.carrierId || realization.surface?.carrierId || null;
     const surfaceId = realization.surfaceId || null;
+    const branchId = realization.branchId || crmOrder.branchId || null;
     const itemDescription = realization.surface?.name || realization.note || 'Realizační plocha';
 
     let item = realization.workOrderItem;
@@ -112,16 +113,20 @@ export async function syncCrmOrderToWorkOrderInTransaction(
           workOrderId: workOrder.id,
           carrierId,
           surfaceId,
+          branchId,
           crmRealizationId: realization.id,
           description: itemDescription,
           quantity: 1,
           executionStatus: 'PLANNED',
         },
       });
-    } else if (item.workOrderId !== workOrder.id) {
+    } else if (item.workOrderId !== workOrder.id || (item.branchId ?? null) !== branchId) {
       await tx.workOrderItem.update({
         where: { id: item.id },
-        data: { workOrderId: workOrder.id },
+        data: {
+          workOrderId: workOrder.id,
+          branchId,
+        },
       });
     }
   }

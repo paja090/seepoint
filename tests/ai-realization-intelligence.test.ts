@@ -771,6 +771,7 @@ describe('AI Realization Intelligence (AI Commercial Engine Phase)', () => {
         id: 'real-autumn-2026',
         organizationId: TENANT_A,
         crmOrderId: 'crm-ord-autumn',
+        branchId: null,
         surfaceId: 'surf-001',
         carrierId: 'carr-001',
         workOrderId: null,
@@ -792,6 +793,7 @@ describe('AI Realization Intelligence (AI Commercial Engine Phase)', () => {
             taskId: null,
             workEntryId: null,
             crmRealizationId: null, workOrderItemId: null, // NOT linked to this realization!
+            branchId: null,
             surveyCandidatePointId: null,
             surveyNavigationPointId: null,
             electionRemovalPointId: null,

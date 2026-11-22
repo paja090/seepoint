@@ -190,7 +190,38 @@ export async function getClientProfile(clientId: string) {
         orderBy: { createdAt: 'desc' },
         include: {
           assignedUser: { select: { name: true } },
-          realizations: true,
+          agencyClient: { select: { id: true, name: true, companyId: true } },
+          branch: { select: { id: true, name: true, code: true, city: true } },
+          realizations: {
+            orderBy: { createdAt: 'asc' },
+            include: {
+              branch: { select: { id: true, name: true, code: true, city: true } },
+              carrier: { select: { id: true, code: true, name: true, city: true, address: true } },
+              surface: {
+                select: {
+                  id: true,
+                  name: true,
+                  carrier: { select: { id: true, code: true, name: true, city: true } },
+                },
+              },
+              assignedUser: { select: { name: true } },
+              photos: {
+                where: { isPrivate: false },
+                orderBy: { createdAt: 'desc' },
+                select: {
+                  id: true,
+                  url: true,
+                  fileName: true,
+                  type: true,
+                  note: true,
+                  branchId: true,
+                  branch: { select: { id: true, name: true, city: true } },
+                  createdAt: true,
+                  capturedByWorkerName: true,
+                },
+              },
+            },
+          },
           offer: {
             select: {
               id: true,
@@ -206,7 +237,24 @@ export async function getClientProfile(clientId: string) {
               },
             },
           },
-          _count: { select: { workOrders: true, clientInvoices: true } },
+          _count: { select: { workOrders: true, clientInvoices: true, realizations: true } },
+        },
+      },
+      agencyCrmOrders: {
+        orderBy: { createdAt: 'desc' },
+        include: {
+          client: { select: { id: true, name: true, companyId: true } },
+          branch: { select: { id: true, name: true, code: true, city: true } },
+          assignedUser: { select: { name: true } },
+          offer: {
+            select: {
+              id: true,
+              publicTokenHash: true,
+              publicTokenEncrypted: true,
+              publicTokenRevokedAt: true,
+            },
+          },
+          _count: { select: { workOrders: true, clientInvoices: true, realizations: true } },
         },
       },
       occupancies: {
@@ -251,6 +299,26 @@ export async function getClientProfile(clientId: string) {
   });
 
   const mappedOrders = client.crmOrders.map((order) => {
+    const portalToken = order.offer ? recoverPortalToken(order.offer) : null;
+    const orderAgencyLabel = order.agencyClient?.name || order.agencyName || null;
+    return {
+      ...order,
+      portalToken,
+      realizations: order.realizations.map((realization) => ({
+        ...realization,
+        crmOrderId: order.id,
+        orderNumber: order.orderNumber,
+        orderTitle: order.title,
+        orderAgencyLabel,
+        photos: realization.photos.map((photo) => ({
+          ...photo,
+          url: `/api/photos/${encodeURIComponent(photo.id)}/file`,
+        })),
+      })),
+    };
+  });
+
+  const mappedAgencyOrders = client.agencyCrmOrders.map((order) => {
     const portalToken = order.offer ? recoverPortalToken(order.offer) : null;
     return {
       ...order,
@@ -392,6 +460,7 @@ export async function getClientProfile(clientId: string) {
     ...client,
     offers: mappedOffers,
     crmOrders: mappedOrders,
+    agencyCrmOrders: mappedAgencyOrders,
     portalToken: activePortalToken,
     occupiedSurfaces,
     metrics: {

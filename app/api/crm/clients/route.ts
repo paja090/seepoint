@@ -3,6 +3,7 @@ import { requireApiAccess, isApiDenied } from '@/lib/api-auth';
 import { createClient, findDuplicateClients } from '@/lib/crm/client-service';
 import { normalizeClientName } from '@/lib/crm/domain';
 import { CrmClientValidationError, parseClientInput, parseClientListQuery } from '@/lib/crm/client-policy';
+import { buildClientSearchWhere } from '@/lib/crm/search-query';
 import { prisma } from '@/lib/db';
 import { Prisma } from '@prisma/client';
 
@@ -21,29 +22,22 @@ export async function GET(req: NextRequest) {
   const { q, status, clientType, assignedUserId, page, pageSize } = parsed;
   const inactiveDays = searchParams.get('inactiveDays')?.trim();
 
-  const where: Prisma.ClientWhereInput = { active: true };
+  const andClauses: Prisma.ClientWhereInput[] = [{ active: true }];
 
   if (q) {
-    where.OR = [
-      { name: { contains: q, mode: 'insensitive' } },
-      { companyId: { contains: q, mode: 'insensitive' } },
-      { email: { contains: q, mode: 'insensitive' } },
-      { phone: { contains: q, mode: 'insensitive' } },
-      { contactPerson: { contains: q, mode: 'insensitive' } },
-      { billingCity: { contains: q, mode: 'insensitive' } },
-    ];
+    andClauses.push(buildClientSearchWhere(q));
   }
 
   if (status) {
-    where.status = status;
+    andClauses.push({ status });
   }
 
   if (clientType) {
-    where.clientType = clientType;
+    andClauses.push({ clientType });
   }
 
   if (assignedUserId) {
-    where.assignedUserId = assignedUserId;
+    andClauses.push({ assignedUserId });
   }
 
   if (inactiveDays) {
@@ -51,9 +45,11 @@ export async function GET(req: NextRequest) {
     if (!isNaN(days) && days > 0) {
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - days);
-      where.lastActivityAt = { lte: cutoff };
+      andClauses.push({ lastActivityAt: { lte: cutoff } });
     }
   }
+
+  const where: Prisma.ClientWhereInput = andClauses.length === 1 ? andClauses[0] : { AND: andClauses };
 
   const [clients, total] = await Promise.all([
     prisma.client.findMany({
@@ -68,6 +64,8 @@ export async function GET(req: NextRequest) {
             occupancies: true,
             offers: true,
             crmOrders: true,
+            agencyCrmOrders: true,
+            branches: true,
             invoices: true,
             crmTasks: true,
           },

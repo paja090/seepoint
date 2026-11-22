@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ClientLogoControl } from '@/components/ClientLogoControl';
 import { Button } from '@/components/ui';
 import { Building2, ShieldCheck, Mail, Phone, Globe, MapPin, Plus, Edit3, Trash2, Link2, CheckSquare, MessageSquare, FilePlus, Store, AlertTriangle, TrendingUp, DollarSign, Layers, Copy, Check, ExternalLink } from 'lucide-react';
-import { ClientProfileData, CLIENT_STATUS_LABELS } from '@/lib/crm/types';
+import { ClientProfileData, CLIENT_STATUS_LABELS, CLIENT_TYPE_LABELS, type ClientType } from '@/lib/crm/types';
 
 export function ClientHeader({ client, canManageLifecycle }: { client: ClientProfileData; canManageLifecycle: boolean }) {
   const router = useRouter();
@@ -28,7 +28,7 @@ export function ClientHeader({ client, canManageLifecycle }: { client: ClientPro
   const [phone, setPhone] = useState(client.phone || '');
   const [website, setWebsite] = useState(client.website || '');
   const [status, setStatus] = useState(client.status || 'ACTIVE');
-  const [clientType] = useState(client.clientType || 'DIRECT_CLIENT');
+  const [clientType, setClientType] = useState<ClientType>(client.clientType || 'DIRECT_CLIENT');
   const [pricingSegment, setPricingSegment] = useState(client.pricingSegment || 'COMMERCIAL');
   const [source] = useState(client.source || 'WEBSITE');
   const [billingStreet, setBillingStreet] = useState(client.billingStreet || '');
@@ -332,6 +332,15 @@ export function ClientHeader({ client, canManageLifecycle }: { client: ClientPro
               <span className={`px-3 py-1 rounded-full text-xs font-bold border ${statusObj.badge} shrink-0`}>
                 {statusObj.label}
               </span>
+              <span
+                className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border shrink-0 ${
+                  client.clientType === 'ADVERTISING_AGENCY' || client.clientType === 'MEDIA_AGENCY'
+                    ? 'bg-violet-950/80 text-violet-200 border-violet-700'
+                    : 'bg-slate-800/80 text-slate-200 border-slate-700'
+                }`}
+              >
+                {CLIENT_TYPE_LABELS[client.clientType as keyof typeof CLIENT_TYPE_LABELS] || client.clientType}
+              </span>
               {client.companyId && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-800 px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider shrink-0">
                   <ShieldCheck size={12} className="text-emerald-400" />
@@ -520,9 +529,18 @@ export function ClientHeader({ client, canManageLifecycle }: { client: ClientPro
               <button onClick={() => setShowEditModal(false)} className="text-slate-400 hover:text-slate-700 text-sm font-bold p-1">✕</button>
             </div>
             <form onSubmit={handleSaveClient} className="space-y-3">
-              <label className="text-xs font-bold text-slate-700">Název firmy *
-                <input type="text" value={name} onChange={e => setName(e.target.value)} required className="input text-xs mt-1 font-bold" />
-              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <label className="text-xs font-bold text-slate-700">Název firmy *
+                  <input type="text" value={name} onChange={e => setName(e.target.value)} required className="input text-xs mt-1 font-bold" />
+                </label>
+                <label className="text-xs font-bold text-slate-700">Typ partnera
+                  <select value={clientType} onChange={e => setClientType(e.target.value as ClientType)} className="input text-xs mt-1">
+                    {(Object.entries(CLIENT_TYPE_LABELS) as [ClientType, string][]).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <label className="text-xs font-bold text-slate-700">Obchodní název značky
                 <input type="text" value={tradingName} onChange={e => setTradingName(e.target.value)} className="input text-xs mt-1" />
               </label>

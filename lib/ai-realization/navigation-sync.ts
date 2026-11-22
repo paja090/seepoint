@@ -309,6 +309,7 @@ export async function reconcileNavigationOrderFromOffer(
         navigationOfferId: navData?.id || null,
         navigationOrderId: null,
         sourceOfferTargetId: null,
+        clientBranchId: null,
         stableKey: `st-${idx}`,
         name: st.name,
         address: st.address || null,
