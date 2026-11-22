@@ -305,7 +305,14 @@ export async function findSurfaceConflicts(
     orderBy: { dateFrom: 'asc' },
   });
 
+  const todayNorm = normalizeDateOnly(new Date());
+
   for (const occ of occupancies) {
+    // Expired reservation holds no longer block new bookings
+    if (occ.status === 'RESERVED' && occ.reservedUntil && normalizeDateOnly(occ.reservedUntil) < todayNorm) {
+      continue;
+    }
+
     const res = resultMap.get(occ.surfaceId);
     if (!res) continue;
 
@@ -472,7 +479,20 @@ export type BasicOccupancyRecord = {
   status: OccupancyStatus;
   dateFrom: Date | string;
   dateTo: Date | string;
+  reservedUntil?: Date | string | null;
 };
+
+/**
+ * Returns true if a RESERVED occupancy has an explicit `reservedUntil` deadline
+ * strictly prior to the reference day (i.e. reservation hold has expired).
+ */
+export function isReservationHoldExpired(
+  occ: Pick<BasicOccupancyRecord, 'status' | 'reservedUntil'>,
+  referenceDate: Date = new Date()
+): boolean {
+  if (occ.status !== 'RESERVED' || !occ.reservedUntil) return false;
+  return normalizeDateOnly(occ.reservedUntil).getTime() < normalizeDateOnly(referenceDate).getTime();
+}
 
 /**
  * Derives the real-time surface occupancy status snapshot at a reference date.
@@ -488,19 +508,31 @@ export function getSurfaceAvailabilityState(
   currentRentEnd: Date | null;
   activeOccupancyId: string | null;
 } {
-  const refTime = referenceDate.getTime();
+  const refDayTime = normalizeDateOnly(referenceDate).getTime();
 
-  const active = occupancies.filter((occ) => {
+  const validOccupancies = occupancies.filter((occ) => {
     if (occ.status === 'FINISHED' || occ.status === 'CANCELLED') return false;
-    const fromTime = new Date(occ.dateFrom).getTime();
-    const toTime = new Date(occ.dateTo).getTime();
-    return fromTime <= refTime && toTime >= refTime;
+    if (isReservationHoldExpired(occ, referenceDate)) return false;
+    return true;
+  });
+
+  const active = validOccupancies.filter((occ) => {
+    const fromTime = normalizeDateOnly(occ.dateFrom).getTime();
+    const toTime = normalizeDateOnly(occ.dateTo).getTime();
+    return fromTime <= refDayTime && toTime >= refDayTime;
   });
 
   if (active.length === 0) {
-    const upcoming = occupancies
-      .filter((occ) => ['OCCUPIED', 'RESERVED'].includes(occ.status) && new Date(occ.dateFrom).getTime() > refTime)
-      .sort((a, b) => new Date(a.dateFrom).getTime() - new Date(b.dateFrom).getTime())[0];
+    const upcoming = validOccupancies
+      .filter(
+        (occ) =>
+          ['OCCUPIED', 'RESERVED'].includes(occ.status) &&
+          normalizeDateOnly(occ.dateFrom).getTime() > refDayTime
+      )
+      .sort(
+        (a, b) =>
+          normalizeDateOnly(a.dateFrom).getTime() - normalizeDateOnly(b.dateFrom).getTime()
+      )[0];
 
     if (upcoming) {
       return {

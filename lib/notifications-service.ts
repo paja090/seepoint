@@ -185,22 +185,25 @@ export const workOrdersProvider: NotificationProvider = {
   async getNotifications(ctx) {
     const items: SystemNotificationItem[] = [];
 
-    // Overdue Work Tasks
+    // Overdue Work Tasks (either explicit deadline passed OR scheduled day already elapsed)
+    const todayStart = new Date(ctx.now.getFullYear(), ctx.now.getMonth(), ctx.now.getDate());
     const overdueWorkOrders = await prisma.workOrder.findMany({
       where: {
-        deadlineAt: { lt: ctx.now },
         status: { notIn: ['DONE', 'CANCELLED'] },
+        OR: [{ deadlineAt: { lt: ctx.now } }, { scheduledAt: { lt: todayStart } }],
       },
-      select: { id: true, title: true, clientName: true, deadlineAt: true },
+      select: { id: true, title: true, clientName: true, deadlineAt: true, scheduledAt: true },
+      orderBy: { scheduledAt: 'asc' },
       take: 15,
     });
 
     overdueWorkOrders.forEach((o) => {
+      const refDate = o.deadlineAt && o.deadlineAt < ctx.now ? o.deadlineAt : o.scheduledAt;
       items.push({
         id: `overdue-${o.id}`,
         type: 'OVERDUE_TASK',
         title: `🚨 Úkol po termínu: ${o.title}`,
-        message: `Zakázka pro ${o.clientName} měla být hotová do ${o.deadlineAt ? new Date(o.deadlineAt).toLocaleDateString('cs-CZ') : 'dnes'}.`,
+        message: `Zakázka pro ${o.clientName} byla plánována na ${new Date(refDate).toLocaleDateString('cs-CZ')} a dosud nebyla uzavřena ani přeplánována.`,
         severity: 'HIGH',
         link: `/work/${o.id}`,
         createdAt: ctx.now.toISOString(),
@@ -458,6 +461,43 @@ export const occupancyIntelligenceProvider: NotificationProvider = {
   },
 };
 
+// 11. ADMIN, MANAGER, SALES: Unified expirations (leases, reservation holds, client contracts, carrier permits)
+export const occupancyExpirationsProvider: NotificationProvider = {
+  name: 'occupancy-expirations',
+  shouldRun: (ctx) =>
+    (ctx.enabled('occupancy') || ctx.enabled('carriers') || ctx.enabled('clients')) &&
+    (ctx.userRole === 'ADMIN' || ctx.userRole === 'MANAGER' || ctx.userRole === 'SALES'),
+  async getNotifications(ctx) {
+    const { collectExpirationsForOrganization, formatExpirationBadgeText } = await import(
+      '@/lib/occupancy/expiration-alerts'
+    );
+    const summary = await collectExpirationsForOrganization(ctx.organizationId, {
+      referenceDate: ctx.now,
+      lookaheadDays: 30,
+      expiredLookbackDays: 14,
+    });
+
+    return summary.items.slice(0, 12).map((item) => ({
+      id: `expiration-${item.id}`,
+      type:
+        item.category === 'CLIENT_CONTRACT'
+          ? ('EXPIRING_CONTRACT' as const)
+          : item.category === 'CARRIER_PERMIT'
+          ? ('CITY_GALLERY_PERMIT_EXPIRING' as const)
+          : ('OCCUPANCY_INSIGHT' as const),
+      title: `⏳ ${item.title}`,
+      message: `${formatExpirationBadgeText(item.daysRemaining)} (${item.expiresAt}) – ${item.subtitle}`,
+      severity:
+        item.urgency === 'EXPIRED' || item.urgency === 'URGENT'
+          ? ('HIGH' as const)
+          : ('MEDIUM' as const),
+      link: item.link,
+      createdAt: ctx.now.toISOString(),
+      metadata: { category: item.category, daysRemaining: item.daysRemaining, expiresAt: item.expiresAt },
+    }));
+  },
+};
+
 export const ALL_NOTIFICATION_PROVIDERS: NotificationProvider[] = [
   fieldPlanningNotifications,
   personalTasksProvider,
@@ -470,6 +510,7 @@ export const ALL_NOTIFICATION_PROVIDERS: NotificationProvider[] = [
   vehicleNotificationsProvider,
   aiInboxNotificationsProvider,
   occupancyIntelligenceProvider,
+  occupancyExpirationsProvider,
 ];
 
 export async function getSystemNotifications(

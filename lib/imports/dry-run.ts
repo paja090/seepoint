@@ -1,8 +1,17 @@
 import { importJson } from './json';
 import { prisma } from '@/lib/db';
-import { cleanText, normalizeCode, normalizeText, parseCoordinate } from '@/lib/carriers-2026/normalize';
+import { cleanText, normalizeCode, normalizeText } from '@/lib/carriers-2026/normalize';
 import { calculateHaversineDistanceKm } from '@/lib/opportunities/distance';
-import { matchCarrier, matchClient } from './matching';
+import { isReservationHoldExpired, periodsOverlap } from '@/lib/occupancy/availability-service';
+import {
+  matchCarrier,
+  matchClient,
+  matchSurface,
+  parseImportDateOnly,
+  parseOccupancyImportDates,
+  parseOccupancyImportStatus,
+  type ExistingSurfaceRecord,
+} from './matching';
 import type {
   ColumnMappingProposal,
   DryRunRowResult,
@@ -63,7 +72,7 @@ export async function executeDryRun(
   organizationId: string,
   batchId: string
 ): Promise<{ stats: DryRunStats; sampleRows: DryRunRowResult[] }> {
-  const [batch, sheets, existingCarriersRaw, existingClientsRaw] = await Promise.all([
+  const [batch, sheets, existingCarriersRaw, existingClientsRaw, existingOccupanciesRaw] = await Promise.all([
     prisma.importBatch.findFirstOrThrow({
       where: { id: batchId, organizationId },
     }),
@@ -82,6 +91,17 @@ export async function executeDryRun(
         latitude: true,
         longitude: true,
         sourceKey: true,
+        surfaces: {
+          select: {
+            id: true,
+            carrierId: true,
+            name: true,
+            mediaType: true,
+            sidePosition: true,
+            sourceKey: true,
+          },
+          orderBy: { name: 'asc' },
+        },
         _count: { select: { photos: true } },
       },
     }),
@@ -94,6 +114,22 @@ export async function executeDryRun(
         companyId: true,
       },
     }),
+    prisma.occupancy.findMany({
+      where: {
+        organizationId,
+        status: { in: ['OCCUPIED', 'RESERVED', 'NEGOTIATION'] },
+      },
+      select: {
+        id: true,
+        surfaceId: true,
+        clientName: true,
+        campaignName: true,
+        dateFrom: true,
+        dateTo: true,
+        status: true,
+        reservedUntil: true,
+      },
+    }),
   ]);
 
   const existingCarriers = existingCarriersRaw.map((c) => ({
@@ -101,6 +137,52 @@ export async function executeDryRun(
     type: String(c.type),
     photoCount: c._count.photos,
   }));
+
+  const surfacesByCarrierId = new Map<string, ExistingSurfaceRecord[]>(
+    existingCarriersRaw.map((c) => [
+      c.id,
+      c.surfaces.map((s) => ({
+        id: s.id,
+        carrierId: s.carrierId,
+        name: s.name,
+        mediaType: String(s.mediaType),
+        sidePosition: s.sidePosition,
+        sourceKey: s.sourceKey,
+      })),
+    ])
+  );
+
+  const now = new Date();
+  const activeOccupanciesBySurfaceId = new Map<
+    string,
+    Array<{
+      id: string;
+      clientName: string;
+      campaignName: string;
+      dateFrom: Date;
+      dateTo: Date;
+      status: string;
+      source: 'DB' | 'BATCH';
+      rowNumber?: number;
+    }>
+  >();
+
+  for (const occ of existingOccupanciesRaw) {
+    if (isReservationHoldExpired({ status: occ.status, reservedUntil: occ.reservedUntil }, now)) {
+      continue;
+    }
+    const list = activeOccupanciesBySurfaceId.get(occ.surfaceId) ?? [];
+    list.push({
+      id: occ.id,
+      clientName: occ.clientName,
+      campaignName: occ.campaignName,
+      dateFrom: occ.dateFrom,
+      dateTo: occ.dateTo,
+      status: occ.status,
+      source: 'DB',
+    });
+    activeOccupanciesBySurfaceId.set(occ.surfaceId, list);
+  }
 
   const existingClients = existingClientsRaw;
 
@@ -230,15 +312,168 @@ export async function executeDryRun(
       }
     } else if (classification === 'OCCUPANCY') {
       targetEntity = 'OCCUPANCY';
-      const code = mappedData.carrierCode ? String(mappedData.carrierCode) : '';
-      if (!code) {
+      const rawCode = mappedData.carrierCode ? String(mappedData.carrierCode).trim() : '';
+      if (!rawCode) {
         action = 'SKIP';
         skipCount++;
       } else {
-        action = 'CREATE';
-        targetIdentifier = `${code} (${mappedData.clientName || mappedData.campaignName || 'Obsazenost'})`;
-        createCount++;
-        entityStats.occupancies.create++;
+        const normCode = normalizeCode(rawCode);
+        const carrier = existingCarriers.find((c) => normalizeCode(c.code) === normCode);
+        if (!carrier) {
+          action = 'ERROR';
+          targetIdentifier = rawCode;
+          issues.push({
+            code: 'CARRIER_NOT_FOUND',
+            message: `Nosič s kódem „${rawCode}“ nebyl v databázi nalezen.`,
+            severity: 'error',
+          });
+          errorCount++;
+        } else {
+          const carrierSurfaces = surfacesByCarrierId.get(carrier.id) ?? [];
+          const surfMatch = matchSurface(carrierSurfaces, {
+            sidePosition: mappedData.sidePosition ? String(mappedData.sidePosition) : null,
+            surfaceName: mappedData.surfaceName ? String(mappedData.surfaceName) : null,
+          });
+
+          const parsedDates = parseOccupancyImportDates(mappedData);
+          if (!parsedDates) {
+            action = 'ERROR';
+            targetIdentifier = `${carrier.code} (${mappedData.clientName || 'Obsazenost'})`;
+            issues.push({
+              code: 'MISSING_OR_INVALID_DATES',
+              message: 'Chybí platné datum od/do (nebo měsíc obsazenosti).',
+              severity: 'error',
+            });
+            errorCount++;
+          } else if (parsedDates.dateFrom > parsedDates.dateTo) {
+            action = 'ERROR';
+            targetIdentifier = `${carrier.code} (${mappedData.clientName || 'Obsazenost'})`;
+            issues.push({
+              code: 'INVALID_DATE_RANGE',
+              message: `Datum od (${parsedDates.dateFrom.toISOString().slice(0, 10)}) je po datu do (${parsedDates.dateTo.toISOString().slice(0, 10)}).`,
+              severity: 'error',
+            });
+            errorCount++;
+          } else if (surfMatch.status === 'NOT_FOUND') {
+            action = 'ERROR';
+            targetIdentifier = carrier.code;
+            issues.push({
+              code: 'NO_SURFACE_ON_CARRIER',
+              message: `Nosič ${carrier.code} nemá založenou žádnou reklamní plochu.`,
+              severity: 'error',
+            });
+            errorCount++;
+          } else if (surfMatch.status === 'AMBIGUOUS') {
+            action = 'NEEDS_REVIEW';
+            targetIdentifier = `${carrier.code} (neurčená strana)`;
+            issues.push({
+              code: 'AMBIGUOUS_SURFACE_SIDE',
+              message: `Nosič ${carrier.code} má více stran (${surfMatch.candidates.map((s) => s.sidePosition ? `${s.name} [${s.sidePosition}]` : s.name).join(', ')}). Doplňte sloupec Strana (A/B) nebo Název plochy.`,
+              severity: 'warning',
+            });
+            needsReviewCount++;
+          } else {
+            const surface = surfMatch.surface;
+            const dateFromIso = parsedDates.dateFrom.toISOString().slice(0, 10);
+            const dateToIso = parsedDates.dateTo.toISOString().slice(0, 10);
+            const parsedStatus = parseOccupancyImportStatus(
+              mappedData.status,
+              parsedDates.dateFrom,
+              parsedDates.dateTo,
+              now
+            );
+            const parsedReservedUntil = parseImportDateOnly(mappedData.reservedUntil);
+            const clientName = mappedData.clientName ? String(mappedData.clientName).trim() : '';
+
+            // Resolve existing client ID if matched
+            if (clientName) {
+              const clientMatch = matchClient({ name: clientName }, existingClients);
+              if (clientMatch.status === 'MATCHED') {
+                mappedData.matchedClientId = clientMatch.client.id;
+              }
+            }
+
+            mappedData.resolvedSurfaceId = surface.id;
+            mappedData.resolvedSurfaceName = surface.name;
+            mappedData.dateFrom = dateFromIso;
+            mappedData.dateTo = dateToIso;
+            mappedData.parsedStatus = parsedStatus;
+            if (parsedReservedUntil) {
+              mappedData.reservedUntil = parsedReservedUntil.toISOString().slice(0, 10);
+            }
+
+            targetEntityId = surface.id;
+            targetIdentifier = `${carrier.code} · ${surface.name} (${clientName || mappedData.campaignName || 'Obsazenost'})`;
+
+            // Check date-overlap collisions against DB and earlier rows in this batch
+            const surfaceOccupancies = activeOccupanciesBySurfaceId.get(surface.id) ?? [];
+            const overlapping = surfaceOccupancies.filter((existingOcc) => {
+              if (parsedStatus === 'FINISHED') return false;
+              if (existingOcc.status === 'NEGOTIATION' && parsedStatus === 'NEGOTIATION') return false;
+              return periodsOverlap(
+                parsedDates.dateFrom,
+                parsedDates.dateTo,
+                existingOcc.dateFrom,
+                existingOcc.dateTo
+              );
+            });
+
+            const hardOverlaps = overlapping.filter(
+              (o) => o.status === 'OCCUPIED' || o.status === 'RESERVED'
+            );
+
+            if (hardOverlaps.length > 0 && (parsedStatus === 'OCCUPIED' || parsedStatus === 'RESERVED')) {
+              const first = hardOverlaps[0];
+              const dbRange = `${first.dateFrom.toISOString().slice(0, 10)} – ${first.dateTo.toISOString().slice(0, 10)}`;
+              const srcLabel =
+                first.source === 'BATCH'
+                  ? `řádek #${first.rowNumber} v tomto importu`
+                  : 'databáze';
+              action = 'CONFLICT';
+              conflictDetails = {
+                field: 'occupancy_overlap',
+                message: `Kolize obsazenosti na ploše ${carrier.code} (${surface.name}): překryv s ${first.clientName} (${dbRange}, zdroj: ${srcLabel}).`,
+                dbValue: `${first.clientName} · ${dbRange}`,
+                importValue: `${clientName || 'Import'} · ${dateFromIso} – ${dateToIso}`,
+              };
+              diff.push({
+                field: 'occupancy_overlap',
+                label: 'Termín obsazenosti',
+                oldValue: `${first.clientName} (${dbRange})`,
+                newValue: `${clientName || 'Import'} (${dateFromIso} – ${dateToIso})`,
+                isCritical: true,
+              });
+              conflictCount++;
+            } else {
+              if (overlapping.length > 0) {
+                issues.push({
+                  code: 'SOFT_OCCUPANCY_OVERLAP',
+                  message: `Měkký překryv s opcí/jednáním (${overlapping[0].clientName}).`,
+                  severity: 'warning',
+                });
+              }
+              action = 'CREATE';
+              createCount++;
+              entityStats.occupancies.create++;
+
+              // Register in intra-batch map so subsequent overlapping rows in the same Excel are caught
+              if (parsedStatus === 'OCCUPIED' || parsedStatus === 'RESERVED') {
+                const list = activeOccupanciesBySurfaceId.get(surface.id) ?? [];
+                list.push({
+                  id: `batch:${row.id}`,
+                  clientName: clientName || 'Import',
+                  campaignName: mappedData.campaignName ? String(mappedData.campaignName) : 'Kampaň',
+                  dateFrom: parsedDates.dateFrom,
+                  dateTo: parsedDates.dateTo,
+                  status: parsedStatus,
+                  source: 'BATCH',
+                  rowNumber: row.rowNumber,
+                });
+                activeOccupanciesBySurfaceId.set(surface.id, list);
+              }
+            }
+          }
+        }
       }
     } else {
       // Default: CARRIER & SURFACE
@@ -370,8 +605,10 @@ export async function executeDryRun(
       mappedData,
     });
 
-    if (sampleResults.length < 50) {
+    const isPrioritySample = action === 'CONFLICT' || action === 'ERROR' || action === 'NEEDS_REVIEW';
+    if (sampleResults.length < 50 || (isPrioritySample && sampleResults.length < 150)) {
       sampleResults.push({
+        rowId: row.id,
         rowNumber: row.rowNumber,
         sheetName: sheet?.name || 'Neznámý list',
         action,

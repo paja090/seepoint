@@ -32,6 +32,19 @@ export function ClientContractsTab({ client }: { client: ClientProfileData }) {
           <tbody>
             {contracts.map((c: ContractRecordItem) => {
               const statusObj = CONTRACT_STATUS_LABELS[c.status as keyof typeof CONTRACT_STATUS_LABELS] || CONTRACT_STATUS_LABELS.ACTIVE;
+              const validToDate = c.validTo ? new Date(c.validTo) : null;
+              const daysRemaining =
+                validToDate && c.status === 'ACTIVE'
+                  ? Math.ceil((validToDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+                  : null;
+              const expiryBadge =
+                daysRemaining !== null && daysRemaining <= 30
+                  ? daysRemaining < 0
+                    ? { text: `Vypršela (${Math.abs(daysRemaining)} d)`, cls: 'bg-red-100 text-red-800 border-red-300' }
+                    : daysRemaining <= 7
+                    ? { text: `Končí za ${daysRemaining} d`, cls: 'bg-orange-100 text-orange-900 border-orange-300' }
+                    : { text: `Končí za ${daysRemaining} d`, cls: 'bg-amber-100 text-amber-900 border-amber-300' }
+                  : null;
               return (
                 <tr key={c.id} className="hover:bg-slate-50/70">
                   <TableCell>
@@ -40,7 +53,16 @@ export function ClientContractsTab({ client }: { client: ClientProfileData }) {
                   </TableCell>
                   <TableCell>{c.type}</TableCell>
                   <TableCell>{new Date(c.validFrom).toLocaleDateString('cs-CZ')}</TableCell>
-                  <TableCell>{c.validTo ? new Date(c.validTo).toLocaleDateString('cs-CZ') : 'Neurčito'}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span>{validToDate ? validToDate.toLocaleDateString('cs-CZ') : 'Neurčito'}</span>
+                      {expiryBadge && (
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black ${expiryBadge.cls}`}>
+                          ⚠️ {expiryBadge.text}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <span className={`px-2.5 py-1 rounded text-xs font-semibold border ${statusObj.badge}`}>
                       {statusObj.label}

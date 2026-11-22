@@ -1115,7 +1115,7 @@ export async function flushPendingGoogleSheetWritebacks(params: {
       const needsRescheduleWriteback =
         typeof pc.manualScheduledDateIso === 'string' &&
         pc.manualScheduledDateIso.length > 0 &&
-        !pc.sheetWritebackAt;
+        pc.sheetScheduledDateAtReschedule !== pc.manualScheduledDateIso;
 
       if (needsRescheduleWriteback) {
         const res = await writeBackWorkOrderRescheduledToGoogleSheet({

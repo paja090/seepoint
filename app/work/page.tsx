@@ -14,6 +14,7 @@ import {
   getGoogleSheetWritebackStatus,
 } from '@/lib/work/google-sheets-writeback';
 import { extractWorkOrderConstraintFlags } from '@/lib/work';
+import { extractWorkOrderEmailAction } from '@/lib/work/overdue';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +32,11 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
   const initialClientName = cleanParam(params.clientName) || '';
   const initialCampaignDateFrom = cleanParam(params.campaignDateFrom) || '';
   const initialCampaignDateTo = cleanParam(params.campaignDateTo) || '';
+  const rawInitialFilter = cleanParam(params.filter) || '';
+  const allowedFilters = new Set(['open', 'overdue', 'today', 'week', 'urgent', 'invoicing', 'history', 'all']);
+  const initialFilter = allowedFilters.has(rawInitialFilter)
+    ? (rawInitialFilter as 'open' | 'overdue' | 'today' | 'week' | 'urgent' | 'invoicing' | 'history' | 'all')
+    : undefined;
 
   // 1. Ensure active CRM realizations are reflected in WorkOrders
   const unlinkedCrmOrders = await prisma.crmOrder.findMany({
@@ -235,6 +241,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
       mediaLabel: order.mediaLabel,
       contactPhone: order.contactPhone,
       locationNote: order.locationNote,
+      emailAction: extractWorkOrderEmailAction(order.planningConstraints),
       assignments: order.assignments.map((a) => ({
         workerName: a.workerName,
         acknowledgedAt: a.acknowledgedAt?.toISOString() ?? null,
@@ -275,6 +282,7 @@ export default async function WorkPlanPage({ searchParams }: { searchParams: Pro
           initialClientName={initialClientName}
           initialCampaignDateFrom={initialCampaignDateFrom}
           initialCampaignDateTo={initialCampaignDateTo}
+          initialFilter={initialFilter}
           canCreateWorkOrder={canCreateWorkOrder}
           categories={categories}
           isSeePointOrg={isSeePointOrg}

@@ -1,5 +1,12 @@
-import { prisma } from '@/lib/db';
+import { prisma, syncSurfaceOccupancyState } from '@/lib/db';
 import { normalizeCode, normalizeText } from '@/lib/carriers-2026/normalize';
+import { isReservationHoldExpired } from '@/lib/occupancy/availability-service';
+import {
+  matchSurface,
+  parseImportDateOnly,
+  parseOccupancyImportDates,
+  parseOccupancyImportStatus,
+} from './matching';
 import { saveOrUpdateProfile } from './profile-service';
 import type { ColumnMappingProposal, ConflictResolutionChoice, SheetClassificationType } from './types';
 import type { CarrierType, MediaType, Prisma } from '@prisma/client';
@@ -65,7 +72,10 @@ export async function commitImportBatch(
   let updatedCarriersCount = 0;
   let createdClientsCount = 0;
   let createdPricesCount = 0;
+  let createdOccupanciesCount = 0;
   let skippedRowsCount = 0;
+  const touchedSurfaceIds = new Set<string>();
+  const now = new Date();
 
   // Process rows in batches of 100 in database transaction
   for (let i = 0; i < rows.length; i += 100) {
@@ -73,12 +83,15 @@ export async function commitImportBatch(
 
     await prisma.$transaction(async (tx) => {
       for (const row of chunk) {
-        const resolution = options.resolutions?.[row.id] || (row.resolution as ConflictResolutionChoice);
+        const resolution =
+          options.resolutions?.[row.id] ??
+          options.resolutions?.[String(row.rowNumber)] ??
+          (row.resolution as ConflictResolutionChoice | null);
         let action = row.action;
 
         if (action === 'CONFLICT') {
           if (resolution === 'USE_IMPORT') {
-            action = 'UPDATE';
+            action = row.targetEntity === 'OCCUPANCY' ? 'CREATE' : 'UPDATE';
           } else {
             action = 'SKIP';
           }
@@ -155,38 +168,141 @@ export async function commitImportBatch(
           }
         } else if (row.targetEntity === 'OCCUPANCY') {
           const rawCode = mapped.carrierCode ? String(mapped.carrierCode) : '';
-          if (rawCode) {
+          const parsedDates = parseOccupancyImportDates(mapped);
+          if (!rawCode || !parsedDates || parsedDates.dateFrom > parsedDates.dateTo) {
+            skippedRowsCount++;
+            continue;
+          }
+
+          let targetSurfaceId =
+            typeof mapped.resolvedSurfaceId === 'string' && mapped.resolvedSurfaceId.trim()
+              ? mapped.resolvedSurfaceId.trim()
+              : null;
+
+          if (!targetSurfaceId) {
             const code = normalizeCode(rawCode);
             const carrier = await tx.advertisingCarrier.findFirst({
               where: { organizationId, code },
-              include: { surfaces: true },
+              include: { surfaces: { orderBy: { name: 'asc' } } },
             });
-
             if (carrier && carrier.surfaces.length > 0) {
-              const surface = carrier.surfaces[0];
-              const dateFrom = mapped.dateFrom ? new Date(String(mapped.dateFrom)) : new Date();
-              const dateTo = mapped.dateTo ? new Date(String(mapped.dateTo)) : new Date(Date.now() + 30 * 24 * 3600 * 1000);
-              const clientName = mapped.clientName ? String(mapped.clientName) : 'Nespecifikovaný inzerent';
-              const campaignName = mapped.campaignName ? String(mapped.campaignName) : 'Kampaň';
-
-              await tx.occupancy.create({
-                data: {
-                  organizationId,
-                  surfaceId: surface.id,
-                  clientName,
-                  campaignName,
-                  dateFrom,
-                  dateTo,
-                  status: 'RESERVED',
-                  note: mapped.status ? `Stav z importu: ${mapped.status}` : null,
-                },
-              });
-              await tx.importRow.update({
-                where: { id: row.id },
-                data: { importedAt: new Date() },
-              });
+              const matchedSurf = matchSurface(
+                carrier.surfaces.map((s) => ({
+                  id: s.id,
+                  carrierId: s.carrierId,
+                  name: s.name,
+                  mediaType: String(s.mediaType),
+                  sidePosition: s.sidePosition,
+                  sourceKey: s.sourceKey,
+                })),
+                {
+                  sidePosition: mapped.sidePosition ? String(mapped.sidePosition) : null,
+                  surfaceName: mapped.surfaceName ? String(mapped.surfaceName) : null,
+                }
+              );
+              if (matchedSurf.status === 'MATCHED') {
+                targetSurfaceId = matchedSurf.surface.id;
+              }
             }
           }
+
+          if (!targetSurfaceId) {
+            skippedRowsCount++;
+            continue;
+          }
+
+          const { dateFrom, dateTo } = parsedDates;
+          const status = parseOccupancyImportStatus(mapped.status, dateFrom, dateTo, now);
+          const reservedUntil =
+            status === 'RESERVED' ? parseImportDateOnly(mapped.reservedUntil) : null;
+
+          // Safety collision re-check at commit time unless explicitly approved via USE_IMPORT
+          if (resolution !== 'USE_IMPORT' && (status === 'OCCUPIED' || status === 'RESERVED')) {
+            const overlapping = await tx.occupancy.findMany({
+              where: {
+                organizationId,
+                surfaceId: targetSurfaceId,
+                status: { in: ['OCCUPIED', 'RESERVED'] },
+                dateFrom: { lte: dateTo },
+                dateTo: { gte: dateFrom },
+              },
+              select: { id: true, status: true, reservedUntil: true },
+            });
+            const blocking = overlapping.filter(
+              (o) => !isReservationHoldExpired({ status: o.status, reservedUntil: o.reservedUntil }, now)
+            );
+            if (blocking.length > 0) {
+              skippedRowsCount++;
+              continue;
+            }
+          }
+
+          const clientName = mapped.clientName ? String(mapped.clientName).trim() : 'Nespecifikovaný inzerent';
+          const campaignName = mapped.campaignName ? String(mapped.campaignName).trim() : `Kampaň – ${clientName}`;
+          let resolvedClientId =
+            typeof mapped.matchedClientId === 'string' && mapped.matchedClientId.trim()
+              ? mapped.matchedClientId.trim()
+              : null;
+
+          if (!resolvedClientId && clientName && clientName !== 'Nespecifikovaný inzerent') {
+            const normClient = normalizeText(clientName);
+            if (normClient) {
+              const clientRec = await tx.client.upsert({
+                where: {
+                  organizationId_normalizedName: {
+                    organizationId,
+                    normalizedName: normClient,
+                  },
+                },
+                create: {
+                  organizationId,
+                  name: clientName,
+                  normalizedName: normClient,
+                  active: true,
+                },
+                update: {},
+                select: { id: true },
+              });
+              resolvedClientId = clientRec.id;
+            }
+          }
+
+          const numericPrice =
+            mapped.price != null && Number.isFinite(Number(mapped.price)) ? Number(mapped.price) : null;
+          const noteText = [
+            mapped.note ? String(mapped.note).trim() : null,
+            mapped.status ? `Import stav: ${String(mapped.status).trim()}` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ') || null;
+
+          const createdOcc = await tx.occupancy.create({
+            data: {
+              organizationId,
+              surfaceId: targetSurfaceId,
+              clientId: resolvedClientId,
+              clientName,
+              campaignName,
+              dateFrom,
+              dateTo,
+              status,
+              reservedUntil,
+              price: numericPrice,
+              note: noteText,
+              importBatchId: batch.id,
+              sourceSystem: 'UNIVERSAL_IMPORT',
+            },
+          });
+          createdOccupanciesCount++;
+          touchedSurfaceIds.add(targetSurfaceId);
+          await tx.importRow.update({
+            where: { id: row.id },
+            data: {
+              importedAt: new Date(),
+              targetEntityId: createdOcc.id,
+              ...(resolution ? { resolution } : {}),
+            },
+          });
         } else {
           // CARRIER & SURFACE
           const rawCode = mapped.carrierCode ? String(mapped.carrierCode) : `CARRIER_${row.rowNumber}`;
@@ -224,6 +340,7 @@ export async function commitImportBatch(
                   create: {
                     organizationId,
                     name: mapped.surfaceName ? String(mapped.surfaceName) : (mapped.sidePosition ? `Strana ${mapped.sidePosition}` : 'Celý nosič'),
+                    sidePosition: mapped.sidePosition ? String(mapped.sidePosition) : null,
                     mediaType,
                     size: surfaceSize,
                     price: surfacePrice,
@@ -277,12 +394,22 @@ export async function commitImportBatch(
     });
   }
 
+  // Synchronize surface occupancy states for every surface updated during import
+  for (const surfaceId of touchedSurfaceIds) {
+    await syncSurfaceOccupancyState(surfaceId);
+  }
+
   // Update batch status to COMPLETED
   await prisma.importBatch.update({
     where: { id: batch.id },
     data: {
       status: 'COMPLETED',
-      importedRows: createdCarriersCount + updatedCarriersCount + createdClientsCount + createdPricesCount,
+      importedRows:
+        createdCarriersCount +
+        updatedCarriersCount +
+        createdClientsCount +
+        createdPricesCount +
+        createdOccupanciesCount,
       skippedRows: skippedRowsCount,
       finishedAt: new Date(),
     },
@@ -312,6 +439,7 @@ export async function commitImportBatch(
     updatedCarriers: updatedCarriersCount,
     createdClients: createdClientsCount,
     createdPrices: createdPricesCount,
+    createdOccupancies: createdOccupanciesCount,
     skippedRows: skippedRowsCount,
   };
 }

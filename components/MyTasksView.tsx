@@ -14,6 +14,7 @@ import {
   History,
 } from 'lucide-react';
 import { resolveGoogleDriveUrl, formatGoogleDriveLabel } from '@/lib/work';
+import { formatOverdueDaysLabel, getWorkOrderOverdueInfo } from '@/lib/work/overdue';
 
 export type MyTaskItem = {
   id: string;
@@ -164,6 +165,7 @@ export function MyTasksView({
             const isExpanded = expandedTaskId === t.id;
             const isDone = t.status === 'DONE';
             const isInProgress = t.status === 'IN_PROGRESS';
+            const overdueInfo = getWorkOrderOverdueInfo(t);
 
             return (
               <div
@@ -171,6 +173,8 @@ export function MyTasksView({
                 className={`rounded-3xl border bg-white p-5 transition-all shadow-sm ${
                   isDone
                     ? 'border-emerald-200 bg-emerald-50/20'
+                    : overdueInfo.isOverdue
+                    ? 'border-red-400 ring-2 ring-red-100 bg-red-50/20'
                     : isInProgress
                     ? 'border-sky-300 ring-2 ring-sky-100'
                     : 'border-slate-200 hover:border-slate-300'
@@ -190,6 +194,12 @@ export function MyTasksView({
                     >
                       {isDone ? '✓ Dokončeno' : isInProgress ? '▶ Probíhá' : '📋 Plánováno'}
                     </span>
+
+                    {overdueInfo.isOverdue && (
+                      <span className="rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-black text-white">
+                        ⚠️ Po termínu ({formatOverdueDaysLabel(overdueInfo.overdueDays)})
+                      </span>
+                    )}
 
                     <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600">
                       {t.workType}

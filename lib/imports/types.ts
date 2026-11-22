@@ -67,6 +67,7 @@ export type RowIssue = {
 };
 
 export type DryRunRowResult = {
+  rowId?: string;
   rowNumber: number;
   sheetName: string;
   action: RowAction;
@@ -179,13 +180,16 @@ export const TARGET_FIELDS_BY_ENTITY: Record<
   ],
   OCCUPANCY: [
     { field: 'carrierCode', label: 'Kód nosiče / Plochy', description: 'Identifikátor obsazené plochy', required: true },
+    { field: 'sidePosition', label: 'Strana / Pozice (A / B)', description: 'Konkrétní strana oboustranného nosiče (A, B, 1, 2)' },
+    { field: 'surfaceName', label: 'Název plochy / Strany', description: 'Přesný název plochy na nosiči (např. Strana A, Směr centrum)' },
     { field: 'clientName', label: 'Název klienta / Inzerent', description: 'Inzerující firma' },
     { field: 'campaignName', label: 'Název kampaně / Motiv', description: 'Obsah či téma kampaně' },
     { field: 'dateFrom', label: 'Platnost od', description: 'Datum začátku kampaně', required: true },
     { field: 'dateTo', label: 'Platnost do', description: 'Datum konce kampaně', required: true },
-    { field: 'monthSlot', label: 'Měsíc obsazenosti', description: 'Měsíční sloupec např. Leden, Únor...' },
+    { field: 'reservedUntil', label: 'Rezervace platná do', description: 'Termín vypršení předběžné rezervace / opce' },
+    { field: 'monthSlot', label: 'Měsíc obsazenosti', description: 'Měsíční sloupec např. Leden, Únor, 2026-11...' },
     { field: 'price', label: 'Cena kampaně', description: 'Dohodnutá cena' },
-    { field: 'status', label: 'Stav rezervace', description: 'Potvrzeno, Rezervace, Opce' },
+    { field: 'status', label: 'Stav rezervace', description: 'Obsazeno, Rezervace, Opce' },
     { field: 'note', label: 'Poznámka', description: 'Poznámka k objednávce' },
   ],
   PRICES: [

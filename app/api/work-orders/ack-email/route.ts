@@ -101,7 +101,7 @@ export async function GET(request: Request) {
   }
 
   const payload = verifyBriefingAckToken(token);
-  if (!payload) {
+  if (!payload || (payload.action && payload.action !== 'ack')) {
     return renderHtmlResponse({
       ok: false,
       title: 'Platnost odkazu vypršela',

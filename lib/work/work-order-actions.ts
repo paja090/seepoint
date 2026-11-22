@@ -261,7 +261,7 @@ export async function reportWorkOrderUnfinishedAction(params: {
       status: true,
       locationNote: true,
       planningConstraints: true,
-      assignments: { select: { id: true, userId: true, workerName: true, note: true } },
+      assignments: { select: { id: true, userId: true, workerName: true, acknowledgedAt: true, note: true } },
     },
   });
 
@@ -320,7 +320,10 @@ export async function reportWorkOrderUnfinishedAction(params: {
         if (params.assignmentMatcher({ userId: a.userId, workerName: a.workerName })) {
           await tx.workAssignment.update({
             where: { id: a.id },
-            data: { note: assignmentNote },
+            data: {
+              acknowledgedAt: a.acknowledgedAt ?? now,
+              note: assignmentNote,
+            },
           });
         }
       }
@@ -432,6 +435,7 @@ export async function updateWorkOrderStatusAction(params: {
               ...(params.viaEmail
                 ? {
                     lastEmailAction: 'COMPLETED',
+                    completedViaEmailAt: now.toISOString(),
                     lastWorkerReportBy: params.actor.name,
                     lastWorkerReportAt: now.toISOString(),
                     ...(cleanNote ? { lastWorkerNote: cleanNote } : {}),

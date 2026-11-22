@@ -5,7 +5,7 @@ import { assertTenantResult } from '@/lib/tenant-result';
 import { enrichClientLogoFromSiblings, fetchClientLogoAsset, hasResolvableClientLogo } from '@/lib/client-logo';
 import { Prisma, type OfferEventType, type OfferStatus } from '@prisma/client';
 import type { CurrentUser } from '@/lib/rbac';
-import { platformPrisma, prisma } from '@/lib/db';
+import { platformPrisma, prisma, syncSurfaceOccupancyState } from '@/lib/db';
 import { sendTransactionalEmail } from '@/lib/email';
 import { enterTenantContext, runWithTenantContext, requireTenantContext } from '@/lib/tenant-context';
 import { handoffAcceptedOfferToRealizationInTransaction } from '@/lib/ai-realization/handoff';
@@ -1543,7 +1543,7 @@ export async function convertOfferToOccupancy(user: CurrentUser, id: string, tar
           reservedUntil: targetStatus === 'RESERVED' ? offer.validUntil : null,
         },
       });
-      await tx.advertisingSurface.update({ where: { id: item.surfaceId }, data: { status: targetStatus, currentClientId: offer.clientId } });
+      await syncSurfaceOccupancyState(item.surfaceId, tx);
       occupancies.push(occupancy);
     }
     await tx.offer.update({ where: { id }, data: { updatedByUserId: user.id, events: { create: { type: 'CONVERTED', actorUserId: user.id, actorName: user.name, metadata: { targetStatus, occupancyIds: occupancies.map((row) => row.id) } } } } });

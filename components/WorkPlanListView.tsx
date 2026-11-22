@@ -26,6 +26,12 @@ import {
   workTypeLabels,
 } from '@/lib/work';
 import type { WorkOrderRouteInfo } from '@/lib/field-planning/order-route-mapper';
+import {
+  formatOverdueDaysLabel,
+  getWorkOrderOverdueInfo,
+  isWorkOrderOverdue,
+  type WorkOrderEmailActionSummary,
+} from '@/lib/work/overdue';
 
 export type { WorkOrderRouteInfo };
 
@@ -51,6 +57,7 @@ export type WorkOrderData = {
   mediaLabel?: string | null;
   contactPhone?: string | null;
   locationNote?: string | null;
+  emailAction?: WorkOrderEmailActionSummary | null;
   assignments: Array<{ workerName: string; acknowledgedAt?: string | null }>;
   workTasksCount: number;
   carrierCode?: string;
@@ -104,32 +111,38 @@ export function WorkPlanListView({
     .sort((a, b) => {
       const aTime = new Date(a.scheduledAt).getTime();
       const bTime = new Date(b.scheduledAt).getTime();
+      const aOverdue = isWorkOrderOverdue(a, now) ? 1 : 0;
+      const bOverdue = isWorkOrderOverdue(b, now) ? 1 : 0;
+
+      // 1. Nepřeplánované úkoly po termínu nahoře
+      if (aOverdue !== bOverdue) return bOverdue - aOverdue;
+
       const aIsToday = aTime >= todayStart.getTime() && aTime < tomorrowStart.getTime() ? 1 : 0;
       const bIsToday = bTime >= todayStart.getTime() && bTime < tomorrowStart.getTime() ? 1 : 0;
 
-      // 1. Dnešní úkoly jsou seřazeny na prvním místě
+      // 2. Dnešní úkoly hned za nimi
       if (aIsToday !== bIsToday) return bIsToday - aIsToday;
 
-      // 2. Urgentní / vysoká priorita má přednost
+      // 3. Urgentní / vysoká priorita má přednost
       const aUrgent = a.priority === 'URGENT' || a.priority === 'HIGH' ? 1 : 0;
       const bUrgent = b.priority === 'URGENT' || b.priority === 'HIGH' ? 1 : 0;
       if (aUrgent !== bUrgent) return bUrgent - aUrgent;
 
-      // 3. Probíhající úkoly před plánovanými
+      // 4. Probíhající úkoly před plánovanými
       if (a.status === 'IN_PROGRESS' && b.status !== 'IN_PROGRESS') return -1;
       if (a.status !== 'IN_PROGRESS' && b.status === 'IN_PROGRESS') return 1;
 
-      // 4. Zařazené ve výjezdu podle zastávky
+      // 5. Zařazené ve výjezdu podle zastávky
       if (a.routeInfo?.routeOrder && b.routeInfo?.routeOrder) {
         return a.routeInfo.routeOrder - b.routeInfo.routeOrder;
       }
       if (a.routeInfo?.routeOrder) return -1;
       if (b.routeInfo?.routeOrder) return 1;
 
-      // 5. Podle termínu ASC
+      // 6. Podle termínu ASC
       if (aTime !== bTime) return aTime - bTime;
 
-      // 6. Abecedně podle klienta
+      // 7. Abecedně podle klienta
       return a.clientName.localeCompare(b.clientName, 'cs');
     });
 
@@ -319,10 +332,8 @@ export function WorkPlanListView({
           </div>
         ) : (
           displayedOrders.map((order) => {
-            const isOverdue =
-              order.deadlineAt &&
-              new Date(order.deadlineAt) < now &&
-              !['DONE', 'CANCELLED'].includes(order.status);
+            const overdueInfo = getWorkOrderOverdueInfo(order, now);
+            const isOverdue = overdueInfo.isOverdue;
 
             const isToday =
               new Date(order.scheduledAt).toDateString() === now.toDateString();
@@ -378,7 +389,26 @@ export function WorkPlanListView({
                         )}
                         {isOverdue && (
                           <span className="rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-black text-white">
-                            ⚠️ Po termínu
+                            ⚠️ Po termínu ({formatOverdueDaysLabel(overdueInfo.overdueDays)})
+                          </span>
+                        )}
+                        {order.emailAction && (
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-xs font-bold border ${
+                              order.emailAction.action === 'COMPLETED'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : order.emailAction.action === 'RESCHEDULED'
+                                ? 'bg-sky-50 text-sky-800 border-sky-200'
+                                : 'bg-amber-50 text-amber-900 border-amber-300'
+                            }`}
+                            title={
+                              [order.emailAction.actorName, order.emailAction.reason]
+                                .filter(Boolean)
+                                .join(' – ') || order.emailAction.label
+                            }
+                          >
+                            📧 {order.emailAction.label}
+                            {order.emailAction.actorName ? ` (${order.emailAction.actorName})` : ''}
                           </span>
                         )}
                         {isWorkshop ? (

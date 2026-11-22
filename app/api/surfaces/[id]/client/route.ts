@@ -144,6 +144,45 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       let occupancy = null;
       if (dateFrom && dateTo && statuses.occupancy) {
         const occupancyId = typeof body.occupancyId === 'string' ? body.occupancyId : undefined;
+        const todayStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()));
+
+        // Guard against date-overlap collision with another active/reserved booking on the same surface
+        if (statuses.occupancy === 'OCCUPIED' || statuses.occupancy === 'RESERVED') {
+          const overlapping = await transaction.occupancy.findMany({
+            where: {
+              surfaceId,
+              id: occupancyId ? { not: occupancyId } : undefined,
+              status: { in: ['OCCUPIED', 'RESERVED'] },
+              dateFrom: { lte: dateTo },
+              dateTo: { gte: dateFrom },
+            },
+            select: {
+              id: true,
+              clientName: true,
+              campaignName: true,
+              dateFrom: true,
+              dateTo: true,
+              status: true,
+              reservedUntil: true,
+            },
+            orderBy: { dateFrom: 'asc' },
+          });
+
+          const blocking = overlapping.filter(
+            (occ) => !(occ.status === 'RESERVED' && occ.reservedUntil && occ.reservedUntil < todayStart)
+          );
+
+          if (blocking.length > 0) {
+            const first = blocking[0];
+            const conflictErr = new Error(
+              `Kolize obsazenosti: plocha je v termínu ${dateOnly(first.dateFrom)} – ${dateOnly(first.dateTo)} již obsazena (${first.clientName}${first.campaignName ? ` – ${first.campaignName}` : ''}).`
+            ) as Error & { statusCode?: number; conflicts?: typeof blocking };
+            conflictErr.statusCode = 409;
+            conflictErr.conflicts = blocking;
+            throw conflictErr;
+          }
+        }
+
         const occupancyData = {
           surfaceId,
           clientId: client.id,
@@ -187,9 +226,20 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     });
   } catch (error) {
     console.error('Surface client assignment failed', error);
+    const statusCode =
+      error && typeof error === 'object' && 'statusCode' in error && typeof (error as { statusCode?: unknown }).statusCode === 'number'
+        ? (error as { statusCode: number }).statusCode
+        : 400;
+    const conflicts =
+      error && typeof error === 'object' && 'conflicts' in error
+        ? (error as { conflicts?: unknown }).conflicts
+        : undefined;
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Klienta se nepodařilo uložit.' },
-      { status: 400 },
+      {
+        error: error instanceof Error ? error.message : 'Klienta se nepodařilo uložit.',
+        ...(conflicts ? { conflicts } : {}),
+      },
+      { status: statusCode },
     );
   }
 }
