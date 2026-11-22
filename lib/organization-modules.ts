@@ -94,9 +94,9 @@ export const SYSTEM_MODULES: SystemModule[] = [
   {
     id: 'analytics',
     name: 'Analytics & Tržby',
-    description: 'Finanční přehledy, tržby z ploch, grafy výkonu a predikce obsazenosti',
+    description: 'Finanční přehledy, tržby z ploch, grafy výkonu a firemní reporty',
     category: 'sales',
-    routes: ['/analytics'],
+    routes: ['/analytics', '/reports'],
   },
   {
     id: 'offers',

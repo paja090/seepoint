@@ -20,6 +20,7 @@ const additions = [
   { href: '/fotodokumentace', section: 'photoDocumentation' as AppSection, module: 'photoDocumentation' },
   { href: '/academy', section: 'academy' as AppSection, module: 'academy' },
   { href: '/occupancy/ai', section: 'aiOccupancy' as AppSection, module: 'aiOccupancy' },
+  { href: '/reports', section: 'clients' as AppSection, module: 'analytics' },
 ];
 // Dispatch replaces the old planner's menu entry; both pages remain available.
 const current = [...original.map(item => item.href === '/work/route' ? {...item, href:'/work/dispatch'} : item), ...additions];
