@@ -39,6 +39,7 @@ export const navigationHubs: NavigationHub[] = [
       ["/dashboard","Nástěnka / Přehled","barChart3","dashboard"],
       ["/offers","Nabídky","badgeDollarSign","offers"],
       ["/analytics","Analytics & Tržby","barChart3","clients"],
+      ["/reports","Firemní reporty","fileText","clients"],
       ["/network","B2B Media Network","globe","offers"]
     ] },
     { label: 'CRM & Podpora', items: [

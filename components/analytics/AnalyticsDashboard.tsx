@@ -1,6 +1,7 @@
 'use client';
 
-import { DollarSign, TrendingUp, Percent, PanelsTopLeft, Building2, Calendar } from 'lucide-react';
+import Link from 'next/link';
+import { DollarSign, TrendingUp, Percent, PanelsTopLeft, Building2, Calendar, FileSpreadsheet } from 'lucide-react';
 function getCarrierBadgeMeta(type: string) {
   switch (type) {
     case 'NAVIGATION':
@@ -122,16 +123,25 @@ export function AnalyticsDashboard({
   return (
     <div className="space-y-6">
       {/* Top Header */}
-      <div>
-        <span className="text-xs font-bold text-sky-700 uppercase tracking-widest block mb-1">
-          📊 Finanční & Provozní Analýza
-        </span>
-        <h1 className="text-3xl font-extrabold text-slate-950 tracking-tight">
-          Analytics & Přehled Kapacity
-        </h1>
-        <p className="mt-1 text-sm font-semibold text-slate-500">
-          Analýza vytíženosti reklamních nosičů a evidovaného měsíčního nájemného bez dopočítaných odhadů.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <span className="text-xs font-bold text-sky-700 uppercase tracking-widest block mb-1">
+            📊 Finanční & Provozní Analýza
+          </span>
+          <h1 className="text-3xl font-extrabold text-slate-950 tracking-tight">
+            Analytics & Přehled Kapacity
+          </h1>
+          <p className="mt-1 text-sm font-semibold text-slate-500">
+            Analýza vytíženosti reklamních nosičů a evidovaného měsíčního nájemného bez dopočítaných odhadů.
+          </p>
+        </div>
+        <Link
+          href="/reports"
+          className="inline-flex items-center gap-2 self-start sm:self-auto rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-extrabold text-white shadow-sm transition hover:bg-slate-800"
+        >
+          <FileSpreadsheet size={15} className="text-emerald-400" />
+          <span>Firemní tabulkový report →</span>
+        </Link>
       </div>
 
       {/* 4 TOP KPI CARDS */}
