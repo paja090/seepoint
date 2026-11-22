@@ -53,6 +53,8 @@ export function TeamAvailability({
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [expandedMembers, setExpandedMembers] = useState<Record<string, boolean>>({});
+  const [salesFilter, setSalesFilter] = useState<'ALL' | 'PIPELINE' | 'CONFIRMED' | 'COMPLETED'>('ALL');
+  const [expandedSalespeople, setExpandedSalespeople] = useState<Record<string, boolean>>({});
   const [showMeetingModal, setShowMeetingModal] = useState(false);
   const [activeReportDetail, setActiveReportDetail] = useState<MeetingReportRecord | null>(null);
 
@@ -703,111 +705,352 @@ export function TeamAvailability({
       {/* CENTRÁLNÍ TABULKA ZAKÁZEK OBCHODNÍKŮ */}
       {data.salesSheet && data.salesSheet.totalOrders > 0 && (
         <section className="rounded-3xl border border-amber-300/80 bg-gradient-to-br from-amber-50/70 via-white to-orange-50/30 p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200/70 pb-3">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500 text-white shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-amber-200/70 pb-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-sm">
                 <TrendingUp className="h-5 w-5" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-black text-slate-900">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-black text-slate-900">
                     Zakázky obchodníků z centrální tabulky
                   </h3>
                   <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-900">
-                    Google Sheets
+                    Google Sheets · živý přehled
                   </span>
                 </div>
-                <p className="text-xs text-slate-600">
-                  {data.salesSheet.totalOrders} zakázek celkem · {data.salesSheet.confirmedCampaigns} potvrzených kampaní · {data.salesSheet.inRealizationCampaigns} v realizaci
-                  {data.salesSheetSyncAt && ` · synchronizováno ${new Date(data.salesSheetSyncAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}`}
+                <p className="mt-0.5 text-xs text-slate-600">
+                  Přehled rozpracovaných nabídek, potvrzených kampaní a stavu výroby/instalace podle obchodníků
+                  {data.salesSheetSyncAt &&
+                    ` · aktualizováno ${new Date(data.salesSheetSyncAt).toLocaleTimeString('cs-CZ', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}`}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                href="https://docs.google.com/spreadsheets/d/1AdXE894895FfDlkhvp_HMs31x1Te2ZAeZbjZZW9DEKo/edit?gid=311603038#gid=311603038"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-amber-300 hover:bg-amber-50/50 shadow-sm"
+              >
+                <span>Otevřít Google Tabulku ↗</span>
+              </a>
               <button
                 type="button"
                 disabled={syncingSalesSheet}
                 onClick={handleSyncSalesSheet}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs font-black text-amber-900 hover:bg-amber-50 disabled:opacity-50 shadow-sm"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-500 px-3.5 py-1.5 text-xs font-black text-white hover:bg-amber-600 disabled:opacity-50 shadow-sm"
               >
-                <RefreshCw className={`h-3.5 w-3.5 text-amber-700 ${syncingSalesSheet ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-3.5 w-3.5 ${syncingSalesSheet ? 'animate-spin' : ''}`} />
                 <span>{syncingSalesSheet ? 'Synchronizuji…' : 'Aktualizovat tabulku'}</span>
               </button>
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {/* SUMMARY KPI STRIP & QUICK FILTER PILLS */}
+          <div className="mt-3.5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(
+                [
+                  ['ALL', `Všechny zakázky (${data.salesSheet.totalOrders})`],
+                  [
+                    'PIPELINE',
+                    `Rozpracované & nabídky (${Math.max(
+                      0,
+                      data.salesSheet.totalOrders - data.salesSheet.confirmedCampaigns
+                    )})`,
+                  ],
+                  ['CONFIRMED', `Potvrzené kampaně (${data.salesSheet.confirmedCampaigns})`],
+                  ['COMPLETED', `Hotové (${data.salesSheet.completedCampaigns})`],
+                ] as const
+              ).map(([filterKey, label]) => (
+                <button
+                  key={filterKey}
+                  type="button"
+                  onClick={() => setSalesFilter(filterKey)}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-extrabold transition ${
+                    salesFilter === filterKey
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'border border-amber-200/80 bg-white text-slate-700 hover:bg-amber-50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <Link
+              href="/orders"
+              className="text-xs font-extrabold text-amber-900 hover:underline"
+            >
+              Otevřít všechny zakázky v CRM →
+            </Link>
+          </div>
+
+          {/* SALESPERSON CARDS */}
+          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {Object.values(data.salesSheet.bySalesperson)
               .filter((sp) => sp.totalOrdersCount > 0 || ['MM', 'M', 'V', 'Z', 'S'].includes(sp.code))
-              .map((sp) => (
-                <div
-                  key={sp.code}
-                  className="flex flex-col justify-between rounded-2xl border border-amber-200/90 bg-white p-3.5 shadow-sm"
-                >
-                  <div>
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="text-sm font-black text-slate-900 truncate">
-                        {sp.name}
-                      </span>
-                      <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-black text-white shrink-0">
-                        {sp.displayCode || sp.code}
-                      </span>
-                    </div>
+              .sort((a, b) => b.totalOrdersCount - a.totalOrdersCount)
+              .map((sp) => {
+                const filteredOrders = sp.activeOrders.filter((ord) => {
+                  if (salesFilter === 'PIPELINE') return !ord.isConfirmed && !ord.isCompletedOrder;
+                  if (salesFilter === 'CONFIRMED') return ord.isConfirmed && !ord.isCompletedOrder;
+                  if (salesFilter === 'COMPLETED') return Boolean(ord.isCompletedOrder || ord.status === 'COMPLETED');
+                  return true;
+                });
+                const isSpExpanded = Boolean(expandedSalespeople[sp.code]);
+                const visibleOrders = isSpExpanded ? filteredOrders : filteredOrders.slice(0, 4);
+                const inProgressCount = Math.max(0, sp.totalOrdersCount - sp.completedCount);
 
-                    <div className="mt-2 flex items-baseline gap-2">
-                      <span className="text-xl font-black text-slate-950">{sp.totalOrdersCount}</span>
-                      <span className="text-xs font-bold text-slate-500">zakázek</span>
-                    </div>
-
-                    <div className="mt-1 flex flex-wrap gap-1.5 text-[10px] font-bold">
-                      <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-emerald-800">
-                        {sp.confirmedCampaignsCount} potvrzeno
-                      </span>
-                      {sp.inRealizationCount > 0 && (
-                        <span className="rounded-md bg-sky-50 px-1.5 py-0.5 text-sky-800">
-                          {sp.inRealizationCount} montáž
-                        </span>
-                      )}
-                      {sp.completedCount > 0 && (
-                        <span className="rounded-md bg-purple-50 px-1.5 py-0.5 text-purple-800">
-                          {sp.completedCount} hotovo
-                        </span>
-                      )}
-                    </div>
-
-                    {sp.activeOrders.length > 0 && (
-                      <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-2.5">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                          Aktivní kampaně ({sp.activeOrders.length})
-                        </p>
-                        {sp.activeOrders.slice(0, 3).map((order) => (
-                          <div
-                            key={order.id}
-                            className="rounded-lg bg-amber-50/60 p-2 text-[11px] leading-snug text-slate-800"
+                return (
+                  <div
+                    key={sp.code}
+                    className={`flex flex-col justify-between rounded-2xl border bg-white p-4 shadow-sm transition ${
+                      sp.totalOrdersCount > 0
+                        ? 'border-amber-200/90 hover:border-amber-300 hover:shadow-md'
+                        : 'border-slate-200/80 bg-slate-50/40'
+                    }`}
+                  >
+                    <div>
+                      {/* CARD HEADER: AVATAR + NAME + CODE + TOTAL */}
+                      <div className="flex items-start justify-between gap-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-black text-white shadow-sm ${
+                              sp.totalOrdersCount > 0 ? 'bg-slate-900' : 'bg-slate-400'
+                            }`}
                           >
-                            <div className="flex items-start justify-between gap-1 font-extrabold text-slate-900">
-                              <span className="truncate">{order.clientName}</span>
-                              <span className="shrink-0 text-[10px] font-bold text-amber-800">
-                                {order.carrierTypeLabel.replace(/\s*\(.*\)/, '')}
+                            {memberInitials(sp.name)}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <h4 className="text-sm font-black text-slate-950 truncate">
+                                {sp.name}
+                              </h4>
+                              <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-black text-amber-900 shrink-0">
+                                {sp.displayCode || sp.code}
                               </span>
                             </div>
-                            <div className="mt-0.5 flex items-center justify-between text-[10px] text-slate-500">
-                              <span>{order.period || 'neuvedeno'}</span>
-                              <span className="font-bold text-emerald-800">{order.checklistProgress}</span>
-                            </div>
+                            <p className="text-[11px] font-semibold text-slate-500">
+                              {sp.totalOrdersCount === 0
+                                ? 'Zatím žádné zapsané zakázky v tabulce'
+                                : `${inProgressCount} rozpracováno · ${sp.completedCount} hotovo`}
+                            </p>
                           </div>
-                        ))}
-                        {sp.activeOrders.length > 3 && (
-                          <p className="text-center text-[10px] font-bold text-slate-400">
-                            +{sp.activeOrders.length - 3} dalších v CRM
-                          </p>
-                        )}
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="inline-flex items-baseline gap-1 rounded-xl bg-amber-50 border border-amber-200/80 px-2.5 py-1">
+                            <span className="text-base font-black text-slate-950">
+                              {sp.totalOrdersCount}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-600">
+                              {sp.totalOrdersCount === 1
+                                ? 'zakázka'
+                                : sp.totalOrdersCount >= 2 && sp.totalOrdersCount <= 4
+                                ? 'zakázky'
+                                : 'zakázek'}
+                            </span>
+                          </span>
+                        </div>
                       </div>
-                    )}
+
+                      {/* STATUS COUNTERS ROW */}
+                      {sp.totalOrdersCount > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] font-extrabold">
+                          {sp.pipelineCount > 0 && (
+                            <span className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-900">
+                              📝 {sp.pipelineCount} v přípravě / nabídka
+                            </span>
+                          )}
+                          {sp.confirmedCampaignsCount > 0 && (
+                            <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-800">
+                              ✓ {sp.confirmedCampaignsCount} potvrzeno
+                            </span>
+                          )}
+                          {sp.inRealizationCount > 0 && (
+                            <span className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-0.5 text-sky-800">
+                              ⚙️ {sp.inRealizationCount} výroba / montáž
+                            </span>
+                          )}
+                          {sp.completedCount > 0 && (
+                            <span className="rounded-lg border border-purple-200 bg-purple-50 px-2 py-0.5 text-purple-800">
+                              🏁 {sp.completedCount} dokončeno
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* ORDERS LIST */}
+                      {visibleOrders.length > 0 ? (
+                        <div className="mt-3.5 space-y-2.5 border-t border-slate-100 pt-3">
+                          {visibleOrders.map((order) => {
+                            const isDone = Boolean(order.isCompletedOrder || order.status === 'COMPLETED');
+                            const pct = order.progressPct ?? (isDone ? 100 : order.isConfirmed ? 50 : 20);
+                            const stageTone = isDone
+                              ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                              : order.isConfirmed
+                              ? 'bg-sky-100 text-sky-900 border-sky-300'
+                              : order.hasOffer
+                              ? 'bg-amber-100 text-amber-900 border-amber-300'
+                              : 'bg-slate-100 text-slate-700 border-slate-300';
+
+                            const formatShortCzDate = (iso: string | null) => {
+                              if (!iso) return null;
+                              const d = new Date(`${iso}T12:00:00Z`);
+                              if (Number.isNaN(d.getTime())) return null;
+                              return d.toLocaleDateString('cs-CZ', {
+                                day: 'numeric',
+                                month: 'numeric',
+                                year: 'numeric',
+                              });
+                            };
+                            const fromLabel = formatShortCzDate(order.dateFromStr);
+                            const toLabel = formatShortCzDate(order.dateToStr);
+                            const dateRangeLabel =
+                              fromLabel && toLabel
+                                ? `${fromLabel} – ${toLabel}`
+                                : fromLabel
+                                ? `od ${fromLabel}`
+                                : toLabel
+                                ? `do ${toLabel}`
+                                : null;
+
+                            return (
+                              <div
+                                key={order.id}
+                                className={`rounded-2xl border p-3 text-xs transition ${
+                                  isDone
+                                    ? 'border-emerald-200/90 bg-gradient-to-br from-emerald-50/50 via-white to-white'
+                                    : order.isConfirmed
+                                    ? 'border-sky-200/90 bg-gradient-to-br from-sky-50/40 via-white to-white'
+                                    : 'border-amber-200/80 bg-gradient-to-br from-amber-50/40 via-white to-white'
+                                }`}
+                              >
+                                {/* TOP ROW: CLIENT NAME + CARRIER BADGE */}
+                                <div className="flex items-start justify-between gap-2">
+                                  <Link
+                                    href="/orders"
+                                    className="text-sm font-black text-slate-950 hover:text-amber-800 hover:underline leading-snug break-words"
+                                  >
+                                    {order.clientName}
+                                  </Link>
+                                  <span className="shrink-0 rounded-lg bg-slate-900 px-2 py-0.5 text-[10px] font-black text-white">
+                                    {order.rawCarrier || order.carrierTypeLabel.replace(/\s*\(.*\)/, '')}
+                                  </span>
+                                </div>
+
+                                {/* STAGE & PERIOD / DATES ROW */}
+                                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                                  <span className={`rounded-md border px-2 py-0.5 text-[10px] font-black ${stageTone}`}>
+                                    {order.currentStageLabel || (isDone ? 'Hotová zakázka' : order.isConfirmed ? 'Potvrzeno' : 'Rozpracováno')}
+                                  </span>
+                                  {order.period && (
+                                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                                      📅 {order.period}
+                                    </span>
+                                  )}
+                                  {dateRangeLabel && (
+                                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                                      {dateRangeLabel}
+                                    </span>
+                                  )}
+                                  {order.orderCode && (
+                                    <span
+                                      className={`rounded-md px-2 py-0.5 text-[10px] font-extrabold ${
+                                        order.orderCode.toUpperCase().includes('PŘIJAT')
+                                          ? 'bg-emerald-50 text-emerald-800'
+                                          : 'bg-slate-100 text-slate-600'
+                                      }`}
+                                    >
+                                      Obj.: {order.orderCode}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* CONTACT PERSON & EMAIL/PHONE */}
+                                {(order.contactPerson || order.contactDetail) && (
+                                  <p className="mt-1.5 text-[11px] font-medium text-slate-600 break-words">
+                                    👤 <strong className="text-slate-800">{order.contactPerson || 'Kontakt'}</strong>
+                                    {order.contactDetail ? ` · ${order.contactDetail}` : ''}
+                                  </p>
+                                )}
+
+                                {/* WORKFLOW STEPS CHIPS */}
+                                {order.workflowSteps && order.workflowSteps.length > 0 && (
+                                  <div className="mt-2.5 flex flex-wrap gap-1">
+                                    {order.workflowSteps.map((step) => (
+                                      <span
+                                        key={step.key}
+                                        className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                                          step.done
+                                            ? 'bg-emerald-100/90 text-emerald-900'
+                                            : step.active
+                                            ? 'border border-amber-400 bg-amber-100/90 text-amber-950 font-black'
+                                            : 'bg-slate-100 text-slate-400'
+                                        }`}
+                                      >
+                                        <span>{step.done ? '✓' : step.active ? '●' : '○'}</span>
+                                        <span>{step.label}</span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* PROGRESS BAR & NEXT STEP CALLOUT */}
+                                <div className="mt-2.5 space-y-1">
+                                  <div className="flex items-center justify-between gap-2 text-[10px] font-bold">
+                                    <span className={isDone ? 'text-emerald-800' : 'text-amber-900'}>
+                                      {isDone ? '✓ Zakázka kompletně odbavena' : `→ Na řadě: ${order.nextActionLabel || order.checklistProgress}`}
+                                    </span>
+                                    <span className="shrink-0 font-black text-slate-600">{pct} %</span>
+                                  </div>
+                                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                    <div
+                                      className={`h-full rounded-full transition-all ${
+                                        isDone ? 'bg-emerald-500' : order.isConfirmed ? 'bg-sky-500' : 'bg-amber-500'
+                                      }`}
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {filteredOrders.length > 4 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedSalespeople((prev) => ({
+                                  ...prev,
+                                  [sp.code]: !prev[sp.code],
+                                }))
+                              }
+                              className="w-full rounded-xl border border-amber-200 bg-amber-50/70 py-1.5 text-center text-xs font-extrabold text-amber-900 hover:bg-amber-100"
+                            >
+                              {isSpExpanded
+                                ? 'Sbalit seznam zakázek ↑'
+                                : `Zobrazit dalších ${filteredOrders.length - 4} zakázek ↓`}
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-white/70 p-3 text-center text-[11px] font-medium text-slate-400">
+                          {sp.totalOrdersCount === 0
+                            ? 'Žádné aktivní zakázky v centrální tabulce.'
+                            : 'Žádné zakázky neodpovídají zvolenému filtru.'}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
           </div>
         </section>
       )}
@@ -931,11 +1174,11 @@ export function TeamAvailability({
           const act = member.dailyActivity;
           const salesAct = member.salesActivity;
           const chk = member.checkout;
-          const isExpanded = Boolean(expandedMembers[member.id]);
           const totalActivityCount =
             (act?.completedTasks.length ?? 0) +
             (act?.activeTasks.length ?? 0) +
             (act?.rescheduledTasks.length ?? 0);
+          const isExpanded = expandedMembers[member.id] ?? totalActivityCount > 0;
 
           return (
             <section
