@@ -30,6 +30,7 @@ export async function POST(req: Request) {
 
     const albumId = form.get('albumId') ? String(form.get('albumId')).trim() : null;
     const pointId = form.get('pointId') ? String(form.get('pointId')).trim() : null;
+    const requestedBranchId = form.get('branchId') ? String(form.get('branchId')).trim() : null;
     const customName = form.get('fileName') ? String(form.get('fileName')).trim() : null;
     const rawType = form.get('type') ? String(form.get('type')).trim().toUpperCase() : 'CONTROL';
     const note = form.get('note') ? String(form.get('note')).trim().slice(0, 1000) : null;
@@ -58,6 +59,18 @@ export async function POST(req: Request) {
     let navigationDocumentationItemId: string | null = null;
     let workOrderItemId: string | null = null;
     let resolvedWorkOrderId: string | null = null;
+    let resolvedCrmRealizationId: string | null = null;
+    let resolvedBranchId: string | null = null;
+
+    if (requestedBranchId) {
+      const validBranch = await prisma.clientBranch.findFirst({
+        where: { id: requestedBranchId, organizationId, active: true },
+        select: { id: true },
+      });
+      if (validBranch) {
+        resolvedBranchId = validBranch.id;
+      }
+    }
 
     // Check if pointId is ElectionRemovalPoint, AdvertisingSurface, NavigationDocumentationItem, or WorkOrderItem
     if (pointId) {
@@ -72,18 +85,28 @@ export async function POST(req: Request) {
             resolvedWorkOrderId = wo.id;
             const existingItem = await prisma.workOrderItem.findFirst({
               where: { workOrderId: wo.id, organizationId },
-              select: { id: true, carrierId: true, surfaceId: true },
+              select: {
+                id: true,
+                carrierId: true,
+                surfaceId: true,
+                branchId: true,
+                crmRealizationId: true,
+                crmRealization: { select: { branchId: true } },
+              },
               orderBy: { createdAt: 'asc' },
             });
             if (existingItem) {
               workOrderItemId = existingItem.id;
               carrierId = existingItem.carrierId;
               surfaceId = existingItem.surfaceId;
+              resolvedCrmRealizationId = existingItem.crmRealizationId;
+              resolvedBranchId = resolvedBranchId ?? existingItem.branchId ?? existingItem.crmRealization?.branchId ?? null;
             } else {
               const createdItem = await prisma.workOrderItem.create({
                 data: {
                   organizationId,
                   workOrderId: wo.id,
+                  branchId: resolvedBranchId,
                   description: wo.title,
                   quantity: wo.quantity || 1,
                 },
@@ -125,13 +148,23 @@ export async function POST(req: Request) {
               // Check if WorkOrderItem
               const woItem = await prisma.workOrderItem.findFirst({
                 where: { id: pointId, organizationId },
-                select: { id: true, workOrderId: true, carrierId: true, surfaceId: true },
+                select: {
+                  id: true,
+                  workOrderId: true,
+                  carrierId: true,
+                  surfaceId: true,
+                  branchId: true,
+                  crmRealizationId: true,
+                  crmRealization: { select: { branchId: true } },
+                },
               });
               if (woItem) {
                 workOrderItemId = woItem.id;
                 resolvedWorkOrderId = woItem.workOrderId;
                 carrierId = woItem.carrierId;
                 surfaceId = woItem.surfaceId;
+                resolvedCrmRealizationId = woItem.crmRealizationId;
+                resolvedBranchId = resolvedBranchId ?? woItem.branchId ?? woItem.crmRealization?.branchId ?? null;
               }
             }
           }
@@ -152,7 +185,14 @@ export async function POST(req: Request) {
             items: {
               take: 1,
               orderBy: { createdAt: 'asc' },
-              select: { id: true, carrierId: true, surfaceId: true },
+              select: {
+                id: true,
+                carrierId: true,
+                surfaceId: true,
+                branchId: true,
+                crmRealizationId: true,
+                crmRealization: { select: { branchId: true } },
+              },
             },
           },
         });
@@ -162,11 +202,14 @@ export async function POST(req: Request) {
             workOrderItemId = wo.items[0].id;
             carrierId = wo.items[0].carrierId;
             surfaceId = wo.items[0].surfaceId;
+            resolvedCrmRealizationId = wo.items[0].crmRealizationId;
+            resolvedBranchId = resolvedBranchId ?? wo.items[0].branchId ?? wo.items[0].crmRealization?.branchId ?? null;
           } else {
             const createdItem = await prisma.workOrderItem.create({
               data: {
                 organizationId,
                 workOrderId: wo.id,
+                branchId: resolvedBranchId,
                 description: wo.title,
                 quantity: wo.quantity || 1,
               },
@@ -206,6 +249,8 @@ export async function POST(req: Request) {
         surfaceId,
         electionRemovalPointId,
         workOrderItemId,
+        crmRealizationId: resolvedCrmRealizationId,
+        branchId: resolvedBranchId,
         type: photoType,
         url: `/api/photos/${photoId}/file`,
         fileName,

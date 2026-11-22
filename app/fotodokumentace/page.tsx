@@ -266,6 +266,13 @@ export default async function PhotoDocumentationHubPage({
                 name: true,
               },
             },
+            branch: {
+              select: {
+                id: true,
+                name: true,
+                city: true,
+              },
+            },
             photos: {
               where: { isPrivate: false },
               select: {
@@ -650,11 +657,16 @@ export default async function PhotoDocumentationHubPage({
                 ph.capturedLongitude != null &&
                 (ph.capturedLatitude !== 0 || ph.capturedLongitude !== 0)
             );
+            const branchTag = it.branch
+              ? `🏬 ${it.branch.name}${it.branch.city ? ` (${it.branch.city})` : ''}`
+              : null;
+            const baseLabel = it.carrier
+              ? `${it.carrier.code} · ${it.surface?.name || it.description || wo.title}`
+              : it.description || wo.title;
             return {
               id: it.id,
-              label: it.carrier
-                ? `${it.carrier.code} · ${it.surface?.name || it.description || wo.title}`
-                : it.description || wo.title,
+              label: branchTag ? `${baseLabel} · ${branchTag}` : baseLabel,
+              layerName: branchTag || undefined,
               description: baseDescription,
               clientName: wo.clientName || undefined,
               quantity: it.quantity || wo.quantity || 1,

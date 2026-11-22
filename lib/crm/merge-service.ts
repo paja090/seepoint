@@ -59,6 +59,7 @@ export async function mergeDuplicateClients(
       tx.clientBranch.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
       tx.offer.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
       tx.crmOrder.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId } }),
+      tx.crmOrder.updateMany({ where: { agencyClientId: sourceClientId }, data: { agencyClientId: targetClientId } }),
       tx.occupancy.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId, clientName: targetClient.name } }),
       tx.advertisingSurface.updateMany({ where: { currentClientId: sourceClientId }, data: { currentClientId: targetClientId } }),
       tx.workOrder.updateMany({ where: { clientId: sourceClientId }, data: { clientId: targetClientId, clientName: targetClient.name } }),

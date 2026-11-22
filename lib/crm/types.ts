@@ -76,28 +76,71 @@ export type OfferRecordItem = {
   createdByUser?: { name: string } | null;
 };
 
+export type CrmAgencyOption = {
+  id: string;
+  name: string;
+  clientType: ClientType;
+  companyId?: string | null;
+};
+
+export type CrmRealizationPhotoItem = {
+  id: string;
+  url: string;
+  fileName: string;
+  type: string;
+  note?: string | null;
+  branchId?: string | null;
+  branch?: { id: string; name: string; city?: string | null } | null;
+  createdAt: Date | string;
+  capturedByWorkerName?: string | null;
+};
+
 export type CrmOrderRecordItem = {
   id: string;
   orderNumber: string;
+  clientOrderCode?: string | null;
+  clientId?: string;
   title: string;
   projectType: CrmProjectType;
   status: CrmOrderStatus;
   offerId?: string | null;
   portalToken?: string | null;
+  agencyClientId?: string | null;
+  agencyName?: string | null;
+  agencyClient?: { id: string; name: string; companyId?: string | null } | null;
+  branchId?: string | null;
+  branch?: { id: string; name: string; code?: string | null; city?: string | null } | null;
+  client?: { id: string; name: string; companyId?: string | null } | null;
+  dateFrom?: Date | string | null;
+  dateTo?: Date | string | null;
   totalPrice?: unknown;
+  billingMethod?: string | null;
+  note?: string | null;
+  internalNote?: string | null;
   assignedUser?: { name: string } | null;
   realizations?: CrmRealizationRecordItem[];
-  _count?: { workOrders: number; clientInvoices: number };
+  _count?: { workOrders: number; clientInvoices: number; realizations?: number };
 };
 
 export type CrmRealizationRecordItem = {
   id: string;
+  crmOrderId?: string;
+  orderNumber?: string;
+  orderTitle?: string;
+  orderAgencyLabel?: string | null;
+  branchId?: string | null;
+  branch?: { id: string; name: string; code?: string | null; city?: string | null } | null;
+  carrierId?: string | null;
+  carrier?: { id: string; code: string; name: string; city?: string | null; address?: string | null } | null;
+  surfaceId?: string | null;
+  surface?: { id: string; name: string; carrier?: { id: string; code: string; name: string; city?: string | null } | null } | null;
   status: RealizationStatus;
   plannedDate?: Date | string | null;
   actualDate?: Date | string | null;
   note?: string | null;
   claimNote?: string | null;
   assignedUser?: { name: string } | null;
+  photos?: CrmRealizationPhotoItem[];
 };
 
 export type ContractRecordItem = {
@@ -226,6 +269,7 @@ export type ClientProfileData = {
   branches: ClientBranchItem[];
   offers: OfferRecordItem[];
   crmOrders: CrmOrderRecordItem[];
+  agencyCrmOrders?: CrmOrderRecordItem[];
   occupancies: OccupancyRecordItem[];
   occupiedSurfaces?: OccupiedSurfaceItem[];
   contracts: ContractRecordItem[];

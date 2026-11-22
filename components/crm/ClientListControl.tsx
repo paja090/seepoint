@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui';
 import { Sparkles, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { CLIENT_TYPE_LABELS, type ClientType } from '@/lib/crm/types';
 
 export type ClientSimpleItem = {
   id: string;
@@ -26,6 +27,7 @@ export function AddClientModalButton() {
 
   // Form inputs
   const [name, setName] = useState('');
+  const [clientType, setClientType] = useState<ClientType>('DIRECT_CLIENT');
   const [companyId, setCompanyId] = useState('');
   const [dic, setDic] = useState('');
   const [billingStreet, setBillingStreet] = useState('');
@@ -84,6 +86,7 @@ export function AddClientModalButton() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
+          clientType,
           companyId: companyId ? companyId.replace(/\s+/g, '') : undefined,
           dic: dic ? dic.replace(/\s+/g, '') : undefined,
           billingStreet: billingStreet || undefined,
@@ -125,9 +128,9 @@ export function AddClientModalButton() {
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 text-slate-900">
-          <div className="card max-w-lg w-full bg-white space-y-4 shadow-2xl">
+          <div className="card max-w-lg w-full bg-white space-y-4 shadow-2xl max-h-[92vh] overflow-y-auto">
             <h2 className="text-xl font-bold border-b pb-2 flex items-center gap-2">
-              <span>➕</span> Založit Nového Klienta do CRM
+              <span>➕</span> Založit Nového Klienta / Agenturu do CRM
             </h2>
 
             {/* Fast AI & ARES Pre-fill Box */}
@@ -212,9 +215,18 @@ export function AddClientModalButton() {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-3">
-                <label className="text-xs font-semibold">Název společnosti *
-                  <input className="input text-sm mt-1 font-bold" placeholder="Např. Kofola ČeskoSlovensko a.s." value={name} onChange={e => setName(e.target.value)} required />
-                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <label className="text-xs font-semibold sm:col-span-2">Název společnosti *
+                    <input className="input text-sm mt-1 font-bold" placeholder="Např. Kofola ČeskoSlovensko a.s." value={name} onChange={e => setName(e.target.value)} required />
+                  </label>
+                  <label className="text-xs font-semibold">Typ partnera
+                    <select className="input text-sm mt-1" value={clientType} onChange={e => setClientType(e.target.value as ClientType)}>
+                      {(Object.entries(CLIENT_TYPE_LABELS) as [ClientType, string][]).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <label className="text-xs font-semibold">IČO<input className="input text-sm mt-1" placeholder="Např. 24261980" value={companyId} onChange={e => setCompanyId(e.target.value)} /></label>
                   <label className="text-xs font-semibold">DIČ<input className="input text-sm mt-1" placeholder="Např. CZ24261980" value={dic} onChange={e => setDic(e.target.value)} /></label>

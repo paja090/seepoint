@@ -1,6 +1,11 @@
 import { getCurrentUser } from '@/lib/auth';
 import { hasModuleAccess } from '@/lib/module-policy';
 import { prisma } from '@/lib/db';
+import {
+  buildClientBranchSearchWhere,
+  buildClientSearchWhere,
+  buildCrmOrderSearchWhere,
+} from '@/lib/crm/search-query';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
@@ -13,10 +18,12 @@ export async function GET(request: Request) {
   const q = searchParams.get('q')?.trim();
 
   if (!q || q.length < 2) {
-    return NextResponse.json({ carriers: [], clients: [], employees: [], vehicles: [] });
+    return NextResponse.json({ carriers: [], clients: [], branches: [], orders: [], employees: [], vehicles: [] });
   }
 
-  const [carriers, clients, employees, vehicles] = await Promise.all([
+  const hasCrm = hasModuleAccess(user, 'crm');
+
+  const [carriers, clients, branches, orders, employees, vehicles] = await Promise.all([
     // Carriers search (AdvertisingCarrier)
     hasModuleAccess(user, 'carriers') ? prisma.advertisingCarrier.findMany({
       where: {
@@ -39,24 +46,55 @@ export async function GET(request: Request) {
       take: 6,
     }) : [],
 
-    // CRM Clients search (Client)
-    hasModuleAccess(user, 'crm') ? prisma.client.findMany({
+    // CRM Clients & Agencies search (Client)
+    hasCrm ? prisma.client.findMany({
       where: {
-        OR: [
-          { name: { contains: q, mode: 'insensitive' } },
-          { contactPerson: { contains: q, mode: 'insensitive' } },
-          { email: { contains: q, mode: 'insensitive' } },
-          { phone: { contains: q, mode: 'insensitive' } },
-        ],
+        active: true,
+        ...buildClientSearchWhere(q),
       },
       select: {
         id: true,
         name: true,
+        clientType: true,
         contactPerson: true,
         email: true,
         phone: true,
+        billingCity: true,
       },
       take: 5,
+    }) : [],
+
+    // Client Branches search (ClientBranch)
+    hasCrm ? prisma.clientBranch.findMany({
+      where: buildClientBranchSearchWhere(q),
+      select: {
+        id: true,
+        clientId: true,
+        name: true,
+        code: true,
+        city: true,
+        street: true,
+        client: { select: { id: true, name: true } },
+      },
+      take: 5,
+    }) : [],
+
+    // CRM Orders search (by client, agency, branch, orderNumber, title)
+    hasCrm ? prisma.crmOrder.findMany({
+      where: buildCrmOrderSearchWhere(q),
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        orderNumber: true,
+        title: true,
+        status: true,
+        clientId: true,
+        agencyName: true,
+        client: { select: { id: true, name: true } },
+        agencyClient: { select: { id: true, name: true } },
+        branch: { select: { id: true, name: true, city: true } },
+      },
+      take: 6,
     }) : [],
 
     // Employees search (Employee)
@@ -101,6 +139,8 @@ export async function GET(request: Request) {
   return NextResponse.json({
     carriers,
     clients,
+    branches,
+    orders,
     employees,
     vehicles,
   });

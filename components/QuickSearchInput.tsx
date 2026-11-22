@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, MapPin, Building2, User, Car, X, Loader2, ArrowRight } from 'lucide-react';
+import { Search, MapPin, Building2, User, Car, X, Loader2, ArrowRight, Store, Briefcase } from 'lucide-react';
 
 interface CarrierResult {
   id: string;
@@ -16,9 +16,33 @@ interface CarrierResult {
 interface ClientResult {
   id: string;
   name: string;
+  clientType?: string | null;
   contactPerson?: string | null;
   email?: string | null;
   phone?: string | null;
+  billingCity?: string | null;
+}
+
+interface BranchResult {
+  id: string;
+  clientId: string;
+  name: string;
+  code?: string | null;
+  city?: string | null;
+  street?: string | null;
+  client: { id: string; name: string };
+}
+
+interface OrderResult {
+  id: string;
+  orderNumber: string;
+  title: string;
+  status: string;
+  clientId: string;
+  agencyName?: string | null;
+  client: { id: string; name: string };
+  agencyClient?: { id: string; name: string } | null;
+  branch?: { id: string; name: string; city?: string | null } | null;
 }
 
 interface EmployeeResult {
@@ -39,6 +63,8 @@ interface VehicleResult {
 interface SearchResults {
   carriers: CarrierResult[];
   clients: ClientResult[];
+  branches?: BranchResult[];
+  orders?: OrderResult[];
   employees: EmployeeResult[];
   vehicles: VehicleResult[];
 }
@@ -110,10 +136,15 @@ export function QuickSearchInput() {
     router.push(url);
   }
 
+  const branches = results?.branches ?? [];
+  const orders = results?.orders ?? [];
+
   const hasResults =
     results &&
     (results.carriers.length > 0 ||
       results.clients.length > 0 ||
+      branches.length > 0 ||
+      orders.length > 0 ||
       results.employees.length > 0 ||
       results.vehicles.length > 0);
 
@@ -130,7 +161,7 @@ export function QuickSearchInput() {
             setQuery(e.target.value);
             setOpen(true);
           }}
-          placeholder="Hledat nosiče, klienty, tým…"
+          placeholder="Hledat nosiče, klienty, agentury, pobočky, zakázky…"
           className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-14 text-xs xl:text-sm text-slate-900 placeholder-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none transition shadow-2xs"
         />
         {query ? (
@@ -152,7 +183,7 @@ export function QuickSearchInput() {
 
       {/* Results Dropdown */}
       {open && query.trim().length >= 2 && (
-        <div className="absolute left-0 right-0 top-full mt-2 z-50 max-h-[30rem] overflow-y-auto rounded-2xl bg-white p-3 shadow-2xl border border-slate-200 divide-y divide-slate-100 animate-in fade-in zoom-in-95">
+        <div className="absolute left-0 right-0 top-full mt-2 z-50 max-h-[32rem] overflow-y-auto rounded-2xl bg-white p-3 shadow-2xl border border-slate-200 divide-y divide-slate-100 animate-in fade-in zoom-in-95">
           {loading ? (
             <div className="flex items-center justify-center py-8 text-xs font-semibold text-slate-500 gap-2">
               <Loader2 size={16} className="animate-spin text-emerald-600" />
@@ -161,13 +192,116 @@ export function QuickSearchInput() {
           ) : !hasResults ? (
             <div className="py-8 text-center text-xs text-slate-500">
               <p className="font-bold text-slate-700">Žádné výsledky pro „{query}“</p>
-              <p className="mt-1">Zkuste zadat jiné slovo, kód nosiče nebo jméno klienta.</p>
+              <p className="mt-1">Zkuste zadat název klienta, agentury, pobočky, číslo zakázky nebo kód nosiče.</p>
             </div>
           ) : (
             <div className="space-y-3 pt-1">
+              {/* CRM Klienti & Agentury */}
+              {results.clients.length > 0 && (
+                <div>
+                  <p className="px-2 mb-1 text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                    <Building2 size={12} className="text-sky-600" />
+                    <span>Klienti & Agentury ({results.clients.length})</span>
+                  </p>
+                  <div className="space-y-0.5">
+                    {results.clients.map((cl) => {
+                      const isAgency = cl.clientType === 'ADVERTISING_AGENCY' || cl.clientType === 'MEDIA_AGENCY';
+                      return (
+                        <button
+                          key={cl.id}
+                          onClick={() => handleSelect(`/clients/${cl.id}`)}
+                          className="w-full flex items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs hover:bg-slate-50 transition group"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900 group-hover:text-sky-700 flex items-center gap-1.5 flex-wrap">
+                              <span>{cl.name}</span>
+                              {isAgency && (
+                                <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-bold text-violet-700 border border-violet-200">
+                                  Agentura
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-[11px] text-slate-500 truncate">
+                              {[cl.contactPerson ? `Kontakt: ${cl.contactPerson}` : null, cl.billingCity, cl.phone]
+                                .filter(Boolean)
+                                .join(' · ') || 'Otevřít profil klienta'}
+                            </p>
+                          </div>
+                          <ArrowRight size={14} className="text-slate-300 group-hover:text-sky-600 group-hover:translate-x-0.5 transition shrink-0" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* CRM Zakázky */}
+              {orders.length > 0 && (
+                <div className={results.clients.length > 0 ? 'pt-2 border-t border-slate-100' : ''}>
+                  <p className="px-2 mb-1 text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                    <Briefcase size={12} className="text-violet-600" />
+                    <span>CRM Zakázky ({orders.length})</span>
+                  </p>
+                  <div className="space-y-0.5">
+                    {orders.map((o) => {
+                      const agencyLabel = o.agencyClient?.name || o.agencyName;
+                      return (
+                        <button
+                          key={o.id}
+                          onClick={() => handleSelect(`/clients/${o.clientId}?tab=orders`)}
+                          className="w-full flex items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs hover:bg-slate-50 transition group"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900 group-hover:text-violet-700 truncate">
+                              <span className="font-mono text-[11px] text-slate-400 mr-1.5">{o.orderNumber}</span>
+                              {o.title}
+                            </p>
+                            <p className="text-[11px] text-slate-500 flex items-center gap-1.5 flex-wrap">
+                              <span>Klient: <strong>{o.client.name}</strong></span>
+                              {agencyLabel && <span className="text-violet-700 font-semibold">· Agentura: {agencyLabel}</span>}
+                              {o.branch && <span className="text-indigo-700 font-semibold">· 🏬 {o.branch.name}</span>}
+                            </p>
+                          </div>
+                          <ArrowRight size={14} className="text-slate-300 group-hover:text-violet-600 group-hover:translate-x-0.5 transition shrink-0" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Pobočky klientů */}
+              {branches.length > 0 && (
+                <div className="pt-2 border-t border-slate-100">
+                  <p className="px-2 mb-1 text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                    <Store size={12} className="text-indigo-600" />
+                    <span>Pobočky klientů ({branches.length})</span>
+                  </p>
+                  <div className="space-y-0.5">
+                    {branches.map((b) => (
+                      <button
+                        key={b.id}
+                        onClick={() => handleSelect(`/clients/${b.clientId}?tab=branches`)}
+                        className="w-full flex items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs hover:bg-slate-50 transition group"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900 group-hover:text-indigo-700 truncate">
+                            {b.name} {b.code ? <span className="font-mono text-[11px] text-slate-400">({b.code})</span> : null}
+                          </p>
+                          <p className="text-[11px] text-slate-500 truncate">
+                            {b.client.name} {b.city ? `· ${b.city}` : ''} {b.street ? `· ${b.street}` : ''}
+                          </p>
+                        </div>
+                        <ArrowRight size={14} className="text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Nosiče & Plochy */}
               {results.carriers.length > 0 && (
-                <div>
+                <div className="pt-2 border-t border-slate-100">
                   <p className="px-2 mb-1 text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1">
                     <MapPin size={12} className="text-emerald-600" />
                     <span>Nosiče & Plochy ({results.carriers.length})</span>
@@ -188,33 +322,6 @@ export function QuickSearchInput() {
                           </p>
                         </div>
                         <ArrowRight size={14} className="text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* CRM Klienti */}
-              {results.clients.length > 0 && (
-                <div className="pt-2 border-t border-slate-100">
-                  <p className="px-2 mb-1 text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                    <Building2 size={12} className="text-sky-600" />
-                    <span>Klienti ({results.clients.length})</span>
-                  </p>
-                  <div className="space-y-0.5">
-                    {results.clients.map((cl) => (
-                      <button
-                        key={cl.id}
-                        onClick={() => handleSelect(`/clients`)}
-                        className="w-full flex items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs hover:bg-slate-50 transition group"
-                      >
-                        <div>
-                          <p className="font-bold text-slate-900 group-hover:text-sky-700">{cl.name}</p>
-                          <p className="text-[11px] text-slate-500">
-                            {cl.contactPerson ? `Kontakt: ${cl.contactPerson}` : ''} {cl.phone ? `· ${cl.phone}` : ''}
-                          </p>
-                        </div>
-                        <ArrowRight size={14} className="text-slate-300 group-hover:text-sky-600 group-hover:translate-x-0.5 transition" />
                       </button>
                     ))}
                   </div>
