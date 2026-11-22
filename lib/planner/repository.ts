@@ -25,7 +25,15 @@ export async function tasksFor(actor: AuthenticatedPlannerActor, userId = actor.
   const [work, quick, crm, field] = await Promise.all([
     canTasks && employee
       ? prisma.workTask.findMany({
-          where: { organizationId, assignedToEmployeeId: employee.id, status: { in: ['TODO', 'IN_PROGRESS'] } },
+          where: {
+            organizationId,
+            assignedToEmployeeId: employee.id,
+            status: { in: ['TODO', 'IN_PROGRESS'] },
+            OR: [
+              { workOrderId: null },
+              { workOrder: { status: { notIn: ['DONE', 'CANCELLED'] } } },
+            ],
+          },
           select: {
             id: true,
             title: true,

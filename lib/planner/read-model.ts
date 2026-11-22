@@ -72,10 +72,20 @@ export async function userTimeline(actor: AuthenticatedPlannerActor, userId: str
             organizationId,
             assignedToEmployeeId: employee.id,
             status: { in: ['TODO', 'IN_PROGRESS'] },
-            OR: [
-              { dueDate: { gte: workWindowFrom, lt: workWindowTo } },
-              { scheduledDate: { gte: workWindowFrom, lt: workWindowTo } },
-              { workOrder: { scheduledAt: { gte: workWindowFrom, lt: workWindowTo } } },
+            AND: [
+              {
+                OR: [
+                  { workOrderId: null },
+                  { workOrder: { status: { notIn: ['DONE', 'CANCELLED'] } } },
+                ],
+              },
+              {
+                OR: [
+                  { dueDate: { gte: workWindowFrom, lt: workWindowTo } },
+                  { scheduledDate: { gte: workWindowFrom, lt: workWindowTo } },
+                  { workOrder: { scheduledAt: { gte: workWindowFrom, lt: workWindowTo } } },
+                ],
+              },
             ],
           },
           select: {
