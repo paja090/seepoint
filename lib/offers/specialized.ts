@@ -158,6 +158,18 @@ export function parseNavigationOfferInput(raw: unknown) {
       routeStatus: 'OK' as const,
       arrowDirectionEnum: arrowDir,
       visualizedPhotoUrl: nullable(text(point.visualizedPhotoUrl)),
+      visualizationConfig: (() => {
+        const rawCfg = (point as { visualizationConfig?: unknown }).visualizationConfig;
+        if (!rawCfg || typeof rawCfg !== 'object' || Array.isArray(rawCfg)) return Prisma.DbNull;
+        const rec = rawCfg as Record<string, unknown>;
+        const signX = Number(rec.signX);
+        const signY = Number(rec.signY);
+        const signScale = Number(rec.signScale);
+        if (!Number.isFinite(signX) || !Number.isFinite(signY) || !Number.isFinite(signScale) || signScale <= 0) {
+          return Prisma.DbNull;
+        }
+        return rawCfg as Prisma.InputJsonValue;
+      })(),
       sitePhotoId: nullable(text(point.sitePhotoId)),
       priceSnapshot: typeof (point as { color?: unknown }).color === 'string' && (point as { color?: string }).color
         ? ({ ...((point.priceSnapshot as object) || {}), color: text((point as { color?: string }).color) } as Prisma.InputJsonValue)

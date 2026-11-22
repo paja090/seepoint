@@ -22,8 +22,10 @@ import {
 import {
   CARRIER_PIN_COLORS,
   detectCarrierCategory,
+  formatNavigationPointDesignation,
   getPointPinColor,
   getPointPinVisual,
+  parseDistanceTextToManual,
 } from '@/lib/offers/navigation-carrier-types';
 import type {
   ClientOption,
@@ -193,6 +195,7 @@ export function NavigationOfferCockpit({
         sitePhotoId: p.sitePhotoId || undefined,
         sitePhotoUrl: p.sitePhotoUrl || undefined,
         visualizedPhotoUrl: p.visualizedPhotoUrl || undefined,
+        visualizationConfig: p.visualizationConfig || null,
         color: p.color || undefined,
         isSelectedByClient: p.isSelectedByClient !== false,
       }));
@@ -1059,31 +1062,56 @@ export function NavigationOfferCockpit({
       />
 
       {/* AI Visualizer Modal */}
-      {activeVisualizerPointId && (
-        <NavigationSignVisualizer
-          pointLabel={points.find((p) => p.id === activeVisualizerPointId)?.label || 'Bod'}
-          initialSignText={campaignName || selectedClient?.name || 'Navigace'}
-          distanceText={(() => {
-            const pt = points.find((p) => p.id === activeVisualizerPointId);
-            if (!pt) return '350 m';
-            if (pt.distanceSource === 'MANUAL' && pt.manualDistanceValue?.trim()) {
-              return `${pt.manualDistanceValue.trim()} ${pt.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'}`;
-            }
-            return pt.calculatedDistanceMeters ? (formatNavigationDistance(pt.calculatedDistanceMeters) || '350 m') : '350 m';
-          })()}
-          arrowDirectionEnum={points.find((p) => p.id === activeVisualizerPointId)?.arrowDirectionEnum || 'STRAIGHT'}
-          orientation={points.find((p) => p.id === activeVisualizerPointId)?.orientation || 'Jednostranná'}
-          initialPhotoUrl={points.find((p) => p.id === activeVisualizerPointId)?.sitePhotoUrl || null}
-          onClose={() => setActiveVisualizerPointId(null)}
-          onSaveVisualization={(dataUrl: string) => {
-            setPoints((curr) =>
-              curr.map((p) => (p.id === activeVisualizerPointId ? { ...p, visualizedPhotoUrl: dataUrl } : p))
-            );
-            setActiveVisualizerPointId(null);
-            setHasUnsavedChanges(true);
-          }}
-        />
-      )}
+      {activeVisualizerPointId && (() => {
+        const ptIdx = points.findIndex((p) => p.id === activeVisualizerPointId);
+        const pt = ptIdx >= 0 ? points[ptIdx] : null;
+        if (!pt) return null;
+        const desig = formatNavigationPointDesignation(pt, ptIdx, { audience: 'INTERNAL' });
+        const initialDist = desig.confirmedDistance || desig.calculatedDistance || '';
+        return (
+          <NavigationSignVisualizer
+            key={pt.id}
+            pointLabel={desig.fullTitle}
+            initialSignText={campaignName || selectedClient?.name || 'Navigace'}
+            distanceText={initialDist}
+            arrowDirectionEnum={pt.arrowDirectionEnum || 'STRAIGHT'}
+            orientation={pt.orientation || 'Jednostranná'}
+            initialPhotoUrl={pt.sitePhotoUrl || null}
+            initialConfig={pt.visualizationConfig ?? null}
+            isDistanceConfirmed={desig.isDistanceConfirmed}
+            onClose={() => setActiveVisualizerPointId(null)}
+            onSaveVisualization={(dataUrl, savedConfig, syncedFields) => {
+              const parsedDist = syncedFields?.distanceText
+                ? parseDistanceTextToManual(syncedFields.distanceText)
+                : null;
+              setPoints((curr) =>
+                curr.map((p) => {
+                  if (p.id !== activeVisualizerPointId) return p;
+                  return {
+                    ...p,
+                    visualizedPhotoUrl: dataUrl,
+                    visualizationConfig: savedConfig ?? p.visualizationConfig ?? null,
+                    ...(parsedDist
+                      ? {
+                          manualDistanceValue: parsedDist.value,
+                          manualDistanceUnit: parsedDist.unit,
+                          distanceSource: 'MANUAL' as const,
+                        }
+                      : {}),
+                    ...(syncedFields?.arrowDirectionEnum
+                      ? {
+                          arrowDirectionEnum: syncedFields.arrowDirectionEnum as DraftPoint['arrowDirectionEnum'],
+                        }
+                      : {}),
+                  };
+                })
+              );
+              setActiveVisualizerPointId(null);
+              setHasUnsavedChanges(true);
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }

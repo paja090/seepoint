@@ -82,7 +82,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
 
       {offer.offerType === 'STANDARD_MEDIA' || !offer.offerType
         ? <OfferProposal offer={toProposalOffer(offer)} token={offer.portalToken ?? offer.id} variant="internal" />
-        : <SpecializedOfferSummary offer={offer} proposalKey={offer.portalToken ?? offer.id} />}
+        : <SpecializedOfferSummary offer={offer} proposalKey={offer.portalToken ?? offer.id} variant="internal" />}
 
       <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="grid gap-6 lg:grid-cols-2">

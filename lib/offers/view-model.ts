@@ -176,6 +176,7 @@ export type OfferView = {
       installedPhotoId?: string | null;
       installedPhotoUrl?: string | null;
       visualizedPhotoUrl?: string | null;
+      visualizationConfig?: import('./navigation-carrier-types').NavigationVisualizationConfig | null;
       pillarNumber?: string | null;
       pillarType?: string | null;
       arrowDirectionEnum?: string | null;

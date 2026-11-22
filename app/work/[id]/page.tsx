@@ -12,6 +12,7 @@ import { WorkOrderActions } from '@/components/WorkOrderActions';
 import { WorkOrderEditForm } from '@/components/WorkOrderEditForm';
 import { WorkOrderPhotosDriveBar } from '@/components/work/WorkOrderPhotosDriveBar';
 import { isWorkOrderEligibleForPhotoApp, readWorkOrderDriveExports } from '@/lib/work/photo-folder';
+import { formatNavigationPointDesignation } from '@/lib/offers/navigation-carrier-types';
 import { prisma, ensureWorkOrderSchema } from '@/lib/db';
 import {
   extractWorkOrderConstraintFlags,
@@ -550,7 +551,23 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
                 </div>
 
                 <div className="space-y-3">
-                  {navPoints.map((point, idx) => (
+                  {navPoints.map((point, idx) => {
+                    const desig = formatNavigationPointDesignation(
+                      {
+                        label: point.label,
+                        address: point.address,
+                        pillarNumber: point.pillarNumber,
+                        arrowDirectionEnum: point.arrowDirectionEnum,
+                        arrowDirection: point.arrowDirection,
+                        distanceSource: point.distanceSource,
+                        manualDistanceValue: point.manualDistanceValue != null ? Number(point.manualDistanceValue) : null,
+                        manualDistanceUnit: point.manualDistanceUnit,
+                        calculatedDistanceMeters: point.calculatedDistanceMeters,
+                      },
+                      idx,
+                      { audience: 'INTERNAL' }
+                    );
+                    return (
                     <div
                       key={point.id}
                       className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2 shadow-2xs transition hover:border-sky-400"
@@ -561,7 +578,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
                             {idx + 1}
                           </span>
                           <p className="font-extrabold text-sm text-slate-900">
-                            {point.pillarNumber ? `Sloup VO ${point.pillarNumber}` : `Bod ${idx + 1}`}: {point.label}
+                            {desig.fullTitle}{point.pillarNumber ? ` · Sloup VO ${point.pillarNumber}` : ''}
                           </p>
                         </div>
                         <span
@@ -576,11 +593,18 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
                       </div>
 
                       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
-                        {point.address && <span>📍 {point.address}</span>}
-                        {point.arrowDirection && <span>🧭 Směr: <strong>{point.arrowDirection}</strong></span>}
-                        {point.calculatedDistanceMeters && (
-                          <span>📏 Vzdálenost k cíli: <strong>{point.calculatedDistanceMeters} m</strong></span>
-                        )}
+                        {desig.street && <span>📍 {point.address || desig.street}</span>}
+                        <span>🧭 Směr: <strong>{desig.direction}</strong></span>
+                        {desig.isDistanceConfirmed ? (
+                          <span>
+                            📏 Vzdálenost na ceduli: <strong className="text-emerald-800">{desig.confirmedDistance}</strong>
+                            {desig.calculatedDistance && desig.calculatedDistance !== desig.confirmedDistance
+                              ? ` (mapa: ${desig.calculatedDistance})`
+                              : ''}
+                          </span>
+                        ) : desig.calculatedDistance ? (
+                          <span>📏 Orientačně (mapa): <strong>{desig.calculatedDistance}</strong></span>
+                        ) : null}
                         <span>GPS: {point.latitude.toFixed(5)}, {point.longitude.toFixed(5)}</span>
                       </div>
 
@@ -611,7 +635,8 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
                         )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
             )}

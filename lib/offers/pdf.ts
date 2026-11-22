@@ -6,6 +6,7 @@ import type { ProposalOffer } from './presentation';
 import { getSignedStaticMapUrl } from '@/lib/google-maps';
 import { prisma } from '@/lib/db';
 import { readStoredPhoto } from '@/lib/storage/photo-storage';
+import { formatNavigationPointDesignation } from './navigation-carrier-types';
 
 const BLUE = '#009EE2';
 const NAVY = '#10253F';
@@ -276,35 +277,20 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
 
   const tableWidths = isNavigation ? [18, '*', 110, 80, 70] : [18, '*', 105, 78];
 
-  const formatPointDistancePdf = (pAny: Record<string, unknown>) => {
-    const rawManual =
-      pAny.manualDistanceValue !== undefined && pAny.manualDistanceValue !== null
-        ? String(pAny.manualDistanceValue).trim().replace(',', '.')
-        : '';
-    if ((pAny.distanceSource === 'MANUAL' || rawManual !== '') && rawManual !== '' && Number(rawManual) > 0) {
-      return `${String(pAny.manualDistanceValue).trim()} ${pAny.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'}`;
-    }
-    const rawDist = pAny.calculatedDistanceMeters;
-    const distMeters = typeof rawDist === 'number' && rawDist > 0 ? Math.max(50, Math.round(rawDist / 50) * 50) : null;
-    if (typeof distMeters === 'number') {
-      return distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1).replace('.', ',')} km` : `${distMeters} m`;
-    }
-    return '—';
-  };
-
   const tableRows = isNavigation
     ? navigationData.points.slice(0, 18).map((point, index) => {
         const pAny = point as unknown as Record<string, unknown>;
-        const distStr = formatPointDistancePdf(pAny);
+        const desig = formatNavigationPointDesignation(pAny, index, { audience: 'CLIENT' });
+        const distStr = desig.isDistanceConfirmed ? `${desig.confirmedDistance} do cíle` : 'Bude upřesněna';
 
         const pillarStr = pAny.pillarNumber ? ` [Sloup ${pAny.pillarNumber}]` : '';
         const streetStr = point.address ? `📍 ${point.address}` : point.navigationType;
 
         return [
           { text: String(index + 1), color: MUTED, bold: true },
-          { stack: [{ text: `${point.label}${pillarStr}`, bold: true }, { text: streetStr, fontSize: 8, color: MUTED }] },
+          { stack: [{ text: `${desig.fullTitle}${pillarStr}`, bold: true }, { text: streetStr, fontSize: 8, color: MUTED }] },
           { text: formatArrowDirectionPdf(typeof pAny.arrowDirectionEnum === 'string' ? pAny.arrowDirectionEnum : null), fontSize: 8.5, bold: true, color: BLUE },
-          { text: `${distStr} do cíle`, fontSize: 8.5, bold: true },
+          { text: distStr, fontSize: 8.5, bold: true },
           { text: money(Number(point.subtotal)), alignment: 'right', bold: true },
         ];
       })
@@ -422,7 +408,8 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
         { text: 'Pohledy na osazované sloupy veřejného osvětlení a přesné umístění navigačních médií na trase:', fontSize: 8.5, color: MUTED, margin: [0, 0, 0, 10] },
         ...resolvedPointPhotos.map(({ pointIndex, point, dataUrl }) => {
           const pAny = point as unknown as Record<string, unknown>;
-          const distStr = formatPointDistancePdf(pAny);
+          const desig = formatNavigationPointDesignation(pAny, pointIndex, { audience: 'CLIENT' });
+          const distStr = desig.isDistanceConfirmed ? `${desig.confirmedDistance} do cíle` : 'Vzdálenost bude upřesněna';
 
           const pillarStr = pAny.pillarNumber ? `Sloup VO: ${pAny.pillarNumber}` : '';
           const addressStr = point.address ? `📍 ${point.address}` : point.navigationType;
@@ -440,8 +427,8 @@ export async function createOfferPdf(offer: ProposalOffer, clientLogoDataUrl?: s
                       stack: [
                         {
                           columns: [
-                            { text: `Bod #${pointIndex + 1}: ${point.label}`, bold: true, fontSize: 10, color: NAVY },
-                            { text: `${distStr} do cíle  •  ${arrowStr}`, bold: true, fontSize: 9, color: BLUE, alignment: 'right' },
+                            { text: desig.fullTitle, bold: true, fontSize: 10, color: NAVY },
+                            { text: `${distStr}  •  ${arrowStr}`, bold: true, fontSize: 9, color: BLUE, alignment: 'right' },
                           ],
                         },
                         {
@@ -596,21 +583,18 @@ export async function createInstallationSheetPdf(offer: ProposalOffer): Promise<
 
   const pointRows = navigationData ? navigationData.points.map((point, index) => {
     const pAny = point as unknown as Record<string, unknown>;
-    const rawDist = pAny.calculatedDistanceMeters;
-    const distMeters = typeof rawDist === 'number' && rawDist > 0
-      ? Math.max(50, Math.round(rawDist / 50) * 50)
-      : null;
-    const distStr = pAny.distanceSource === 'MANUAL' && pAny.manualDistanceValue
-      ? `${pAny.manualDistanceValue} ${pAny.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'}`
-      : typeof distMeters === 'number'
-        ? (distMeters >= 1000 ? `${(distMeters / 1000).toFixed(1).replace('.', ',')} km` : `${distMeters} m`)
+    const desig = formatNavigationPointDesignation(pAny, index, { audience: 'INTERNAL' });
+    const distStr = desig.isDistanceConfirmed
+      ? desig.confirmedDistance
+      : desig.calculatedDistance
+        ? `${desig.calculatedDistance} (auto)`
         : '—';
 
     const pillarStr = pAny.pillarNumber ? `Sloup ${pAny.pillarNumber}` : '—';
 
     return [
       { text: String(index + 1), alignment: 'center', bold: true },
-      { stack: [{ text: point.label, bold: true }, { text: safe(point.address), fontSize: 8, color: MUTED }] },
+      { stack: [{ text: desig.fullTitle, bold: true }, { text: safe(point.address || desig.street), fontSize: 8, color: MUTED }] },
       { text: pillarStr, alignment: 'center', bold: true, color: BLUE },
       { text: `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`, fontSize: 8 },
       { text: formatArrowDirectionPdf(typeof pAny.arrowDirectionEnum === 'string' ? pAny.arrowDirectionEnum : null), fontSize: 8.5, bold: true },

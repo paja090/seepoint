@@ -31,7 +31,13 @@ import type { OfferView } from '@/lib/offers/view-model';
 import { canDownloadInstallationSheet, canDownloadOfferPdf } from '@/lib/offers/navigation-document-access';
 import { canUploadNavigationArtwork } from '@/lib/offers/navigation-artwork-access';
 import { GoogleNavigationOfferMap } from './GoogleNavigationOfferMap';
-import { getPointPinVisual, formatNavigationPointDesignation } from '@/lib/offers/navigation-carrier-types';
+import {
+  getPointPinVisual,
+  formatNavigationPointDesignation,
+  resolveNavigationDistance,
+  formatCalculatedDistanceForInput,
+  type NavigationAudience,
+} from '@/lib/offers/navigation-carrier-types';
 import { toPhotoFullUrl, toPhotoThumbnailUrl } from '@/lib/photo-url';
 import {
   RENTAL_DURATION_OPTIONS,
@@ -229,29 +235,47 @@ export function ArrowBadge({ arrowEnum, size = 'md' }: { arrowEnum?: string | nu
   }
 }
 
-export function formatDistanceBadge(point: Record<string, unknown>) {
-  const rawManual =
-    point.manualDistanceValue !== undefined && point.manualDistanceValue !== null
-      ? String(point.manualDistanceValue).trim().replace(',', '.')
-      : '';
-  if ((point.distanceSource === 'MANUAL' || rawManual !== '') && rawManual !== '' && Number(rawManual) > 0) {
-    const unit = point.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm';
-    return `${String(point.manualDistanceValue).trim()} ${unit} od cíle`;
+export function formatDistanceBadge(
+  point: Record<string, unknown>,
+  options?: { audience?: NavigationAudience }
+) {
+  const audience = options?.audience ?? 'CLIENT';
+  const resolved = resolveNavigationDistance(
+    {
+      distanceSource: typeof point.distanceSource === 'string' ? point.distanceSource : null,
+      manualDistanceValue:
+        typeof point.manualDistanceValue === 'number' || typeof point.manualDistanceValue === 'string'
+          ? point.manualDistanceValue
+          : null,
+      manualDistanceUnit: typeof point.manualDistanceUnit === 'string' ? point.manualDistanceUnit : null,
+      calculatedDistanceMeters:
+        typeof point.calculatedDistanceMeters === 'number' ? point.calculatedDistanceMeters : null,
+    },
+    { audience }
+  );
+
+  if (resolved.isConfirmed) {
+    return `${resolved.confirmedDistance} od cíle`;
   }
-  if (typeof point.calculatedDistanceMeters === 'number') {
-    const rounded = Math.max(50, Math.round(point.calculatedDistanceMeters / 50) * 50);
-    if (rounded >= 1000) {
-      return `${(rounded / 1000).toFixed(1).replace('.', ',')} km od cíle`;
-    }
-    return `${rounded} m od cíle`;
+  if (audience === 'INTERNAL' && resolved.calculatedDistance) {
+    return `${resolved.calculatedDistance} (interní mapa)`;
   }
-  return 'Vzdálenost zatím neuvedena';
+  return 'Vzdálenost bude upřesněna';
 }
 
-export function NavigationOfferPublicView({ offer, proposalKey }: { offer: OfferView; proposalKey?: string }) {
+export function NavigationOfferPublicView({
+  offer,
+  proposalKey,
+  variant = 'public',
+}: {
+  offer: OfferView;
+  proposalKey?: string;
+  variant?: 'internal' | 'public';
+}) {
   const navigation = offer.navigation;
   const effectiveProposalKey = proposalKey ?? offer.portalToken ?? offer.id;
-  const isInternalOfferPage = Boolean(offer.id);
+  const isInternalOfferPage = variant === 'internal' && Boolean(offer.id);
+  const audience: NavigationAudience = isInternalOfferPage ? 'INTERNAL' : 'CLIENT';
 
   const [distanceEdits, setDistanceEdits] = useState<
     Record<
@@ -330,6 +354,45 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
       setDistanceEdits((prev) => ({
         ...prev,
         [pointId]: { ...prev[pointId], saving: false },
+      }));
+    }
+  }
+
+  async function confirmCalculatedDistance(pointId: string, calculatedMeters?: number | null) {
+    if (!offer.id) return;
+    const suggested = formatCalculatedDistanceForInput(calculatedMeters);
+    if (!suggested) return;
+
+    setDistanceEdits((prev) => ({
+      ...prev,
+      [pointId]: { value: suggested.value, unit: suggested.unit, source: 'MANUAL', saving: true, saved: false },
+    }));
+
+    try {
+      const res = await fetch(`/api/offers/${encodeURIComponent(offer.id)}/navigation-distance`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pointId,
+          manualDistanceValue: suggested.value,
+          manualDistanceUnit: suggested.unit,
+          distanceSource: 'MANUAL',
+        }),
+      });
+      setDistanceEdits((prev) => ({
+        ...prev,
+        [pointId]: {
+          value: suggested.value,
+          unit: suggested.unit,
+          source: 'MANUAL',
+          saving: false,
+          saved: res.ok,
+        },
+      }));
+    } catch {
+      setDistanceEdits((prev) => ({
+        ...prev,
+        [pointId]: { value: suggested.value, unit: suggested.unit, source: 'MANUAL', saving: false },
       }));
     }
   }
@@ -1086,7 +1149,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <h4 className="font-black text-slate-900 text-base sm:text-lg break-words">
-                              {formatNavigationPointDesignation(pObj, index).fullTitle}
+                              {formatNavigationPointDesignation(getPointWithDistanceOverride(pObj), index, { audience }).fullTitle}
                             </h4>
                             {(() => {
                               const vis = getPointPinVisual({
@@ -1198,7 +1261,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                             <ArrowBadge arrowEnum={typeof pObj.arrowDirectionEnum === 'string' ? pObj.arrowDirectionEnum : undefined} size="lg" />
                             <span className="inline-flex items-center gap-1 rounded-xl bg-slate-950/85 backdrop-blur-md px-3 py-1.5 text-xs font-black text-white shadow-md">
                               <Compass size={14} className="text-sky-400" />
-                              {formatDistanceBadge(getPointWithDistanceOverride(pObj))}
+                              {formatDistanceBadge(getPointWithDistanceOverride(pObj), { audience })}
                             </span>
                           </div>
 
@@ -1219,7 +1282,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
 
                       <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700 border border-slate-200">
                         <Compass size={13} className="text-sky-600" />
-                        {formatDistanceBadge(getPointWithDistanceOverride(pObj))}
+                        {formatDistanceBadge(getPointWithDistanceOverride(pObj), { audience })}
                       </span>
 
                       {Boolean(pObj.pillarNumber) && (
@@ -1289,7 +1352,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <h4 className="font-bold text-slate-900 text-sm break-words">
-                            {formatNavigationPointDesignation(pObj, index).fullTitle}
+                            {formatNavigationPointDesignation(getPointWithDistanceOverride(pObj), index, { audience }).fullTitle}
                           </h4>
                           {(() => {
                             const vis = getPointPinVisual({
@@ -1354,7 +1417,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
 
                     <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700 border border-slate-200">
                       <Compass size={13} className="text-sky-600" />
-                      {formatDistanceBadge(getPointWithDistanceOverride(pObj))}
+                      {formatDistanceBadge(getPointWithDistanceOverride(pObj), { audience })}
                     </span>
 
                     {Boolean(pObj.pillarNumber) && (
@@ -1443,7 +1506,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
               const pObj = point as unknown as Record<string, unknown>;
               const pointIndex = navigation.points.findIndex((p) => p.id === point.id);
               const effectiveIndex = pointIndex >= 0 ? pointIndex : actIdx;
-              const desig = formatNavigationPointDesignation(pObj, effectiveIndex);
+              const desig = formatNavigationPointDesignation(getPointWithDistanceOverride(pObj), effectiveIndex, { audience });
               const pointCalc = calculateNavigationPointPrice(point, selectedDuration);
               const activePhoto = (typeof pObj.visualizedPhotoUrl === 'string' && pObj.visualizedPhotoUrl)
                 ? pObj.visualizedPhotoUrl
@@ -1503,7 +1566,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition" />
                           <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-white text-xs font-bold pointer-events-none">
                             <span className="bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg">
-                              {formatDistanceBadge(getPointWithDistanceOverride(pObj))}
+                              {formatDistanceBadge(getPointWithDistanceOverride(pObj), { audience })}
                             </span>
                             <span className="bg-emerald-600/90 backdrop-blur-md px-2.5 py-1 rounded-lg flex items-center gap-1">
                               ✓ Zařazeno v trase
@@ -1524,7 +1587,7 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
 
                       <span className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-900 border border-sky-200">
                         <Compass size={13} className="text-sky-600" />
-                        {formatDistanceBadge(getPointWithDistanceOverride(pObj))}
+                        {formatDistanceBadge(getPointWithDistanceOverride(pObj), { audience })}
                       </span>
 
                       {Boolean(pObj.pillarNumber) && (
@@ -1699,7 +1762,8 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                   const effectivePoint = getPointWithDistanceOverride(pObj);
                   const editState = distanceEdits[point.id] || { value: '', unit: 'METERS' as const, source: 'CALCULATED' as const };
                   const pointIndex = activePoints.indexOf(point);
-                  const desig = formatNavigationPointDesignation(pObj, pointIndex >= 0 ? pointIndex : 0);
+                  const desig = formatNavigationPointDesignation(effectivePoint, pointIndex >= 0 ? pointIndex : 0, { audience });
+                  const rawCalcMeters = typeof pObj.calculatedDistanceMeters === 'number' ? pObj.calculatedDistanceMeters : null;
                   return (
                     <tr key={point.id}>
                       <td className="px-5 py-4">
@@ -1708,10 +1772,26 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                       </td>
                       <td className="px-3 py-4">
                         <div className="space-y-1.5">
-                          <span className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2.5 py-1 text-xs font-extrabold text-sky-900 border border-sky-200">
-                            <Compass size={13} className="text-sky-600" />
-                            {formatDistanceBadge(effectivePoint)}
+                          <span className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-extrabold border ${
+                            desig.isDistanceConfirmed
+                              ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                              : 'bg-sky-50 text-sky-900 border-sky-200'
+                          }`}>
+                            <Compass size={13} className={desig.isDistanceConfirmed ? 'text-emerald-600' : 'text-sky-600'} />
+                            {formatDistanceBadge(effectivePoint, { audience })}
                           </span>
+                          {isInternalOfferPage && !desig.isDistanceConfirmed && rawCalcMeters && rawCalcMeters > 0 && (
+                            <div>
+                              <button
+                                type="button"
+                                disabled={editState.saving}
+                                onClick={() => void confirmCalculatedDistance(point.id, rawCalcMeters)}
+                                className="rounded-lg bg-emerald-600 px-2 py-0.5 text-[10px] font-black text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer"
+                              >
+                                ✓ Potvrdit pro klienta ({desig.calculatedDistance})
+                              </button>
+                            </div>
+                          )}
                           {isInternalOfferPage && (
                             <div className="flex items-center gap-1 pt-0.5">
                               <input
@@ -1833,11 +1913,13 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                   const pObj = point as unknown as Record<string, unknown>;
                   const effectivePoint = getPointWithDistanceOverride(pObj);
                   const editState = distanceEdits[point.id] || { value: '', unit: 'METERS' as const, source: 'CALCULATED' as const };
+                  const desig = formatNavigationPointDesignation(effectivePoint, idx, { audience });
+                  const rawCalcMeters = typeof pObj.calculatedDistanceMeters === 'number' ? pObj.calculatedDistanceMeters : null;
                   return (
                     <tr key={`phase1-row-${point.id}`}>
                       <td className="px-5 py-3.5 font-mono font-black text-sky-800">#{idx + 1}</td>
                       <td className="px-5 py-3.5">
-                        <p className="font-bold text-slate-900">{cleanDisplayLabel(point.label)}</p>
+                        <p className="font-bold text-slate-900">{desig.fullTitle}</p>
                         {point.address && cleanDisplayAddress(point.address) && (
                           <p className="text-xs text-slate-500 mt-0.5">📍 {cleanDisplayAddress(point.address)}</p>
                         )}
@@ -1847,10 +1929,26 @@ export function NavigationOfferPublicView({ offer, proposalKey }: { offer: Offer
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="space-y-1.5">
-                          <span className="inline-flex items-center gap-1 rounded-lg bg-sky-50 px-2.5 py-1 text-xs font-extrabold text-sky-900 border border-sky-200">
-                            <Compass size={13} className="text-sky-600" />
-                            {formatDistanceBadge(effectivePoint)}
+                          <span className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-extrabold border ${
+                            desig.isDistanceConfirmed
+                              ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                              : 'bg-sky-50 text-sky-900 border-sky-200'
+                          }`}>
+                            <Compass size={13} className={desig.isDistanceConfirmed ? 'text-emerald-600' : 'text-sky-600'} />
+                            {formatDistanceBadge(effectivePoint, { audience })}
                           </span>
+                          {isInternalOfferPage && !desig.isDistanceConfirmed && rawCalcMeters && rawCalcMeters > 0 && (
+                            <div>
+                              <button
+                                type="button"
+                                disabled={editState.saving}
+                                onClick={() => void confirmCalculatedDistance(point.id, rawCalcMeters)}
+                                className="rounded-lg bg-emerald-600 px-2 py-0.5 text-[10px] font-black text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer"
+                              >
+                                ✓ Potvrdit pro klienta ({desig.calculatedDistance})
+                              </button>
+                            </div>
+                          )}
                           {isInternalOfferPage && (
                             <div className="flex items-center gap-1 pt-0.5">
                               <input
