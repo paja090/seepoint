@@ -493,18 +493,21 @@ export function PlannerCockpit() {
                       <h2 className="text-base font-black text-slate-900">Priority</h2>
                     </div>
                     <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600">
-                      {data.tasks.length}
+                      {data.tasks.filter((t) => !(t.sourceKind === 'WORK_TASK' && dayItems.some((item) => item.id === `work-task:${t.id}`))).length}
                     </span>
                   </div>
 
-                  {!data.tasks.length && (
+                  {!data.tasks.some((t) => !(t.sourceKind === 'WORK_TASK' && dayItems.some((item) => item.id === `work-task:${t.id}`))) && (
                     <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-4 text-xs font-semibold text-slate-500">
-                      Žádné otevřené úkoly. Vyhraďte si prostor na další práci.
+                      Žádné další otevřené úkoly mimo dnešní plán. Vyhraďte si prostor na soustředěnou práci.
                     </p>
                   )}
 
                   <ol className="space-y-2.5">
-                    {data.tasks.slice(0, 8).map((t, i) => {
+                    {data.tasks
+                      .filter((t) => !(t.sourceKind === 'WORK_TASK' && dayItems.some((item) => item.id === `work-task:${t.id}`)))
+                      .slice(0, 8)
+                      .map((t, i) => {
                       const badge = formatTaskDueBadge(t.dueAt, todayIso, tomorrowIso, tz);
                       const isUrgent = t.priority === 'URGENT' || t.priority === 'HIGH';
                       const sourceName =

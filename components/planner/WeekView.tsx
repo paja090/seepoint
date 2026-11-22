@@ -28,8 +28,16 @@ export function WeekView({
         const events = items.filter((item) =>
           overlaps(item, { startAt: range.start.toISOString(), endAt: range.end.toISOString() })
         );
+        const eventWorkTaskIds = new Set(
+          events
+            .filter((item) => item.id.startsWith('work-task:'))
+            .map((item) => item.id.slice('work-task:'.length))
+        );
         const deadlines = tasks.filter(
-          (task) => task.dueAt && dateInZone(new Date(task.dueAt), timezone) === day
+          (task) =>
+            task.dueAt &&
+            dateInZone(new Date(task.dueAt), timezone) === day &&
+            !(task.sourceKind === 'WORK_TASK' && eventWorkTaskIds.has(task.id))
         );
         const isToday = day === realToday;
         const dayObj = new Date(`${day}T12:00Z`);

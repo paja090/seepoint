@@ -430,6 +430,7 @@ function parseGooglePlanRows(
   };
 
   const tasks: ParsedGooglePlanTask[] = [];
+  let lastValidScheduledDate: Date | null = null;
 
   for (let i = headerIdx + 1; i < rawRows.length; i++) {
     const rawRow = rawRows[i];
@@ -458,7 +459,14 @@ function parseGooglePlanRows(
       taskYear = zahajeniDate.getUTCFullYear();
     }
 
-    const scheduledDate = parseDateString(rawDatum, taskYear) || zahajeniDate || new Date();
+    const parsedDatum = parseDateString(rawDatum, taskYear);
+    if (parsedDatum) {
+      lastValidScheduledDate = parsedDatum;
+    } else if (zahajeniDate) {
+      lastValidScheduledDate = zahajeniDate;
+    }
+
+    const scheduledDate = parsedDatum || zahajeniDate || lastValidScheduledDate || referenceDate;
     const campaignDateFrom = zahajeniDate;
     const campaignDateTo = parseDateString(rawUkonceni, taskYear);
 
@@ -799,11 +807,13 @@ export async function syncGooglePlanToWorkOrders(
   const existingBySheetKey = new Map<string, ExistingOrderRow[]>();
   const existingBySignature = new Map<string, ExistingOrderRow[]>();
   const existingByRowDateClient = new Map<string, ExistingOrderRow[]>();
+  const existingByRowClientTitle = new Map<string, ExistingOrderRow[]>();
 
   for (const eo of existingOrders) {
     const pc = eo.planningConstraints as Record<string, unknown> | null;
     const eoDateIso = eo.scheduledAt.toISOString().slice(0, 10);
     const eoClientNorm = eo.clientName.trim().toLowerCase();
+    const eoTitleNorm = eo.title.trim().toLowerCase();
     if (pc && typeof pc.sheetKey === 'string') {
       pushToList(existingBySheetKey, pc.sheetKey, eo);
       if (typeof pc.sheetRow === 'number') {
@@ -812,8 +822,9 @@ export async function syncGooglePlanToWorkOrders(
     }
     if (pc?.source === 'GOOGLE_SHEETS_PLAN' && typeof pc.sheetRow === 'number') {
       pushToList(existingByRowDateClient, `${eoDateIso}::${pc.sheetRow}::${eoClientNorm}`, eo);
+      pushToList(existingByRowClientTitle, `${pc.sheetRow}::${eoClientNorm}::${eoTitleNorm}`, eo);
     }
-    const sig = `${eoDateIso}::${eoClientNorm}::${eo.title.trim().toLowerCase()}`;
+    const sig = `${eoDateIso}::${eoClientNorm}::${eoTitleNorm}`;
     pushToList(existingBySignature, sig, eo);
   }
 
@@ -827,11 +838,13 @@ export async function syncGooglePlanToWorkOrders(
   for (const task of tasks) {
     const taskDateIso = task.scheduledAt.toISOString().slice(0, 10);
     const taskClientNorm = task.clientName.trim().toLowerCase();
-    const signature = `${taskDateIso}::${taskClientNorm}::${task.title.trim().toLowerCase()}`;
+    const taskTitleNorm = task.title.trim().toLowerCase();
+    const signature = `${taskDateIso}::${taskClientNorm}::${taskTitleNorm}`;
     const existing =
       pickUnmatched(existingBySheetKeyRow.get(`${task.sheetKey}_r${task.sheetRowIndex}`), matchedOrderIds) ||
       pickUnmatched(existingBySheetKey.get(task.sheetKey), matchedOrderIds) ||
       pickUnmatched(existingBySignature.get(signature), matchedOrderIds) ||
+      pickUnmatched(existingByRowClientTitle.get(`${task.sheetRowIndex}::${taskClientNorm}::${taskTitleNorm}`), matchedOrderIds) ||
       pickUnmatched(existingByRowDateClient.get(`${taskDateIso}::${task.sheetRowIndex}::${taskClientNorm}`), matchedOrderIds);
 
     if (existing) {
@@ -1073,13 +1086,31 @@ export async function syncGooglePlanToWorkOrders(
   // Remove or archive stale open GOOGLE_SHEETS_PLAN orders (duplicates or rows deleted/moved in the sheet)
   const shouldReconcileRemoved = options.reconcileRemovedRows ?? tasks.length >= 20;
   if (shouldReconcileRemoved) {
+    const matchedClientTitles = new Set(
+      tasks.map((t) => `${t.clientName.trim().toLowerCase()}::${t.title.trim().toLowerCase()}`)
+    );
     for (const eo of existingOrders) {
       if (matchedOrderIds.has(eo.id)) continue;
       const pc = (eo.planningConstraints as Record<string, unknown> | null) || {};
       if (pc.source !== 'GOOGLE_SHEETS_PLAN') continue;
-      if (['DONE', 'CANCELLED'].includes(eo.status)) continue;
+      if (eo.status === 'CANCELLED') continue;
       if (eo.invoiced || eo.ftdSent) continue;
       if (eo.crmOrderId || eo.navigationOrderId) continue;
+
+      const wasExplicitlyCompleted =
+        Boolean(pc.completedBySheetColor) ||
+        Boolean(pc.manualCompleted) ||
+        Boolean(pc.sheetColoredByWriteback) ||
+        Boolean(pc.manualFtdSent) ||
+        pc.lastEmailAction === 'COMPLETED' ||
+        Boolean(pc.lastWorkerReportAt) ||
+        Boolean(pc.completedViaEmailAt);
+
+      const eoClientTitle = `${eo.clientName.trim().toLowerCase()}::${eo.title.trim().toLowerCase()}`;
+      const isAutoClosedMovedGhost =
+        eo.status === 'DONE' && !wasExplicitlyCompleted && matchedClientTitles.has(eoClientTitle);
+
+      if (eo.status === 'DONE' && !isAutoClosedMovedGhost) continue;
 
       const assignments = (eo as { assignments?: Array<{ acknowledgedAt?: Date | null }> }).assignments || [];
       const hasAck = assignments.some((a) => Boolean(a.acknowledgedAt));
@@ -1121,6 +1152,14 @@ export async function syncGooglePlanToWorkOrders(
           },
         },
       });
+      if (typeof (client.workTask as { updateMany?: unknown })?.updateMany === 'function') {
+        await client.workTask
+          .updateMany({
+            where: { workOrderId: eo.id, status: { in: ['TODO', 'IN_PROGRESS'] } },
+            data: { status: 'CANCELLED' },
+          })
+          .catch(() => undefined);
+      }
       cleanedCount++;
     }
   }
