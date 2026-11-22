@@ -20,6 +20,7 @@ type SurfaceItem = {
     code: string;
     city?: string | null;
     name: string;
+    permitValidUntil?: string | null;
   };
 };
 
@@ -31,6 +32,7 @@ type OccupancyRow = {
   campaignName: string;
   dateFrom: string;
   dateTo: string;
+  reservedUntil?: string | null;
   status: string;
   price?: string | number | null;
   surface: SurfaceItem;
@@ -125,8 +127,16 @@ export function OccupancyTableWithBulk({
             const isSelected = selectedSurfaceIds.includes(row.surface.id);
             const dateToObj = new Date(row.dateTo);
             const diffDays = Math.ceil((dateToObj.getTime() - referenceTime) / (1000 * 3600 * 24));
-            const isEndingSoon = diffDays >= 0 && diffDays <= 7 && ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(row.status);
+            const isEndingSoon = diffDays >= 0 && diffDays <= 14 && ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(row.status);
             const freeFromDate = new Date(dateToObj.getTime() + 86400000).toISOString().slice(0, 10);
+
+            const resUntilDays =
+              row.status === 'RESERVED' && row.reservedUntil
+                ? Math.ceil((new Date(row.reservedUntil).getTime() - referenceTime) / (1000 * 3600 * 24))
+                : null;
+            const permitDays = row.surface.carrier.permitValidUntil
+              ? Math.ceil((new Date(row.surface.carrier.permitValidUntil).getTime() - referenceTime) / (1000 * 3600 * 24))
+              : null;
 
             return (
               <tr
@@ -155,6 +165,18 @@ export function OccupancyTableWithBulk({
                         🚨 ZÁVADA
                       </span>
                     )}
+                    {permitDays !== null && permitDays <= 30 && (
+                      <span
+                        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-black border ${
+                          permitDays < 0
+                            ? 'bg-red-100 text-red-800 border-red-300'
+                            : 'bg-amber-100 text-amber-900 border-amber-300'
+                        }`}
+                        title={`Povolení nosiče platné do ${new Date(row.surface.carrier.permitValidUntil!).toISOString().slice(0, 10)}`}
+                      >
+                        🏛️ {permitDays < 0 ? `Povolení prošlo (${Math.abs(permitDays)} d)` : `Povolení: ${permitDays} d`}
+                      </span>
+                    )}
                   </div>
                   <span className="text-slate-500">{row.surface.carrier.city}</span>
                 </TableCell>
@@ -177,8 +199,13 @@ export function OccupancyTableWithBulk({
                   <b>{row.campaignName}</b>
                   {row.price && <span className="block text-xs font-bold text-emerald-700">{Number(row.price).toLocaleString('cs-CZ')} Kč</span>}
                   {isEndingSoon && (
-                    <span className="mt-1 block rounded-lg bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-black text-amber-900">
+                    <span className={`mt-1 block rounded-lg border px-2 py-0.5 text-[10px] font-black ${diffDays <= 7 ? 'bg-orange-100 border-orange-300 text-orange-950' : 'bg-amber-100 border-amber-300 text-amber-900'}`}>
                       ⏳ Končí za {diffDays === 0 ? 'dnes' : `${diffDays} dní`} (Volná od {freeFromDate})
+                    </span>
+                  )}
+                  {resUntilDays !== null && resUntilDays <= 14 && (
+                    <span className={`mt-1 block rounded-lg border px-2 py-0.5 text-[10px] font-black ${resUntilDays < 0 ? 'bg-red-100 border-red-300 text-red-900' : 'bg-sky-100 border-sky-300 text-sky-900'}`}>
+                      🔒 {resUntilDays < 0 ? `Rezervace vypršela (${new Date(row.reservedUntil!).toISOString().slice(0, 10)})` : `Rezervace do ${new Date(row.reservedUntil!).toISOString().slice(0, 10)} (${resUntilDays} d)`}
                     </span>
                   )}
                 </TableCell>

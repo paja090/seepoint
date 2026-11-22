@@ -12,6 +12,11 @@ import { WorkOrderActions } from '@/components/WorkOrderActions';
 import { WorkOrderEditForm } from '@/components/WorkOrderEditForm';
 import { WorkOrderPhotosDriveBar } from '@/components/work/WorkOrderPhotosDriveBar';
 import { isWorkOrderEligibleForPhotoApp, readWorkOrderDriveExports } from '@/lib/work/photo-folder';
+import {
+  extractWorkOrderEmailAction,
+  formatOverdueDaysLabel,
+  getWorkOrderOverdueInfo,
+} from '@/lib/work/overdue';
 import { formatNavigationPointDesignation } from '@/lib/offers/navigation-carrier-types';
 import { prisma, ensureWorkOrderSchema } from '@/lib/db';
 import {
@@ -230,9 +235,9 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
       r.vehicle.name.toLowerCase().includes('přívěs')
   );
 
-  const isOverdue = Boolean(
-    order.deadlineAt && order.deadlineAt < new Date() && !['DONE', 'CANCELLED'].includes(order.status)
-  );
+  const overdueInfo = getWorkOrderOverdueInfo(order);
+  const isOverdue = overdueInfo.isOverdue;
+  const emailAction = extractWorkOrderEmailAction(order.planningConstraints);
   const flags = extractWorkOrderConstraintFlags(order.planningConstraints);
   const awaitsInvoice = isOrderReadyForInvoicing({
     status: order.status,
@@ -329,6 +334,37 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
           </section>
         )}
 
+        {/* Email Action Sync Banner */}
+        {emailAction && (
+          <section
+            className={`rounded-2xl border p-4 shadow-sm ${
+              emailAction.action === 'COMPLETED'
+                ? 'border-emerald-300 bg-emerald-50/80 text-emerald-950'
+                : emailAction.action === 'RESCHEDULED'
+                ? 'border-sky-300 bg-sky-50/80 text-sky-950'
+                : 'border-amber-300 bg-amber-50/80 text-amber-950'
+            }`}
+            role="status"
+          >
+            <div className="flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-wider">
+              <Mail size={14} /> {emailAction.label}
+              {emailAction.actorName ? ` · ${emailAction.actorName}` : ''}
+              {emailAction.at
+                ? ` · ${new Date(emailAction.at).toLocaleString('cs-CZ', {
+                    day: 'numeric',
+                    month: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'Europe/Prague',
+                  })}`
+                : ''}
+            </div>
+            {emailAction.reason && (
+              <p className="mt-1 text-xs font-semibold opacity-90">Poznámka z e-mailu: {emailAction.reason}</p>
+            )}
+          </section>
+        )}
+
         {/* Main Card Header */}
         <header className={`card ${isOverdue ? 'border-red-400 ring-2 ring-red-100 bg-red-50/10' : ''}`}>
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -350,7 +386,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
                 </span>
                 {isOverdue && (
                   <span className="rounded-full bg-red-600 px-3 py-0.5 text-xs font-black text-white">
-                    ⚠️ Po termínu
+                    ⚠️ Po termínu ({formatOverdueDaysLabel(overdueInfo.overdueDays)})
                   </span>
                 )}
                 <span className="text-xs font-extrabold text-slate-600">

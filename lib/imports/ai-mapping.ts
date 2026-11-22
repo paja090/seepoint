@@ -22,6 +22,7 @@ const KNOWN_COLUMN_PATTERNS: Array<{
   { target: 'latitude', patterns: [/lat/i, /zem[eě]pisn[aá]\s*[sš][ií][rř]ka/i, /\b[sš][ií][rř]ka\b/i] },
   { target: 'longitude', patterns: [/l[on]g/i, /zem[eě]pisn[aá]\s*d[eé]lka/i, /\bd[eé]lka\b/i] },
   { target: 'dateFrom', patterns: [/\bod\b/i, /za[cč][aá]tek/i, /platnost\s*od/i, /podn[aá]jem\s*od/i, /datum\s*od/i], transform: 'DATE_ISO' },
+  { target: 'reservedUntil', patterns: [/rezervac[ei]\s*do/i, /platnost\s*rezervace/i, /opce\s*do/i, /reserved\s*until/i], transform: 'DATE_ISO' },
   { target: 'dateTo', patterns: [/\bdo\b/i, /konec/i, /platnost\s*do/i, /podn[aá]jem\s*do/i, /datum\s*do/i], transform: 'DATE_ISO' },
   { target: 'rentalPrice', patterns: [/z[aá]kladn[ií]\s*m[eě]s[ií][cč]n[ií]\s*n[aá]jem/i, /n[aá]jem/i], transform: 'CURRENCY_CZK' },
   { target: 'productionPrice', patterns: [/v[yý]lep/i, /instalace/i, /v[yý]roba/i, /mont[aá][zž]/i], transform: 'CURRENCY_CZK' },

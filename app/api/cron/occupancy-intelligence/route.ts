@@ -6,14 +6,15 @@ import { isModuleEnabled } from '@/lib/organization-modules';
 import { runWithTenantContext } from '@/lib/tenant-context';
 import { getOrganizationOccupancyProfile } from '@/lib/occupancy/intelligence-profile';
 import { runOccupancyAudit } from '@/lib/occupancy/intelligence-service';
+import { sendExpirationAlertEmailsForOrganization } from '@/lib/occupancy/expiration-alerts';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 /**
- * Automated Cron Endpoint for AI Occupancy Intelligence
+ * Automated Cron Endpoint for AI Occupancy Intelligence & Expiration Alerts
  *
- * Invoked by scheduler on schedule (e.g. daily at 05:00 UTC / 06:00 CET).
+ * Invoked by scheduler on schedule (e.g. daily at 05:30 UTC).
  * Authenticates via Bearer CRON_SECRET or an authenticated ADMIN/MANAGER session.
  */
 export async function GET(request: Request) {
@@ -60,16 +61,40 @@ async function handleCronExecution(request: Request) {
     let deferredCount = 0;
     let totalCreated = 0;
     let totalAutoResolved = 0;
+    let totalExpirationEmailsSent = 0;
     let skippedCount = 0;
 
     for (const org of organizations) {
       try {
+        if (deadline - Date.now() < 30_000) {
+          deferredCount++;
+          executionResults.push({
+            organizationId: org.id,
+            name: org.name,
+            status: 'DEFERRED_TIME_BUDGET',
+          });
+          continue;
+        }
+
+        // Send daily deduplicated expiration alerts (leases, reservations, client contracts, carrier permits)
+        const expirationAlerts = await runWithTenantContext(
+          { organizationId: org.id, source: 'script' },
+          () => sendExpirationAlertEmailsForOrganization(org.id),
+        ).catch((err) => {
+          console.warn(`Expiration alert digest failed for org ${org.id}:`, err);
+          return null;
+        });
+        if (expirationAlerts) {
+          totalExpirationEmailsSent += expirationAlerts.sentCount;
+        }
+
         if (!isModuleEnabled(org, 'aiOccupancy')) {
           skippedCount++;
           executionResults.push({
             organizationId: org.id,
             name: org.name,
             status: 'SKIPPED_MODULE_DISABLED',
+            expirationAlerts,
           });
           continue;
         }
@@ -85,16 +110,7 @@ async function handleCronExecution(request: Request) {
             organizationId: org.id,
             name: org.name,
             status: 'SKIPPED_AUTO_CHECKS_DISABLED',
-          });
-          continue;
-        }
-
-        if (deadline - Date.now() < 30_000) {
-          deferredCount++;
-          executionResults.push({
-            organizationId: org.id,
-            name: org.name,
-            status: 'DEFERRED_TIME_BUDGET',
+            expirationAlerts,
           });
           continue;
         }
@@ -114,6 +130,7 @@ async function handleCronExecution(request: Request) {
           activeFindings: auditResult.openInsights,
           createdCount: auditResult.newInsights,
           autoResolvedCount: auditResult.autoResolvedInsights,
+          expirationAlerts,
         });
       } catch (orgErr) {
         console.error(`Cron occupancy audit error for organization ${org.id}:`, orgErr);
@@ -137,6 +154,7 @@ async function handleCronExecution(request: Request) {
         deferred: deferredCount,
         totalCreated,
         totalAutoResolved,
+        totalExpirationEmailsSent,
       },
       results: executionResults,
     });

@@ -616,6 +616,16 @@ export async function POST(request: Request) {
 
   const allowedSet = new Set(payload.orderIds);
   const selectedIds = rawSelectedIds.filter((id) => allowedSet.has(id));
+  if (payload.orderIds.length > 1 && selectedIds.length === 0) {
+    return renderPage({
+      title: 'Nevybrali jste žádný úkol',
+      badgeEmoji: '⚠️',
+      badgeBg: '#fffbeb',
+      statusCode: 400,
+      bodyHtml:
+        '<p class="subtitle" style="text-align:center;">Zaškrtněte prosím alespoň jeden úkol, který chcete označit nebo přesunout, a odešlete formulář znovu.</p>',
+    });
+  }
   const targetOrderIds = selectedIds.length > 0 ? selectedIds : [payload.orderIds[0]];
   const effectiveAction =
     actionOverride === 'complete' || actionOverride === 'reschedule'

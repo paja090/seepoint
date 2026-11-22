@@ -141,6 +141,7 @@ export type Carrier = {
   status: CarrierStatus;
   description?: string;
   placementDescription?: string;
+  permitValidUntil?: string;
   note?: string;
   archivedAt?: string;
   archivedBy?: string;

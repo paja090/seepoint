@@ -138,6 +138,9 @@ async function save(request: Request, status = 200) {
     const surfaceId = typeof input.surfaceId === 'string' ? input.surfaceId : '';
     const dateFrom = typeof input.dateFrom === 'string' ? input.dateFrom : '';
     const dateTo = typeof input.dateTo === 'string' ? input.dateTo : '';
+    if (dateFrom && dateTo && new Date(dateFrom) > new Date(dateTo)) {
+      return NextResponse.json({ error: 'Datum od musí být před nebo rovno datu do.' }, { status: 400 });
+    }
     const occupancyStatus = typeof input.status === 'string' ? input.status : 'RESERVED';
     const shouldCheck = ['OCCUPIED', 'RESERVED', 'NEGOTIATION'].includes(occupancyStatus) && surfaceId && dateFrom && dateTo;
 

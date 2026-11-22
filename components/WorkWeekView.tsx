@@ -10,6 +10,11 @@ import {
 } from '@/lib/work';
 import type { WorkOrderRouteInfo } from '@/lib/field-planning/order-route-mapper';
 import {
+  formatOverdueDaysLabel,
+  getWorkOrderOverdueInfo,
+  isWorkOrderOverdue,
+} from '@/lib/work/overdue';
+import {
   Calendar,
   ChevronLeft,
   ChevronRight,
@@ -75,7 +80,7 @@ function isOpen(order: WeekOrder) {
 }
 
 function isOrderOverdue(order: WeekOrder, now = new Date()) {
-  return Boolean(order.deadlineAt && new Date(order.deadlineAt) < now && isOpen(order));
+  return isWorkOrderOverdue(order, now);
 }
 
 export function WorkWeekView({ initialOrders, onOpenReschedule, onOrderUpdated }: WorkWeekViewProps) {
@@ -123,6 +128,17 @@ export function WorkWeekView({ initialOrders, onOpenReschedule, onOrderUpdated }
       ),
     [clientFilter, orders, statusFilter, workerFilter]
   );
+
+  const earlierOverdueOrders = useMemo(() => {
+    const now = new Date();
+    return visibleOrders
+      .filter((order) => {
+        if (!isOpen(order)) return false;
+        const scheduled = new Date(order.scheduledAt);
+        return scheduled.getTime() < weekStart.getTime() && isWorkOrderOverdue(order, now);
+      })
+      .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+  }, [visibleOrders, weekStart]);
 
   async function updateOrder(order: WeekOrder, patch: OrderPatch) {
     setSavingId(order.id);
@@ -264,6 +280,51 @@ export function WorkWeekView({ initialOrders, onOpenReschedule, onOrderUpdated }
       {error && (
         <div className="rounded-xl bg-red-50 p-3 text-xs font-bold text-red-700 border border-red-200" role="alert">
           {error}
+        </div>
+      )}
+
+      {earlierOverdueOrders.length > 0 && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50/90 p-3.5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <span className="text-xs font-black uppercase tracking-wider text-amber-900">
+              ⚠️ Nepřeplánované zakázky z předchozích týdnů ({earlierOverdueOrders.length})
+            </span>
+            <span className="text-[11px] font-semibold text-amber-800">
+              Neuzavřené úkoly ze starších dnů zůstávají zde, aby v kalendáři nezmizely.
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {earlierOverdueOrders.slice(0, 10).map((ord) => {
+              const info = getWorkOrderOverdueInfo(ord);
+              return (
+                <div
+                  key={ord.id}
+                  className="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-white px-2.5 py-1.5 text-xs shadow-2xs"
+                >
+                  <Link href={`/work/${ord.id}`} className="font-bold text-slate-900 hover:text-sky-700 hover:underline">
+                    {ord.clientName} · {ord.title}
+                  </Link>
+                  <span className="rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">
+                    +{formatOverdueDaysLabel(info.overdueDays)}
+                  </span>
+                  {onOpenReschedule && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenReschedule(ord)}
+                      className="rounded-lg bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900 hover:bg-amber-200"
+                    >
+                      Přesunout
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+            {earlierOverdueOrders.length > 10 && (
+              <span className="self-center text-xs font-bold text-amber-900">
+                +{earlierOverdueOrders.length - 10} dalších
+              </span>
+            )}
+          </div>
         </div>
       )}
 

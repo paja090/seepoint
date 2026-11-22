@@ -184,3 +184,204 @@ export function matchClient(
 
   return { status: 'NEW' };
 }
+
+export type SurfaceMatchResult =
+  | { status: 'MATCHED'; surface: ExistingSurfaceRecord; matchRule: string }
+  | { status: 'AMBIGUOUS'; candidates: ExistingSurfaceRecord[] }
+  | { status: 'NOT_FOUND' };
+
+function extractSideToken(raw?: string | null): string {
+  if (!raw) return '';
+  const cleaned = normalizeText(raw).toUpperCase();
+  const explicit = cleaned.match(/\b(?:STRANA|SIDE|POZICE|POS)\s*([A-D1-4])\b/);
+  if (explicit) return explicit[1];
+  if (/^[A-D1-4]$/.test(cleaned)) return cleaned;
+  return '';
+}
+
+/**
+ * Resolves the target surface on a carrier during occupancy import.
+ * Supports side A/B/1/2 targeting (`sidePosition` / `surfaceName`) so double-sided
+ * carriers never blindly overwrite surface[0].
+ */
+export function matchSurface(
+  carrierSurfaces: ExistingSurfaceRecord[],
+  criteria: { sidePosition?: string | null; surfaceName?: string | null }
+): SurfaceMatchResult {
+  if (!carrierSurfaces || carrierSurfaces.length === 0) {
+    return { status: 'NOT_FOUND' };
+  }
+
+  const rawSide = cleanText(criteria.sidePosition ?? '');
+  const rawName = cleanText(criteria.surfaceName ?? '');
+  const sideToken = extractSideToken(rawSide) || extractSideToken(rawName);
+  const normName = rawName ? normalizeText(rawName) : '';
+  const normSide = rawSide ? normalizeText(rawSide) : '';
+
+  if (carrierSurfaces.length === 1 && !sideToken && !normName && !normSide) {
+    return { status: 'MATCHED', surface: carrierSurfaces[0], matchRule: 'SINGLE_SURFACE' };
+  }
+
+  // 1. Exact sidePosition or surface name match
+  if (normName) {
+    const exactName = carrierSurfaces.find((s) => normalizeText(s.name) === normName);
+    if (exactName) return { status: 'MATCHED', surface: exactName, matchRule: 'EXACT_SURFACE_NAME' };
+  }
+
+  if (sideToken) {
+    const bySidePos = carrierSurfaces.filter(
+      (s) =>
+        extractSideToken(s.sidePosition) === sideToken ||
+        extractSideToken(s.name) === sideToken
+    );
+    if (bySidePos.length === 1) {
+      return { status: 'MATCHED', surface: bySidePos[0], matchRule: 'SIDE_TOKEN' };
+    }
+    // Map numeric 1->A, 2->B and vice versa
+    const altToken = sideToken === '1' ? 'A' : sideToken === '2' ? 'B' : sideToken === 'A' ? '1' : sideToken === 'B' ? '2' : '';
+    if (altToken) {
+      const byAlt = carrierSurfaces.filter(
+        (s) =>
+          extractSideToken(s.sidePosition) === altToken ||
+          extractSideToken(s.name) === altToken
+      );
+      if (byAlt.length === 1) {
+        return { status: 'MATCHED', surface: byAlt[0], matchRule: 'SIDE_TOKEN_ALIAS' };
+      }
+    }
+  }
+
+  // 2. Partial surface name match (e.g. "centrum" -> "Strana A - směr centrum")
+  if (normName.length >= 2) {
+    const partial = carrierSurfaces.filter((s) => {
+      const sn = normalizeText(s.name);
+      return sn.includes(normName) || normName.includes(sn);
+    });
+    if (partial.length === 1) {
+      return { status: 'MATCHED', surface: partial[0], matchRule: 'PARTIAL_SURFACE_NAME' };
+    }
+  }
+
+  if (carrierSurfaces.length === 1) {
+    return { status: 'MATCHED', surface: carrierSurfaces[0], matchRule: 'SINGLE_SURFACE_FALLBACK' };
+  }
+
+  return { status: 'AMBIGUOUS', candidates: carrierSurfaces };
+}
+
+const CZECH_MONTHS: Record<string, number> = {
+  leden: 1,
+  unor: 2,
+  brezen: 3,
+  duben: 4,
+  kveten: 5,
+  cerven: 6,
+  cervenec: 7,
+  srpen: 8,
+  zari: 9,
+  rijen: 10,
+  listopad: 11,
+  prosinec: 12,
+};
+
+export function parseImportDateOnly(raw: unknown): Date | null {
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    return new Date(Date.UTC(raw.getUTCFullYear(), raw.getUTCMonth(), raw.getUTCDate()));
+  }
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(trimmed);
+  if (iso) {
+    const y = Number(iso[1]);
+    const m = Number(iso[2]);
+    const d = Number(iso[3]);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d ? dt : null;
+  }
+
+  const cz = /^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})$/.exec(trimmed);
+  if (cz) {
+    const d = Number(cz[1]);
+    const m = Number(cz[2]);
+    const y = Number(cz[3]);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d ? dt : null;
+  }
+
+  return null;
+}
+
+export function parseOccupancyImportDates(
+  mapped: Record<string, unknown>,
+  referenceYear = new Date().getUTCFullYear()
+): { dateFrom: Date; dateTo: Date } | null {
+  const from = parseImportDateOnly(mapped.dateFrom);
+  const to = parseImportDateOnly(mapped.dateTo);
+  if (from && to) {
+    return { dateFrom: from, dateTo: to };
+  }
+
+  const slot = typeof mapped.monthSlot === 'string' ? mapped.monthSlot.trim() : '';
+  if (slot) {
+    const ym = /^(\d{4})[-/](\d{1,2})$/.exec(slot);
+    const my = /^(\d{1,2})[./-](\d{4})$/.exec(slot);
+    let year = referenceYear;
+    let month = 0;
+
+    if (ym) {
+      year = Number(ym[1]);
+      month = Number(ym[2]);
+    } else if (my) {
+      month = Number(my[1]);
+      year = Number(my[2]);
+    } else {
+      const norm = normalizeText(slot);
+      const yearMatch = norm.match(/\b(20\d{2})\b/);
+      if (yearMatch) year = Number(yearMatch[1]);
+      for (const [key, num] of Object.entries(CZECH_MONTHS)) {
+        if (norm.includes(key)) {
+          month = num;
+          break;
+        }
+      }
+    }
+
+    if (month >= 1 && month <= 12) {
+      const start = new Date(Date.UTC(year, month - 1, 1));
+      const end = new Date(Date.UTC(year, month, 0));
+      return { dateFrom: start, dateTo: end };
+    }
+  }
+
+  return null;
+}
+
+export function parseOccupancyImportStatus(
+  rawStatus: unknown,
+  dateFrom: Date,
+  dateTo: Date,
+  now = new Date()
+): 'OCCUPIED' | 'RESERVED' | 'NEGOTIATION' | 'FINISHED' {
+  const norm = typeof rawStatus === 'string' ? normalizeText(rawStatus) : '';
+  if (norm) {
+    if (norm.includes('obsaz') || norm.includes('potvrz') || norm.includes('aktiv') || norm.includes('prodan') || norm === 'occupied') {
+      return 'OCCUPIED';
+    }
+    if (norm.includes('opce') || norm.includes('jednan') || norm.includes('nabidk') || norm === 'negotiation') {
+      return 'NEGOTIATION';
+    }
+    if (norm.includes('ukonc') || norm.includes('skonc') || norm === 'finished') {
+      return 'FINISHED';
+    }
+    if (norm.includes('rezerv') || norm === 'reserved') {
+      return 'RESERVED';
+    }
+  }
+
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  if (dateTo < today) return 'FINISHED';
+  if (dateFrom > today) return 'RESERVED';
+  return 'OCCUPIED';
+}

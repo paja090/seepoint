@@ -232,6 +232,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
         campaignName: row.campaignName,
         dateFrom: row.dateFrom.toISOString(),
         dateTo: row.dateTo.toISOString(),
+        reservedUntil: row.reservedUntil ? row.reservedUntil.toISOString() : null,
         status: row.status as string,
         price: row.price?.toString() ?? null,
         client: row.client ? { name: row.client.name } : null,
@@ -245,6 +246,9 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
             code: row.surface.carrier.code,
             city: row.surface.carrier.city,
             name: row.surface.carrier.name,
+            permitValidUntil: row.surface.carrier.permitValidUntil
+              ? row.surface.carrier.permitValidUntil.toISOString()
+              : null,
           },
         },
       };
@@ -268,6 +272,7 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
           campaignName: 'VOLNÁ PLOCHA K PRONÁJMU',
           dateFrom: today.toISOString(),
           dateTo: in30.toISOString(),
+          reservedUntil: null,
           status: 'AVAILABLE',
           price: null,
           client: null,
@@ -281,6 +286,9 @@ export default async function Occupancy({ searchParams }: { searchParams: Promis
               code: s.carrier.code,
               city: s.carrier.city,
               name: s.carrier.name,
+              permitValidUntil: s.carrier.permitValidUntil
+                ? s.carrier.permitValidUntil.toISOString()
+                : null,
             },
           },
         };

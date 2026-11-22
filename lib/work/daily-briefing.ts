@@ -149,6 +149,8 @@ export type ManagerMorningDigestItem = {
   status: string;
   detailUrl: string;
   newDateLabel?: string;
+  scheduledDateLabel?: string;
+  overdueDays?: number;
   workerReason?: string | null;
   reportBy?: string | null;
 };
@@ -160,6 +162,7 @@ export type ManagerMorningDigestData = {
   workUrl: string;
   rescheduledItems: ManagerMorningDigestItem[];
   unfinishedItems: ManagerMorningDigestItem[];
+  olderOverdueItems?: ManagerMorningDigestItem[];
   completedItems: ManagerMorningDigestItem[];
 };
 
@@ -1362,6 +1365,7 @@ export async function loadDailyBriefingsForOrganization(
   const todayDate = addCalendarDays(targetDate, -1);
   const { start, end } = getDayBoundsUtc(targetDate, timezone);
   const { start: todayStart, end: todayEnd } = getDayBoundsUtc(todayDate, timezone);
+  const overdueLookbackStart = new Date(todayStart.getTime() - 14 * 24 * 60 * 60 * 1000);
 
   const [orders, todayOrders, fieldPlans, directory] = await Promise.all([
     prisma.workOrder.findMany({
@@ -1377,7 +1381,7 @@ export async function loadDailyBriefingsForOrganization(
       where: {
         organizationId,
         status: { notIn: ['DONE', 'CANCELLED'] },
-        scheduledAt: { gte: todayStart, lt: todayEnd },
+        scheduledAt: { gte: overdueLookbackStart, lt: todayEnd },
       },
       select: BRIEFING_ORDER_SELECT,
       orderBy: [{ priority: 'desc' }, { scheduledAt: 'asc' }],
@@ -2380,6 +2384,7 @@ export function assembleManagerMorningDigest(input: {
   auditedDate: string;
   yesterdayOrders: ManagerAuditOrderInput[];
   recentRescheduledOrders?: ManagerAuditOrderInput[];
+  olderOverdueOrders?: ManagerAuditOrderInput[];
   baseUrl?: string;
   timezone?: string;
 }): ManagerMorningDigestData {
@@ -2418,10 +2423,12 @@ export function assembleManagerMorningDigest(input: {
 
   const unfinishedItems: ManagerMorningDigestItem[] = [];
   const completedItems: ManagerMorningDigestItem[] = [];
+  const seenIds = new Set<string>(rescheduledMap.keys());
 
   for (const order of input.yesterdayOrders) {
     if (order.status === 'CANCELLED') continue;
     if (rescheduledMap.has(order.id)) continue;
+    seenIds.add(order.id);
 
     const pc = asPcObj(order.planningConstraints);
     const preferredReason =
@@ -2450,6 +2457,39 @@ export function assembleManagerMorningDigest(input: {
     }
   }
 
+  const olderOverdueItems: ManagerMorningDigestItem[] = [];
+  const auditedStartMs = new Date(`${input.auditedDate}T00:00:00Z`).getTime();
+  for (const order of input.olderOverdueOrders ?? []) {
+    if (order.status === 'DONE' || order.status === 'CANCELLED') continue;
+    if (seenIds.has(order.id)) continue;
+    seenIds.add(order.id);
+
+    const pc = asPcObj(order.planningConstraints);
+    const schedDayIso = dayInZone(order.scheduledAt, timezone);
+    const schedDayMs = new Date(`${schedDayIso}T00:00:00Z`).getTime();
+    const daysPastAudited = Number.isFinite(schedDayMs)
+      ? Math.max(2, Math.round((auditedStartMs - schedDayMs) / (24 * 60 * 60 * 1000)) + 1)
+      : 2;
+
+    olderOverdueItems.push({
+      workOrderId: order.id,
+      title: order.title,
+      clientName: order.clientName,
+      workerNames: order.assignments.map((a) => a.workerName.trim()).filter(Boolean),
+      status: order.status,
+      detailUrl: `${baseUrl}/work/${order.id}`,
+      scheduledDateLabel: formatCzechFullDate(schedDayIso),
+      overdueDays: daysPastAudited,
+      workerReason:
+        typeof pc.lastWorkerReason === 'string'
+          ? pc.lastWorkerReason
+          : typeof pc.lastWorkerNote === 'string'
+          ? pc.lastWorkerNote
+          : null,
+      reportBy: typeof pc.lastWorkerReportBy === 'string' ? pc.lastWorkerReportBy : null,
+    });
+  }
+
   return {
     auditedDate: input.auditedDate,
     auditedDateLabel,
@@ -2457,6 +2497,7 @@ export function assembleManagerMorningDigest(input: {
     workUrl: `${baseUrl}/work`,
     rescheduledItems: [...rescheduledMap.values()],
     unfinishedItems,
+    olderOverdueItems,
     completedItems,
   };
 }
@@ -2468,12 +2509,16 @@ export function renderManagerMorningDigestEmail(
 ): { subject: string; html: string; text: string } {
   const prefix = options?.isTest ? '[TEST] ' : '';
   const openCount = digest.unfinishedItems.length;
+  const olderOverdueItems = digest.olderOverdueItems ?? [];
+  const olderCount = olderOverdueItems.length;
   const movedCount = digest.rescheduledItems.length;
   const doneCount = digest.completedItems.length;
 
   const subject =
-    openCount > 0 || movedCount > 0
-      ? `${prefix}Ranní kontrola plánu (${digest.auditedDateLabel}): ${openCount} neuzavřeno, ${movedCount} přesunuto`
+    openCount > 0 || olderCount > 0 || movedCount > 0
+      ? `${prefix}Ranní kontrola plánu (${digest.auditedDateLabel}): ${openCount} neuzavřeno${
+          olderCount > 0 ? `, ${olderCount} starších po termínu` : ''
+        }, ${movedCount} přesunuto`
       : `${prefix}Ranní kontrola plánu (${digest.auditedDateLabel}): vše hotovo (${doneCount})`;
 
   const renderItemCard = (
@@ -2490,6 +2535,7 @@ export function renderManagerMorningDigestEmail(
       <div style="font-size:12.5px;color:#475569;line-height:1.45;">
         Klient: <strong>${escapeHtml(item.clientName)}</strong>
         ${item.workerNames.length ? ` · Tým: ${escapeHtml(item.workerNames.join(', '))}` : ''}
+        ${item.scheduledDateLabel ? ` · Původní termín: <strong>${escapeHtml(item.scheduledDateLabel)}</strong>` : ''}
         ${item.newDateLabel ? ` · Nový termín: <strong>${escapeHtml(item.newDateLabel)}</strong>` : ''}
       </div>
       ${
@@ -2542,8 +2588,9 @@ export function renderManagerMorningDigestEmail(
     )
     .join('');
 
+  const totalActionableOpen = openCount + olderCount;
   const managerBatchBarHtml =
-    openCount > 0 && (options?.batchCompleteUrl || options?.batchRescheduleUrl)
+    totalActionableOpen > 0 && (options?.batchCompleteUrl || options?.batchRescheduleUrl)
       ? `<div style="margin:0 0 12px;padding:12px 14px;border-radius:12px;background:#fff1f2;border:1px solid #fecdd3;">
           <div style="font-size:12px;font-weight:800;color:#881337;margin-bottom:8px;">
             ⚡ Hromadná akce pro neuzavřené úkoly (vyber více úkolů najednou):
@@ -2551,7 +2598,7 @@ export function renderManagerMorningDigestEmail(
           <div>
             ${
               options?.batchCompleteUrl
-                ? `<a href="${escapeHtml(options.batchCompleteUrl)}" style="display:inline-block;margin:0 8px 6px 0;padding:9px 14px;border-radius:9px;background:#059669;color:#ffffff;font-size:12.5px;font-weight:800;text-decoration:none;">✅ Hromadně označit vybrané jako HOTOVÉ (${openCount})</a>`
+                ? `<a href="${escapeHtml(options.batchCompleteUrl)}" style="display:inline-block;margin:0 8px 6px 0;padding:9px 14px;border-radius:9px;background:#059669;color:#ffffff;font-size:12.5px;font-weight:800;text-decoration:none;">✅ Hromadně označit vybrané jako HOTOVÉ (${totalActionableOpen})</a>`
                 : ''
             }
             ${
@@ -2574,14 +2621,14 @@ export function renderManagerMorningDigestEmail(
             Kontrola plánu za ${escapeHtml(digest.auditedDateLabel)}
           </h1>
           <div style="padding:10px 14px;border-radius:10px;background:rgba(255,255,255,0.08);font-size:13px;color:#e2e8f0;font-weight:700;">
-            ❗ Neuzavřeno: ${openCount}  ·  ⏳ Přesunuto pracovníky: ${movedCount}  ·  ✅ Dokončeno: ${doneCount}
+            ❗ Neuzavřeno: ${openCount}${olderCount > 0 ? `  ·  ⚠️ Starší po termínu: ${olderCount}` : ''}  ·  ⏳ Přesunuto pracovníky: ${movedCount}  ·  ✅ Dokončeno: ${doneCount}
           </div>
           <div style="margin-top:12px;">
             <a href="${escapeHtml(digest.plannerUrl)}" style="display:inline-block;margin:4px 8px 0 0;padding:10px 16px;border-radius:10px;background:#059669;color:#ffffff;font-size:12.5px;font-weight:800;text-decoration:none;">
               Otevřít Planner →
             </a>
-            <a href="${escapeHtml(digest.workUrl)}" style="display:inline-block;margin:4px 0 0 0;padding:10px 16px;border-radius:10px;background:#334155;color:#ffffff;font-size:12.5px;font-weight:800;text-decoration:none;">
-              Plán práce →
+            <a href="${escapeHtml(digest.workUrl)}${olderCount > 0 || openCount > 0 ? '?filter=overdue' : ''}" style="display:inline-block;margin:4px 0 0 0;padding:10px 16px;border-radius:10px;background:#334155;color:#ffffff;font-size:12.5px;font-weight:800;text-decoration:none;">
+              Plán práce${olderCount + openCount > 0 ? ' (po termínu)' : ''} →
             </a>
           </div>
         </div>
@@ -2597,6 +2644,22 @@ export function renderManagerMorningDigestEmail(
                        bg: '#fff1f2',
                        badgeText: 'Bez uzavření',
                        badgeColor: '#be123c',
+                     })
+                   )
+                   .join('')}`
+              : ''
+          }
+          ${
+            olderCount > 0
+              ? `<h2 style="margin:14px 0 10px;font-size:14px;font-weight:900;text-transform:uppercase;color:#9a3412;">⚠️ Starší nepřeplánované úkoly po termínu (${olderCount})</h2>
+                 ${openCount === 0 ? managerBatchBarHtml : ''}
+                 ${olderOverdueItems
+                   .map((i) =>
+                     renderItemCard(i, {
+                       border: '#fdba74',
+                       bg: '#fff7ed',
+                       badgeText: i.overdueDays ? `Po termínu (${i.overdueDays} d)` : 'Starší po termínu',
+                       badgeColor: '#9a3412',
                      })
                    )
                    .join('')}`
@@ -2624,7 +2687,7 @@ export function renderManagerMorningDigestEmail(
               : ''
           }
           ${
-            openCount === 0 && movedCount === 0 && doneCount === 0
+            openCount === 0 && olderCount === 0 && movedCount === 0 && doneCount === 0
               ? '<p style="margin:0;font-size:13px;color:#64748b;">Za tento den nebyly naplánovány žádné zakázky.</p>'
               : ''
           }
@@ -2635,10 +2698,14 @@ export function renderManagerMorningDigestEmail(
 
   const textLines = [
     subject,
-    `Neuzavřeno: ${openCount} | Přesunuto: ${movedCount} | Dokončeno: ${doneCount}`,
+    `Neuzavřeno: ${openCount}${olderCount > 0 ? ` | Starší po termínu: ${olderCount}` : ''} | Přesunuto: ${movedCount} | Dokončeno: ${doneCount}`,
     '',
     ...digest.unfinishedItems.map(
       (i) => `[NEUZAVŘENO] ${i.title} (${i.clientName}) – ${i.workerNames.join(', ')} | ${i.detailUrl}`
+    ),
+    ...olderOverdueItems.map(
+      (i) =>
+        `[STARŠÍ PO TERMÍNU (${i.scheduledDateLabel || '?'})] ${i.title} (${i.clientName}) – ${i.workerNames.join(', ')} | ${i.detailUrl}`
     ),
     ...digest.rescheduledItems.map(
       (i) =>
@@ -2671,6 +2738,7 @@ export async function loadManagerMorningDigestForOrganization(
   const auditedDate = options?.auditedDate || addCalendarDays(todayStr, -1);
   const { start, end } = getDayBoundsUtc(auditedDate, timezone);
   const rescheduleLookbackStart = new Date(start.getTime() - 12 * 60 * 60 * 1000);
+  const olderOverdueLookbackStart = new Date(start.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   const select = {
     id: true,
@@ -2683,7 +2751,7 @@ export async function loadManagerMorningDigestForOrganization(
     assignments: { select: { workerName: true } },
   } as const;
 
-  const [yesterdayOrders, recentRescheduledOrders] = await Promise.all([
+  const [yesterdayOrders, recentRescheduledOrders, olderOverdueOrders] = await Promise.all([
     prisma.workOrder.findMany({
       where: {
         organizationId,
@@ -2703,12 +2771,23 @@ export async function loadManagerMorningDigestForOrganization(
       orderBy: { updatedAt: 'desc' },
       take: 150,
     }),
+    prisma.workOrder.findMany({
+      where: {
+        organizationId,
+        status: { notIn: ['DONE', 'CANCELLED'] },
+        scheduledAt: { gte: olderOverdueLookbackStart, lt: start },
+      },
+      select,
+      orderBy: [{ scheduledAt: 'asc' }, { priority: 'desc' }],
+      take: 40,
+    }),
   ]);
 
   return assembleManagerMorningDigest({
     auditedDate,
     yesterdayOrders,
     recentRescheduledOrders,
+    olderOverdueOrders,
     baseUrl: options?.baseUrl,
     timezone,
   });
@@ -2734,7 +2813,10 @@ export async function sendManagerMorningDigestForOrganization(
   });
 
   const baseUrl = (options?.baseUrl || resolvePublicAppUrl()).replace(/\/+$/, '');
-  const unfinishedOrderIds = digest.unfinishedItems.map((i) => i.workOrderId).filter(Boolean);
+  const unfinishedOrderIds = [
+    ...digest.unfinishedItems.map((i) => i.workOrderId),
+    ...(digest.olderOverdueItems ?? []).map((i) => i.workOrderId),
+  ].filter(Boolean);
 
   if (options?.testRecipientEmail) {
     const testEmail = options.testRecipientEmail.trim().toLowerCase();
@@ -2782,6 +2864,7 @@ export async function sendManagerMorningDigestForOrganization(
 
   const totalItems =
     digest.unfinishedItems.length +
+    (digest.olderOverdueItems?.length ?? 0) +
     digest.rescheduledItems.length +
     digest.completedItems.length;
   if (totalItems === 0 && !options?.force) {

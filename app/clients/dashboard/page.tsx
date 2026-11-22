@@ -60,6 +60,7 @@ export default async function CrmDashboardPage() {
     }),
     prisma.occupancy.findMany({
       where: {
+        status: { in: ['OCCUPIED', 'RESERVED'] },
         dateTo: {
           gte: now,
           lte: thirtyDaysFromNow,

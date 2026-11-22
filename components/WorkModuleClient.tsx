@@ -31,10 +31,12 @@ import type { WorkOrderStatus, WorkPriority, WorkType } from '@prisma/client';
 import type { WorkCategory } from '@/lib/work-categories';
 import type { TodayCrewRouteSummary } from '@/lib/field-planning/order-route-mapper';
 import { isOrderDoneWithoutFtdFlag, isOrderReadyForInvoicing } from '@/lib/work';
+import { isWorkOrderOverdue } from '@/lib/work/overdue';
 
 type Option = { id: string; label: string };
 type CarrierOption = Option & { code: string };
 type EmployeeOption = { id: string; name: string };
+type WorkQuickFilter = 'open' | 'overdue' | 'today' | 'week' | 'urgent' | 'invoicing' | 'history' | 'all';
 
 export type WorkModuleClientProps = {
   orders: WorkOrderData[];
@@ -47,6 +49,7 @@ export type WorkModuleClientProps = {
   initialClientName?: string;
   initialCampaignDateFrom?: string;
   initialCampaignDateTo?: string;
+  initialFilter?: WorkQuickFilter;
   canCreateWorkOrder: boolean;
   categories?: WorkCategory[];
   isSeePointOrg?: boolean;
@@ -66,6 +69,7 @@ export function WorkModuleClient({
   initialClientName = '',
   initialCampaignDateFrom = '',
   initialCampaignDateTo = '',
+  initialFilter,
   canCreateWorkOrder,
   categories,
   isSeePointOrg = false,
@@ -79,9 +83,15 @@ export function WorkModuleClient({
   const [createModalOpen, setCreateModalOpen] = useState(autoOpenModal);
   const [createTargetDate, setCreateTargetDate] = useState<string>('');
   const [rescheduleOrder, setRescheduleOrder] = useState<WorkOrderData | null>(null);
-  const [activeTab, setActiveTab] = useState<'day' | 'calendar' | 'list' | 'invoicing'>('day');
+  const [activeTab, setActiveTab] = useState<'day' | 'calendar' | 'list' | 'invoicing'>(
+    initialFilter === 'overdue' || initialFilter === 'urgent' || initialFilter === 'history'
+      ? 'list'
+      : initialFilter === 'invoicing'
+      ? 'invoicing'
+      : 'day'
+  );
   const [ordersList, setOrdersList] = useState<WorkOrderData[]>(orders);
-  const [selectedFilter, setSelectedFilter] = useState<'open' | 'today' | 'week' | 'urgent' | 'invoicing' | 'history' | 'all'>('open');
+  const [selectedFilter, setSelectedFilter] = useState<WorkQuickFilter>(initialFilter || 'open');
   const [scopeFilter, setScopeFilter] = useState<'ALL' | 'WORKSHOP' | 'FIELD' | 'ROUTED' | 'UNROUTED'>('ALL');
   const [syncingGoogle, setSyncingGoogle] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
@@ -215,10 +225,7 @@ export function WorkModuleClient({
     return d >= dayStart && d < tomorrow;
   }).length;
 
-  const overdueOpenCount = openOrders.filter((o) => {
-    const d = new Date(o.scheduledAt);
-    return d < dayStart;
-  }).length;
+  const overdueOpenCount = openOrders.filter((o) => isWorkOrderOverdue(o, now)).length;
 
   const weekCount = openOrders.filter((o) => {
     const d = new Date(o.scheduledAt);
@@ -245,10 +252,13 @@ export function WorkModuleClient({
   const filteredOrders = scopeFilteredOrders.filter((o) => {
     const d = new Date(o.scheduledAt);
     const isCompleted = ['DONE', 'CANCELLED'].includes(o.status);
+    const overdue = isWorkOrderOverdue(o, now);
 
     if (selectedFilter === 'open') return !isCompleted;
-    if (selectedFilter === 'today') return !isCompleted && d >= dayStart && d < tomorrow;
-    if (selectedFilter === 'week') return !isCompleted && d >= dayStart && d < weekEnd;
+    if (selectedFilter === 'overdue') return overdue;
+    // Keep unrescheduled overdue tasks visible in "Dnes (+X po termínu)" and "Příštích 7 dní"
+    if (selectedFilter === 'today') return !isCompleted && ((d >= dayStart && d < tomorrow) || overdue);
+    if (selectedFilter === 'week') return !isCompleted && ((d >= dayStart && d < weekEnd) || overdue);
     if (selectedFilter === 'urgent') return !isCompleted && ['URGENT', 'HIGH'].includes(o.priority);
     if (selectedFilter === 'invoicing') return isOrderReadyForInvoicing(o);
     if (selectedFilter === 'history') return isCompleted;
@@ -257,33 +267,38 @@ export function WorkModuleClient({
     const aDate = new Date(a.scheduledAt);
     const bDate = new Date(b.scheduledAt);
 
+    // 1. Nepřeplánované úkoly po termínu mají nejvyšší prioritu zobrazení
+    const aOverdue = isWorkOrderOverdue(a, now) ? 1 : 0;
+    const bOverdue = isWorkOrderOverdue(b, now) ? 1 : 0;
+    if (aOverdue !== bOverdue) return bOverdue - aOverdue;
+
     const aIsToday = aDate >= dayStart && aDate < tomorrow ? 1 : 0;
     const bIsToday = bDate >= dayStart && bDate < tomorrow ? 1 : 0;
 
-    // 1. Dnešní úkoly jsou seřazeny na prvním místě
+    // 2. Dnešní úkoly hned za nimi
     if (aIsToday !== bIsToday) return bIsToday - aIsToday;
 
-    // 2. Urgentní / vysoká priorita má přednost
+    // 3. Urgentní / vysoká priorita má přednost
     const aUrgent = a.priority === 'URGENT' || a.priority === 'HIGH' ? 1 : 0;
     const bUrgent = b.priority === 'URGENT' || b.priority === 'HIGH' ? 1 : 0;
     if (aUrgent !== bUrgent) return bUrgent - aUrgent;
 
-    // 3. Probíhající práce před plánovanými
+    // 4. Probíhající práce před plánovanými
     if (a.status === 'IN_PROGRESS' && b.status !== 'IN_PROGRESS') return -1;
     if (a.status !== 'IN_PROGRESS' && b.status === 'IN_PROGRESS') return 1;
 
-    // 4. Zařazené ve výjezdu podle pořadí zastávky
+    // 5. Zařazené ve výjezdu podle pořadí zastávky
     if (a.routeInfo?.routeOrder && b.routeInfo?.routeOrder) {
       return a.routeInfo.routeOrder - b.routeInfo.routeOrder;
     }
     if (a.routeInfo?.routeOrder) return -1;
     if (b.routeInfo?.routeOrder) return 1;
 
-    // 5. Podle termínu ASC
+    // 6. Podle termínu ASC
     const diff = aDate.getTime() - bDate.getTime();
     if (diff !== 0) return diff;
 
-    // 6. Abecedně podle klienta
+    // 7. Abecedně podle klienta
     return a.clientName.localeCompare(b.clientName, 'cs');
   });
 
@@ -546,7 +561,7 @@ export function WorkModuleClient({
       )}
 
       {/* STAT TILES / QUICK FILTERS */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-7">
         <button
           type="button"
           onClick={() => {
@@ -565,6 +580,37 @@ export function WorkModuleClient({
           </div>
           <p className="mt-1 text-2xl font-black text-slate-900">{openCount}</p>
           <span className="text-[10px] font-semibold text-slate-400">aktivní úkoly</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            const next = selectedFilter === 'overdue' ? 'open' : 'overdue';
+            setSelectedFilter(next);
+            if (next === 'overdue' && (activeTab === 'day' || activeTab === 'invoicing')) {
+              setActiveTab('list');
+            } else if (activeTab === 'invoicing') {
+              setActiveTab('day');
+            }
+          }}
+          className={`rounded-2xl border p-4 text-left transition ${
+            selectedFilter === 'overdue'
+              ? 'border-amber-500 bg-amber-50 ring-2 ring-amber-500/30'
+              : overdueOpenCount > 0
+              ? 'border-amber-300 bg-amber-50/70 hover:bg-amber-50 shadow-sm'
+              : 'border-slate-200 bg-white hover:border-slate-300 shadow-sm'
+          }`}
+        >
+          <div className="flex items-center justify-between text-amber-800">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Po termínu</span>
+            <AlertCircle size={16} className={overdueOpenCount > 0 ? 'text-amber-600' : 'text-slate-400'} />
+          </div>
+          <p className={`mt-1 text-2xl font-black ${overdueOpenCount > 0 ? 'text-amber-950' : 'text-slate-900'}`}>
+            {overdueOpenCount}
+          </p>
+          <span className="text-[10px] font-semibold text-amber-700">
+            {overdueOpenCount > 0 ? 'nepřeplánované' : 'vše v termínu'}
+          </span>
         </button>
 
         <button
@@ -700,8 +746,9 @@ export function WorkModuleClient({
           <span>
             Zobrazený filtr:{' '}
             <strong className="text-slate-900">
-              {selectedFilter === 'today' && 'Dnešní zakázky'}
-              {selectedFilter === 'week' && 'Zakázky v příštích 7 dnech'}
+              {selectedFilter === 'overdue' && '⚠️ Nepřeplánované zakázky po termínu'}
+              {selectedFilter === 'today' && 'Dnešní zakázky (včetně úkolů po termínu)'}
+              {selectedFilter === 'week' && 'Zakázky v příštích 7 dnech (včetně úkolů po termínu)'}
               {selectedFilter === 'urgent' && 'Urgentní zakázky'}
               {selectedFilter === 'invoicing' && 'Zakázky čekající na fakturaci'}
               {selectedFilter === 'history' && '📜 Historie a hotové úkoly'}

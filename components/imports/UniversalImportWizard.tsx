@@ -63,7 +63,14 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
   // Commit state
   const [confirmationText, setConfirmationText] = useState('');
   const [saveProfileAs, setSaveProfileAs] = useState('');
-  const [commitResult, setCommitResult] = useState<{ createdCarriers: number; updatedCarriers: number; createdClients: number; createdPrices: number } | null>(null);
+  const [commitResult, setCommitResult] = useState<{
+    createdCarriers: number;
+    updatedCarriers: number;
+    createdClients: number;
+    createdPrices: number;
+    createdOccupancies?: number;
+    skippedRows?: number;
+  } | null>(null);
 
   // --- Step 1: Upload ---
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -744,7 +751,9 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
                     )}
 
                     {/* Conflict decision buttons */}
-                    {row.action === 'CONFLICT' && (
+                    {row.action === 'CONFLICT' && (() => {
+                      const rowKey = row.rowId || String(row.rowNumber);
+                      return (
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-1 border-t border-amber-200">
                         <span className="text-amber-900 font-semibold">
                           {row.conflictDetails?.message || 'Rozpor mezi importem a databází.'}
@@ -752,9 +761,9 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => handleResolveConflict(String(row.rowNumber), 'KEEP_DATABASE')}
+                            onClick={() => handleResolveConflict(rowKey, 'KEEP_DATABASE')}
                             className={`px-3 py-1.5 rounded-lg font-bold text-xs transition border ${
-                              resolutions[String(row.rowNumber)] === 'KEEP_DATABASE'
+                              resolutions[rowKey] === 'KEEP_DATABASE'
                                 ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
                                 : 'bg-white border-amber-300 text-amber-900 hover:bg-amber-100'
                             }`}
@@ -763,9 +772,9 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleResolveConflict(String(row.rowNumber), 'USE_IMPORT')}
+                            onClick={() => handleResolveConflict(rowKey, 'USE_IMPORT')}
                             className={`px-3 py-1.5 rounded-lg font-bold text-xs transition border ${
-                              resolutions[String(row.rowNumber)] === 'USE_IMPORT'
+                              resolutions[rowKey] === 'USE_IMPORT'
                                 ? 'bg-purple-600 text-white border-purple-700 shadow-xs'
                                 : 'bg-white border-purple-300 text-purple-900 hover:bg-purple-100'
                             }`}
@@ -774,9 +783,9 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleResolveConflict(String(row.rowNumber), 'SKIP')}
+                            onClick={() => handleResolveConflict(rowKey, 'SKIP')}
                             className={`px-3 py-1.5 rounded-lg font-bold text-xs transition border ${
-                              resolutions[String(row.rowNumber)] === 'SKIP'
+                              resolutions[rowKey] === 'SKIP'
                                 ? 'bg-rose-600 text-white border-rose-700 shadow-xs'
                                 : 'bg-white border-rose-300 text-rose-900 hover:bg-rose-100'
                             }`}
@@ -785,7 +794,8 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
                           </button>
                         </div>
                       </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 ))}
             </div>
@@ -875,7 +885,7 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
             </p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl mx-auto text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 max-w-4xl mx-auto text-xs">
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
               <span className="text-slate-600 block font-medium">Vytvořené nosiče</span>
               <strong className="text-2xl font-black text-emerald-700">
@@ -895,9 +905,21 @@ export function UniversalImportWizard({ onImportComplete }: { onImportComplete?:
               </strong>
             </div>
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+              <span className="text-slate-600 block font-medium">Obsazenosti / kampaně</span>
+              <strong className="text-2xl font-black text-indigo-700">
+                +{commitResult.createdOccupancies ?? 0}
+              </strong>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
               <span className="text-slate-600 block font-medium">Položky ceníku</span>
               <strong className="text-2xl font-black text-amber-700">
                 +{commitResult.createdPrices}
+              </strong>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+              <span className="text-slate-600 block font-medium">Přeskočené / kolize</span>
+              <strong className="text-2xl font-black text-slate-600">
+                {commitResult.skippedRows ?? 0}
               </strong>
             </div>
           </div>

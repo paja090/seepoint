@@ -55,6 +55,7 @@ export function QuickOccupancyBookingForm({
   const [dateFrom, setDateFrom] = useState(defaultDateFrom);
   const [dateTo, setDateTo] = useState(defaultDateTo);
   const [status, setStatus] = useState<BookingStatus>('RESERVED');
+  const [reservedUntil, setReservedUntil] = useState('');
   const [price, setPrice] = useState('');
   const [note, setNote] = useState('');
   const [allowNegotiationConflict, setAllowNegotiationConflict] = useState(false);
@@ -92,6 +93,7 @@ export function QuickOccupancyBookingForm({
           dateFrom,
           dateTo,
           status,
+          reservedUntil: status === 'RESERVED' && reservedUntil ? reservedUntil : null,
           price: price ? parseFloat(price) : null,
           note,
           createdBy: currentUserName || 'Obchodník',
@@ -245,6 +247,20 @@ export function QuickOccupancyBookingForm({
                 <option value="OCCUPIED">🟥 Obsazeno / Schváleno (Smlouva podepsána)</option>
               </select>
             </div>
+
+            {status === 'RESERVED' && (
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-800">
+                  Platnost předběžné rezervace do (volitelné — automaticky hlídáno)
+                </label>
+                <input
+                  type="date"
+                  className="input w-full text-xs font-bold"
+                  value={reservedUntil}
+                  onChange={(e) => setReservedUntil(e.target.value)}
+                />
+              </div>
+            )}
 
             {/* Price */}
             <div className="space-y-1">

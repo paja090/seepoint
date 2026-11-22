@@ -214,6 +214,16 @@ export function CarrierForm({
       )}
       <textarea className="input" placeholder="Popis nosiče" aria-label="Popis nosiče" value={form.description ?? ''} onChange={(event) => set('description', event.target.value)} />
       <textarea className="input" placeholder="Popis umístění" aria-label="Popis umístění" value={form.placementDescription ?? ''} onChange={(event) => set('placementDescription', event.target.value)} />
+      <label className="block text-xs font-bold text-slate-700">
+        <span>Platnost povolení / záboru nosiče do (volitelné — hlídá automatické upozornění)</span>
+        <input
+          type="date"
+          className="input mt-1"
+          aria-label="Platnost povolení do"
+          value={form.permitValidUntil ? String(form.permitValidUntil).slice(0, 10) : ''}
+          onChange={(event) => set('permitValidUntil', event.target.value || undefined)}
+        />
+      </label>
       <textarea className="input" placeholder="Poznámka" aria-label="Poznámka" value={form.note ?? ''} onChange={(event) => set('note', event.target.value)} />
       {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p>}
       <button type="submit" disabled={saving} className="rounded-xl bg-slate-950 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60">
