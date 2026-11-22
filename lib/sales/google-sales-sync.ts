@@ -51,7 +51,7 @@ export const CANONICAL_SALESPEOPLE: CanonicalSalesperson[] = [
     displayCode: 'M / MK',
     name: 'Marek Konečný',
     email: 'marek.konecny@seepoint.cz',
-    aliases: ['m', 'mk', 'konecny', 'konečný', 'marek'],
+    aliases: ['m', 'mk', 'konecny', 'konečný', 'marek', 'sss', 'ss', 'sp'],
   },
   {
     code: 'V',
@@ -72,7 +72,7 @@ export const CANONICAL_SALESPEOPLE: CanonicalSalesperson[] = [
     displayCode: 'S',
     name: 'Silva',
     email: 'silva@seepoint.cz',
-    aliases: ['s', 'ss', 'sss', 'silva', 'silvie'],
+    aliases: ['s', 'silva', 'silvie'],
   },
 ];
 
@@ -80,13 +80,14 @@ export const KNOWN_SALESPEOPLE: Record<string, { code: string; displayCode: stri
   mm: { code: 'MM', displayCode: 'MM', name: 'Miroslav Mec', email: 'mirek.mec@seepoint.cz' },
   m: { code: 'M', displayCode: 'M / MK', name: 'Marek Konečný', email: 'marek.konecny@seepoint.cz' },
   mk: { code: 'M', displayCode: 'M / MK', name: 'Marek Konečný', email: 'marek.konecny@seepoint.cz' },
+  sss: { code: 'M', displayCode: 'M / MK', name: 'Marek Konečný', email: 'marek.konecny@seepoint.cz' },
+  ss: { code: 'M', displayCode: 'M / MK', name: 'Marek Konečný', email: 'marek.konecny@seepoint.cz' },
+  sp: { code: 'M', displayCode: 'M / MK', name: 'Marek Konečný', email: 'marek.konecny@seepoint.cz' },
   v: { code: 'V', displayCode: 'V / VK', name: 'Vladimíra Konečná', email: 'vladka.konecna@seepoint.cz' },
   vk: { code: 'V', displayCode: 'V / VK', name: 'Vladimíra Konečná', email: 'vladka.konecna@seepoint.cz' },
   z: { code: 'Z', displayCode: 'Z / ZV', name: 'Zuzana Vavrečková', email: 'zuzana.vavreckova@seepoint.cz' },
   zv: { code: 'Z', displayCode: 'Z / ZV', name: 'Zuzana Vavrečková', email: 'zuzana.vavreckova@seepoint.cz' },
   s: { code: 'S', displayCode: 'S', name: 'Silva', email: 'silva@seepoint.cz' },
-  ss: { code: 'S', displayCode: 'S', name: 'Silva', email: 'silva@seepoint.cz' },
-  sss: { code: 'S', displayCode: 'S', name: 'Silva', email: 'silva@seepoint.cz' },
   silva: { code: 'S', displayCode: 'S', name: 'Silva', email: 'silva@seepoint.cz' },
   silvie: { code: 'S', displayCode: 'S', name: 'Silva', email: 'silva@seepoint.cz' },
   lv: { code: 'LV', displayCode: 'LV', name: 'Lenka Valíčková', email: 'lenka.valickova@seepoint.cz' },
@@ -754,6 +755,7 @@ export async function syncGoogleSalesToCrm(
         existingOrder.projectType === task.projectType &&
         existingOrder.title === orderTitle &&
         existingOrder.assignedUserId === (assignedUserId || existingOrder.assignedUserId) &&
+        prevMeta.salespersonCode === metadata.salespersonCode &&
         JSON.stringify(prevMeta.checklist) === JSON.stringify(metadata.checklist) &&
         prevMeta.campaignConfirmed === metadata.campaignConfirmed &&
         prevMeta.isCompletedOrder === metadata.isCompletedOrder &&
