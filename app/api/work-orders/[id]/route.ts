@@ -174,6 +174,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         }
       }
 
+      const hasStatusToDone = input.status === 'DONE' && current.status !== 'DONE';
+      const hasStatusFromDone = current.status === 'DONE' && input.status !== 'DONE';
+      if (hasStatusToDone) {
+        nextPc.manualCompleted = true;
+        nextPc.manualCompletedAt = new Date().toISOString();
+      } else if (hasStatusFromDone) {
+        nextPc.manualCompleted = false;
+        nextPc.sheetColoredByWriteback = false;
+        nextPc.completedBySheetColor = false;
+      }
+
       const updated = await tx.workOrder.update({
         where: { id },
         data: {
@@ -184,7 +195,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           invoiced: effectiveInvoiced,
           scheduledAt: scheduledAt ?? undefined,
           deadlineAt: deadlineAt ?? undefined,
-          ...(hasFtdChange || hasInvoicedChange || hasExemptChange
+          ...(hasFtdChange || hasInvoicedChange || hasExemptChange || hasStatusToDone || hasStatusFromDone
             ? { planningConstraints: nextPc as Prisma.InputJsonValue }
             : {}),
         },

@@ -429,6 +429,8 @@ export async function updateWorkOrderStatusAction(params: {
         ? {
             planningConstraints: {
               ...prevPc,
+              manualCompleted: true,
+              manualCompletedAt: now.toISOString(),
               manualFtdSent: true,
               ftdSkipped: false,
               completedBySheetColor: false,
@@ -441,6 +443,15 @@ export async function updateWorkOrderStatusAction(params: {
                     ...(cleanNote ? { lastWorkerNote: cleanNote } : {}),
                   }
                 : {}),
+            } as Prisma.InputJsonValue,
+          }
+        : wasAlreadyDone
+        ? {
+            planningConstraints: {
+              ...prevPc,
+              manualCompleted: false,
+              sheetColoredByWriteback: false,
+              completedBySheetColor: false,
             } as Prisma.InputJsonValue,
           }
         : {}),
