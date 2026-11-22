@@ -72,7 +72,7 @@ export const CANONICAL_SALESPEOPLE: CanonicalSalesperson[] = [
     displayCode: 'S',
     name: 'Silva',
     email: 'silva@seepoint.cz',
-    aliases: ['s', 'silva', 'silvie'],
+    aliases: ['s', 'ss', 'sss', 'silva', 'silvie'],
   },
 ];
 
@@ -85,6 +85,8 @@ export const KNOWN_SALESPEOPLE: Record<string, { code: string; displayCode: stri
   z: { code: 'Z', displayCode: 'Z / ZV', name: 'Zuzana Vavrečková', email: 'zuzana.vavreckova@seepoint.cz' },
   zv: { code: 'Z', displayCode: 'Z / ZV', name: 'Zuzana Vavrečková', email: 'zuzana.vavreckova@seepoint.cz' },
   s: { code: 'S', displayCode: 'S', name: 'Silva', email: 'silva@seepoint.cz' },
+  ss: { code: 'S', displayCode: 'S', name: 'Silva', email: 'silva@seepoint.cz' },
+  sss: { code: 'S', displayCode: 'S', name: 'Silva', email: 'silva@seepoint.cz' },
   silva: { code: 'S', displayCode: 'S', name: 'Silva', email: 'silva@seepoint.cz' },
   silvie: { code: 'S', displayCode: 'S', name: 'Silva', email: 'silva@seepoint.cz' },
   lv: { code: 'LV', displayCode: 'LV', name: 'Lenka Valíčková', email: 'lenka.valickova@seepoint.cz' },
@@ -281,10 +283,14 @@ export type ParsedGoogleSalesRow = {
   carrierTypeLabel: string;
   projectType: CrmProjectType;
   isCampaignConfirmed: boolean;
+  isCompletedOrder?: boolean;
+  hasOffer?: boolean;
   orderCode: string | null;
   dateFrom: Date | null;
   dateTo: Date | null;
   checklist: {
+    hotovaZakazka?: boolean;
+    nabidka?: boolean;
     planPrace: boolean;
     slozkaFtd: boolean;
     grafikaOdKlienta: boolean;
@@ -299,6 +305,13 @@ export type ParsedGoogleSalesRow = {
   computedStatus: CrmOrderStatus;
   sheetKey: string;
 };
+
+export function isPlaceholderSalesClientName(raw?: string | null): boolean {
+  if (!raw) return true;
+  const clean = raw.trim().toLowerCase();
+  if (!clean) return true;
+  return clean === 'doplnit' || clean === 'doplnit...' || /^[\s?.-]+$/.test(clean);
+}
 
 export function parseGoogleSalesSheetRows(
   rows: Array<{ rowNumber: number; cells: string[] }>,
@@ -320,11 +333,13 @@ export function parseGoogleSalesSheetRows(
   const colIdx = {
     obdobi: header.findIndex((h) => h.includes('obdob')),
     obchodnik: header.findIndex((h) => h.includes('obchodn')),
+    hotovaZakazka: header.findIndex((h) => h.includes('hotová zakázka') || h.includes('hotova zakazka') || h.includes('hotová')),
     klient: header.findIndex((h) => h === 'klient' || h.includes('klient')),
     kontaktOsoba: header.findIndex((h) => h.includes('kontaktní osoba') || h.includes('kontaktni osoba')),
     kontaktDetail: header.findIndex((h) => h.includes('kontakt na osobu')),
     typZakazky: header.findIndex((h) => h.includes('typ zakázky') || h.includes('typ zakazky')),
     potvrzena: header.findIndex((h) => h.includes('potvrzená kampaň') || h.includes('potvrzena kampan') || h.includes('potvrzen')),
+    nabidka: header.findIndex((h) => h === 'nabídka' || h === 'nabidka' || h.includes('nabídk') || h.includes('nabidk')),
     objednavka: header.findIndex((h) => h.includes('objednávk') || h.includes('objednavk')),
     terminOd: header.findIndex((h) => h.includes('termín kampaně od') || h.includes('termin kampane od') || h.includes('termín od')),
     terminDo: header.findIndex((h) => h.includes('termín kampaně do') || h.includes('termin kampane do') || h.includes('termín do')),
@@ -347,8 +362,8 @@ export function parseGoogleSalesSheetRows(
     const cells = rawRow.cells;
 
     const rawKlient = (colIdx.klient !== -1 ? cells[colIdx.klient] : '') || '';
-    if (!rawKlient.trim()) {
-      // Skip empty template rows
+    if (isPlaceholderSalesClientName(rawKlient)) {
+      // Skip empty template or 'doplnit' placeholder rows
       continue;
     }
 
@@ -359,16 +374,22 @@ export function parseGoogleSalesSheetRows(
     const rawContactDetail = (colIdx.kontaktDetail !== -1 ? cells[colIdx.kontaktDetail] : '') || '';
     const rawTypZakazky = (colIdx.typZakazky !== -1 ? cells[colIdx.typZakazky] : '') || '';
     const rawPotvrzena = (colIdx.potvrzena !== -1 ? cells[colIdx.potvrzena] : '') || '';
+    const rawHotova = (colIdx.hotovaZakazka !== -1 ? cells[colIdx.hotovaZakazka] : '') || '';
+    const rawNabidka = (colIdx.nabidka !== -1 ? cells[colIdx.nabidka] : '') || '';
     const rawObjednavka = (colIdx.objednavka !== -1 ? cells[colIdx.objednavka] : '') || '';
     const rawTerminOd = (colIdx.terminOd !== -1 ? cells[colIdx.terminOd] : '') || '';
     const rawTerminDo = (colIdx.terminDo !== -1 ? cells[colIdx.terminDo] : '') || '';
 
     const isCampaignConfirmed = parseBooleanCell(rawPotvrzena);
+    const isCompletedOrder = parseBooleanCell(rawHotova);
+    const hasOffer = parseBooleanCell(rawNabidka);
     const orderCode = rawObjednavka.trim() || null;
     const { dateFrom, dateTo } = parseCampaignDates(rawTerminOd, rawTerminDo, defaultYear);
     const { projectType, label: carrierTypeLabel } = resolveSalesProjectType(rawTypZakazky);
 
     const checklist = {
+      hotovaZakazka: isCompletedOrder,
+      nabidka: hasOffer,
       planPrace: colIdx.planPrace !== -1 ? parseBooleanCell(cells[colIdx.planPrace]) : false,
       slozkaFtd: colIdx.slozkaFtd !== -1 ? parseBooleanCell(cells[colIdx.slozkaFtd]) : false,
       grafikaOdKlienta: colIdx.grafikaKlient !== -1 ? parseBooleanCell(cells[colIdx.grafikaKlient]) : false,
@@ -388,7 +409,7 @@ export function parseGoogleSalesSheetRows(
 
     // Status progression logic
     let computedStatus: CrmOrderStatus = 'DRAFT';
-    if (checklist.odeslFakt) {
+    if (isCompletedOrder || checklist.odeslFakt) {
       computedStatus = 'COMPLETED';
     } else if (checklist.fakturace || checklist.odeslFtd || checklist.nahranaFtd) {
       computedStatus = 'COMPLETED';
@@ -419,6 +440,8 @@ export function parseGoogleSalesSheetRows(
       carrierTypeLabel,
       projectType,
       isCampaignConfirmed,
+      isCompletedOrder,
+      hasOffer,
       orderCode,
       dateFrom,
       dateTo,
@@ -691,8 +714,11 @@ export async function syncGoogleSalesToCrm(
       rawCarrier: task.carrierTypeRaw,
       carrierTypeLabel: task.carrierTypeLabel,
       campaignConfirmed: task.isCampaignConfirmed,
+      isCompletedOrder: Boolean(task.isCompletedOrder),
+      hasOffer: Boolean(task.hasOffer),
       orderCode: task.orderCode,
       contactRaw: task.contactPerson,
+      contactDetail: task.contactDetail,
       checklist: task.checklist,
       lastSyncedAt: new Date().toISOString(),
     };
@@ -730,6 +756,9 @@ export async function syncGoogleSalesToCrm(
         existingOrder.assignedUserId === (assignedUserId || existingOrder.assignedUserId) &&
         JSON.stringify(prevMeta.checklist) === JSON.stringify(metadata.checklist) &&
         prevMeta.campaignConfirmed === metadata.campaignConfirmed &&
+        prevMeta.isCompletedOrder === metadata.isCompletedOrder &&
+        prevMeta.hasOffer === metadata.hasOffer &&
+        prevMeta.contactDetail === metadata.contactDetail &&
         prevMeta.orderCode === metadata.orderCode;
 
       if (isUnchanged) {
@@ -866,6 +895,13 @@ export async function syncGoogleSalesToCrm(
   };
 }
 
+export type SalesOrderWorkflowStep = {
+  key: string;
+  label: string;
+  done: boolean;
+  active: boolean;
+};
+
 export type SalespersonCrmSummary = {
   code: string;
   displayCode: string;
@@ -882,12 +918,22 @@ export type SalespersonCrmSummary = {
     title: string;
     clientName: string;
     carrierTypeLabel: string;
+    rawCarrier?: string | null;
     period: string;
     isConfirmed: boolean;
+    isCompletedOrder?: boolean;
+    hasOffer?: boolean;
+    orderCode?: string | null;
+    contactPerson?: string | null;
+    contactDetail?: string | null;
     dateFromStr: string | null;
     dateToStr: string | null;
     status: CrmOrderStatus;
     checklistProgress: string;
+    progressPct?: number;
+    currentStageLabel?: string;
+    nextActionLabel?: string;
+    workflowSteps?: SalesOrderWorkflowStep[];
   }>;
 };
 
@@ -912,7 +958,7 @@ export async function getGoogleSalesSheetSummary(
       clientOrderCode: { startsWith: 'gsheet_sales_' },
     },
     include: {
-      client: { select: { name: true } },
+      client: { select: { name: true, contactPerson: true, email: true, phone: true } },
       assignedUser: { select: { id: true, name: true, email: true } },
     },
     orderBy: { createdAt: 'desc' },
@@ -943,6 +989,11 @@ export async function getGoogleSalesSheetSummary(
   let completedCampaigns = 0;
 
   for (const o of orders) {
+    const clientNameRaw = o.client?.name || '';
+    if (isPlaceholderSalesClientName(clientNameRaw)) {
+      continue;
+    }
+
     let meta: Record<string, unknown> = {};
     try {
       meta = o.internalNote ? JSON.parse(o.internalNote) : {};
@@ -961,9 +1012,33 @@ export async function getGoogleSalesSheetSummary(
     const spCode = spInfo.code;
     const spDisplayCode = spInfo.displayCode;
     const spName = spInfo.name;
-    const isConfirmed = Boolean(meta.campaignConfirmed) || o.status === 'CONFIRMED' || o.status === 'IN_REALIZATION' || o.status === 'COMPLETED';
+    const chk = (meta.checklist && typeof meta.checklist === 'object' ? meta.checklist : {}) as Record<string, boolean>;
+    const isCompletedOrder =
+      Boolean(meta.isCompletedOrder) ||
+      Boolean(chk.hotovaZakazka) ||
+      Boolean(chk.odeslFakt) ||
+      o.status === 'COMPLETED';
+    const hasOffer = Boolean(meta.hasOffer) || Boolean(chk.nabidka);
+    const orderCode = typeof meta.orderCode === 'string' && meta.orderCode.trim() ? meta.orderCode.trim() : null;
+    const isConfirmed =
+      Boolean(meta.campaignConfirmed) ||
+      isCompletedOrder ||
+      o.status === 'CONFIRMED' ||
+      o.status === 'READY_FOR_PRODUCTION' ||
+      o.status === 'IN_REALIZATION' ||
+      o.status === 'COMPLETED';
     const period = typeof meta.period === 'string' ? meta.period : '';
     const carrierTypeLabel = typeof meta.carrierTypeLabel === 'string' ? meta.carrierTypeLabel : 'Media';
+    const rawCarrier = typeof meta.rawCarrier === 'string' && meta.rawCarrier.trim() ? meta.rawCarrier.trim() : null;
+    const contactPerson =
+      (typeof meta.contactRaw === 'string' && meta.contactRaw.trim()) ||
+      o.client?.contactPerson ||
+      null;
+    const contactDetail =
+      (typeof meta.contactDetail === 'string' && meta.contactDetail.trim()) ||
+      o.client?.email ||
+      o.client?.phone ||
+      null;
 
     if (!bySalesperson[spCode]) {
       bySalesperson[spCode] = {
@@ -994,36 +1069,122 @@ export async function getGoogleSalesSheetSummary(
       bySalesperson[spCode].pipelineCount++;
     }
 
-    if (o.status === 'IN_REALIZATION') {
-      inRealizationCampaigns++;
-      bySalesperson[spCode].inRealizationCount++;
-    } else if (o.status === 'COMPLETED') {
+    if (isCompletedOrder) {
       completedCampaigns++;
       bySalesperson[spCode].completedCount++;
+    } else if (o.status === 'IN_REALIZATION' || o.status === 'READY_FOR_PRODUCTION') {
+      inRealizationCampaigns++;
+      bySalesperson[spCode].inRealizationCount++;
     }
 
     // Build checklist progress snippet e.g. "Plán ✓ | Tisk ✓ | Instalace"
-    const chk = (meta.checklist && typeof meta.checklist === 'object' ? meta.checklist : {}) as Record<string, boolean>;
     const progressPills: string[] = [];
-    if (chk.grafikaDoTisku) progressPills.push('Grafika');
+    if (hasOffer && !isConfirmed) progressPills.push('Nabídka');
+    if (chk.planPrace) progressPills.push('Plán');
+    if (chk.grafikaDoTisku || chk.grafikaOdKlienta) progressPills.push('Grafika');
     if (chk.vytisteno) progressPills.push('Tisk');
     if (chk.instalace) progressPills.push('Instalace');
-    if (chk.nahranaFtd) progressPills.push('FTD');
-    if (chk.odeslFakt) progressPills.push('Faktura');
-    const checklistProgress = progressPills.length ? progressPills.join(' · ') : 'Zadání';
+    if (chk.nahranaFtd || chk.odeslFtd) progressPills.push('FTD');
+    if (chk.odeslFakt || chk.fakturace) progressPills.push('Faktura');
+    const checklistProgress = progressPills.length
+      ? progressPills.join(' · ')
+      : isConfirmed
+      ? 'Potvrzeno'
+      : hasOffer
+      ? 'Nabídka odeslána'
+      : 'Rozpracováno';
+
+    const rawSteps = [
+      {
+        key: 'offer',
+        label: 'Nabídka',
+        done: Boolean(hasOffer || isConfirmed || chk.planPrace || chk.vytisteno || isCompletedOrder),
+      },
+      {
+        key: 'confirmed',
+        label: 'Potvrzeno',
+        done: Boolean(isConfirmed),
+      },
+      {
+        key: 'plan',
+        label: 'Plán & FTD',
+        done: Boolean(chk.planPrace || chk.slozkaFtd || isCompletedOrder),
+      },
+      {
+        key: 'print',
+        label: 'Grafika & Tisk',
+        done: Boolean(chk.grafikaOdKlienta || chk.grafikaDoTisku || chk.vytisteno || isCompletedOrder),
+      },
+      {
+        key: 'install',
+        label: 'Instalace',
+        done: Boolean(chk.instalace || chk.nahranaFtd || chk.odeslFtd || isCompletedOrder),
+      },
+      {
+        key: 'invoice',
+        label: 'FTD & Faktura',
+        done: Boolean(chk.odeslFakt || chk.fakturace || isCompletedOrder),
+      },
+    ];
+
+    let foundFirstUndone = false;
+    const workflowSteps: SalesOrderWorkflowStep[] = rawSteps.map((s) => {
+      if (!s.done && !foundFirstUndone) {
+        foundFirstUndone = true;
+        return { ...s, active: true };
+      }
+      return { ...s, active: false };
+    });
+
+    const doneStepsCount = workflowSteps.filter((s) => s.done).length;
+    const progressPct = isCompletedOrder
+      ? 100
+      : Math.max(10, Math.round((doneStepsCount / workflowSteps.length) * 100));
+
+    let currentStageLabel = 'Rozpracováno';
+    let nextActionLabel = 'Odeslat nabídku a domluvit kampaň';
+    if (isCompletedOrder) {
+      currentStageLabel = 'Hotová zakázka';
+      nextActionLabel = 'Dokončeno ✓';
+    } else if (chk.instalace) {
+      currentStageLabel = 'Po montáži';
+      nextActionLabel = chk.nahranaFtd ? 'Odeslat FTD a vystavit fakturu' : 'Nahrát fotodokumentaci (FTD) a fakturovat';
+    } else if (chk.vytisteno) {
+      currentStageLabel = 'Vytištěno';
+      nextActionLabel = 'Provést instalaci v terénu';
+    } else if (chk.grafikaDoTisku || chk.grafikaOdKlienta) {
+      currentStageLabel = 'Grafika v přípravě';
+      nextActionLabel = chk.grafikaDoTisku ? 'Potvrdit vytištění' : 'Předat grafiku do tisku';
+    } else if (isConfirmed) {
+      currentStageLabel = 'Potvrzená kampaň';
+      nextActionLabel = !chk.planPrace ? 'Zapsat do Plánu práce a založit FTD' : 'Získat grafiku od klienta';
+    } else if (hasOffer) {
+      currentStageLabel = 'Nabídka odeslána';
+      nextActionLabel = 'Čeká na potvrzení klienta a termín kampaně';
+    }
 
     bySalesperson[spCode].activeOrders.push({
       id: o.id,
       orderNumber: o.orderNumber,
       title: o.title,
-      clientName: o.client?.name || 'Klient',
+      clientName: clientNameRaw || 'Klient',
       carrierTypeLabel,
+      rawCarrier,
       period,
       isConfirmed,
+      isCompletedOrder,
+      hasOffer,
+      orderCode,
+      contactPerson,
+      contactDetail,
       dateFromStr: o.dateFrom ? o.dateFrom.toISOString().slice(0, 10) : null,
       dateToStr: o.dateTo ? o.dateTo.toISOString().slice(0, 10) : null,
-      status: o.status,
+      status: isCompletedOrder ? 'COMPLETED' : o.status,
       checklistProgress,
+      progressPct,
+      currentStageLabel,
+      nextActionLabel,
+      workflowSteps,
     });
   }
 
