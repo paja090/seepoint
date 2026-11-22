@@ -1546,7 +1546,7 @@ export async function buildNavigationAgencyExportZip(
     const pt = sourcePoints[i];
     const index1 = i + 1;
     const code = formatExportPointCode(index1);
-    const designation = formatNavigationPointDesignation(pt, i);
+    const designation = formatNavigationPointDesignation(pt, i, { audience: 'CLIENT' });
     const pinVisual = getPointPinVisual(pt);
 
     const matchedTarget =

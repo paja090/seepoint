@@ -2,9 +2,17 @@ import { GalleryHorizontalEnd } from 'lucide-react';
 import type { OfferView } from '@/lib/offers/view-model';
 import { NavigationOfferPublicView } from './NavigationOfferPublicView';
 
-export function SpecializedOfferSummary({ offer, proposalKey }: { offer: OfferView; proposalKey?: string }) {
+export function SpecializedOfferSummary({
+  offer,
+  proposalKey,
+  variant = 'public',
+}: {
+  offer: OfferView;
+  proposalKey?: string;
+  variant?: 'internal' | 'public';
+}) {
   if (offer.offerType === 'NAVIGATION' && offer.navigation) {
-    return <NavigationOfferPublicView offer={offer} proposalKey={proposalKey} />;
+    return <NavigationOfferPublicView offer={offer} proposalKey={proposalKey} variant={variant} />;
   }
   if (offer.offerType === 'CITY_GALLERY') {
     return (

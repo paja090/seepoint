@@ -293,6 +293,7 @@ export function NavigationMapStep({
             setSelectedPointId(pt.id);
           }}
           onUpdatePoint={handleUpdatePoint}
+          onAdoptLocation={onPointMove}
           onOpenVisualizer={onOpenVisualizer}
         />
       )}

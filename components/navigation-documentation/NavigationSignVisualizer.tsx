@@ -2,8 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Check, Upload, X } from 'lucide-react';
+import {
+  arrowCharToDirectionEnum,
+  type NavigationSignTheme,
+  type NavigationVisualizationConfig,
+} from '@/lib/offers/navigation-carrier-types';
 
-type SignTheme = 'dark' | 'blue' | 'green' | 'yellow' | 'red';
+type SignTheme = NavigationSignTheme;
+
+export type SignVisualizerSyncedFields = {
+  distanceText: string;
+  arrowDirectionEnum: string;
+};
 
 function getArrowChar(arrowEnum?: string): string {
   switch (arrowEnum) {
@@ -37,6 +47,8 @@ export function NavigationSignVisualizer({
   arrowDirectionEnum,
   orientation,
   initialPhotoUrl,
+  initialConfig,
+  isDistanceConfirmed,
   onClose,
   onSaveVisualization,
 }: {
@@ -47,29 +59,39 @@ export function NavigationSignVisualizer({
   arrowDirectionEnum?: string;
   orientation?: string;
   initialPhotoUrl?: string | null;
+  initialConfig?: NavigationVisualizationConfig | null;
+  isDistanceConfirmed?: boolean;
   onClose: () => void;
-  onSaveVisualization: (dataUrl: string) => void;
+  onSaveVisualization: (
+    dataUrl: string,
+    config?: NavigationVisualizationConfig,
+    syncedFields?: SignVisualizerSyncedFields
+  ) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
+  const hasExplicitPositionRef = useRef(Boolean(initialConfig));
+  const initialConfigRef = useRef(initialConfig ?? null);
 
-  // Sign properties
-  const [signText, setSignText] = useState(initialSignText || 'NÁZEV ZNAČKY');
-  const [subText, setSubText] = useState(initialSubText || 'Směrová tabule');
-  const [distanceText, setDistanceText] = useState(initialDistanceText || '1,1 km');
+  // Sign properties (preserve previously customized brand/subText while always using latest point distance & arrow)
+  const [signText, setSignText] = useState(initialConfig?.signText || initialSignText || 'NÁZEV ZNAČKY');
+  const [subText, setSubText] = useState(
+    initialConfig?.subText !== undefined ? initialConfig.subText : (initialSubText || 'Směrová tabule')
+  );
+  const [distanceText, setDistanceText] = useState(initialDistanceText || '');
   const [arrow, setArrow] = useState(getArrowChar(arrowDirectionEnum || (orientation?.includes('vlevo') ? 'LEFT' : orientation?.includes('rovně') ? 'STRAIGHT' : 'RIGHT')));
-  const [theme, setTheme] = useState<SignTheme>('dark');
+  const [theme, setTheme] = useState<SignTheme>(initialConfig?.theme || 'dark');
 
-  // Sign position & size overlay on canvas
-  const [signX, setSignX] = useState(250);
-  const [signY, setSignY] = useState(180);
-  const [signScale, setSignScale] = useState(1.0);
-  const [signRotation, setSignRotation] = useState(0);
-  const [mountType, setMountType] = useState<'pole' | 'ground_pole'>('pole');
+  // Sign position & size overlay on canvas — restored from saved visualizationConfig so text/distance edits keep exact geometry
+  const [signX, setSignX] = useState(initialConfig?.signX ?? 250);
+  const [signY, setSignY] = useState(initialConfig?.signY ?? 180);
+  const [signScale, setSignScale] = useState(initialConfig?.signScale ?? 1.0);
+  const [signRotation, setSignRotation] = useState(initialConfig?.signRotation ?? 0);
+  const [mountType, setMountType] = useState<'pole' | 'ground_pole'>(initialConfig?.mountType ?? 'pole');
   // 'right' = brackets on right edge of sign (sign mounted to the left of the pole)
   // 'left' = brackets on left edge of sign (sign mounted to the right of the pole)
-  const [mountSide, setMountSide] = useState<'right' | 'left'>('right');
-  const [mirrorGraphic, setMirrorGraphic] = useState(false);
+  const [mountSide, setMountSide] = useState<'right' | 'left'>(initialConfig?.mountSide ?? 'right');
+  const [mirrorGraphic, setMirrorGraphic] = useState(Boolean(initialConfig?.mirrorGraphic));
 
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ offsetX: 0, offsetY: 0 });
@@ -85,8 +107,26 @@ export function NavigationSignVisualizer({
     }
     img.onload = () => {
       setBgImage(img);
-      setSignX(img.width ? img.width / 2 : 400);
-      setSignY(img.height ? img.height / 2 : 300);
+      const w = img.width || 800;
+      const h = img.height || 600;
+      const saved = initialConfigRef.current;
+      if (saved) {
+        // Restore exact saved sign position (scaling proportionally only if photo dimensions changed)
+        const restoredX =
+          saved.canvasWidth && saved.canvasWidth !== w && saved.signXRatio !== undefined
+            ? saved.signXRatio * w
+            : saved.signX;
+        const restoredY =
+          saved.canvasHeight && saved.canvasHeight !== h && saved.signYRatio !== undefined
+            ? saved.signYRatio * h
+            : saved.signY;
+        setSignX(Math.max(20, Math.min(w - 20, restoredX)));
+        setSignY(Math.max(20, Math.min(h - 20, restoredY)));
+        hasExplicitPositionRef.current = true;
+      } else if (!hasExplicitPositionRef.current) {
+        setSignX(w / 2);
+        setSignY(h / 2);
+      }
     };
     img.onerror = (err) => {
       console.error('Visualizer photo load error:', err);
@@ -129,6 +169,7 @@ export function NavigationSignVisualizer({
 
     const handleWindowMove = (e: MouseEvent | TouchEvent) => {
       const coords = getCanvasCoords(e);
+      hasExplicitPositionRef.current = true;
       setSignX(coords.x - dragStart.offsetX);
       setSignY(coords.y - dragStart.offsetY);
     };
@@ -150,7 +191,7 @@ export function NavigationSignVisualizer({
     };
   }, [isDragging, dragStart]);
 
-  // Handle custom photo upload
+  // Handle custom photo upload (preserve relative position if user already positioned the sign)
   function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -158,9 +199,18 @@ export function NavigationSignVisualizer({
     reader.onload = (event) => {
       const img = new Image();
       img.onload = () => {
+        const prevW = canvasRef.current?.width || 800;
+        const prevH = canvasRef.current?.height || 600;
         setBgImage(img);
-        setSignX(img.width / 2);
-        setSignY(img.height / 2);
+        if (hasExplicitPositionRef.current && prevW > 0 && prevH > 0) {
+          const ratioX = Math.max(0.05, Math.min(0.95, signX / prevW));
+          const ratioY = Math.max(0.05, Math.min(0.95, signY / prevH));
+          setSignX(ratioX * img.width);
+          setSignY(ratioY * img.height);
+        } else {
+          setSignX(img.width / 2);
+          setSignY(img.height / 2);
+        }
       };
       img.src = event.target?.result as string;
     };
@@ -336,7 +386,28 @@ export function NavigationSignVisualizer({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-    onSaveVisualization(dataUrl);
+    const canvasWidth = canvas.width || 800;
+    const canvasHeight = canvas.height || 600;
+    const savedConfig: NavigationVisualizationConfig = {
+      signX: Math.round(signX * 10) / 10,
+      signY: Math.round(signY * 10) / 10,
+      signXRatio: Math.round(Math.max(0, Math.min(1, signX / canvasWidth)) * 10000) / 10000,
+      signYRatio: Math.round(Math.max(0, Math.min(1, signY / canvasHeight)) * 10000) / 10000,
+      signScale: Math.round(signScale * 1000) / 1000,
+      signRotation: Math.round(signRotation * 10) / 10,
+      mountType,
+      mountSide,
+      mirrorGraphic,
+      theme,
+      signText: signText.trim() || undefined,
+      subText: subText.trim(),
+      canvasWidth,
+      canvasHeight,
+    };
+    onSaveVisualization(dataUrl, savedConfig, {
+      distanceText: distanceText.trim(),
+      arrowDirectionEnum: arrowCharToDirectionEnum(arrow),
+    });
   }
 
   return (
@@ -349,7 +420,14 @@ export function NavigationSignVisualizer({
               🎨
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Foto-vizualizátor navigační cedule SeePOINT</h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-bold text-white">Foto-vizualizátor navigační cedule SeePOINT</h2>
+                {initialConfig && (
+                  <span className="rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300">
+                    ✓ Zachována uložená poloha a velikost ({Math.round(signScale * 100)} %)
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-400">Vložení navigační cedule do fotky pro bod: {pointLabel}</p>
             </div>
           </div>
@@ -369,19 +447,21 @@ export function NavigationSignVisualizer({
               onMouseDown={(e) => {
                 e.preventDefault();
                 const coords = getCanvasCoords(e);
+                hasExplicitPositionRef.current = true;
                 setIsDragging(true);
                 setDragStart({ offsetX: coords.x - signX, offsetY: coords.y - signY });
               }}
               onTouchStart={(e) => {
                 e.preventDefault();
                 const coords = getCanvasCoords(e);
+                hasExplicitPositionRef.current = true;
                 setIsDragging(true);
                 setDragStart({ offsetX: coords.x - signX, offsetY: coords.y - signY });
               }}
             />
 
             <div className="absolute bottom-6 left-6 rounded-xl bg-slate-900/90 border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 pointer-events-none">
-              💡 Tip: Uchopte ceduli myší/prstem a přesuňte ji na sloup, nebo použijte tlačítka posunu vpravo.
+              💡 Tip: Změna textu nebo vzdálenosti zachová přesnou polohu a velikost cedule na sloupu.
             </div>
           </div>
 
@@ -416,8 +496,20 @@ export function NavigationSignVisualizer({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-400 mb-1">Vzdálenost (km / m)</label>
-                <input className="input text-xs bg-slate-800 border-slate-700 text-white" value={distanceText} onChange={(e) => setDistanceText(e.target.value)} />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-400">Vzdálenost (km / m)</label>
+                  {isDistanceConfirmed ? (
+                    <span className="text-[10px] font-bold text-emerald-400">✓ Potvrzená vzdálenost</span>
+                  ) : (
+                    <span className="text-[10px] font-semibold text-amber-300">Při uložení se potvrdí do nabídky</span>
+                  )}
+                </div>
+                <input
+                  className="input text-xs bg-slate-800 border-slate-700 text-white"
+                  placeholder="např. 350 m nebo 1,2 km"
+                  value={distanceText}
+                  onChange={(e) => setDistanceText(e.target.value)}
+                />
               </div>
 
               <div>
@@ -591,7 +683,10 @@ export function NavigationSignVisualizer({
                 <div className="flex flex-col items-center gap-1.5 bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
                   <button
                     type="button"
-                    onClick={() => setSignY((y) => y - 15)}
+                    onClick={() => {
+                      hasExplicitPositionRef.current = true;
+                      setSignY((y) => y - 15);
+                    }}
                     className="px-3.5 py-1.5 bg-slate-800 hover:bg-sky-600 rounded-xl text-xs font-bold text-white transition active:scale-95 cursor-pointer"
                   >
                     ▲ Nahoru
@@ -599,7 +694,10 @@ export function NavigationSignVisualizer({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setSignX((x) => x - 15)}
+                      onClick={() => {
+                        hasExplicitPositionRef.current = true;
+                        setSignX((x) => x - 15);
+                      }}
                       className="px-3.5 py-1.5 bg-slate-800 hover:bg-sky-600 rounded-xl text-xs font-bold text-white transition active:scale-95 cursor-pointer"
                     >
                       ◀ Vlevo
@@ -608,6 +706,7 @@ export function NavigationSignVisualizer({
                       type="button"
                       onClick={() => {
                         if (canvasRef.current) {
+                          hasExplicitPositionRef.current = true;
                           setSignX(canvasRef.current.width / 2);
                           setSignY(canvasRef.current.height / 2);
                         }
@@ -619,7 +718,10 @@ export function NavigationSignVisualizer({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setSignX((x) => x + 15)}
+                      onClick={() => {
+                        hasExplicitPositionRef.current = true;
+                        setSignX((x) => x + 15);
+                      }}
                       className="px-3.5 py-1.5 bg-slate-800 hover:bg-sky-600 rounded-xl text-xs font-bold text-white transition active:scale-95 cursor-pointer"
                     >
                       Vpravo ▶
@@ -627,7 +729,10 @@ export function NavigationSignVisualizer({
                   </div>
                   <button
                     type="button"
-                    onClick={() => setSignY((y) => y + 15)}
+                    onClick={() => {
+                      hasExplicitPositionRef.current = true;
+                      setSignY((y) => y + 15);
+                    }}
                     className="px-3.5 py-1.5 bg-slate-800 hover:bg-sky-600 rounded-xl text-xs font-bold text-white transition active:scale-95 cursor-pointer"
                   >
                     ▼ Dolů

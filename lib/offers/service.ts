@@ -467,6 +467,9 @@ export function serializeOffer(row: OfferRow, options: { publicToken?: string; p
           installedPhotoId: effectiveInstalledPhotoId,
           installedPhotoUrl: installedUrl,
           visualizedPhotoUrl: visualizedUrl,
+          visualizationConfig: point.visualizationConfig && typeof point.visualizationConfig === 'object' && !Array.isArray(point.visualizationConfig)
+            ? (point.visualizationConfig as import('./navigation-carrier-types').NavigationVisualizationConfig)
+            : null,
 
           // Structured Navigation fields
           targetLatitude: point.targetLatitude,

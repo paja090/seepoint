@@ -21,6 +21,8 @@ import {
   NAVIGATION_CARRIER_TYPES,
   CARRIER_PIN_COLORS,
   getPointPinVisual,
+  formatNavigationPointDesignation,
+  formatCalculatedDistanceForInput,
 } from '@/lib/offers/navigation-carrier-types';
 import { toPhotoThumbnailUrl } from '@/lib/photo-url';
 import { formatNavigationDistance } from '@/lib/ai-offers/route-direction-helper';
@@ -218,68 +220,121 @@ export function NavigationPointDrawer({
             )}
           </div>
 
-          {/* Vzdálenost */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-800">Vzdálenost do cíle</span>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-slate-500">
-                  Google auto: <strong>{point.calculatedDistanceMeters ? formatNavigationDistance(point.calculatedDistanceMeters) : '—'}</strong>
-                </span>
-                {onRecalculateRoute && (
+          {/* Vzdálenost – Potvrzená pro klienta vs. Interní výpočet z mapy */}
+          {(() => {
+            const clientPreview = formatNavigationPointDesignation(point, 0, { audience: 'CLIENT' });
+            const suggestedFromMap = formatCalculatedDistanceForInput(point.calculatedDistanceMeters);
+            return (
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-slate-800">Vzdálenost do cíle</span>
+                    {isManualActive ? (
+                      <span className="rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 text-[10px] font-black">
+                        ✓ Potvrzeno pro klienta
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 text-[10px] font-bold">
+                        Nepotvrzeno (skryto klientovi)
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-slate-500">
+                      Interní mapa: <strong>{point.calculatedDistanceMeters ? formatNavigationDistance(point.calculatedDistanceMeters) : '—'}</strong>
+                    </span>
+                    {onRecalculateRoute && (
+                      <button
+                        type="button"
+                        onClick={() => void onRecalculateRoute(point.id)}
+                        title="Přepočítat interní trasu a vzdálenost přes Google Routes"
+                        className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1 cursor-pointer"
+                      >
+                        <RefreshCw size={11} className="text-sky-600" />
+                        <span>Přepočítat</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {suggestedFromMap && !isManualActive && (
                   <button
                     type="button"
-                    onClick={() => void onRecalculateRoute(point.id)}
-                    title="Přepočítat trasu a vzdálenost přes Google Routes"
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-700 hover:bg-slate-100 transition flex items-center gap-1 cursor-pointer"
+                    onClick={() =>
+                      onUpdatePoint(point.id, {
+                        manualDistanceValue: suggestedFromMap.value,
+                        manualDistanceUnit: suggestedFromMap.unit,
+                        distanceSource: 'MANUAL',
+                      })
+                    }
+                    className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-[11px] font-black transition cursor-pointer"
                   >
-                    <RefreshCw size={11} className="text-sky-600" />
-                    <span>Přepočítat</span>
+                    ✓ Potvrdit vzdálenost z mapy pro klienta ({suggestedFromMap.value} {suggestedFromMap.unit === 'KILOMETERS' ? 'km' : 'm'})
                   </button>
                 )}
-              </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">
-                  Ruční hodnota vzdálenosti
-                </label>
-                <input
-                  type="text"
-                  className={`input text-xs ${isManualActive ? 'border-amber-400 bg-amber-50/40 text-amber-950 font-bold' : ''}`}
-                  placeholder={point.calculatedDistanceMeters ? `${point.calculatedDistanceMeters}` : 'např. 350'}
-                  value={point.manualDistanceValue || ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const numStr = val.trim().replace(',', '.').replace(/[^0-9.]/g, '');
-                    onUpdatePoint(point.id, {
-                      manualDistanceValue: val,
-                      distanceSource: numStr && Number(numStr) > 0 ? 'MANUAL' : 'CALCULATED',
-                    });
-                  }}
-                />
-              </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                      Potvrzená vzdálenost pro klienta
+                    </label>
+                    <input
+                      type="text"
+                      className={`input text-xs ${isManualActive ? 'border-emerald-400 bg-emerald-50/40 text-emerald-950 font-bold' : ''}`}
+                      placeholder={suggestedFromMap ? `např. ${suggestedFromMap.value}` : 'např. 350'}
+                      value={point.manualDistanceValue || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const numStr = val.trim().replace(',', '.').replace(/[^0-9.]/g, '');
+                        onUpdatePoint(point.id, {
+                          manualDistanceValue: val,
+                          distanceSource: numStr && Number(numStr) > 0 ? 'MANUAL' : 'CALCULATED',
+                        });
+                      }}
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">
-                  Jednotka
-                </label>
-                <select
-                  className="input text-xs font-semibold"
-                  value={point.manualDistanceUnit || 'METERS'}
-                  onChange={(e) =>
-                    onUpdatePoint(point.id, {
-                      manualDistanceUnit: e.target.value as 'METERS' | 'KILOMETERS',
-                    })
-                  }
-                >
-                  <option value="METERS">Metry (m)</option>
-                  <option value="KILOMETERS">Kilometry (km)</option>
-                </select>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                      Jednotka
+                    </label>
+                    <select
+                      className="input text-xs font-semibold"
+                      value={point.manualDistanceUnit || 'METERS'}
+                      onChange={(e) =>
+                        onUpdatePoint(point.id, {
+                          manualDistanceUnit: e.target.value as 'METERS' | 'KILOMETERS',
+                        })
+                      }
+                    >
+                      <option value="METERS">Metry (m)</option>
+                      <option value="KILOMETERS">Kilometry (km)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="rounded-lg bg-white border border-slate-200 px-2.5 py-1.5 text-[11px] flex items-center justify-between gap-2">
+                  <span className="text-slate-500">
+                    Popisek v nabídce: <strong className="text-slate-900">{clientPreview.fullTitle.replace(/^P1 – /, '')}</strong>
+                  </span>
+                  {isManualActive && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onUpdatePoint(point.id, {
+                          manualDistanceValue: '',
+                          distanceSource: 'CALCULATED',
+                        })
+                      }
+                      className="text-[10px] font-semibold text-slate-400 hover:text-rose-600 cursor-pointer shrink-0"
+                    >
+                      Zrušit potvrzení
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
         </div>
 
         {/* Sekce 2: Navigační parametry a nosič */}

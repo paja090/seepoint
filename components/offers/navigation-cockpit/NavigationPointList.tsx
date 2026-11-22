@@ -14,8 +14,7 @@ import {
   Eye,
 } from 'lucide-react';
 import type { DraftPoint, DraftTarget } from './types';
-import { getPointPinVisual } from '@/lib/offers/navigation-carrier-types';
-import { formatNavigationDistance } from '@/lib/ai-offers/route-direction-helper';
+import { getPointPinVisual, formatNavigationPointDesignation } from '@/lib/offers/navigation-carrier-types';
 
 interface NavigationPointListProps {
   points: DraftPoint[];
@@ -60,12 +59,7 @@ export function NavigationPointList({
         const isSelected = selectedPointId === pt.id;
         const vis = getPointPinVisual(pt);
         const assignedTarget = targets.find((t) => t.id === pt.targetId) || targets[0];
-
-        const distText = pt.distanceSource === 'MANUAL' && pt.manualDistanceValue?.trim()
-          ? `${pt.manualDistanceValue.trim()} ${pt.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm'} (ručně)`
-          : pt.calculatedDistanceMeters
-          ? formatNavigationDistance(pt.calculatedDistanceMeters)
-          : null;
+        const desig = formatNavigationPointDesignation(pt, index, { audience: 'INTERNAL' });
 
         const hasPhoto = Boolean(pt.sitePhotoUrl || pt.visualizedPhotoUrl);
 
@@ -79,7 +73,7 @@ export function NavigationPointList({
                 : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60'
             }`}
           >
-            {/* Top row: Order, label, carrier chip */}
+            {/* Top row: Order, unified designation, carrier chip */}
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <span
@@ -91,7 +85,7 @@ export function NavigationPointList({
 
                 <div className="min-w-0 flex-1">
                   <h4 className="text-xs font-extrabold text-slate-900 truncate">
-                    {pt.label}
+                    {desig.fullTitle}
                   </h4>
                   {pt.address && (
                     <p className="text-[10px] text-slate-500 truncate">{pt.address}</p>
@@ -114,12 +108,17 @@ export function NavigationPointList({
 
             {/* Middle row: Routing and metadata */}
             <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-slate-600">
-              {distText && (
-                <span className="font-semibold text-slate-700 flex items-center gap-1">
-                  <Compass size={11} className="text-sky-600" />
-                  <span>{distText}</span>
+              {desig.isDistanceConfirmed ? (
+                <span className="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.2 flex items-center gap-1">
+                  <Compass size={11} className="text-emerald-600" />
+                  <span>✓ {desig.confirmedDistance}</span>
                 </span>
-              )}
+              ) : desig.calculatedDistance ? (
+                <span className="font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.2 flex items-center gap-1" title="Automatický výpočet z mapy (zatím nepotvrzeno pro klienta)">
+                  <Compass size={11} className="text-amber-600" />
+                  <span>Mapa: {desig.calculatedDistance} (nepotvrzeno)</span>
+                </span>
+              ) : null}
 
               {assignedTarget && targets.length > 1 && (
                 <span className="text-[10px] font-semibold text-slate-500 truncate max-w-[120px]">

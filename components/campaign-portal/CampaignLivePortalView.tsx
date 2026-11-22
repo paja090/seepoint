@@ -65,6 +65,16 @@ function formatArrowText(direction?: string | null): string {
       return '➡️ Doprava';
     case 'LEFT':
       return '⬅️ Doleva';
+    case 'STRAIGHT_LEFT':
+      return '⬆️⬅️ Rovně a vlevo';
+    case 'STRAIGHT_RIGHT':
+      return '⬆️➡️ Rovně a vpravo';
+    case 'LEFT_STRAIGHT':
+      return '⬅️⬆️ Vlevo a rovně';
+    case 'RIGHT_STRAIGHT':
+      return '➡️⬆️ Vpravo a rovně';
+    case 'LEFT_RIGHT':
+      return '⬅️➡️ Vlevo i vpravo';
     case 'SLANTED_RIGHT':
     case 'SLIGHT_RIGHT':
       return '↗️ Šikmo vpravo';
@@ -96,15 +106,9 @@ function formatArrowText(direction?: string | null): string {
 }
 
 function formatDistanceText(point: { distanceSource?: string | null; manualDistanceValue?: number | null; manualDistanceUnit?: string | null; calculatedDistanceMeters?: number | null }): string {
-  if (point.distanceSource === 'MANUAL' && point.manualDistanceValue) {
+  if (point.distanceSource !== 'CALCULATED' && point.manualDistanceValue && Number(point.manualDistanceValue) > 0) {
     const unit = point.manualDistanceUnit === 'KILOMETERS' ? 'km' : 'm';
     return `${point.manualDistanceValue} ${unit} od cíle`;
-  }
-  if (typeof point.calculatedDistanceMeters === 'number') {
-    if (point.calculatedDistanceMeters >= 1000) {
-      return `${(point.calculatedDistanceMeters / 1000).toFixed(1).replace('.', ',')} km od cíle`;
-    }
-    return `${point.calculatedDistanceMeters} m od cíle`;
   }
   return '';
 }
@@ -556,7 +560,7 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
         }> = [];
 
         if (point.installedPhotoUrl) {
-          const desig = formatNavigationPointDesignation(point, idx);
+          const desig = formatNavigationPointDesignation(point, idx, { audience: 'CLIENT' });
           const visual = getPointPinVisual(point);
           list.push({
             id: `install-${point.id}`,
@@ -1124,7 +1128,7 @@ export function CampaignLivePortalView({ offer, publicToken }: Props) {
                     const isPointInstalled = point.status === 'INSTALLED' || Boolean(point.installedPhotoUrl);
                     const arrowText = formatArrowText(point.arrowDirectionEnum);
                     const distText = formatDistanceText(point);
-                    const desig = formatNavigationPointDesignation(point, idx);
+                    const desig = formatNavigationPointDesignation(point, idx, { audience: 'CLIENT' });
                     const visual = getPointPinVisual(point);
                     const rawVariant = point.variant || (offer.navigation?.city === 'Havířov' ? 'Havířov – atyp s horním půlkruhem' : '670 × 900 mm');
                     const panelVariant = rawVariant === '670x900 mm' ? '670 × 900 mm' : rawVariant === '120x80 cm' ? '120 × 80 cm' : rawVariant;

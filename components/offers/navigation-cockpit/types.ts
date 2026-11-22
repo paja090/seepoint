@@ -87,6 +87,7 @@ export type DraftPoint = {
   sitePhotoId?: string;
   sitePhotoUrl?: string;
   visualizedPhotoUrl?: string;
+  visualizationConfig?: import('@/lib/offers/navigation-carrier-types').NavigationVisualizationConfig | null;
   color?: string;
   isSelectedByClient?: boolean;
 };

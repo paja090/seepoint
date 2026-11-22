@@ -17,7 +17,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import type { DraftPoint } from './types';
-import { getPointPinVisual } from '@/lib/offers/navigation-carrier-types';
+import { getPointPinVisual, haversineDistanceMeters } from '@/lib/offers/navigation-carrier-types';
 
 interface NavigationStreetViewModalProps {
   point: DraftPoint | null;
@@ -25,6 +25,7 @@ interface NavigationStreetViewModalProps {
   onClose: () => void;
   onSelectPoint: (point: DraftPoint) => void;
   onUpdatePoint: (id: string, updates: Partial<DraftPoint>) => void;
+  onAdoptLocation?: (id: string, lat: number, lng: number) => Promise<void> | void;
   onOpenVisualizer?: (pointId: string) => void;
   apiKey?: string;
 }
@@ -35,6 +36,7 @@ export function NavigationStreetViewModal({
   onClose,
   onSelectPoint,
   onUpdatePoint,
+  onAdoptLocation,
   onOpenVisualizer,
   apiKey,
 }: NavigationStreetViewModalProps) {
@@ -46,6 +48,9 @@ export function NavigationStreetViewModal({
   const [capturing, setCapturing] = useState(false);
   const [captureSuccessMsg, setCaptureSuccessMsg] = useState('');
   const [capturePreviewUrl, setCapturePreviewUrl] = useState<string | null>(null);
+  const [liveSvCoords, setLiveSvCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [adoptingLocation, setAdoptingLocation] = useState(false);
+  const [adoptSuccessMsg, setAdoptSuccessMsg] = useState('');
 
   const effectiveApiKey =
     apiKey ||
@@ -69,6 +74,49 @@ export function NavigationStreetViewModal({
       onSelectPoint(points[currentIndex + 1]);
     }
   }, [hasNext, currentIndex, points, onSelectPoint]);
+
+  const readCurrentPanoramaCoords = useCallback((): { lat: number; lng: number } | null => {
+    const pano = panoramaRef.current as {
+      getPosition?: () => { lat: () => number; lng: () => number } | null;
+    } | null;
+    const pos = pano?.getPosition?.();
+    if (!pos) return liveSvCoords;
+    const lat = pos.lat?.();
+    const lng = pos.lng?.();
+    if (typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng)) {
+      return { lat, lng };
+    }
+    return liveSvCoords;
+  }, [liveSvCoords]);
+
+  const handleAdoptStreetViewLocation = useCallback(async () => {
+    if (!point || adoptingLocation) return;
+    const coords = readCurrentPanoramaCoords();
+    if (!coords) {
+      setErrorMessage('Nepodařilo se načíst aktuální souřadnice ze Street View.');
+      return;
+    }
+
+    setAdoptingLocation(true);
+    setAdoptSuccessMsg('');
+    setErrorMessage('');
+    try {
+      if (onAdoptLocation) {
+        await onAdoptLocation(point.id, coords.lat, coords.lng);
+      } else {
+        onUpdatePoint(point.id, { latitude: coords.lat, longitude: coords.lng });
+      }
+      setAdoptSuccessMsg(
+        `✓ Poloha ze Street View (${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}) byla převzata do bodu na mapě.`
+      );
+      setSavedBadge(true);
+      setTimeout(() => setSavedBadge(false), 2500);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Převzetí polohy ze Street View selhalo.');
+    } finally {
+      setAdoptingLocation(false);
+    }
+  }, [point, adoptingLocation, readCurrentPanoramaCoords, onAdoptLocation, onUpdatePoint]);
 
   const handleCaptureSnapshot = useCallback(async () => {
     if (!point || capturing) return;
@@ -144,6 +192,10 @@ export function NavigationStreetViewModal({
     if (!point || !containerRef.current) return;
     setStatus('loading');
     setErrorMessage('');
+    setAdoptSuccessMsg('');
+    setLiveSvCoords(null);
+
+    let positionListener: { remove?: () => void } | null = null;
 
     // Function to attach StreetView once google.maps is ready
     const initPanorama = () => {
@@ -158,7 +210,10 @@ export function NavigationStreetViewModal({
         StreetViewService?: new () => {
           getPanorama: (
             request: { location: { lat: number; lng: number }; radius: number },
-            callback: (data: { location?: { pano?: string; latLng?: unknown } } | null, status: string) => void
+            callback: (
+              data: { location?: { pano?: string; latLng?: { lat: () => number; lng: () => number } } } | null,
+              status: string
+            ) => void
           ) => void;
         };
       }).StreetViewService;
@@ -171,6 +226,8 @@ export function NavigationStreetViewModal({
           setPano: (pano: string) => void;
           setPosition: (pos: { lat: number; lng: number }) => void;
           setVisible: (visible: boolean) => void;
+          getPosition?: () => { lat: () => number; lng: () => number } | null;
+          addListener?: (eventName: string, handler: () => void) => { remove?: () => void };
         };
       }).StreetViewPanorama;
 
@@ -203,9 +260,33 @@ export function NavigationStreetViewModal({
           const pano = panoramaRef.current as {
             setPano: (pano: string) => void;
             setVisible: (v: boolean) => void;
+            getPosition?: () => { lat: () => number; lng: () => number } | null;
+            addListener?: (eventName: string, handler: () => void) => { remove?: () => void };
           };
           pano.setPano(data.location.pano);
           pano.setVisible(true);
+
+          const syncCoords = () => {
+            const pPos = pano.getPosition?.();
+            if (pPos) {
+              const lat = pPos.lat?.();
+              const lng = pPos.lng?.();
+              if (typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng)) {
+                setLiveSvCoords({ lat, lng });
+              }
+            }
+          };
+
+          if (data.location.latLng) {
+            setLiveSvCoords({
+              lat: data.location.latLng.lat(),
+              lng: data.location.latLng.lng(),
+            });
+          } else {
+            syncCoords();
+          }
+
+          positionListener = pano.addListener?.('position_changed', syncCoords) ?? null;
           setStatus('ready');
         } else {
           setStatus('not_found');
@@ -236,18 +317,28 @@ export function NavigationStreetViewModal({
             initPanorama();
           }
         }, 150);
-        return () => clearInterval(interval);
+        return () => {
+          clearInterval(interval);
+          positionListener?.remove?.();
+        };
       }
     } else {
       setStatus('error');
       setErrorMessage('Klíč k mapám (API klíč) není nakonfigurován.');
     }
+
+    return () => {
+      positionListener?.remove?.();
+    };
   }, [point?.id, point?.latitude, point?.longitude, effectiveApiKey]);
 
   if (!point) return null;
 
   const pinVis = getPointPinVisual(point);
   const directMapsUrl = `https://www.google.com/maps?q=&layer=c&cbll=${point.latitude},${point.longitude}`;
+  const svOffsetMeters = liveSvCoords
+    ? haversineDistanceMeters(point.latitude, point.longitude, liveSvCoords.lat, liveSvCoords.lng)
+    : 0;
 
   const handleFieldChange = (field: keyof DraftPoint, value: unknown) => {
     onUpdatePoint(point.id, { [field]: value });
@@ -326,6 +417,23 @@ export function NavigationStreetViewModal({
                 </button>
               </div>
             )}
+
+            <button
+              type="button"
+              disabled={adoptingLocation || status !== 'ready' || !liveSvCoords}
+              onClick={() => void handleAdoptStreetViewLocation()}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 text-xs font-black shadow-md transition cursor-pointer disabled:opacity-50"
+              title="Převzít aktuální polohu ze Street View přímo do souřadnic bodu na mapě (vč. ulice a přepočtu trasy)"
+            >
+              <MapPin size={14} className={adoptingLocation ? 'animate-pulse' : ''} />
+              <span>
+                {adoptingLocation
+                  ? 'Přebírám…'
+                  : svOffsetMeters >= 3
+                    ? `📍 Převzít polohu (+${svOffsetMeters} m)`
+                    : '📍 Převzít polohu do bodu'}
+              </span>
+            </button>
 
             <button
               type="button"
@@ -439,7 +547,7 @@ export function NavigationStreetViewModal({
               <span className="flex items-center gap-1.5">
                 <Compass size={13} className="text-sky-400 shrink-0" />
                 <span>
-                  <strong>Tip pro práci z kanceláře:</strong> Otáčejte pohled 360°, najděte sloup VO a opište jeho číslo do panelu vpravo.
+                  <strong>Tip:</strong> Posuňte se po ulici v Street View na přesný sloup a klikněte na <strong>Převzít polohu do bodu</strong>.
                 </span>
               </span>
               <span className="hidden sm:inline text-slate-500">
@@ -463,6 +571,47 @@ export function NavigationStreetViewModal({
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold animate-in fade-in">
                   <Check size={11} /> Uloženo
                 </span>
+              )}
+            </div>
+
+            {/* Převzetí polohy ze Street View do bodu na mapě */}
+            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/25 p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-black text-emerald-300 flex items-center gap-1.5">
+                  <MapPin size={13} className="text-emerald-400" />
+                  <span>Poloha ze Street View → bod na mapě</span>
+                </span>
+                {svOffsetMeters >= 3 && (
+                  <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-200 border border-emerald-500/40">
+                    posun {svOffsetMeters} m
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-300 bg-slate-950/70 rounded-xl p-2 border border-slate-800">
+                <div>
+                  <span className="block text-slate-500">Bod na mapě</span>
+                  <span>{point.latitude.toFixed(5)}, {point.longitude.toFixed(5)}</span>
+                </div>
+                <div>
+                  <span className="block text-emerald-400">Aktuální Street View</span>
+                  <span>
+                    {liveSvCoords
+                      ? `${liveSvCoords.lat.toFixed(5)}, ${liveSvCoords.lng.toFixed(5)}`
+                      : 'Načítám…'}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={adoptingLocation || status !== 'ready' || !liveSvCoords}
+                onClick={() => void handleAdoptStreetViewLocation()}
+                className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white py-2 px-3 text-xs font-black transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-xs"
+              >
+                <MapPin size={13} />
+                <span>{adoptingLocation ? 'Aktualizuji polohu a trasu…' : 'Převzít polohu ze Street View do bodu'}</span>
+              </button>
+              {adoptSuccessMsg && (
+                <p className="text-[10px] font-bold text-emerald-300">{adoptSuccessMsg}</p>
               )}
             </div>
 

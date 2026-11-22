@@ -2000,6 +2000,7 @@ model NavigationPoint {
   routeStatus              NavigationRouteStatus?    @default(OK)
   arrowDirectionEnum       NavigationArrowDirection? @default(STRAIGHT)
   visualizedPhotoUrl       String?
+  visualizationConfig      Json?
   isSelectedByClient       Boolean                   @default(true)
 
   createdAt DateTime @default(now())
