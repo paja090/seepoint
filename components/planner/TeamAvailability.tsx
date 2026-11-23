@@ -783,12 +783,20 @@ export function TeamAvailability({
               ))}
             </div>
 
-            <Link
-              href="/orders"
-              className="text-xs font-extrabold text-amber-900 hover:underline"
-            >
-              Otevřít všechny zakázky v CRM →
-            </Link>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href="/offers"
+                className="text-xs font-extrabold text-amber-900 hover:underline"
+              >
+                Otevřít nabídky →
+              </Link>
+              <Link
+                href="/clients"
+                className="text-xs font-extrabold text-slate-700 hover:underline"
+              >
+                Klienti & CRM →
+              </Link>
+            </div>
           </div>
 
           {/* SALESPERSON CARDS */}
@@ -892,6 +900,16 @@ export function TeamAvailability({
                           {visibleOrders.map((order) => {
                             const isDone = Boolean(order.isCompletedOrder || order.status === 'COMPLETED');
                             const pct = order.progressPct ?? (isDone ? 100 : order.isConfirmed ? 50 : 20);
+                            const primaryHref =
+                              order.href ||
+                              (order.offerId
+                                ? `/offers/${encodeURIComponent(order.offerId)}`
+                                : order.clientId
+                                ? `/clients/${encodeURIComponent(order.clientId)}`
+                                : '/offers');
+                            const clientHref =
+                              order.clientHref ||
+                              (order.clientId ? `/clients/${encodeURIComponent(order.clientId)}` : '/clients');
                             const stageTone = isDone
                               ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
                               : order.isConfirmed
@@ -935,7 +953,7 @@ export function TeamAvailability({
                                 {/* TOP ROW: CLIENT NAME + CARRIER BADGE */}
                                 <div className="flex items-start justify-between gap-2">
                                   <Link
-                                    href="/orders"
+                                    href={primaryHref}
                                     className="text-sm font-black text-slate-950 hover:text-amber-800 hover:underline leading-snug break-words"
                                   >
                                     {order.clientName}
@@ -1018,6 +1036,24 @@ export function TeamAvailability({
                                       style={{ width: `${pct}%` }}
                                     />
                                   </div>
+                                </div>
+
+                                {/* QUICK LINKS TO OFFER & CLIENT CARD */}
+                                <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-2 text-[11px] font-extrabold">
+                                  {order.offerId && (
+                                    <Link
+                                      href={`/offers/${encodeURIComponent(order.offerId)}`}
+                                      className="text-amber-800 hover:underline"
+                                    >
+                                      Otevřít nabídku →
+                                    </Link>
+                                  )}
+                                  <Link
+                                    href={clientHref}
+                                    className="text-slate-600 hover:text-slate-900 hover:underline"
+                                  >
+                                    Karta klienta v CRM →
+                                  </Link>
                                 </div>
                               </div>
                             );

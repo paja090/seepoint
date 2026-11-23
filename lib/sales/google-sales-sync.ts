@@ -918,6 +918,10 @@ export type SalespersonCrmSummary = {
     id: string;
     orderNumber: string;
     title: string;
+    clientId?: string;
+    offerId?: string | null;
+    href?: string;
+    clientHref?: string;
     clientName: string;
     carrierTypeLabel: string;
     rawCarrier?: string | null;
@@ -954,18 +958,28 @@ export async function getGoogleSalesSheetSummary(
 ): Promise<GoogleSalesSheetSummary> {
   const client = tx || prisma;
 
-  const orders = await client.crmOrder.findMany({
-    where: {
-      organizationId,
-      clientOrderCode: { startsWith: 'gsheet_sales_' },
-    },
-    include: {
-      client: { select: { name: true, contactPerson: true, email: true, phone: true } },
-      assignedUser: { select: { id: true, name: true, email: true } },
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 150,
-  });
+  const [orders, orgOffers] = await Promise.all([
+    client.crmOrder.findMany({
+      where: {
+        organizationId,
+        clientOrderCode: { startsWith: 'gsheet_sales_' },
+      },
+      include: {
+        client: { select: { name: true, contactPerson: true, email: true, phone: true } },
+        assignedUser: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 150,
+    }),
+    typeof (client as { offer?: { findMany?: unknown } }).offer?.findMany === 'function'
+      ? client.offer.findMany({
+          where: { organizationId, archivedAt: null },
+          select: { id: true, title: true, clientId: true },
+          orderBy: { createdAt: 'desc' },
+          take: 150,
+        })
+      : Promise.resolve([] as Array<{ id: string; title: string; clientId: string }>),
+  ]);
 
   const bySalesperson: Record<string, SalespersonCrmSummary> = {};
 
@@ -1165,10 +1179,26 @@ export async function getGoogleSalesSheetSummary(
       nextActionLabel = 'Čeká na potvrzení klienta a termín kampaně';
     }
 
+    const clientNameNorm = clientNameRaw.trim().toLowerCase();
+    const matchedOffer =
+      (o.offerId ? orgOffers.find((off) => off.id === o.offerId) : null) ||
+      orgOffers.find((off) => off.clientId === o.clientId) ||
+      (clientNameNorm.length >= 3
+        ? orgOffers.find((off) => off.title.toLowerCase().includes(clientNameNorm))
+        : null);
+
+    const matchedOfferId = matchedOffer?.id ?? o.offerId ?? null;
+    const clientHref = o.clientId ? `/clients/${encodeURIComponent(o.clientId)}` : '/clients';
+    const href = matchedOfferId ? `/offers/${encodeURIComponent(matchedOfferId)}` : clientHref;
+
     bySalesperson[spCode].activeOrders.push({
       id: o.id,
       orderNumber: o.orderNumber,
       title: o.title,
+      clientId: o.clientId,
+      offerId: matchedOfferId,
+      href,
+      clientHref,
       clientName: clientNameRaw || 'Klient',
       carrierTypeLabel,
       rawCarrier,
