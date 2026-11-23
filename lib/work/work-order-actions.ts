@@ -124,6 +124,9 @@ export function computeRescheduleUpdate(params: {
     combinedReason,
     planningConstraints: {
       ...prevPc,
+      manualCompleted: false,
+      completedBySheetColor: false,
+      sheetColoredByWriteback: false,
       manualScheduledDateIso: newDateIso,
       sheetScheduledDateAtReschedule: sheetOriginDate,
       manualRescheduledAt: now.toISOString(),

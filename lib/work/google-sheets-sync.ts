@@ -857,12 +857,12 @@ export async function syncGooglePlanToWorkOrders(
       );
       const nextDateIso = nextScheduledAt.toISOString().slice(0, 10);
       const wasExplicitlyCompletedInSystem =
-        Boolean(prevPc.manualCompleted) ||
-        Boolean(prevPc.sheetColoredByWriteback) ||
-        Boolean(prevPc.manualFtdSent) ||
-        prevPc.lastEmailAction === 'COMPLETED' ||
-        Boolean(prevPc.lastWorkerReportAt) ||
-        Boolean(prevPc.completedViaEmailAt);
+        prevPc.lastEmailAction !== 'RESCHEDULED' &&
+        (Boolean(prevPc.manualCompleted) ||
+          Boolean(prevPc.sheetColoredByWriteback) ||
+          Boolean(prevPc.manualFtdSent) ||
+          prevPc.lastEmailAction === 'COMPLETED' ||
+          Boolean(prevPc.completedViaEmailAt));
 
       const wasOnlyAutoClosedWithoutEvidence =
         existing.status === 'DONE' &&
@@ -1098,13 +1098,13 @@ export async function syncGooglePlanToWorkOrders(
       if (eo.crmOrderId || eo.navigationOrderId) continue;
 
       const wasExplicitlyCompleted =
-        Boolean(pc.completedBySheetColor) ||
-        Boolean(pc.manualCompleted) ||
-        Boolean(pc.sheetColoredByWriteback) ||
-        Boolean(pc.manualFtdSent) ||
-        pc.lastEmailAction === 'COMPLETED' ||
-        Boolean(pc.lastWorkerReportAt) ||
-        Boolean(pc.completedViaEmailAt);
+        pc.lastEmailAction !== 'RESCHEDULED' &&
+        (Boolean(pc.completedBySheetColor) ||
+          Boolean(pc.manualCompleted) ||
+          Boolean(pc.sheetColoredByWriteback) ||
+          Boolean(pc.manualFtdSent) ||
+          pc.lastEmailAction === 'COMPLETED' ||
+          Boolean(pc.completedViaEmailAt));
 
       const eoClientTitle = `${eo.clientName.trim().toLowerCase()}::${eo.title.trim().toLowerCase()}`;
       const isAutoClosedMovedGhost =
